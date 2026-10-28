@@ -1,29 +1,38 @@
 /**
- * The tools a run called, in its thread: each a summary that opens to what it was asked and what
- * it returned. Closed, it says the tool's name, how it is going, and a line of its arguments, or,
- * once it failed or was refused, of why. It follows the run as each call returns.
+ * The tools a run called, in its thread (portalr ADR-0053): each run of them one quiet line that
+ * says what they did, opening to the calls, each to its detail, and that to its raw form.
  */
 
+import { Button as BaseButton } from "@base-ui/react/button";
+import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import type { Artifactr } from "@portalr/client";
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { Button } from "./button";
+import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
+import { backdrop, popup } from "./dialog";
 import { Disclosure } from "./disclosure";
+import { keepTabWithin } from "./full-view";
 import { Icon } from "./icon";
+import { IconButton } from "./icon-button";
 import { glyphs } from "./icons";
 import { useRetrying } from "./on-demand";
 import { ScrollRegion } from "./scroll-region";
+import { SheetHandle, sheet, useSheet } from "./sheet";
+import { RING } from "./states";
 import { StatusBadge, type Tone } from "./status-badge";
+import { callAbout, callLabel, foldSummary } from "./tool-fold";
+import { usePhone } from "./touch";
 import { TYPE } from "./type";
 
 /** How a call is going, as a shape and a word, by the status its run recorded. */
-const STATUS: Record<string, readonly [Tone, string, string]> = {
-  // tone, the badge's word, and what the second part holds
-  called: ["working", "Running", "Result"],
-  ok: ["done", "Done", "Result"],
-  error: ["failed", "Failed", "Error"],
-  retry: ["retrying", "Refused", "Why it was refused"],
+const STATUS: Record<string, readonly [Tone, string, string, string]> = {
+  // tone, the badge's word, what the second part holds, and its name in plain words
+  called: ["working", "Running", "Result", "What it returned"],
+  ok: ["done", "Done", "Result", "What it returned"],
+  error: ["failed", "Failed", "Error", "Why it failed"],
+  retry: ["retrying", "Refused", "Why it was refused", "Why it was refused"],
 };
 
 /** The formatted view of a call's parts (portalr ADR-0083), loaded as a call is first opened. */
@@ -38,12 +47,15 @@ type JsonView = Awaited<ReturnType<typeof loadJsonView>>;
  */
 function Part({
   name,
+  label = name,
   tool,
   text,
   cut,
   view,
 }: {
   name: string;
+  /** What it is called where it is shown, in plain words: "What it was asked". */
+  label?: string;
   tool: string;
   /** The value, as the run recorded it. */
   text: string;
@@ -70,7 +82,7 @@ function Part({
     );
     return (
       <view.Formatted
-        name={name}
+        name={label}
         what={what}
         text={shown}
         cut={cut}
@@ -81,7 +93,7 @@ function Part({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex min-h-7 items-center justify-between gap-2">
-        <span className={TYPE.note}>{name}</span>
+        <span className={TYPE.note}>{label}</span>
         <CopyButton text={shown} what={what} />
       </div>
       {/* As recorded, unescaped: the add-on's escapes would cost the first load bytes it hasn't. */}
@@ -91,21 +103,65 @@ function Part({
   );
 }
 
-/** One call: a summary line that opens to its arguments and what it returned; `open` to start so. */
-export function ToolCall({
-  tool,
-  open = false,
-  index,
-}: {
-  tool: Artifactr.Tool;
-  open?: boolean;
-  /** Its number in a run's ledger of steps (portalr ADR-0081): then a row of the ledger, unboxed. */
-  index?: number;
-}) {
-  const [tone, word, returned] = STATUS[tool.status] ?? ["done", tool.status, "Result"];
-  const failed = tool.status === "error" || tool.status === "retry";
-  const line = failed ? tool.result : tool.args;
-  const step = index !== undefined;
+/** A call's detail, the third level: what it was asked and what it returned, by its tool's id. */
+function CallDetail({ tool, view }: { tool: Artifactr.Tool; view: JsonView | null }) {
+  const [, , returned, plain] = STATUS[tool.status] ?? [
+    "done",
+    tool.status,
+    "Result",
+    "What it returned",
+  ];
+  return (
+    <>
+      <code className="font-mono text-muted text-xs">{tool.name}</code>
+      <Part
+        name="Arguments"
+        label="What it was asked"
+        tool={tool.name}
+        text={tool.args}
+        cut={tool.argsCut}
+        view={view}
+      />
+      {tool.status !== "called" && (
+        <Part
+          name={returned}
+          label={plain}
+          tool={tool.name}
+          text={tool.result}
+          cut={tool.resultCut}
+          view={view}
+        />
+      )}
+    </>
+  );
+}
+
+/** A call's status, as a badge; none for one done, which needs no word. */
+function CallStatus({ tool }: { tool: Artifactr.Tool }) {
+  const [tone, word] = STATUS[tool.status] ?? ["done", tool.status];
+  return tool.status === "ok" ? null : (
+    <StatusBadge tone={tone} className="shrink-0">
+      {word}
+    </StatusBadge>
+  );
+}
+
+/** A call's verb and a line of what it was about: the second level, in plain words. */
+function CallLine({ tool }: { tool: Artifactr.Tool }) {
+  const about = callAbout(tool);
+  return (
+    <span className="flex min-w-0 flex-1 flex-col">
+      <span>{callLabel(tool)}</span>
+      {about && <bdi className="truncate text-muted text-xs">{about}</bdi>}
+    </span>
+  );
+}
+
+/**
+ * One call, the second level: its verb and what it was about, which opens to its detail, the
+ * third, whose parts each turn to their raw form, the fourth; `open` to start so.
+ */
+export function ToolCall({ tool, open = false }: { tool: Artifactr.Tool; open?: boolean }) {
   // The formatted view loads once the call is opened, by the reader or by a find in the page; one
   // that failed to load, as offline, is tried again as the call is opened again.
   const [opened, setOpened] = useState(open);
@@ -116,44 +172,18 @@ export function ToolCall({
         look="block"
         open={opened}
         onOpenChange={setOpened}
-        className={
-          step
-            ? "text-sm"
-            : "rounded-(--tool-call-radius) border border-line bg-surface text-sm data-open:border-edge"
-        }
-        triggerClassName="min-h-10 flex-wrap items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
+        className="text-sm"
+        triggerClassName="min-h-10 items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
         panelClassName="data-open:pt-0"
         summary={
           <>
-            {step ? (
-              <span
-                aria-hidden="true"
-                className="w-4 shrink-0 text-end font-mono text-muted text-xs tabular-nums"
-              >
-                {index}
-              </span>
-            ) : (
-              <Icon icon={glyphs.wrench} className="size-3.5 shrink-0 text-muted" />
-            )}
-            <code className="shrink-0 font-mono">{tool.name}</code>
-            <bdi className="min-w-0 flex-1 truncate font-mono text-muted text-xs">{line}</bdi>
-            <StatusBadge tone={tone} className="shrink-0">
-              {word}
-            </StatusBadge>
+            <CallLine tool={tool} />
+            <CallStatus tool={tool} />
           </>
         }
       >
-        <div className="flex flex-col gap-3 border-line border-t p-3">
-          <Part name="Arguments" tool={tool.name} text={tool.args} cut={tool.argsCut} view={view} />
-          {tool.status !== "called" && (
-            <Part
-              name={returned}
-              tool={tool.name}
-              text={tool.result}
-              cut={tool.resultCut}
-              view={view}
-            />
-          )}
+        <div className="flex flex-col gap-3 px-(--tool-call-pad-x) pb-3">
+          <CallDetail tool={tool} view={view} />
         </div>
       </Disclosure>
     </li>
@@ -171,89 +201,218 @@ export function ToolCalls({ children }: { children: ReactNode }) {
   );
 }
 
-/** How a run's steps are going together: failed if any did, running while one is, else done. */
-function stepsStatus(tools: readonly Artifactr.Tool[], running: boolean): readonly [Tone, string] {
-  if (tools.some((tool) => tool.status === "error" || tool.status === "retry")) {
-    return ["failed", "Failed"];
-  }
-  const called = tools.filter((tool) => tool.status === "called").length;
-  if (running) {
-    // Between one call's answer and the next, the run is still at work.
-    const step =
-      called > 0 ? `Running step ${tools.length - called + 1} of ${tools.length}` : "Working";
-    return ["working", step];
-  }
-  return ["done", "Done"];
+/**
+ * A group of calls on a phone: a sheet titled by what they did, listing the calls (the second
+ * level), each going on to its detail (the third, whose parts turn raw, the fourth); Back returns
+ * to the list, the focus following.
+ */
+function ToolSheet({
+  open,
+  onOpenChange,
+  title,
+  tools,
+  finalFocus,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  tools: readonly (readonly [string, Artifactr.Tool])[];
+  finalFocus: RefObject<HTMLElement | null>;
+}) {
+  const asSheet = useSheet(open, () => onOpenChange(false));
+  const view = useRetrying(loadJsonView, open, open);
+  const [chosen, setChosen] = useState<string | null>(null);
+  // The call last opened, whose row takes the focus back from its detail.
+  const [left, setLeft] = useState<string | null>(null);
+  const tool = tools.find(([call]) => call === chosen)?.[1];
+  const close = (next: boolean) => {
+    if (!next) {
+      setChosen(null);
+      setLeft(null);
+    }
+    onOpenChange(next);
+  };
+  return (
+    <BaseDialog.Root open={open} onOpenChange={close}>
+      <BaseDialog.Portal>
+        <BaseDialog.Backdrop className={backdrop} />
+        <BaseDialog.Popup
+          ref={asSheet}
+          aria-modal="true"
+          onKeyDown={(event) => keepTabWithin(event.currentTarget, event.nativeEvent)}
+          className={`${popup} ${sheet}`}
+          finalFocus={finalFocus}
+        >
+          <SheetHandle />
+          <div className="flex items-center gap-2">
+            {tool ? (
+              <IconButton
+                label="Back to the calls"
+                icon={glyphs.chevronLeft}
+                className="rounded-full bg-wash"
+                // The focus moves with the reader: to Back, and from it to the call's row.
+                autoFocus
+                onClick={() => {
+                  setLeft(chosen);
+                  setChosen(null);
+                }}
+              />
+            ) : (
+              <BaseDialog.Close
+                render={
+                  <IconButton label="Close" icon={glyphs.x} className="rounded-full bg-wash" />
+                }
+              />
+            )}
+            <BaseDialog.Title className={`${TYPE.section} line-clamp-2 min-w-0 flex-1`}>
+              {tool ? callLabel(tool) : title}
+            </BaseDialog.Title>
+          </div>
+          {tool ? (
+            <div key={chosen} className="flex flex-col gap-3 text-sm">
+              <CallDetail tool={tool} view={view} />
+            </div>
+          ) : (
+            <ol aria-label="Tool calls" className="flex flex-col">
+              {tools.map(([call, each]) => (
+                <li key={call} className="border-line border-s ps-2">
+                  <BaseButton
+                    autoFocus={call === left}
+                    onClick={() => setChosen(call)}
+                    className={`flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-(--tool-call-radius) py-2 text-start text-sm ${RING}`}
+                  >
+                    <CallLine tool={each} />
+                    <CallStatus tool={each} />
+                    <Icon
+                      icon={glyphs.chevronRight}
+                      className="size-3.5 shrink-0 text-muted rtl:-scale-x-100"
+                    />
+                  </BaseButton>
+                </li>
+              ))}
+            </ol>
+          )}
+        </BaseDialog.Popup>
+      </BaseDialog.Portal>
+    </BaseDialog.Root>
+  );
 }
 
+/** Where motion is welcome and colours are the page's own: a running group's words shimmer. */
+const SHIMMERS = "(prefers-reduced-motion: no-preference) and (forced-colors: none)";
+
 /**
- * A run's calls as one group (portalr ADR-0080): a summary that says how many steps and how
- * they are going, open while the run is, with the newest step open too, and folded once it is
- * done, so a run of eight calls is one line of the thread until it is wanted. One call is its
- * own row, as before.
+ * A light passing over a running group's words, drawn here rather than in the stylesheet every
+ * page loads: their colour a gradient clipped to the text, moved across them. Purely visual.
  */
-export function RunSteps({
-  tools,
-  running,
-}: {
-  tools: readonly (readonly [string, Artifactr.Tool])[];
-  running: boolean;
-}) {
-  // Open while the run is, and folded as it ends; opened or closed by the reader meanwhile.
-  const [open, setOpen] = useState(running);
-  const [wasRunning, setWasRunning] = useState(running);
-  if (wasRunning !== running) {
-    setWasRunning(running);
-    setOpen(running);
+function useShimmer(running: boolean) {
+  const words = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    const element = words.current;
+    if (!running || element === null || !matchMedia(SHIMMERS).matches) {
+      return;
+    }
+    Object.assign(element.style, {
+      backgroundImage: "linear-gradient(90deg, var(--muted) 40%, var(--fg), var(--muted) 60%)",
+      backgroundSize: "300%",
+      backgroundClip: "text",
+      color: "transparent",
+    });
+    const moving = element.animate([{ backgroundPosition: "100%" }, { backgroundPosition: "0%" }], {
+      duration: 2000,
+      iterations: Number.POSITIVE_INFINITY,
+    });
+    return () => {
+      moving.cancel();
+      element.removeAttribute("style");
+    };
+  }, [running]);
+  return words;
+}
+
+/** Which groups the reader unfurled, by their first call, for the page's life: never stored. */
+const opened = new Map<string, boolean>();
+
+/**
+ * A run's calls in a row as one quiet line (portalr ADR-0055): what they did, in plain words,
+ * the first level, shimmering while a call runs, with how many failed, and a caret. It opens,
+ * when tapped, to the calls (the second level): beneath it on a desktop, in a sheet on a phone,
+ * where the list goes on to a call's detail. Closed until the reader opens it, as calls arrive.
+ */
+export function RunSteps({ tools }: { tools: readonly (readonly [string, Artifactr.Tool])[] }) {
+  const key = tools[0]?.[0] ?? "";
+  const phone = usePhone();
+  // A sheet is never opened again by itself, as the thread is shown again: only an unfurl is.
+  const [open, setOpenState] = useState(() => !phone && (opened.get(key) ?? false));
+  const setOpen = (next: boolean) => {
+    if (!phone) opened.set(key, next);
+    setOpenState(next);
+  };
+  const button = useRef<HTMLButtonElement>(null);
+  const panel = useId();
+  const calls = tools.map(([, tool]) => tool);
+  const { label, failed, running } = foldSummary(calls);
+  const words = useShimmer(running);
+  // Said once, as a group that was running ends: never as each call does.
+  const [ran, setRan] = useState(running);
+  const [ended, setEnded] = useState(false);
+  if (ran !== running) {
+    setRan(running);
+    setEnded(!running);
   }
-  if (tools.length === 1) {
-    return (
-      <ToolCalls>
-        <ToolCall tool={(tools[0] as [string, Artifactr.Tool])[1]} />
-      </ToolCalls>
-    );
-  }
-  const [tone, word] = stepsStatus(
-    tools.map(([, tool]) => tool),
-    running,
-  );
-  const latest = tools.at(-1)?.[1];
+  const marker = failed > 0 ? ` · ${failed} failed` : "";
+  const count = `${tools.length} tool call${tools.length === 1 ? "" : "s"}`;
   return (
-    <li>
-      <Disclosure
-        look="block"
-        name={`${tools.length} steps`}
-        open={open}
-        onOpenChange={setOpen}
-        className="rounded-(--tool-call-radius) border border-line bg-surface text-sm data-open:border-edge"
-        triggerClassName="min-h-10 flex-wrap items-center rounded-(--tool-call-radius) px-(--tool-call-pad-x) py-(--tool-call-pad-y) hover:bg-transparent"
-        panelClassName="data-open:pt-0"
-        summary={
-          <>
-            <Icon icon={glyphs.terminal} className="size-3.5 shrink-0 text-muted" />
-            <span className="shrink-0 font-semibold">{tools.length} steps</span>
-            {latest && (
-              <code className="min-w-0 flex-1 truncate font-mono text-muted text-xs">
-                {latest.name}
-              </code>
-            )}
-            <StatusBadge tone={tone} live={running} className="shrink-0">
-              {word}
-            </StatusBadge>
-          </>
-        }
+    <li className="flex flex-col">
+      <BaseButton
+        ref={button}
+        aria-expanded={open}
+        {...(phone ? { "aria-haspopup": "dialog" as const } : { "aria-controls": panel })}
+        aria-label={`${label}${marker}: ${count}`}
+        onClick={() => setOpen(!open)}
+        className={cn(
+          "flex min-h-(--disclosure-target) max-w-full cursor-pointer items-center gap-1.5 self-start rounded-(--disclosure-radius) text-muted text-xs hover:text-fg phone:min-h-11",
+          RING,
+        )}
       >
-        <ol aria-label="Steps" className="flex flex-col border-line border-t py-1">
-          {tools.map(([call, tool], at) => (
-            <ToolCall
-              key={call}
-              tool={tool}
-              index={at + 1}
-              open={running && at === tools.length - 1}
-            />
+        <Icon icon={glyphs.wrench} className="size-3.5 shrink-0" />
+        <span ref={words} className="min-w-0 truncate">
+          {label}
+        </span>
+        {failed > 0 && (
+          <span className="flex shrink-0 items-center gap-1 text-danger">
+            <Icon icon={glyphs.circleAlert} className="size-3.5" />
+            {failed} failed
+          </span>
+        )}
+        <Icon
+          icon={glyphs.chevronRight}
+          className={`size-3.5 shrink-0 transition-transform duration-(--disclosure-duration) motion-reduce:transition-none rtl:-scale-x-100 ${open && !phone ? "rotate-90" : ""}`}
+        />
+      </BaseButton>
+      <span role="status" className="sr-only">
+        {ended ? `${label}${marker}` : ""}
+      </span>
+      {!phone && open && (
+        <ol
+          id={panel}
+          aria-label="Tool calls"
+          className="ms-1.5 flex flex-col border-line border-s ps-2"
+        >
+          {tools.map(([call, tool]) => (
+            <ToolCall key={call} tool={tool} />
           ))}
         </ol>
-      </Disclosure>
+      )}
+      {phone && (
+        <ToolSheet
+          open={open}
+          onOpenChange={setOpen}
+          title={`${label}${marker}`}
+          tools={tools}
+          finalFocus={button}
+        />
+      )}
     </li>
   );
 }

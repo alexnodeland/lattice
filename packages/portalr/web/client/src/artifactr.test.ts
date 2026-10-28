@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { apply, applyLive, applyWelcome, artifactr, CAP, type Workspace } from "./artifactr";
 import type * as v1 from "./generated/artifactr.v1";
+import { fellBack } from "./models";
 
 function envelope(event: Record<string, unknown>, seq: number): v1.EventFrame {
   return {
@@ -1080,4 +1081,86 @@ test("a resumed run counts afresh: its first request's total takes the place of 
     requests: 1,
     input_tokens: 40,
   });
+});
+
+test("a message keeps the model it asked for, and a run the one it answers with", () => {
+  const state = replay(
+    { type: "message_posted", thread_id: "thr_1", message_id: "m1", content: "Hi", model: "deep" },
+    {
+      type: "run_started",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      message_ids: ["m1"],
+      model: "deep",
+    },
+  );
+  expect(state.threads.thr_1?.messages[0]?.model).toBe("deep");
+  expect(state.runs.run_1).toMatchObject({ model: "deep", asked: "deep" });
+  expect(state.runs.run_1 && fellBack(state.runs.run_1)).toBeNull();
+});
+
+test("a run that answers with the default where its message asked for another fell back", () => {
+  const state = replay(
+    { type: "message_posted", thread_id: "thr_1", message_id: "m1", content: "Hi", model: "deep" },
+    { type: "run_started", run_id: "run_1", thread_id: "thr_1", message_ids: ["m1"] },
+  );
+  expect(state.runs.run_1?.model).toBeUndefined();
+  expect(state.runs.run_1 && fellBack(state.runs.run_1)).toBe("deep");
+});
+
+test("a message that names no model asks for none, and its run fell back from nothing", () => {
+  const state = replay(
+    { type: "message_posted", thread_id: "thr_1", message_id: "m1", content: "Hi" },
+    { type: "run_started", run_id: "run_1", thread_id: "thr_1", message_ids: ["m1"] },
+  );
+  expect(state.threads.thr_1?.messages[0]).not.toHaveProperty("model");
+  expect(state.runs.run_1 && fellBack(state.runs.run_1)).toBeNull();
+});
+
+test("a resumed run is judged by the reply that resumed it, not its first message", () => {
+  const first = [
+    { type: "message_posted", thread_id: "thr_1", message_id: "m1", content: "Hi", model: "deep" },
+    {
+      type: "run_started",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      message_ids: ["m1"],
+      model: "deep",
+    },
+    { type: "run_paused", run_id: "run_1", thread_id: "thr_1", requests: [] },
+  ];
+  // The reply names another model, which the runner takes: nothing fell back.
+  const answered = replay(
+    ...first,
+    { type: "message_posted", thread_id: "thr_1", message_id: "m2", content: "Go", model: "fast" },
+    {
+      type: "run_started",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      message_ids: ["m2"],
+      model: "fast",
+    },
+  );
+  expect(answered.runs.run_1?.prompt).toEqual(["m1"]);
+  expect(answered.runs.run_1 && fellBack(answered.runs.run_1)).toBeNull();
+  // A reply that names none keeps the run's model, and asked for nothing.
+  const kept = replay(
+    ...first,
+    { type: "message_posted", thread_id: "thr_1", message_id: "m2", content: "Go" },
+    {
+      type: "run_started",
+      run_id: "run_1",
+      thread_id: "thr_1",
+      message_ids: ["m2"],
+      model: "deep",
+    },
+  );
+  expect(kept.runs.run_1 && fellBack(kept.runs.run_1)).toBeNull();
+  // A reply whose model the runner refused fell back, and says so.
+  const refused = replay(
+    ...first,
+    { type: "message_posted", thread_id: "thr_1", message_id: "m2", content: "Go", model: "here" },
+    { type: "run_started", run_id: "run_1", thread_id: "thr_1", message_ids: ["m2"] },
+  );
+  expect(refused.runs.run_1 && fellBack(refused.runs.run_1)).toBe("here");
 });

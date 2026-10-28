@@ -97,6 +97,7 @@ nav:
   - adr/0083-a-turn-shows-its-progress-phase-thinking-and-an-estimated-count.md
   - adr/0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md
   - adr/0085-polish-one-shape-per-part-and-what-is-folded.md
+  - adr/0086-the-composer-chooses-the-model-of-the-next-turn.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

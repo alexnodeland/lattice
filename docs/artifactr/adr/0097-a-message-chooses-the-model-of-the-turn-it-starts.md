@@ -67,4 +67,4 @@ Rejected: pydantic-ai runs a turn with one model; switching would stop and resta
 
 1. [x] `PostMessage.model`, `MessagePosted.model`, `RunStarted.model`, `Run.model` and `Access.model`; the schemas and the client's types regenerated
 2. [x] `Runner(model_for=...)`, the turn's model, `artifactr:use_model` in artifactr's catalog and grantr's `editor`, and the notices
-3. [ ] The host's listing of the models a tenant may use, the composer's picker and stackr's factory (the streaming design's phase D2)
+3. [x] The host's listing of the models a tenant may use, the composer's picker and stackr's factory (the streaming design's phase D2): portalr [ADR-0086](../../portalr/adr/0086-the-composer-chooses-the-model-of-the-next-turn.md)

@@ -37,6 +37,9 @@ from portalr.analytics.sql import SqlConsent, SqlReplayConsent
 from portalr.analytics.sql import migrate as migrate_consent
 from portalr.fastapi import UI, Place, SandboxOrigin, Site, {% if use_tracker %}Surfaces, {% endif %}beside, portalr_router
 from portalr.invites import Invite, InviteFailed, SupabaseInvite
+{%- if use_artifactr %}
+from portalr.models import OfferedModel
+{%- endif %}
 from portalr.people import People, SupabasePeople
 from portalr.readers import (
     Analytics,
@@ -52,6 +55,9 @@ from portalr.readers import (
 
 from {{ package_name }}.access import Access
 from {{ package_name }}.database import Database
+{%- if use_artifactr %}
+from {{ package_name }}.gateway import Models
+{%- endif %}
 from {{ package_name }}.settings import Settings
 
 PREFIX = "/portalr"
@@ -241,12 +247,27 @@ class Portal:
     Args:
         access: grantr in the application, which says who the caller is and what they may do.
         settings: The settings; the portal's are ``settings.portal``.
+        database: The database, where consent is kept; without one, it is kept in memory.
+{%- if use_artifactr %}
+        models: The models a message may name, which the composer lists as each workspace's
+            ``models:allowed`` allows, as the runner's check reads it.
+{%- endif %}
     """
 
     def __init__(
-        self, *, access: Access, settings: Settings, database: Database | None = None
+        self,
+        *,
+        access: Access,
+        settings: Settings,
+        database: Database | None = None,
+{%- if use_artifactr %}
+        models: Models | None = None,
+{%- endif %}
     ) -> None:
         self._access = access
+{%- if use_artifactr %}
+        self._models = models
+{%- endif %}
         self._settings = settings
         self._database = database
         self._relay: Relay | None = None
@@ -256,6 +277,23 @@ class Portal:
     def grants(self) -> Grants:
         """grantr, which the portal asks before every read."""
         return self._access.grants
+{%- if use_artifactr %}
+
+    async def _offered(self, tenant_id: str, workspace_id: str) -> list[OfferedModel]:
+        """The models a workspace allows, as the runner's check reads them, for the picker."""
+        assert self._models is not None, "listed only with models"
+        allowed = await self._models.allowed(self.grants, tenant_id, workspace_id)
+        return [
+            OfferedModel(
+                id=model.id,
+                label=model.label,
+                family=model.family,
+                local=model.local,
+                reasoning=model.reasoning,
+            )
+            for model in allowed
+        ]
+{%- endif %}
 
     @property
     def aliases(self) -> dict[str, Place]:
@@ -419,6 +457,9 @@ class Portal:
             relay=relay,
             invite=invitations(self._settings, self._clients),
             people=people(self._settings, self._clients),
+{%- if use_artifactr %}
+            models=self._offered if self._models else None,
+{%- endif %}
             site=site,
             ui=Path(portal.ui_dir) if portal.ui_dir else UI,
         )

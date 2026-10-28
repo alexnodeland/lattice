@@ -1,0 +1,128 @@
+"""The models a message may name: a closed list, which ``models:allowed`` narrows."""
+
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from artifactr import UserActor, new_id
+from artifactr.agent import USE_MODEL
+from artifactr.agent.runner import model_not_allowed, model_unknown
+from artifactr.workspace import Access
+
+from {{ package_name }}.gateway import Models
+from {{ package_name }}.settings import ALWAYS, GatewaySettings, ModelInfo
+
+from conftest import Script, app, bearer, say, settings, wait_for
+
+BASE = "/artifactr/v1/workspaces/main"
+DEEP = ModelInfo(id="deep", label="Deep", family="anthropic", reasoning=True)
+HERE = ModelInfo(id="here", label="On this machine", family="local", local=True)
+ALICE = UserActor(id="alice")
+
+
+def offered(**gateway: Any) -> GatewaySettings:
+    return GatewaySettings(models=(*ALWAYS, DEEP, HERE), **gateway)
+
+
+def use(model: str | None) -> Access:
+    return Access(action=USE_MODEL, thread_id="t1", model=model)
+
+
+def test_a_listed_model_is_built_once_over_the_gateway() -> None:
+    models = Models(offered())
+    deep = models("deep")
+    assert (deep.model_name, deep.system) == ("deep", "litellm")
+    assert models("deep") is deep
+    assert models.local == ("here",)
+
+
+@pytest.mark.parametrize("name", ["gpt-4o", "anthropic/claude", "", "Deep", "../default"])
+def test_any_other_name_is_unknown_and_never_built(name: str) -> None:
+    with pytest.raises(LookupError):
+        Models(offered())(name)
+
+
+def test_a_smoke_tests_mocked_reply_reaches_every_listed_model() -> None:
+    model = Models(offered(mock_response="Hi."))("fast")
+    assert model.settings == {"extra_body": {"mock_response": "Hi."}}
+
+
+async def test_only_default_and_fast_are_allowed_unless_the_operator_offers_more() -> None:
+    models = Models(offered())
+    assert [m.id for m in await models.allowed(models.defaults(), "acme", "main")] == [
+        "default",
+        "fast",
+    ]
+    wider = Models(offered(allowed_models=("default", "fast", "deep")))
+    assert [m.id for m in await wider.allowed(wider.defaults(), "acme", "main")] == [
+        "default",
+        "fast",
+        "deep",
+    ]
+
+
+async def test_a_model_the_workspace_leaves_out_is_refused_where_the_turn_is_checked() -> None:
+    models = Models(offered(allowed_models=("default", "fast", "deep")))
+    check = models.narrowed(None, models.defaults())
+    assert await check("acme", "main", ALICE, use("deep"))
+    assert not await check("acme", "main", ALICE, use("here"))
+    assert not await check("acme", None, ALICE, use("deep")), "a model is chosen in a workspace"
+    # An unlisted name is the runner's to answer as unknown: the list never builds it.
+    assert await check("acme", "main", ALICE, use("gpt-4o"))
+    assert await check("acme", "main", ALICE, Access(action="artifactr:post_message"))
+
+
+async def test_the_narrowing_asks_the_applications_authorize_too() -> None:
+    models = Models(offered())
+    asked: list[Access] = []
+
+    async def refuse(_tenant: str, _workspace: str | None, _actor: object, access: Access) -> bool:
+        asked.append(access)
+        return False
+
+    check = models.narrowed(refuse, models.defaults())
+    assert not await check("acme", "main", ALICE, use("fast"))
+    assert not await check("acme", "main", ALICE, use("deep"))
+    assert asked == [use("fast")], "a model the workspace refuses goes no further"
+
+
+async def test_a_setting_that_isnt_names_is_refused_not_trusted() -> None:
+    class Numbers:
+        async def value(self, _tenant: str, _workspace: str, _key: str, /) -> int:
+            return 3
+
+    models = Models(offered())
+    with pytest.raises(TypeError, match="models:allowed is a subset of names, not int"):
+        await models.allowed(Numbers(), "acme", "main")
+
+
+def command(client: TestClient, **body: Any) -> dict[str, Any]:
+    frame = {"type": "command", "command_id": new_id("cmd"), "command": body}
+    return client.post(f"{BASE}/commands", json=frame).json()
+
+
+def events(client: TestClient, event_type: str) -> list[dict[str, Any]]:
+    return [e for e in client.get(f"{BASE}/events").json() if e["event"]["type"] == event_type]
+
+
+@pytest.mark.parametrize(
+    ("model", "notice"),
+    [("deep", model_not_allowed), ("gpt-4o", model_unknown)],
+    ids=["not allowed", "unlisted"],
+)
+def test_a_message_naming_a_model_it_may_not_use_is_answered_by_the_default_with_a_notice(
+    script: Script, model: str, notice: Any
+) -> None:
+    script.steps += [say("Hello from the default.")]
+    with TestClient(app(script, settings(models=(*ALWAYS, DEEP))), headers=bearer()) as client:
+        command(client, type="create_thread", thread_id="t1")
+        command(client, type="post_message", thread_id="t1", content="Hi", model=model)
+        wait_for(lambda: events(client, "run_ended"))
+        [started] = events(client, "run_started")
+        assert started["event"].get("model") is None, "the default answered"
+        posted = [e["event"] for e in events(client, "message_posted")]
+        [said] = [e for e in posted if e.get("kind") == "notice"]
+        assert said["content"] == notice(model)
+        assert posted[-1]["content"] == "Hello from the default."
+    assert not script.steps, "the scripted default answered: no other model was asked"

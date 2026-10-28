@@ -1,6 +1,6 @@
 # ADR-0085: Polish: one shape per part, and what is folded
 
-**Status:** Accepted, amended by [ADR-0087](0087-a-command-first-layout-a-top-bar-a-palette-a-table-and-a-split-view.md) (the layout pass, the search, the follow-ups)
+**Status:** Accepted, amended by [ADR-0087](0087-a-command-first-layout-a-top-bar-a-palette-a-table-and-a-split-view.md) (the layout pass, the search, the follow-ups; on a phone the agent's mode leaves the composer's row for its Add sheet, and is named Auto or Ask)
 **Date:** 2026-10-27
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the rhythm, the mark in the frame), [ADR-0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md) (counts in mono, a table's head on the wash, an alert's edge), [ADR-0082](0082-sheets-the-thumb-bar-and-a-phone-s-tables.md) (a phone's bar), [ADR-0083](0083-a-turn-shows-its-progress-phase-thinking-and-an-estimated-count.md) (the strip's tokens)
@@ -26,7 +26,7 @@ Nine rules, held by the kit's components so every page has them:
 And the owner's decisions on the audit's questions:
 
 - **A workspace's home** is a row per workspace, its name opening its threads, with the track of its five areas.
-- **The agent's mode** is a small toggle, "Edits" and "Proposes", a radio group named "Agent mode", in the composer's row beside Attach and Send; the `set_thread_mode` command is unchanged. The thread's header keeps the title and the actions' icon button.
+- **The agent's mode** (named Auto and Ask since, and on a phone moved to the composer's Add sheet, by [ADR-0087](0087-a-command-first-layout-a-top-bar-a-palette-a-table-and-a-split-view.md)) is a small toggle, "Edits" and "Proposes", a radio group named "Agent mode", in the composer's row beside Attach and Send; the `set_thread_mode` command is unchanged. The thread's header keeps the title and the actions' icon button.
 - **The mark.** A phone's bar has none: the menu's glyph, the switcher and the account (the drawer holds the way home). The rail and the drawer set portalr's lockup in the violet alone (`Lockup mono`); signing in keeps its inks. A deployment's own mark is untouched.
 - **Thumbs on runs** as above: on hover or focus with a pointer, in the row's menu on a phone.
 - **Tokens** are behind a disclosure for everyone: the strip says its status, phase, elapsed time and Stop; "Tokens" opens the chips.

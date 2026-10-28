@@ -1,6 +1,6 @@
 # ADR-0012: An app for each native type, and no format changed by a check-in
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0019](0019-the-agent-creates-native-files.md)
 **Date:** 2026-10-18
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0006](0006-the-agents-tools-behind-each-apps-switch.md), whose `key_of` claimed every native file for one app, and [ADR-0007](0007-check-out-over-http-and-the-editor-on-its-own-origin.md), whose check-in took any bytes as the format checked out

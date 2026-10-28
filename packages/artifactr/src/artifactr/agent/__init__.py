@@ -41,6 +41,7 @@ from artifactr.agent.tools import (
     artifact_text,
     artifact_tools,
     describe_outcome,
+    follow,
     list_artifacts_text,
     submit,
 )
@@ -74,6 +75,7 @@ __all__ = [
     "artifact_text",
     "artifact_tools",
     "describe_outcome",
+    "follow",
     "forward_live",
     "function_model",
     "is_local_model",

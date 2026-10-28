@@ -1,6 +1,6 @@
 # ADR-0017: A person's upload, told by its bytes, read by the app before it is committed, and held to quotas
 
-**Status:** Accepted, amended by [ADR-0018](0018-a-page-takes-a-reading-is-kept-and-is-paced.md)
+**Status:** Accepted, amended by [ADR-0018](0018-a-page-takes-a-reading-is-kept-and-is-paced.md) and [ADR-0019](0019-the-agent-creates-native-files.md)
 **Date:** 2026-10-21
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0007](0007-check-out-over-http-and-the-editor-on-its-own-origin.md), whose routes made no new file

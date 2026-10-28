@@ -2,7 +2,7 @@
 
 import pytest
 
-from artifactr.files.fastapi.pace import KEPT, Gauge, Pace
+from artifactr.files.native.pace import KEPT, Gauge, Pace
 
 
 class Clock:

@@ -67,6 +67,16 @@ The bytes are put first, the app reads their outline, text, review and fingerpri
 
 Without `media_type`, as for a person's upload, the format is told by the first bytes, never by what a client says: of the type's formats, the one whose signature they match (`FORMATS`), else `AppFailed("refused")` before anything is stored. Either way the name keeps no path or control character and takes the format's extension. Give an `artifact_id` to make a retry safe: an upload whose file with that id is already these bytes commits nothing and returns None. The app reads the file before anything is stored, and the file and what was read from it are then put together (`Blobs.put_all`), so a refused upload holds nothing against a quota. `NativeFiles(readings=2)`, the default, lets each tenant have two files read by the app at once, refusing a third with `Busy` ([ADR-0017](../adr/0017-a-persons-upload-told-by-its-bytes-read-before-it-is-committed.md)).
 
+## Creating a blank file
+
+```python
+outcome = await files.create(ws, WordDocument, "Travel plan", thread_id=thread_id)
+```
+
+The app makes an empty file of the type, `apply(None, [])`, in one of the tenant's readings, and it is stored and committed as an upload is, held to the quotas, under a new id. Its format is the one the app names, or the type's only one, and its provenance's source is `blank`, naming the agent and run that asked when it is committed for one. Give an `artifact_id` to make a retry safe: a file of the type already there with that id makes nothing, before the app is called or the pace spent, and returns None. `create` asks `authorize` for `artifactr:create_native_file` and `artifactr:create_artifact` as the handle's actor before anything else. An agent's run commits the file as the person it acts for, so it is applied, not proposed; its edits of it then follow the type's write policy. A run for no one, or for a person's client, commits it under the policy.
+
+`NativeFiles(pace=Pace(20), gauge=Gauge(8, tenant=4, each=2))` holds each person to a pace of files a minute and this process to so many at once, refusing another with `Paced`; `files_router` then uses them for uploads and check-ins too, in place of its own, so an agent's files and a person's count together. Without them, `create` is held only to the readings ([ADR-0019](../adr/0019-the-agent-creates-native-files.md)).
+
 ## A person's check-out and check-in
 
 ```python
@@ -324,13 +334,14 @@ The agent sees a native file's name, pages and outline through artifactr's own `
 
 | Tool | What it does |
 |---|---|
+| `create_native_file(type, title)` | A blank file of one of the types listed, those whose app is on in the workspace, as `files.create` makes it |
 | `read_native(artifact_id, start)` | The file's words, 8,000 characters a call, saying where to read on |
 | `read_review(artifact_id, start)` | Its comments and tracked changes, 50 a call, as the app gives them, with their ids |
 | `find_commands(artifact_id, query)` | The commands of the file's app that mention a word, ten at most |
 | `edit_native(artifact_id, base_version, commands, summary)` | One batch of the app's commands, as `files.edit` runs it |
 | `view_page(artifact_id, page)` | One rendered page, as an image: only with `native_file_tools(files, view=True)` |
 
-They are offered only while the app is on in the run's workspace. Under `WordDocument`'s `propose` policy, an agent's edit is a proposal. If a person has the file checked out, `edit_native` tells the agent who, and until when, and the agent plans again once it is checked in, rather than retrying; another agent's edit, holding it for seconds, is retried, and a stale `base_version` asks it to read the file again.
+They are offered only while the app is on in the run's workspace. `create_native_file` lists the types whose app is on there, each with its extensions and what it is called, such as `- word_document (.docx): a Word document`, and answers `Created <id>: ... Edit it with edit_native.`, following the file. The file's id comes from the run and the call, so a retried call makes one file, and a run creates ten at most (`native_file_tools(files, creates=10)`); a refusal, such as a pace passed, a quota or a craft that can't make a blank file, is told in a sentence. Under `WordDocument`'s `propose` policy, the agent's edit is a proposal, of a file it created too. If a person has the file checked out, `edit_native` tells the agent who, and until when, and the agent plans again once it is checked in, rather than retrying; another agent's edit, holding it for seconds, is retried, and a stale `base_version` asks it to read the file again.
 
 ## Check-out and check-in over HTTP
 

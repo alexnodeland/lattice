@@ -4,9 +4,13 @@ The toolset is offered only while an app's integration is on in the run's worksp
 a step, so a model in a workspace where every app is off never sees it; `NativeFiles` refuses a
 file whose app is off, whatever calls it. A rejection is raised as it is, for artifactr's
 capability to turn into a retry, except a person's check-out: the agent is told who has the
-file and plans again after the check-in, rather than retrying at once.
+file and plans again after the check-in, rather than retrying at once. `create_native_file`
+answers every refusal in a sentence instead, since none is fixed by calling it again at once.
 """
 
+import copy
+import dataclasses
+import hashlib
 import json
 from collections.abc import Sequence
 from typing import Annotated, Any, Final
@@ -21,11 +25,23 @@ from pydantic_ai import (
     ToolDefinition,
 )
 
-from artifactr.agent import Session, describe_outcome
+from artifactr.agent import Session, describe_outcome, follow
+from artifactr.core import (
+    AlreadyExists,
+    ArtifactId,
+    Forbidden,
+    NotEnabled,
+    Proposed,
+    ValidationFailed,
+    artifact_types,
+    new_artifact_id,
+)
 from artifactr.files.app import AppCommand, AppFailed
+from artifactr.files.blobs import OverQuota, TooLarge
 from artifactr.files.manifest import NativeFile
-from artifactr.files.native import NativeFiles
-from artifactr.workspace import ArtifactBusy
+from artifactr.files.native import Busy, NativeFiles, Paced
+from artifactr.telemetry import annotate, attribution, outcome_attributes
+from artifactr.workspace import ArtifactBusy, Workspace
 
 TEXT_CHARS: Final = 8_000
 """The most of a file's words one `read_native` returns."""
@@ -36,18 +52,103 @@ REVIEW_ITEMS: Final = 50
 CHECKOUT: Final = "checkout:"
 """How a person's check-out's lease holder starts: `checkout:<id>:<participant>`."""
 
+CREATES_PER_RUN: Final = 10
+"""How many files one run segment may create, past which `create_native_file` refuses: so a
+looping or misled agent never spends the whole of its person's pace or quota."""
+
 Start = Annotated[int, Field(ge=0)]
 
 
-def native_file_tools(files: NativeFiles, *, view: bool = False) -> AbstractToolset[Session[Any]]:
+def native_file_tools(
+    files: NativeFiles, *, view: bool = False, creates: int = CREATES_PER_RUN
+) -> AbstractToolset[Session[Any]]:
     """Build the toolset for native files, through `files` and its app.
 
     Args:
         files: The native files, and the app that reads and edits them.
         view: Whether to offer `view_page`, which shows the model one rendered page: off by
             default, since a page is an image's worth of tokens.
+        creates: How many files one run segment may create: ten by default.
     """
     toolset = FunctionToolset[Session[Any]]()
+
+    async def creatable(ws: Workspace) -> dict[str, type[NativeFile]]:
+        """The native types whose app is on in the workspace, by kind."""
+        return {kind: t for kind, t in _native_types().items() if await files.enabled(ws, t)}
+
+    async def listed(ctx: RunContext[Session[Any]], tool: ToolDefinition) -> ToolDefinition:
+        """`create_native_file`, offering the types the run's workspace may create."""
+        types = await creatable(ctx.deps.workspace)
+        lines = "\n".join(
+            f"- {kind} ({', '.join(files.extensions(t))}): {_noun(t)}" for kind, t in types.items()
+        )
+        schema = copy.deepcopy(tool.parameters_json_schema)
+        schema["properties"]["type"]["enum"] = list(types)
+        return dataclasses.replace(
+            tool,
+            description=f"{tool.description}\n\nThe types you may create here:\n{lines}",
+            parameters_json_schema=schema,
+        )
+
+    @toolset.tool(prepare=listed)
+    async def create_native_file(ctx: RunContext[Session[Any]], type: str, title: str) -> str:
+        """Create an empty native file of a type, named by its title, to edit with `edit_native`.
+
+        It is made at once, by the type's app; find its commands with `find_commands`, then
+        write it with `edit_native` from version 1. You are told when others change it.
+
+        Args:
+            type: The type of file, one of those listed.
+            title: The file's name, such as "Travel plan"; its extension is added.
+        """
+        session = ctx.deps
+        ws = session.workspace
+        file_type = (await creatable(ws)).get(type)
+        if file_type is None:
+            return f"{type!r} can't be created in this workspace: create one of the types listed."
+        # The call's own id, so a call retried after it succeeded makes one file.
+        artifact_id = _call_id(session.run_id, ctx.tool_call_id)
+        fresh = artifact_id not in session.made
+        if fresh and len(session.made) >= creates:
+            return f"You have created {creates} files in this run: create no more until asked."
+        session.made.add(artifact_id)  # before the commit, which the run's watcher then skips
+        annotate(
+            attribution(
+                tenant_id=ws.tenant_id,
+                workspace_id=ws.workspace_id,
+                thread_id=session.thread_id,
+                run_id=session.run_id,
+                actor=ws.actor,
+            )
+        )
+        try:
+            try:
+                outcome = await files.create(
+                    ws, file_type, title, artifact_id=artifact_id, thread_id=session.thread_id
+                )
+            except BaseException:
+                if fresh:  # nothing made: the run's count of files isn't spent
+                    session.made.discard(artifact_id)
+                raise
+        except (Forbidden, NotEnabled) as refused:
+            return f"You may not create {_noun(file_type)} here: {refused}."
+        except (Paced, Busy, OverQuota, TooLarge, ValidationFailed, AlreadyExists) as refused:
+            noun = _noun(file_type)
+            return f"{noun[0].upper()}{noun[1:]} wasn't created: {refused}."
+        except AppFailed as failed:
+            if failed.failure == "refused":
+                return f"The app can't make {_noun(file_type)} from nothing: {failed}."
+            return f"The app that makes {_noun(file_type)} is unavailable now: {failed}."
+        if outcome is not None:  # None: made by this call before, and retried
+            annotate(outcome_attributes(outcome))
+        if isinstance(outcome, Proposed):
+            return describe_outcome(outcome)
+        await follow(ctx, artifact_id)
+        head = await ws.get(NativeFile, artifact_id)
+        return (
+            f"Created {artifact_id}: {_noun(file_type)} named {head.data.name}, at version "
+            f"{head.version}. Edit it with edit_native."
+        )
 
     @toolset.tool
     async def read_native(ctx: RunContext[Session[Any]], artifact_id: str, start: Start = 0) -> str:
@@ -165,6 +266,29 @@ def native_file_tools(files: NativeFiles, *, view: bool = False) -> AbstractTool
         return tools if await files.enabled(ctx.deps.workspace) else []
 
     return toolset.prepared(offered)
+
+
+def _call_id(run_id: str, tool_call_id: str | None) -> ArtifactId:
+    """The id of the file a tool call creates: the same for the same call, retried.
+
+    A call without an id, which a model's provider may send, gets a new one: it can't be told
+    from another call, so it is never taken for a retry.
+    """
+    if tool_call_id is None:
+        return new_artifact_id()
+    digest = hashlib.sha256(f"{run_id}:{tool_call_id}".encode()).hexdigest()
+    return f"art_{digest[:16]}"
+
+
+def _native_types() -> dict[str, type[NativeFile]]:
+    """Every native type registered, by kind, in order."""
+    found = artifact_types()
+    return {kind: t for kind in sorted(found) if issubclass(t := found[kind], NativeFile)}
+
+
+def _noun(file_type: type[NativeFile]) -> str:
+    """What a native type's file is called, such as `a Word document`."""
+    return file_type.noun or f"a {file_type.kind.replace('_', ' ')}"
 
 
 def _items(review: dict[str, JsonValue]) -> Sequence[JsonValue]:

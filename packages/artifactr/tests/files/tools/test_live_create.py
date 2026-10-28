@@ -65,11 +65,24 @@ FIRST: Final[dict[str, AppCommand]] = {
 
 ALICE = UserActor(id="alice", name="Alice")
 
-pytestmark = pytest.mark.timeout(600)
+NIGHTLY: Final = Path(__file__).parents[5] / ".github" / "workflows" / "nightly.yml"
+
+UNRENDERED: Final = {"figcraft": "the current page is empty: nothing to render"}
+"""Apps whose blank file has a page they refuse to render, and how (lattice#1087): seen on
+FigCraft 0.6.0's macOS CLI. Once a fix renders it, or Linux's CLI does, the test fails, and the
+app comes out of here."""
+
+# Each call to the app has NativeFiles' default deadline, 30 seconds: a create, an edit, a render.
+pytestmark = pytest.mark.timeout(180)
 
 
 def test_every_app_the_template_wires_has_a_first_edit() -> None:
     assert set(FIRST) == set(WIRED), "a new app needs its first edit here"
+
+
+def test_nightly_runs_each_app_the_template_wires() -> None:
+    jobs = yaml.safe_load(NIGHTLY.read_text())["jobs"]
+    assert set(WIRED) <= set(jobs["fidelity"]["strategy"]["matrix"]["app"])
 
 
 def _worker(app: str) -> Worker:
@@ -105,15 +118,7 @@ def _edit(app: str) -> Callable[[list[ModelMessage]], ModelResponse]:
     return step
 
 
-def _marks(app: str) -> list[pytest.MarkDecorator]:
-    marks = [pytest.mark.craft(app)]
-    if app == "figcraft":
-        unrendered = "a blank design's one page can't be rendered (lattice#1087)"
-        marks.append(pytest.mark.xfail(raises=AppFailed, strict=True, reason=unrendered))
-    return marks
-
-
-@pytest.mark.parametrize("app", [pytest.param(a, marks=_marks(a)) for a in WIRED])
+@pytest.mark.parametrize("app", [pytest.param(a, marks=pytest.mark.craft(a)) for a in WIRED])
 async def test_a_blank_file_is_created_opens_and_its_first_edit_is_proposed(app: str) -> None:
     file_type = WIRED[app]
     worker = _worker(app)
@@ -154,7 +159,12 @@ async def test_a_blank_file_is_created_opens_and_its_first_edit_is_proposed(app:
         assert (await ws.get(NativeFile, file.id)).version == 1, "the edit waits for review"
         # Its first page, as a person's preview asks for it, if the blank file has one.
         if CRAFTS[app].render and made.data.pages:
-            png = await files.render(ws, file.id, 1)
-            assert png.startswith(b"\x89PNG\r\n\x1a\n")
+            if app in UNRENDERED:
+                with pytest.raises(AppFailed, match=UNRENDERED[app]) as refused:
+                    await files.render(ws, file.id, 1)
+                assert refused.value.failure == "refused"
+            else:
+                png = await files.render(ws, file.id, 1)
+                assert png.startswith(b"\x89PNG\r\n\x1a\n")
     finally:
         await worker.aclose()

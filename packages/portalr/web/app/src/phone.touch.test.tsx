@@ -13,7 +13,7 @@ import { APPROVAL, serve as notes, STEPPED, WORLD } from "./test/notes";
 import { wider } from "./test/overflow";
 import * as rules from "./test/rules";
 
-/** Files may be attached: a kind offered, so the composer has its Attach. */
+/** Files may be attached: a kind offered, so the composer can add them. */
 const OFFERED = {
   allowed: true,
   limit: 1000,
@@ -184,32 +184,41 @@ for (const [width, height] of [
   [390, 844],
   [430, 932],
 ] as const) {
-  test(`at ${width}px the composer's row, bar and all, keeps the agent's mode on one line, and from 375px the dock at most a quarter of the window`, async () => {
+  test(`at ${width}px the composer's footer is one line of + and the primary action, and the dock at most a quarter of the window`, async () => {
     await page.viewport(width, height);
     const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
     await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
     await expect.poll(() => bar()?.textContent).toContain("Answer");
     const tall = await settled();
-    // The agent's mode keeps its two options on one line at every width (portalr ADR-0087).
-    const mode = screen.getByRole("radiogroup", { name: "Agent mode" }).element();
-    const options = [...mode.querySelectorAll("[role=radio]")].map(
-      (o) => o.getBoundingClientRect().top,
+    // One footer (portalr ADR-0087): "+" at its start, and, while nothing is written, the thumb
+    // bar's Answer where Send would be; every control a finger's 44px, on one line.
+    const shown = [...dock().querySelectorAll("form button")].filter((b) =>
+      (b as HTMLElement).checkVisibility(),
     );
-    expect(new Set(options).size).toBe(1);
-    // From the common small phone (375 by 667) up the row is one line and the dock at most a
-    // quarter of the window; narrower, the thumb bar's Answer takes a second line.
+    expect(shown.map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim())).toEqual([
+      "Add",
+      "Answer",
+    ]);
+    expect(new Set(shown.map((b) => Math.round(b.getBoundingClientRect().top))).size).toBe(1);
+    for (const b of shown) {
+      expect(b.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+    }
+    // Written, Send is back.
+    await screen.getByRole("textbox", { name: "Message" }).fill("hello");
+    await expect.element(screen.getByRole("button", { name: "Send" })).toBeVisible();
+    await screen.getByRole("textbox", { name: "Message" }).fill("");
     if (width >= 375) {
       expect(tall).toBeLessThanOrEqual(window.innerHeight / 4);
     }
   });
 }
 
-test("the account menu, the thread's menu and the attach panel open as sheets, and the page is never wider", async () => {
+test("the account menu, the thread's menu and the Add sheet open as sheets, and the page is never wider", async () => {
   await page.viewport(390, 844);
   const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
   await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
   for (const [name, role] of [
-    [/^Attach/, "dialog"],
+    [/^Add$/, "dialog"],
     ["Account: Signed in", "menu"],
     ["Thread actions", "menu"],
   ] as const) {
@@ -226,16 +235,15 @@ test("the account menu, the thread's menu and the attach panel open as sheets, a
   }
 });
 
-test("the attach panel is modal on a phone: a scrim, the focus kept in, and a Done to leave by", async () => {
+test("the Add sheet is modal on a phone: a scrim, the focus kept in, and a Close to leave by", async () => {
   await page.viewport(390, 844);
   const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
   await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
-  await screen.getByRole("button", { name: /^Attach/ }).click();
-  const panel = screen.getByRole("dialog");
+  await screen.getByRole("button", { name: "Add", exact: true }).click();
+  const panel = screen.getByRole("dialog", { name: "Add" });
   await expect.element(panel).toBeVisible();
   expect(panel.element().getAttribute("aria-modal")).toBe("true");
-  await expect.element(screen.getByRole("button", { name: "Done" })).toBeVisible();
-  await screen.getByRole("button", { name: "Done" }).click();
+  await panel.getByRole("button", { name: "Close" }).click();
   await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
 });
 

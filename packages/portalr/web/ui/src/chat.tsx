@@ -735,6 +735,7 @@ export function Composer({
         </span>
         <Button
           type="submit"
+          data-send=""
           className="ml-auto"
           disabled={disabled || !text.trim()}
           pending={pending}
@@ -1261,8 +1262,8 @@ export function ModeSwitch({
 }
 
 const MODES: readonly Segment<Artifactr.Thread["mode"]>[] = [
-  { value: "edit", label: "Edits" },
-  { value: "suggest", label: "Proposes" },
+  { value: "edit", label: "Auto" },
+  { value: "suggest", label: "Ask" },
 ];
 
 /** How a run is going, announced as it changes. */

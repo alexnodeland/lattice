@@ -53,6 +53,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { author, unnamedPeople } from "../../../../../../../author";
+import { ComposerFooter } from "../../../../../../../composer-footer";
 import { usePosting } from "../../../../../../../posting";
 import { RENDERERS } from "../../../../../../../renderers";
 import { RuleProposal } from "../../../../../../../rule-proposal";
@@ -618,23 +619,45 @@ function Chat() {
                     attach
                     files={dropped}
                   />
-                  {/* The agent's mode, a setting of the thread's, beside what is sent to it (portalr ADR-0085). */}
-                  {mode}
+                  {/* The agent's mode, a setting of the thread's, beside what is sent to it (portalr
+                      ADR-0085); on a phone it is in the "+" sheet, said when it isn't the default. */}
+                  <span className="contents phone:hidden">{mode}</span>
+                  <ComposerFooter
+                    api={context.api}
+                    tenant={tenant}
+                    workspace={workspace}
+                    thread={id}
+                    focused={focused}
+                    model={model}
+                    onModel={setModel}
+                    running={active.length > 0}
+                    mode={thread.mode}
+                    onMode={
+                      allowed.has("artifactr:set_thread_mode")
+                        ? (chosen) =>
+                            stream.send({ type: "set_thread_mode", thread_id: id, mode: chosen })
+                        : undefined
+                    }
+                    onFiles={setDropped}
+                  />
                   {/* A phone's thumb bar: the request's next step, at the row's end (portalr ADR-0082). */}
                   {latestRequest !== undefined && (
                     <ThumbBar target={`request-${latestRequest.tool_call_id}`} />
                   )}
                   {/* The model's choice last: where the row is narrow it wraps to a line of its own (portalr ADR-0087). */}
-                  {picker && (
-                    <picker.ModelPicker
-                      place={place}
-                      thread={id}
-                      value={model}
-                      onChange={setModel}
-                      running={active.length > 0}
-                      Select={SelectField}
-                    />
-                  )}
+                  {/* A select on a desktop; on a phone the pill and its sheet (portalr ADR-0087). */}
+                  <span className="contents phone:hidden">
+                    {picker && (
+                      <picker.ModelPicker
+                        place={place}
+                        thread={id}
+                        value={model}
+                        onChange={setModel}
+                        running={active.length > 0}
+                        Select={SelectField}
+                      />
+                    )}
+                  </span>
                 </div>
               }
             />

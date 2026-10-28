@@ -425,8 +425,8 @@ test("the thread's mode is switched in its head, where the reader may", async ()
     { artifactrLog: LOG },
   );
   const mode = screen.getByRole("radiogroup", { name: "Agent mode" });
-  await expect.element(mode.getByRole("radio", { name: "Edits" })).toBeChecked();
-  await mode.getByRole("radio", { name: "Proposes" }).click();
+  await expect.element(mode.getByRole("radio", { name: "Auto" })).toBeChecked();
+  await mode.getByRole("radio", { name: "Ask" }).click();
   expect(sent.at(-1)).toMatchObject({
     type: "set_thread_mode",
     thread_id: "thr_1",

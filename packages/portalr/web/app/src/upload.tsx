@@ -352,14 +352,11 @@ export function Uploader({
           }
           className="w-[min(var(--dialog-width),calc(100vw-var(--dialog-margin)))]"
           trigger={
-            <Button variant="ghost" size="sm" className="min-w-(--icon-button-size)">
+            // On a phone the composer's "+" adds files (portalr ADR-0087): this trigger is a
+            // desktop's.
+            <Button variant="ghost" size="sm" className="phone:hidden">
               <Icon icon={glyphs.fileUp} className="size-3.5" />
-              {/* Its glyph alone on a phone, where the composer's row has no room for the word;
-                  still named Attach (portalr ADR-0087). */}
-              <span className="sr-only">Attach</span>
-              <span aria-hidden="true" className="phone:hidden">
-                Attach
-              </span>
+              Attach
               {items.length > 0 && (
                 <span className="sr-only">
                   , {items.length === 1 ? "1 file" : `${items.length} files`}

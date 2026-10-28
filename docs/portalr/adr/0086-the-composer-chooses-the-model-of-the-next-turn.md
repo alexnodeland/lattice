@@ -1,6 +1,6 @@
 # ADR-0086: The composer chooses the model of the next turn
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0087](0087-a-command-first-layout-a-top-bar-a-palette-a-table-and-a-split-view.md) (on a phone the picker is a pill and a Select model sheet)
 **Date:** 2026-10-27
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0083](0083-a-turn-shows-its-progress-phase-thinking-and-an-estimated-count.md) (the strip says when a turn answered with another model than it asked for)

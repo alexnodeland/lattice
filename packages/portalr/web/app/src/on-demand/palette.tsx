@@ -181,42 +181,44 @@ export function Palette({
     </div>
   );
   const results = (
-    <div id={list} role="listbox" aria-label="Results" className="overflow-y-auto p-1.5">
+    <>
       {choices.length === 0 && <p className="px-2.5 py-2 text-muted text-sm">Nothing matches.</p>}
-      {[...groups].map(([group, members], place) => (
-        // A fieldset is a group to assistive technology, which a listbox may hold; the lint takes
-        // no `role="group"` on another element, and the repository takes no suppression.
-        <fieldset
-          key={group}
-          aria-labelledby={`${list}-group-${place}`}
-          className="m-0 border-0 p-0"
-        >
-          <div id={`${list}-group-${place}`} className="px-2.5 pt-2 pb-1 text-muted text-xs">
-            {group}
-          </div>
-          {members.map(({ choice, index }) => (
-            <div
-              key={choice.key}
-              id={option(index)}
-              role="option"
-              aria-selected={index === at}
-              tabIndex={-1}
-              onPointerMove={() => setChosen(index)}
-              // The field keeps the focus as a pointer presses; a click, a tap, or a screen
-              // reader's or Voice Control's activation follows the choice.
-              onMouseDown={(event) => event.preventDefault()}
-              onClick={() => follow(choice)}
-              onKeyDown={(event) => event.key === "Enter" && follow(choice)}
-              className="flex cursor-default items-center gap-2.5 rounded-(--radius-3) px-2.5 py-2 text-sm aria-selected:bg-subtle"
-            >
-              <Icon icon={choice.icon} className="text-muted" />
-              <span className="min-w-0 flex-1 truncate">{choice.label}</span>
-              {choice.end}
+      <div id={list} role="listbox" aria-label="Results" className="overflow-y-auto p-1.5">
+        {[...groups].map(([group, members], place) => (
+          // A fieldset is a group to assistive technology, which a listbox may hold; the lint takes
+          // no `role="group"` on another element, and the repository takes no suppression.
+          <fieldset
+            key={group}
+            aria-labelledby={`${list}-group-${place}`}
+            className="m-0 border-0 p-0"
+          >
+            <div id={`${list}-group-${place}`} className="px-2.5 pt-2 pb-1 text-muted text-xs">
+              {group}
             </div>
-          ))}
-        </fieldset>
-      ))}
-    </div>
+            {members.map(({ choice, index }) => (
+              <div
+                key={choice.key}
+                id={option(index)}
+                role="option"
+                aria-selected={index === at}
+                tabIndex={-1}
+                onPointerMove={() => setChosen(index)}
+                // The field keeps the focus as a pointer presses; a click, a tap, or a screen
+                // reader's or Voice Control's activation follows the choice.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => follow(choice)}
+                onKeyDown={(event) => event.key === "Enter" && follow(choice)}
+                className="flex cursor-default items-center gap-2.5 rounded-(--radius-3) px-2.5 py-2 text-sm aria-selected:bg-subtle"
+              >
+                <Icon icon={choice.icon} className="text-muted" />
+                <span className="min-w-0 flex-1 truncate">{choice.label}</span>
+                {choice.end}
+              </div>
+            ))}
+          </fieldset>
+        ))}
+      </div>
+    </>
   );
   return (
     <PaletteFrame

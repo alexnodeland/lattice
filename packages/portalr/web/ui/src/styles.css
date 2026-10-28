@@ -310,9 +310,15 @@
 }
 
 /*
- * With the keyboard up the composer is what is used, and a phone's tab bar gives way (portalr
- * ADR-0087): outside the layers, so it outranks the bar's own `phone:flex`.
+ * With the keyboard up, or a thread being written on the Threads page, the composer is what is
+ * used, and a phone's tab bar gives way (portalr ADR-0087): outside the layers, so it outranks the
+ * bar's own `phone:flex`.
  */
-:root[data-keyboard] [data-tab-bar] {
+:root[data-keyboard] [data-tab-bar],
+:root:has([data-composing]) [data-tab-bar] {
   display: none;
+}
+/* On the keyboard, the docked search has no home indicator to keep clear. */
+:root[data-keyboard] [data-docked] {
+  padding-bottom: var(--space-1);
 }

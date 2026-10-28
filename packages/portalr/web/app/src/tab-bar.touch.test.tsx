@@ -8,7 +8,7 @@
 import { afterEach, expect, test, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { open } from "./test/app";
-import { APPROVAL, serve as notes } from "./test/notes";
+import { APPROVAL, serve as notes, WORLD } from "./test/notes";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -55,7 +55,9 @@ for (const width of [320, 375, 390, 430]) {
       )
       .toBe(true);
     for (const target of bar.querySelectorAll("a, button")) {
-      expect(target.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+      const box = target.getBoundingClientRect();
+      expect(box.height).toBeGreaterThanOrEqual(44);
+      expect(box.width).toBeGreaterThanOrEqual(44);
     }
   });
 }
@@ -135,4 +137,56 @@ test("with the keyboard up, the bar gives way, and nothing of it covers the fiel
   } finally {
     delete document.documentElement.dataset.keyboard;
   }
+});
+
+const real = window.visualViewport;
+
+test("the docked search sits on the on-screen keyboard, its field never under it", async () => {
+  await page.viewport(375, 667);
+  const viewport = new EventTarget() as EventTarget & { height: number; offsetTop: number };
+  viewport.height = window.innerHeight;
+  viewport.offsetTop = 0;
+  Object.defineProperty(window, "visualViewport", { value: viewport, configurable: true });
+  try {
+    const { screen } = await open("/t/acme/w/notes/artifacts", serve, () => null, {
+      artifactrLog: LOG,
+    });
+    await expect.poll(() => visible(tabBar())).toBe(true);
+    (tabBar().querySelector('button[aria-label="Search"]') as HTMLElement).click();
+    const field = screen.getByRole("combobox", { name: "Search or go to" });
+    await expect.element(field).toHaveFocus();
+    viewport.height = window.innerHeight - 300;
+    viewport.dispatchEvent(new Event("resize"));
+    const popup = field.element().closest("[data-docked]") as HTMLElement;
+    await expect
+      .poll(() => Math.round(popup.getBoundingClientRect().bottom))
+      .toBe(window.innerHeight - 300);
+    expect(field.element().getBoundingClientRect().bottom).toBeLessThanOrEqual(
+      window.innerHeight - 300,
+    );
+  } finally {
+    Object.defineProperty(window, "visualViewport", { value: real, configurable: true });
+  }
+});
+
+test("writing a thread from New, the bar gives way and the composer holds the foot", async () => {
+  await page.viewport(375, 667);
+  const { screen } = await open("/t/acme/w/notes", serve, () => null, { artifactrLog: LOG });
+  await expect.poll(() => visible(tabBar())).toBe(true);
+  await screen.getByRole("button", { name: "New thread" }).click();
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await expect.element(box).toHaveFocus();
+  expect(getComputedStyle(tabBar()).display).toBe("none");
+  const hit = box.element().getBoundingClientRect();
+  expect(box.element().contains(document.elementFromPoint(hit.left + 20, hit.top + 10))).toBe(true);
+});
+
+test("on a phone what waits is in the top bar, and its link opens the threads that wait", async () => {
+  await page.viewport(375, 667);
+  const { screen, router } = await open("/t/acme/w/notes", notes, () => null, WORLD);
+  const waiting = screen.getByRole("banner").getByRole("link", { name: /need/ });
+  await expect.element(waiting).toBeVisible();
+  await waiting.click();
+  await expect.poll(() => router.state.location.search).toEqual({ show: "needs" });
+  await expect.element(screen.getByRole("radio", { name: /^Needs you/ })).toBeChecked();
 });

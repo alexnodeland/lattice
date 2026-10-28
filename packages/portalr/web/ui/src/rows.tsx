@@ -148,7 +148,7 @@ export function TrackLink({
     props: {
       "aria-label": count ? `${children} ${count} waiting for you` : children,
       className: cn(
-        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-(--segmented-item-radius) px-1 py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:text-fg aria-[current]:bg-surface aria-[current]:text-fg aria-[current]:shadow-(--card-shadow) max-sm:flex-auto max-sm:flex-col sm:px-(--segmented-item-pad-x)",
+        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-(--segmented-item-radius) px-1 py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:text-fg aria-[current]:bg-surface aria-[current]:text-fg aria-[current]:shadow-(--card-shadow) aria-[current]:font-semibold min-w-11 max-sm:flex-auto max-sm:flex-col sm:px-(--segmented-item-pad-x)",
         RING,
         FEEDBACK,
       ),

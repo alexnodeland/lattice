@@ -305,7 +305,11 @@ function Threads() {
           connected again or to copy; disabled until it is live. On a phone it waits behind the
           title row's New (portalr ADR-0087), and the foot is the tab bar's. */}
       <ComposerDock className="mt-auto">
-        <div className={composing ? "flex flex-col gap-3" : "flex flex-col gap-3 phone:hidden"}>
+        <div
+          // Being written, it holds the foot, and the tab bar gives way (portalr ADR-0087).
+          data-composing={composing || undefined}
+          className={composing ? "flex flex-col gap-3" : "flex flex-col gap-3 phone:hidden"}
+        >
           <Composer
             disabled={!live}
             onSend={write}

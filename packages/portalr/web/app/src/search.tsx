@@ -1,4 +1,4 @@
-import { glyphs, IconButton, useLoaded } from "@portalr/ui";
+import { glyphs, IconButton, useCoarsePointer, useLoaded, useTouch } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import {
@@ -95,6 +95,20 @@ export function SearchPalette({
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, []);
+  // Docked, it sits on the on-screen keyboard, as the composer's dock does: what the keyboard covers
+  // is kept on the root while it is open, as iOS Safari resizes nothing of itself.
+  const touch = useTouch(useCoarsePointer() && open && docked);
+  useEffect(() => touch?.keyboardInset(), [touch]);
+  // Docked in a phone's tab bar, it closes if the window stops being a phone's (turned, or widened).
+  useEffect(() => {
+    if (!(open && docked)) {
+      return;
+    }
+    const phone = matchMedia("(max-width: 48rem) and (any-pointer: coarse)");
+    const left = () => !phone.matches && setOpen(false);
+    phone.addEventListener("change", left);
+    return () => phone.removeEventListener("change", left);
+  }, [open, docked]);
   const opening = {
     icon,
     shown: open,

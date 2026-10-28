@@ -34,7 +34,8 @@ export function PaletteFrame({
           data-docked={docked || undefined}
           className={
             docked
-              ? "fixed inset-x-0 bottom-0 z-50 flex max-h-[76dvh] flex-col overflow-hidden border-line border-t bg-surface text-fg outline-none"
+              ? // On the on-screen keyboard, as the composer's dock is (`--keyboard-inset`).
+                "fixed inset-x-0 bottom-(--keyboard-inset,0px) z-50 flex max-h-[76dvh] flex-col overflow-hidden border-line border-t bg-surface text-fg outline-none"
               : "fixed top-[12dvh] left-1/2 z-50 flex max-h-[76dvh] w-[min(var(--dialog-width),calc(100vw-var(--dialog-margin)))] -translate-x-1/2 flex-col overflow-hidden rounded-(--dialog-radius) border border-line bg-surface text-fg shadow-(--dialog-shadow) outline-none"
           }
         >

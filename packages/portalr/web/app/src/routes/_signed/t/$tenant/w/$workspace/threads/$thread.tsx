@@ -390,12 +390,13 @@ function Chat() {
             case "artifact":
               return (
                 <ThreadArtifact
-                  key={entry.updatedBy ?? entry.artifact.id}
+                  key={entry.updatedBy ? `call:${entry.updatedBy}` : `art:${entry.artifact.id}`}
                   context={context}
                   me={me}
                   tenant={tenant}
                   workspace={workspace}
                   artifact={entry.artifact}
+                  {...(entry.superseded && { superseded: entry.superseded })}
                 />
               );
             case "partial":

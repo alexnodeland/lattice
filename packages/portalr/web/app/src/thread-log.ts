@@ -34,19 +34,31 @@ export type Entry =
       readonly artifact: Artifactr.Artifact;
       /** The `update_app` call it is shown under, again, at its latest version. */
       readonly updatedBy?: string;
+      /** The version that call made. */
+      readonly version?: number;
+      /**
+       * Set on an app's card that a later one in the thread follows: the version it made, shown
+       * without running, so only the app's newest card runs it.
+       */
+      readonly superseded?: number;
     };
 
-/** What `update_app` returns once the app is at its next version: artifactr's outcome. */
-const APPLIED = /^Done: (\S+) is now at version \d+\.$/;
+/**
+ * What `update_app` returns once the app is at its next version: artifactr's `describe_outcome`
+ * (agent/tools.py), as the run records it, cut by `_clip` (agent/capability.py) past its limit, so
+ * a result cut short matches nothing and is a call alone. Change them together.
+ */
+const APPLIED = /^Done: (\S+) is now at version (\d+)\.$/;
 
-/** The app an `update_app` call updated, once it did; else undefined. */
+/** The app an `update_app` call updated, and the version it made, once it did; else null. */
 function appUpdated(
   tool: Artifactr.Tool,
   artifacts: Readonly<Record<string, Artifactr.Artifact>>,
-): Artifactr.Artifact | undefined {
-  const id = tool.status === "ok" && tool.name === "update_app" && APPLIED.exec(tool.result)?.[1];
-  const artifact = id ? artifacts[id] : undefined;
-  return artifact?.kind === "app" ? artifact : undefined;
+): readonly [Artifactr.Artifact, number] | null {
+  const [, id = "", version] =
+    (tool.status === "ok" && tool.name === "update_app" && APPLIED.exec(tool.result)) || [];
+  const artifact = artifacts[id];
+  return artifact?.kind === "app" ? [artifact, Number(version)] : null;
 }
 
 /**
@@ -90,9 +102,11 @@ export function threadLog(
       .flatMap(([id, tool]): Entry[] => {
         const updated = appUpdated(tool, artifacts);
         const entry: Entry = { kind: "tools", seq: tool.seq, run, tools: [[id, tool]] };
-        return updated
-          ? [entry, { kind: "artifact", seq: tool.seq, artifact: updated, updatedBy: id }]
-          : [entry];
+        if (updated === null) {
+          return [entry];
+        }
+        const [artifact, version] = updated;
+        return [entry, { kind: "artifact", seq: tool.seq, artifact, updatedBy: id, version }];
       }),
   );
   const entries: Entry[] = [
@@ -115,6 +129,21 @@ export function threadLog(
     }),
   ];
   entries.sort((a, b) => a.seq - b.seq);
+  // An app runs in its newest card alone; each before it shows the version it made, or its first.
+  const newest = new Map(
+    entries.flatMap((entry, at) =>
+      entry.kind === "artifact" && entry.artifact.kind === "app" ? [[entry.artifact.id, at]] : [],
+    ),
+  );
+  entries.forEach((entry, at) => {
+    if (
+      entry.kind === "artifact" &&
+      entry.artifact.kind === "app" &&
+      newest.get(entry.artifact.id) !== at
+    ) {
+      entries[at] = { ...entry, superseded: entry.version ?? 1 };
+    }
+  });
   // A run's calls in a row, with nothing of the thread's between them, are one group.
   return entries.reduce<Entry[]>((grouped, entry) => {
     const last = grouped.at(-1);

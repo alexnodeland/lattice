@@ -376,8 +376,9 @@ const ALICE = { kind: "user", id: "alice" };
 const HTML = '{"id": "app_1", "html": "<button>Roll twice</button>"}';
 
 /** A thread in which the agent makes an app, then updates it with `update`'s status and result. */
-const updating = (update?: [string, string], ended = true) =>
+const updating = (update?: [string, string], ended = true, more: unknown[] = []) =>
   [
+    ...(more as ReturnType<typeof logged>[]),
     logged(1, { type: "thread_created", thread_id: "thr_1", title: "Games" }, ALICE),
     logged(2, { type: "run_started", run_id: "run_1", thread_id: "thr_1" }),
     ...call(3, "c1", "create_app", '{"title": "Dice"}', ["ok", "Done: app_1 is now at version 1."]),
@@ -420,6 +421,13 @@ test("an app updated by a call is shown again beneath it, at its latest version,
   );
   const updated = screen.getByRole("listitem", { name: "Dice" }).nth(1);
   await expect.element(updated.getByTitle(TITLE)).toBeInTheDocument();
+  // It runs in its newest card alone; the one where it was made says which version it was.
+  expect(screen.container.querySelectorAll("iframe")).toHaveLength(1);
+  await vi.waitFor(() =>
+    expect(screen.getByRole("listitem", { name: "Dice" }).first().element().textContent).toContain(
+      "Version 1. A newer version runs below.",
+    ),
+  );
   await expect.element(updated.getByText(/Version 2\./)).toBeVisible();
   await expect
     .element(updated.getByRole("link", { name: "Open its page" }))
@@ -438,16 +446,52 @@ test("an app updated by a call is shown again beneath it, at its latest version,
   await expect.element(details).toHaveAttribute("aria-expanded", "false");
   await details.click();
   await expect.element(screen.getByText("Done: app_1 is now at version 2.")).toBeVisible();
-  // Read again later, at a later version, both cards show it.
+  // Read again later, at a later version, the running card shows it.
   versions = [...versions, revision("app_1", 3, "Dice")];
   await queryClient.invalidateQueries();
   await expect.element(updated.getByText(/Version 3\./)).toBeVisible();
+});
+
+test("an app updated twice runs in its newest card alone; each before says its version", async () => {
+  const log = [
+    ...updating(["ok", "Done: app_1 is now at version 2."], false),
+    ...call(10, "c3", "update_app", HTML, ["ok", "Done: app_1 is now at version 3."]),
+    logged(11, {
+      type: "artifact_changed",
+      artifact_id: "app_1",
+      kind: "app",
+      version: 3,
+      patch: { kind: "json_patch", ops: [] },
+      summary: "",
+      thread_id: "thr_1",
+      run_id: "run_1",
+    }),
+  ].sort((a, b) => a.seq - b.seq);
+  const versions = [1, 2, 3].map((version) => revision("app_1", version, "Dice"));
+  const { screen } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    threaded(() => Response.json(versions)),
+    undefined,
+    { apps: APPS, artifactrLog: log },
+  );
+  const cards = screen.getByRole("listitem", { name: "Dice" });
+  await expect.element(cards.nth(2).getByText(/Version 3\./)).toBeVisible();
+  await vi.waitFor(() =>
+    expect(cards.nth(0).element().textContent).toContain("Version 1. A newer version runs below."),
+  );
+  await vi.waitFor(() =>
+    expect(cards.nth(1).element().textContent).toContain("Version 2. A newer version runs below."),
+  );
+  expect(screen.container.querySelectorAll("iframe")).toHaveLength(1);
 });
 
 test.each([
   ["running", undefined, false, "Running"],
   ["failed", ["error", "No app app_1."], true, "Failed"],
   ["proposed", ["ok", "Proposed as prop_1. A person will review it."], true, "Done"],
+  ["cut short", ["ok", "Done: app_1 is now at vers…"], true, "Done"],
+  ["naming no artifact known", ["ok", "Done: app_9 is now at version 2."], true, "Done"],
+  ["naming a note", ["ok", "Done: note_1 is now at version 2."], true, "Done"],
 ] as const)(
   "an update_app call %s is a call, as any other, with nothing beneath",
   async (_, update, ended, word) => {
@@ -455,7 +499,18 @@ test.each([
       "/t/acme/w/notes/threads/thr_1",
       threaded(() => Response.json([revision("app_1", 1, "Dice")])),
       undefined,
-      { apps: APPS, artifactrLog: updating(update && [...update], ended) },
+      {
+        apps: APPS,
+        artifactrLog: updating(update && [...update], ended, [
+          logged(5, {
+            type: "artifact_created",
+            artifact_id: "note_1",
+            kind: "note",
+            version: 1,
+            data: {},
+          }),
+        ]),
+      },
     );
     await expect.element(screen.getByRole("listitem", { name: "Dice" })).toBeInTheDocument();
     const row = screen.getByRole("button", { name: /^update_app/ });

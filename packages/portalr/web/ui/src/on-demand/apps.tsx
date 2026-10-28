@@ -11,6 +11,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Alert } from "../alert";
 import {
   APP_BOOT,
+  APP_ERROR,
   APP_STOPPED,
   Bridge,
   CALLS_A_MINUTE,
@@ -146,15 +147,23 @@ function reportLine({ method, params }: Report, frame: Element, container: numbe
 /** What WebKit says of an error thrown by a callback the sandbox couldn't wrap. */
 const MASKED = "Script error.";
 
-/** The app's latest error, as it said it, and whether its frames stopped after it. */
-type Fault = { readonly message: string; readonly stack: string; readonly stopped: boolean | null };
+/**
+ * The app's latest error, as it said it, its line in the report, and whether a frame loop that ran
+ * before it stopped: `true` only where the sandbox saw one stop, never inferred here.
+ */
+type Fault = {
+  readonly message: string;
+  readonly stack: string;
+  readonly line: string;
+  readonly stopped: boolean;
+};
 
 /**
  * A sentence to hand the assistant: what the app did, and its error, the app's own text. Nothing
  * is sent: the person pastes it where they choose.
  */
 function forAssistant({ message, stopped }: Fault): string {
-  const did = stopped ? "The app froze after an error" : "The app reported an error";
+  const did = stopped ? "The app froze after an error" : "The app threw an error";
   return message === MASKED
     ? `${did} that the browser didn't name. Please find the cause and fix it.`
     : `${did}: ${message.replace(/\.$/, "")}. Please find the cause and fix it.`;
@@ -357,20 +366,36 @@ export function Running({
             }
             return;
           }
+          const { kind, message, stack, stopped } = report.params;
+          // The error a stopped loop died of comes with the word that it stopped, so no report
+          // before it can crowd it out; a later error, as a tap on the broken game, isn't it.
+          const said = (now: Fault | null, line: string): Fault =>
+            message === undefined || now?.message === message
+              ? { ...(now as Fault), stopped: stopped === "yes" }
+              : {
+                  message: String(message),
+                  stack: String(stack ?? ""),
+                  line,
+                  stopped: stopped === "yes",
+                };
           if (report.method === APP_STOPPED) {
-            setFault((now) => now && { ...now, stopped: report.params.stopped === "yes" });
+            const errorLine = reportLine(
+              { method: APP_ERROR, params: { kind: "error", message: message ?? "" } },
+              element,
+              0,
+            );
+            setFault((now) => (now === null && message === undefined ? now : said(now, errorLine)));
             return;
           }
-          const { kind, message, stack } = report.params;
           if (kind === "error" || kind === "rejection") {
-            // The error it stopped after is kept: a later one, as a tap on the broken game, isn't it.
             setFault((now) =>
               now?.stopped
                 ? now
                 : {
                     message: String(message ?? ""),
                     stack: String(stack ?? ""),
-                    stopped: now?.stopped ?? null,
+                    line,
+                    stopped: false,
                   },
             );
           }
@@ -417,6 +442,16 @@ export function Running({
   }, [element, host, origin]);
 
   const again = () => setRun({ ...run, count: run.count + 1 });
+  // The sentence to copy by hand, selected once as it is shown, never again on a later render.
+  const byHand = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (copied === "by hand" && byHand.current !== null) {
+      getSelection()?.selectAllChildren(byHand.current);
+    }
+  }, [copied]);
+  // What the card says isn't said again in the report under it.
+  const listed = problems.filter((line) => line !== fault?.line);
+  const looked = fault === null ? boot : null;
   const copy = async (sentence: string) => {
     try {
       await navigator.clipboard.writeText(sentence);
@@ -518,13 +553,11 @@ export function Running({
           </span>
         </Alert>
       )}
-      {fault !== null && fault.stopped !== null && (
+      {fault !== null && (
         <Alert tone={fault.stopped ? "error" : "warn"}>
           <span className="flex flex-col items-start gap-2">
             <span className="font-medium">
-              {fault.stopped
-                ? "The app stopped after an error"
-                : "The app reported an error and is still running"}
+              {fault.stopped ? "The app stopped after an error" : "The app reported an error"}
             </span>
             <code className="break-words font-mono text-xs">
               {fault.message === MASKED ? "This browser doesn't say which error." : fault.message}
@@ -551,28 +584,23 @@ export function Running({
               {copied === "by hand" && "This browser didn't let the page copy. Copy this instead:"}
             </span>
             {copied === "by hand" && (
-              <span
-                ref={(node) => {
-                  node && getSelection()?.selectAllChildren(node);
-                }}
-                className="text-xs"
-              >
+              <span ref={byHand} className="text-xs">
                 {forAssistant(fault)}
               </span>
             )}
           </span>
         </Alert>
       )}
-      {(problems.length > 0 || boot !== null) && (
+      {(listed.length > 0 || looked !== null) && (
         <details className="text-muted text-xs">
           <summary>
-            {problems.length > 0 ? "The app reported a problem" : "What the app reported"}
+            {listed.length > 0 ? "The app reported a problem" : "What the app reported"}
           </summary>
           <ul className="mt-1 flex flex-col gap-1 break-all font-mono">
-            {problems.map((line) => (
+            {listed.map((line) => (
               <li key={line}>{line}</li>
             ))}
-            {boot !== null && <li>{boot}</li>}
+            {looked !== null && <li>{looked}</li>}
           </ul>
         </details>
       )}

@@ -501,12 +501,12 @@ test("a game whose frame loop throws is said to have stopped, with its own error
   await page.close();
 });
 
-test("a game that throws in a frame but draws on is said to be running still", async () => {
+test("a game that throws in a frame but draws on is never said to have stopped", async () => {
   const { page } = await watched(
     `<body style="margin:0"><canvas width="200" height="100"></canvas><script>const c=document.querySelector("canvas").getContext("2d");let n=0;function loop(){n+=1;requestAnimationFrame(loop);c.fillRect(n%200,0,4,4);if(n===30)null.x}requestAnimationFrame(loop)</script>`,
   );
   await expect
-    .poll(() => page.getByText("The app reported an error and is still running").count(), SETTLED)
+    .poll(() => page.getByText("The app reported an error", { exact: true }).count(), SETTLED)
     .toBe(1);
   expect(await page.getByText(STOPPED).count()).toBe(0);
   await page.close();

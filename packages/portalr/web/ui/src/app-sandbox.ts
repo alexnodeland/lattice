@@ -187,17 +187,18 @@ const STARTED = `parent.postMessage({ jsonrpc: "2.0", method: "${APP_STARTED}" }
  * `addEventListener` are wrapped, so an error one throws is said by its own name, message and
  * first lines of its stack, where WebKit says only "Script error." of it, and is then thrown again
  * as it was: the app runs as it would. The window's report of an error said so isn't said again.
- * And where an uncaught error came while the app was drawing frames, one in the second before it,
- * whether any frame came in the 2 s after is said, as `stopped`, and said again if frames come
- * back: a frame loop that died with its error stopped the app. Frames alone count, never timers,
- * which the sandbox's own scripts use. Nothing here is sent anywhere but the host's page, which
+ * And where an uncaught error came while the app was animating, ten frames or more in the second
+ * before it, whether any frame came in the 2 s after is said, as `stopped`, with that error, and
+ * said again if frames come back: a frame loop that died with its error stopped the app. An app
+ * that draws a frame now and then, on a tap, is never said to have stopped. Frames alone count,
+ * never timers, which the sandbox's own scripts use. Nothing here is sent anywhere but the host's page, which
  * keeps none of it.
  */
 const DIAGNOSED = [
   "(() => {",
   "  const said = new Set(), kinds = new WeakMap(), getContext = HTMLCanvasElement.prototype.getContext;",
-  '  let errored = false, frames = 0, drew = 0, caughtAt = -1e9, probing = false, live = "";',
-  "  const caught = new WeakSet(), guarded = new WeakMap(), now = () => performance.now();",
+  '  let errored = false, frames = 0, caughtAt = -1e9, probing = false, live = "", fault = null;',
+  "  const recent = [], caught = new WeakSet(), guarded = new WeakMap(), now = () => performance.now();",
   "  const raw = { frame: requestAnimationFrame, timeout: setTimeout, add: EventTarget.prototype.addEventListener, remove: EventTarget.prototype.removeEventListener };",
   "  HTMLCanvasElement.prototype.getContext = function (type, ...rest) {",
   "    const context = getContext.call(this, type, ...rest);",
@@ -222,11 +223,12 @@ const DIAGNOSED = [
   "  const lived = (stopped) => {",
   "    if (live === stopped) return;",
   "    live = stopped;",
-  `    post("${APP_STOPPED}", { stopped });`,
+  `    post("${APP_STOPPED}", { stopped, ...fault });`,
   "  };",
-  "  const probe = () => {",
-  '    if (probing || live === "yes" || !frames || now() - drew > 1000 || document.hidden) return;',
+  "  const probe = (error) => {",
+  '    if (probing || live === "yes" || recent.length < 10 || now() - recent[0] > 1000 || document.hidden) return;',
   "    probing = true;",
+  "    fault = error;",
   "    const before = frames;",
   "    raw.timeout.call(window, () => {",
   "      probing = false;",
@@ -242,8 +244,9 @@ const DIAGNOSED = [
   "    try { caught.add(error); } catch {}",
   "    const message = named(error), lines = [];",
   '    try { for (const line of String(error.stack || "").split("\\n")) if (line.trim() && line.trim() !== message) lines.push(line.trim()); } catch {}',
-  '    report({ kind: "error", message: cut(message, 300), stack: cut(lines.slice(0, 4).join(" / "), 400) });',
-  "    probe();",
+  '    const found = { message: cut(message, 300), stack: cut(lines.slice(0, 4).join(" / "), 400) };',
+  '    report({ kind: "error", ...found });',
+  "    probe(found);",
   "  };",
   "  const guard = (callback) => function (...rest) {",
   "    try { return callback.apply(this, rest); } catch (error) { failed(error); throw error; }",
@@ -253,7 +256,8 @@ const DIAGNOSED = [
   "    const run = guard(callback);",
   "    return raw.frame.call(window, (time) => {",
   "      frames += 1;",
-  "      drew = now();",
+  "      recent.push(now());",
+  "      if (recent.length > 10) recent.shift();",
   '      if (live === "yes") lived("no");',
   "      return run.call(window, time);",
   "    });",
@@ -276,8 +280,9 @@ const DIAGNOSED = [
   "      return;",
   "    }",
   '    if (caught.has(Object(event.error)) || (event.message === "Script error." && now() - caughtAt < 100)) return;',
-  '    report({ kind: "error", message: cut(event.message || "an error", 300), source: cut(event.filename, 120), line: event.lineno | 0 });',
-  "    probe();",
+  '    const message = cut(event.message || "an error", 300);',
+  '    report({ kind: "error", message, source: cut(event.filename, 120), line: event.lineno | 0 });',
+  "    probe({ message });",
   "  }, true);",
   '  raw.add.call(window, "unhandledrejection", (event) => {',
   '    let message = "a refused promise";',

@@ -234,6 +234,7 @@ function ran(html: string) {
   frame.srcdoc = appDocument(html);
   const errors: Record<string, unknown>[] = [];
   const stopped: string[] = [];
+  const said: Record<string, unknown>[] = [];
   const heard = (event: MessageEvent) => {
     if (event.source !== frame.contentWindow) {
       return;
@@ -243,6 +244,7 @@ function ran(html: string) {
       errors.push(params);
     } else if (method === APP_STOPPED) {
       stopped.push(params.stopped);
+      said.push(params);
     }
   };
   addEventListener("message", heard);
@@ -251,7 +253,7 @@ function ran(html: string) {
     removeEventListener("message", heard);
     frame.remove();
   });
-  return { errors, stopped };
+  return { errors, stopped, said };
 }
 
 /** Tells the test page `value`, from inside the app, as its own message. */
@@ -272,7 +274,7 @@ function told() {
 
 /** A frame loop that throws `error` on its third frame, as the game that froze on a phone did. */
 const LOOP = (error: string) =>
-  `<script>let n=0;const p=null;function loop(){n+=1;if(n===3)${error};requestAnimationFrame(loop)}requestAnimationFrame(loop)</script>`;
+  `<script>let n=0;const p=null;function loop(){n+=1;if(n===15)${error};requestAnimationFrame(loop)}requestAnimationFrame(loop)</script>`;
 
 test("an error thrown in a frame is said by its name, message and stack, and still thrown", async () => {
   const values = told();
@@ -340,16 +342,28 @@ test("a long message and stack are cut short in the app's document", async () =>
 });
 
 test("a frame loop that dies with its error is said to have stopped, once", async () => {
-  const { stopped } = ran(LOOP("p.dir.x"));
+  const { stopped, said } = ran(LOOP("p.dir.x"));
   await vi.waitFor(() => expect(stopped).toEqual(["yes"]), { timeout: 6000 });
+  // With the error it died of, so no report before it can crowd it out.
+  expect(said[0]?.message).toMatch(/^TypeError: Cannot read properties of null/);
+  expect(said[0]?.stack).toMatch(/loop/);
 });
 
 test("a frame loop that goes on past its error is said to be running", async () => {
   const { stopped, errors } = ran(
-    `<script>let n=0;function loop(){n+=1;requestAnimationFrame(loop);if(n===3)null.x}requestAnimationFrame(loop)</script>`,
+    `<script>let n=0;function loop(){n+=1;requestAnimationFrame(loop);if(n===15)null.x}requestAnimationFrame(loop)</script>`,
   );
   await vi.waitFor(() => expect(stopped).toEqual(["no"]), { timeout: 6000 });
   expect(errors).toHaveLength(1);
+});
+
+test("an app that draws a frame now and then, as on a tap, is never said to have stopped", async () => {
+  const { stopped, errors } = ran(
+    `<script>for(let i=0;i<3;i++)requestAnimationFrame(()=>{});setTimeout(()=>requestAnimationFrame(()=>{throw new Error("tapped")}),200)</script>`,
+  );
+  await vi.waitFor(() => expect(errors).toHaveLength(1), { timeout: 5000 });
+  await new Promise((settle) => setTimeout(settle, 2500));
+  expect(stopped).toEqual([]);
 });
 
 test("an app that never drew a frame is never said to have stopped", async () => {

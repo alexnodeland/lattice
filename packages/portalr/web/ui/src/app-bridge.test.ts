@@ -539,7 +539,7 @@ test("a report's kind is one the bridge knows, its numbers within bounds, its te
   );
 });
 
-test("an app's reports reach the page, at most ten a frame, and count against its messages", async () => {
+test("an app's reports reach the page, at most eight a frame, and count against its messages", async () => {
   const { hear, reports, posted, started } = bridged();
   for (let each = 0; each < 10; each += 1) {
     await hear(reported(APP_ERROR, { kind: "error", message: `boom ${each}` }));
@@ -565,6 +565,21 @@ test("an error's stack is kept to 400 characters, and whether the app stopped to
     params: { stopped: "yes" },
   });
   expect(readReport(APP_STOPPED, { stopped: "<script>" })?.params.stopped).toBe("<sc");
+});
+
+test("whether the app stopped passes, with its error, however many reports came before", async () => {
+  const { hear, reports } = bridged();
+  for (let each = 0; each < 12; each += 1) {
+    await hear(reported(APP_ERROR, { kind: "error", message: `noise ${each}` }));
+  }
+  await hear(
+    reported(APP_STOPPED, { stopped: "yes", message: "TypeError: fatal", stack: "loop@x" }),
+  );
+  expect(reports).toHaveLength(MOST_REPORTS + 1);
+  expect(reports.at(-1)).toEqual({
+    method: APP_STOPPED,
+    params: { stopped: "yes", message: "TypeError: fatal", stack: "loop@x" },
+  });
 });
 
 test("an app flooding its reports is quieted like any other message", async () => {

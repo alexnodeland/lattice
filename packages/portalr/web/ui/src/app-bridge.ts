@@ -163,10 +163,11 @@ export class Limiter {
 // ─── what the app's document reports ─────────────────────────────────────────
 
 /**
- * The most reports a frame's bridge passes on: five errors, three of what it drew, and two of
- * whether it stopped.
+ * The most reports a frame's bridge passes on: five errors and three of what it drew; and,
+ * counted apart so no earlier report can crowd them out, four of whether it stopped.
  */
-export const MOST_REPORTS = 10;
+export const MOST_REPORTS = 8;
+export const MOST_STOPPED = 4;
 
 /** Each report's fields: text kept to so many characters, or a number (`0`). Others are dropped. */
 const REPORTED: Readonly<Record<string, Readonly<Record<string, number>>>> = {
@@ -179,7 +180,7 @@ const REPORTED: Readonly<Record<string, Readonly<Record<string, number>>>> = {
     directive: 60,
     blocked: 200,
   },
-  [APP_STOPPED]: { stopped: 3 },
+  [APP_STOPPED]: { stopped: 3, message: 300, stack: 400 },
   [APP_BOOT]: {
     drawn: 20,
     readyState: 20,
@@ -553,8 +554,9 @@ export class Bridge {
   #measuredAt = Number.NEGATIVE_INFINITY;
   /** The latest measure heard too soon after the last, applied when its time comes. */
   #held: { height: number; timer: ReturnType<typeof setTimeout> } | null = null;
-  /** How many of the app's reports were passed on, up to `MOST_REPORTS`. */
+  /** How many of the app's reports were passed on, up to `MOST_REPORTS`, and of whether it stopped. */
   #reports = 0;
+  #stopped = 0;
   readonly #now: () => number;
 
   constructor(options: {
@@ -659,9 +661,15 @@ export class Bridge {
       if (method === SIZE_CHANGED && isNumber(params.height)) {
         this.#sizeChanged(params.height, params.measured === true);
       }
-      const report = this.#reports < MOST_REPORTS ? readReport(method, params) : null;
+      const stopped = method === APP_STOPPED;
+      const room = stopped ? this.#stopped < MOST_STOPPED : this.#reports < MOST_REPORTS;
+      const report = room ? readReport(method, params) : null;
       if (report !== null) {
-        this.#reports += 1;
+        if (stopped) {
+          this.#stopped += 1;
+        } else {
+          this.#reports += 1;
+        }
         this.#host.reported?.(report);
       }
       return;

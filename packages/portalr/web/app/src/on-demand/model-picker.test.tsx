@@ -5,7 +5,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { type ReactNode, useState } from "react";
 import { afterEach, expect, test, vi } from "vitest";
 import { render } from "vitest-browser-react";
-import { AnsweredBy, ModelPicker, remembered } from "./model-picker";
+import { remembered } from "../model-memory";
+import { AnsweredBy, ModelPicker } from "./model-picker";
 
 const MODELS = [
   { id: "default", label: "Default", family: "", local: false, reasoning: false },

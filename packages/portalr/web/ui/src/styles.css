@@ -322,3 +322,17 @@
 :root[data-keyboard] [data-docked] {
   padding-bottom: var(--space-1);
 }
+
+/*
+ * A phone's composer has one primary action (portalr ADR-0087): while the thumb bar mirrors a
+ * question's Answer or Next and nothing is written, it stands where Send would; with the first
+ * word, Send comes back in its place.
+ */
+@media (max-width: 48rem) and (any-pointer: coarse) {
+  form:has([data-thumb-bar]):has(textarea:placeholder-shown) [data-send] {
+    display: none;
+  }
+  form:not(:has(textarea:placeholder-shown)) [data-thumb-bar] {
+    display: none;
+  }
+}

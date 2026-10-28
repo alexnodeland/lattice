@@ -12,34 +12,7 @@ import { type Api, type Artifactr, fellBack, models, type OfferedModel } from "@
 import type { SelectField } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
-
-/** The model a message that names none answers with. */
-export const DEFAULT = "default";
-
-/** Where this browser remembers a thread's model. */
-const key = (thread: string) => `portalr:model:${thread}`;
-
-/** The model last chosen in a thread here, or null; storage that can't be read has none. */
-export function remembered(thread: string): string | null {
-  try {
-    return localStorage.getItem(key(thread));
-  } catch {
-    return null;
-  }
-}
-
-/** Remember a thread's model here; the default is remembered as nothing. */
-function remember(thread: string, model: string): void {
-  try {
-    if (model === DEFAULT) {
-      localStorage.removeItem(key(thread));
-    } else {
-      localStorage.setItem(key(thread), model);
-    }
-  } catch {
-    // Without storage the choice lasts as long as the page.
-  }
-}
+import { DEFAULT, remember, remembered } from "../model-memory";
 
 /** A model as the choices show it: its label, and that it thinks first, or runs here. */
 const shown = (model: OfferedModel) =>

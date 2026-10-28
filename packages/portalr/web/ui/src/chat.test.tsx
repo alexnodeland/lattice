@@ -1275,8 +1275,8 @@ test("the mode switch sends the mode chosen, and says when it is refused", async
   const onChange = sent("refused");
   const screen = await render(<ModeSwitch mode="edit" onChange={onChange} />);
   const group = screen.getByRole("radiogroup", { name: "Agent mode" });
-  await expect.element(group.getByRole("radio", { name: "Edits" })).toBeChecked();
-  await group.getByRole("radio", { name: "Proposes" }).click();
+  await expect.element(group.getByRole("radio", { name: "Auto" })).toBeChecked();
+  await group.getByRole("radio", { name: "Ask" }).click();
   expect(onChange).toHaveBeenCalledWith("suggest");
   await expect.element(screen.getByRole("alert")).toBeVisible();
 });

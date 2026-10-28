@@ -735,11 +735,16 @@ export function Composer({
         </span>
         <Button
           type="submit"
+          data-send=""
           className="ml-auto"
           disabled={disabled || !text.trim()}
           pending={pending}
         >
-          Send
+          {/* Its arrow alone on a phone, where the row is narrow; still named Send (portalr ADR-0087). */}
+          <span className="sr-only">Send</span>
+          <span aria-hidden="true" className="phone:hidden">
+            Send
+          </span>
           <Icon icon={glyphs.arrowRight} className="size-3.5" />
         </Button>
       </div>
@@ -1257,8 +1262,8 @@ export function ModeSwitch({
 }
 
 const MODES: readonly Segment<Artifactr.Thread["mode"]>[] = [
-  { value: "edit", label: "Edits" },
-  { value: "suggest", label: "Proposes" },
+  { value: "edit", label: "Auto" },
+  { value: "suggest", label: "Ask" },
 ];
 
 /** How a run is going, announced as it changes. */

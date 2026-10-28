@@ -10,6 +10,8 @@
 
 import { useEffect, useState } from "react";
 import { Button } from "./button";
+import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { usePhone } from "./touch";
 
 /** The card's button the bar mirrors, if it is one to mirror. */
@@ -74,7 +76,6 @@ export function ThumbBar({ target }: { target: string }) {
   return (
     <span data-thumb-bar="" aria-hidden="true" className="ml-auto short:hidden">
       <Button
-        size="sm"
         tabIndex={-1}
         disabled={mirror.disabled}
         onClick={() => {
@@ -84,6 +85,7 @@ export function ThumbBar({ target }: { target: string }) {
         }}
       >
         {mirror.word}
+        <Icon icon={glyphs.arrowRight} className="size-3.5" />
       </Button>
     </span>
   );

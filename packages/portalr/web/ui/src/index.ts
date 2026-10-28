@@ -73,6 +73,7 @@ export {
   Thumbs,
 } from "./chat";
 export { Checkbox, type CheckboxChoice, CheckboxGroup } from "./checkbox";
+export { ChoiceList, type ChoiceOption } from "./choice-list";
 export { useColourBlind } from "./colour-blind";
 export { ComposerDock } from "./composer-dock";
 export { ConfirmDialog } from "./confirm-dialog";

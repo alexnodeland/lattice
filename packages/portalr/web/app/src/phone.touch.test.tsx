@@ -13,7 +13,7 @@ import { APPROVAL, serve as notes, STEPPED, WORLD } from "./test/notes";
 import { wider } from "./test/overflow";
 import * as rules from "./test/rules";
 
-/** Files may be attached: a kind offered, so the composer has its Attach. */
+/** Files may be attached: a kind offered, so the composer can add them. */
 const OFFERED = {
   allowed: true,
   limit: 1000,
@@ -155,20 +155,72 @@ for (const [what, review] of [
   });
 }
 
-test("on a small phone the composer's row, bar and all, takes at most a quarter of the window", async () => {
-  await page.viewport(375, 667);
-  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
-  await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
-  await expect.poll(() => bar()?.textContent).toContain("Answer");
-  expect(dock().getBoundingClientRect().height).toBeLessThanOrEqual(window.innerHeight / 4);
-});
+/**
+ * The dock's height once it has settled: after the faces have loaded, the same in two readings a
+ * frame apart, so a row that wraps as they arrive is measured as it ends, not as it starts.
+ */
+async function settled(): Promise<number> {
+  await document.fonts.ready;
+  let last = -1;
+  return expect
+    .poll(
+      async () => {
+        await new Promise(requestAnimationFrame);
+        const now = dock().getBoundingClientRect().height;
+        const same = now === last;
+        last = now;
+        return same ? now : Number.NaN;
+      },
+      { timeout: 5_000, interval: 50 },
+    )
+    .not.toBeNaN()
+    .then(() => last);
+}
 
-test("the account menu, the thread's menu and the attach panel open as sheets, and the page is never wider", async () => {
+for (const [width, height] of [
+  [320, 568],
+  [360, 640],
+  [375, 667],
+  [390, 667],
+  [430, 667],
+] as const) {
+  test(`at ${width}px the composer's footer is one line of + and the primary action, and the dock at most a quarter of the window`, async () => {
+    await page.viewport(width, height);
+    const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
+    await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
+    // The bar mirrors the card's Answer only while the card's own is out of view: from the top.
+    window.scrollTo(0, 0);
+    await expect.poll(() => bar()?.textContent).toContain("Answer");
+    const tall = await settled();
+    // One footer (portalr ADR-0087): "+" at its start, and, while nothing is written, the thumb
+    // bar's Answer where Send would be; every control a finger's 44px, on one line.
+    const shown = [...dock().querySelectorAll("form button")].filter((b) =>
+      (b as HTMLElement).checkVisibility(),
+    );
+    expect(shown.map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim())).toEqual([
+      "Add",
+      "Answer",
+    ]);
+    expect(new Set(shown.map((b) => Math.round(b.getBoundingClientRect().top))).size).toBe(1);
+    for (const b of shown) {
+      expect(b.getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+    }
+    // Written, Send is back.
+    await screen.getByRole("textbox", { name: "Message" }).fill("hello");
+    await expect.element(screen.getByRole("button", { name: "Send" })).toBeVisible();
+    await screen.getByRole("textbox", { name: "Message" }).fill("");
+    if (width >= 375) {
+      expect(tall).toBeLessThanOrEqual(window.innerHeight / 4);
+    }
+  });
+}
+
+test("the account menu, the thread's menu and the Add sheet open as sheets, and the page is never wider", async () => {
   await page.viewport(390, 844);
   const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
   await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
   for (const [name, role] of [
-    [/^Attach/, "dialog"],
+    [/^Add$/, "dialog"],
     ["Account: Signed in", "menu"],
     ["Thread actions", "menu"],
   ] as const) {
@@ -185,16 +237,15 @@ test("the account menu, the thread's menu and the attach panel open as sheets, a
   }
 });
 
-test("the attach panel is modal on a phone: a scrim, the focus kept in, and a Done to leave by", async () => {
+test("the Add sheet is modal on a phone: a scrim, the focus kept in, and a Close to leave by", async () => {
   await page.viewport(390, 844);
   const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
   await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
-  await screen.getByRole("button", { name: /^Attach/ }).click();
-  const panel = screen.getByRole("dialog");
+  await screen.getByRole("button", { name: "Add", exact: true }).click();
+  const panel = screen.getByRole("dialog", { name: "Add" });
   await expect.element(panel).toBeVisible();
   expect(panel.element().getAttribute("aria-modal")).toBe("true");
-  await expect.element(screen.getByRole("button", { name: "Done" })).toBeVisible();
-  await screen.getByRole("button", { name: "Done" }).click();
+  await panel.getByRole("button", { name: "Close" }).click();
   await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
 });
 

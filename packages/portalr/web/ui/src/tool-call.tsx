@@ -362,6 +362,11 @@ export function RunSteps({
     setShown(next);
   };
   const open = shown !== null;
+  // The sheet is mounted once first opened, so a thread of many groups mounts none until then.
+  const [sheeted, setSheeted] = useState(false);
+  if (shown === "sheet" && !sheeted) {
+    setSheeted(true);
+  }
   const button = useRef<HTMLButtonElement>(null);
   const panel = useId();
   const calls = tools.map(([, tool]) => tool);
@@ -422,7 +427,7 @@ export function RunSteps({
           ))}
         </ol>
       )}
-      {(phone || shown === "sheet") && (
+      {sheeted && (
         <ToolSheet
           open={shown === "sheet"}
           onOpenChange={(next) => show(next ? "sheet" : null)}

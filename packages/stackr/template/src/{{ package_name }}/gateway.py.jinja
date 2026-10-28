@@ -3,17 +3,43 @@
 Every request carries its tenant's key, so the tenant's team pays for it within its budget and
 rate limits, and asks for the gateway's guardrails. Routing, fallbacks and the guardrails
 themselves are the gateway's configuration.
+{%- if use_artifactr %}
+
+A message may name the model of the turn it starts (artifactr ADR-0097): :class:`Models` is the
+closed list of those the operator offers, and builds no other. Each tenant is offered
+``default`` and ``fast`` unless the operator offers more; a tenant's or a workspace's admins
+narrow that with the ``models:allowed`` setting, which the runner's check and the portal's
+list of models both read.
+{%- endif %}
 """
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass{% if use_artifactr %}, replace{% endif %}
+{%- if use_artifactr %}
+from typing import Final
+{%- endif %}
 
 from pydantic_ai.models import Model
 from pydantic_ai.settings import ModelSettings
 
-from {% if use_artifactr %}artifactr{% else %}reflexr{% endif %}.litellm import litellm_model
+{% if use_artifactr -%}
+from artifactr.agent import USE_MODEL
+from artifactr.core import Actor
+from artifactr.litellm import litellm_model
+from artifactr.workspace import Access, Authorize
+from lattice_core.settings import (
+    KNOWN_SETTINGS,
+    Setting,
+    Settings,
+    SettingsDefaults,
+    Subset,
+    registry,
+)
+{%- else -%}
+from reflexr.litellm import litellm_model
+{%- endif %}
 
-from {{ package_name }}.settings import GatewaySettings
+from {{ package_name }}.settings import GatewaySettings{% if use_artifactr %}, ModelInfo{% endif %}
 
 
 def gateway_model(settings: GatewaySettings) -> Model:
@@ -25,6 +51,110 @@ def gateway_model(settings: GatewaySettings) -> Model:
         api_key=settings.api_key,
         settings=None if mock is None else ModelSettings(extra_body={"mock_response": mock}),
     )
+{%- if use_artifactr %}
+
+
+MODELS_ALLOWED: Final = "models:allowed"
+"""The setting that says which of the offered models a tenant's, or a workspace's, people may
+choose."""
+
+
+def models_allowed(gateway: GatewaySettings) -> Setting:
+    """``models:allowed``, for the settings registry, over the models ``LITELLM_MODELS`` lists.
+
+    It allows ``default`` and ``fast`` unless the operator offers more (``LITELLM_MODELS_ALLOWED``),
+    which a tenant's and a workspace's admins only narrow (lattice ADR-0030).
+    """
+    return Setting(
+        MODELS_ALLOWED,
+        Subset(frozenset(model.id for model in gateway.models)),
+        default=("default", "fast"),
+        lowest="workspace",
+        description="Which of the offered models people may choose for a turn.",
+        labels={model.id: model.label for model in gateway.models},
+    )
+
+
+async def _allowed(settings: Settings, tenant_id: str, workspace_id: str) -> tuple[str, ...]:
+    """A workspace's ``models:allowed``.
+
+    Raises:
+        TypeError: If the settings answer it with something other than names.
+    """
+    names = await settings.value(tenant_id, workspace_id, MODELS_ALLOWED)
+    if not isinstance(names, tuple):
+        raise TypeError(f"{MODELS_ALLOWED} is a subset of names, not {type(names).__name__}")
+    return names
+
+
+class Models:
+    """The models a message may name: a closed list, from ``LITELLM_MODELS``.
+
+    Called with a name, as the runner's ``model_for``, it answers that model, through the
+    gateway as :func:`gateway_model` builds the agent's own, built once and kept; any name it
+    doesn't list raises :class:`KeyError`, a :class:`LookupError`, so the turn answers with the
+    agent's model and a notice says why (artifactr ADR-0097). It never builds a model by a name
+    a message gave it.
+
+    Args:
+        gateway: The gateway's settings: the models, the ceiling every tenant narrows, and how
+            to reach them.
+    """
+
+    def __init__(self, gateway: GatewaySettings) -> None:
+        self._gateway = gateway
+        self._listed: Mapping[str, ModelInfo] = {model.id: model for model in gateway.models}
+        self._built: dict[str, Model] = {}
+
+    @property
+    def local(self) -> tuple[str, ...]:
+        """The listed models served on the operator's own hardware."""
+        return tuple(model.id for model in self._gateway.models if model.local)
+
+    def __call__(self, name: str) -> Model:
+        """The listed model ``name``, built once.
+
+        Raises:
+            KeyError: If it isn't listed.
+        """
+        if name not in self._built:
+            self._built[name] = gateway_model(replace(self._gateway, model=self._listed[name].id))
+        return self._built[name]
+
+    def defaults(self) -> SettingsDefaults:
+        """``models:allowed`` without a store: the operator's, everywhere."""
+        return SettingsDefaults(
+            registry(*KNOWN_SETTINGS.values(), models_allowed(self._gateway)),
+            operator={MODELS_ALLOWED: list(self._gateway.allowed_models)},
+        )
+
+    async def allowed(
+        self, settings: Settings, tenant_id: str, workspace_id: str
+    ) -> list[ModelInfo]:
+        """The models people in a tenant's workspace may choose, in the order they are listed."""
+        names = await _allowed(settings, tenant_id, workspace_id)
+        return [model for model in self._gateway.models if model.id in names]
+
+    def narrowed(self, authorize: Authorize | None, settings: Settings) -> Authorize:
+        """``authorize``, refusing a turn the model a workspace's ``models:allowed`` leaves out.
+
+        A name the list doesn't hold is left to the runner, which answers it as unknown;
+        without ``authorize``, everything else is allowed.
+        """
+
+        async def check(
+            tenant_id: str, workspace_id: str | None, actor: Actor, access: Access
+        ) -> bool:
+            model = access.model
+            if access.action == USE_MODEL and model in self._listed:
+                if workspace_id is None:
+                    return False
+                if model not in await _allowed(settings, tenant_id, workspace_id):
+                    return False
+            return authorize is None or await authorize(tenant_id, workspace_id, actor, access)
+
+        return check
+{%- endif %}
 
 
 class TenantKeys:

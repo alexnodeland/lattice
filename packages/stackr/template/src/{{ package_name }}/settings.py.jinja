@@ -17,7 +17,7 @@ import os
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Self, cast
+from typing import Final, Self, cast
 {%- if use_tracker %}
 
 from pydantic import ValidationError
@@ -71,6 +71,32 @@ class AuthSettings:
 
 
 @dataclass(frozen=True)
+class ModelInfo:
+    """A model a person may choose for a turn, as the composer's picker shows it (ADR-0097).
+
+    Attributes:
+        id: The gateway's model group, the name a message gives.
+        label: What the picker calls it.
+        family: Whose model it is, such as ``anthropic``, or ``local``.
+        local: Whether it runs on the operator's own hardware: slower to its first token.
+        reasoning: Whether it thinks before it answers.
+    """
+
+    id: str
+    label: str
+    family: str = ""
+    local: bool = False
+    reasoning: bool = False
+
+
+ALWAYS: Final = (
+    ModelInfo(id="default", label="Default"),
+    ModelInfo(id="fast", label="Fast"),
+)
+"""The models every deployment offers, and every tenant by default: the gateway's two groups."""
+
+
+@dataclass(frozen=True)
 class GatewaySettings:
     """How agents reach models: the LLM gateway port.
 
@@ -94,6 +120,10 @@ class GatewaySettings:
         hosted_models: Model names to count as hosted whatever their shape.
         tool_seconds: The most a tool call may take to return before the turn fails as
             ``tool_stalled``; ``None`` waits as long as a tool needs.
+        models: Every model a message may name: ``default`` and ``fast``, and those the operator
+            lists. Nothing else is ever built, whatever a message names (artifactr ADR-0097).
+        allowed_models: The models every tenant is offered, of ``models``: the ceiling each
+            tenant's and workspace's ``models:allowed`` only narrows (lattice ADR-0030).
     """
 
     base_url: str = "http://localhost:4400"
@@ -109,6 +139,17 @@ class GatewaySettings:
     local_models: tuple[str, ...] = ()
     hosted_models: tuple[str, ...] = ()
     tool_seconds: float | None = 600.0
+    models: tuple[ModelInfo, ...] = ALWAYS
+    allowed_models: tuple[str, ...] = ("default", "fast")
+
+    def __post_init__(self) -> None:
+        ids = [model.id for model in self.models]
+        if missing := [model.id for model in ALWAYS if model.id not in ids]:
+            raise ValueError(f"LITELLM_MODELS must list {' and '.join(missing)}")
+        if len(set(ids)) != len(ids):
+            raise ValueError("LITELLM_MODELS lists a model twice")
+        if unknown := sorted(set(self.allowed_models) - set(ids)):
+            raise ValueError(f"LITELLM_MODELS_ALLOWED names unlisted {', '.join(unknown)}")
 
 
 {% if use_tracker -%}
@@ -532,6 +573,10 @@ class Settings:
             local_models=_names(env.get("LITELLM_LOCAL_MODELS", "")),
             hosted_models=_names(env.get("LITELLM_HOSTED_MODELS", "")),
             tool_seconds=_seconds(env, "AGENT_TOOL_SECONDS", 600.0, none=True),
+            models=_models(env.get("LITELLM_MODELS", "[]")),
+            allowed_models=_names(
+                env.get("LITELLM_MODELS_ALLOWED", ",".join(GatewaySettings.allowed_models))
+            ),
         )
         return cls(
             service_name=env.get("OTEL_SERVICE_NAME", cls.service_name),
@@ -577,6 +622,40 @@ def _tenant_keys(text: str) -> dict[str, str]:
         raise ValueError("LITELLM_TENANT_KEYS must be a JSON object of tenant keys")
     pairs = cast(dict[object, object], keys)
     return {str(tenant): str(key) for tenant, key in pairs.items()}
+
+
+def _models(text: str) -> tuple[ModelInfo, ...]:
+    """Parse ``LITELLM_MODELS``: a JSON list of the models beyond ``default`` and ``fast``.
+
+    Each is an object with an ``id``, the gateway's model group, and a ``label``, and, if it
+    says so, its ``family``, and ``local`` and ``reasoning`` as booleans. One that lists
+    ``default`` or ``fast`` says how the picker shows it.
+    """
+    try:
+        parsed: object = json.loads(text)
+    except json.JSONDecodeError as error:
+        raise ValueError("LITELLM_MODELS must be a JSON list of models") from error
+    if not isinstance(parsed, list):
+        raise ValueError("LITELLM_MODELS must be a JSON list of models")
+    listed: list[ModelInfo] = []
+    for entry in cast(list[object], parsed):
+        if not isinstance(entry, dict):
+            raise ValueError("each of LITELLM_MODELS is an object with an id and a label")
+        fields = cast(dict[str, object], entry)
+        model, label = fields.get("id"), fields.get("label")
+        family = fields.get("family", "")
+        local, reasoning = fields.get("local", False), fields.get("reasoning", False)
+        if not (isinstance(model, str) and model and isinstance(label, str) and label):
+            raise ValueError("each of LITELLM_MODELS is an object with an id and a label")
+        if not (
+            isinstance(family, str) and isinstance(local, bool) and isinstance(reasoning, bool)
+        ):
+            raise ValueError(f"LITELLM_MODELS' {model}: family is text, local and reasoning bool")
+        listed.append(
+            ModelInfo(id=model, label=label, family=family, local=local, reasoning=reasoning)
+        )
+    named = {model.id for model in listed}
+    return (*(model for model in ALWAYS if model.id not in named), *listed)
 
 
 {% if use_tracker -%}

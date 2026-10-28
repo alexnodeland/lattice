@@ -18,6 +18,7 @@ from grantr.grants import Grants, InMemoryStorage
 from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay, Umami
 from portalr.fastapi.router import portalr_router
 from portalr.fastapi.site import Site
+from portalr.models import OfferedModel
 from portalr.readers import (
     Analytics,
     Grafana,
@@ -42,6 +43,10 @@ async def _no_invite(_email: str) -> str:
 
 
 async def _no_one(_ids: Collection[str]) -> dict[str, str]:
+    raise NotImplementedError
+
+
+async def _no_models(_tenant: str, _workspace: str) -> list[OfferedModel]:
     raise NotImplementedError
 
 
@@ -71,6 +76,7 @@ def openapi_app() -> FastAPI:
         readers=readers,
         invite=_no_invite,
         people=_no_one,
+        models=_no_models,
         relay=relay,
         site=Site(supabase_url="http://supabase", supabase_key="publishable"),
         ui=Path("static"),

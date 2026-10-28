@@ -72,6 +72,7 @@ portalr needs Python 3.12 or newer. Its wheel carries the two built UIs, which V
 | `site` | Your Supabase project's URL and *publishable* key, and where you mounted each router |
 | `people` | Optional. Names people by email: a function from user ids to the emails it can find, such as `portalr.people.SupabasePeople(url=, secret_key=)` over Supabase Auth's admin API. Without it, there is no people route, and the UIs show people by a short id |
 | `relay` | Optional. Product analytics from people's browsers, with their consent ([lattice RFC-0008](../rfcs/0008-portalr-product-analytics.md)): `portalr.analytics.Relay(analytics, consent, limiter, grants=grants)`, over ClickHouse, people's answers (`portalr.analytics.sql.SqlConsent`, with the `sql` extra) and their pace. Without it, there are no analytics routes |
+| `models` | Optional. The models a workspace allows a turn to name ([ADR-0086](adr/0086-the-composer-chooses-the-model-of-the-next-turn.md)): `async (tenant, workspace) -> list[portalr.models.OfferedModel]`, read from the same source as the runner's `artifactr:use_model` check. Without it, there is no models route, and the composer offers no choice |
 
 ```python
 from fastapi import FastAPI

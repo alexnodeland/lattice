@@ -46,6 +46,9 @@ from grantr.core import PRINCIPAL_ID
 from grantr.fastapi import Caller, Unauthorized, grantr_router
 from grantr.sql import SqlStorage, migrate
 from grantr.testing import matrix
+{%- if use_artifactr %}
+from lattice_core.settings import KNOWN_SETTINGS, registry
+{%- endif %}
 {%- if use_portal %}
 from portalr.actions import ACTIONS as PORTALR_ACTIONS
 {%- endif %}
@@ -69,6 +72,10 @@ from {{ package_name }}.auth import (
 from {{ package_name }}.chat_rules import BRIDGE_RULES
 {%- endif %}
 from {{ package_name }}.database import Database
+{%- if use_artifactr %}
+from {{ package_name }}.gateway import MODELS_ALLOWED, models_allowed
+from {{ package_name }}.settings import GatewaySettings
+{%- endif %}
 from {{ package_name }}.telemetry import TelemetryHandle
 {%- if use_reflexr %}
 from {{ package_name }}.tickets import RULES
@@ -148,6 +155,9 @@ def build_grants(
 {%- if use_files %}
     files: Sequence[str] = (),
 {%- endif %}
+{%- if use_artifactr %}
+    gateway: GatewaySettings | None = None,
+{%- endif %}
 ) -> Grants:
     """Make grantr over a storage, with the libraries' catalogs, for the application ``name``.
 {%- if use_files %}
@@ -158,12 +168,24 @@ def build_grants(
 
     The application's own service principal is named after it, and holds the ``application``
     role once :meth:`Access.lifespan` has started.
+{%- if use_artifactr %}
+
+    Beside lattice's settings, it knows ``models:allowed``, over the models ``gateway`` lists,
+    with the operator's ``LITELLM_MODELS_ALLOWED`` as every tenant's ceiling.
+{%- endif %}
     """
+{%- if use_artifactr %}
+    gateway = gateway or GatewaySettings()
+{%- endif %}
     return Grants(
         storage,
         catalogs=CATALOGS,
         installed={% if use_files %}[*INSTALLED, *(f"files:{craft}" for craft in files)]{% else %}INSTALLED{% endif %},
         application=ServicePrincipal(id=name),
+{%- if use_artifactr %}
+        settings=registry(*KNOWN_SETTINGS.values(), models_allowed(gateway)),
+        operator_settings={MODELS_ALLOWED: list(gateway.allowed_models)},
+{%- endif %}
         tracer_provider=telemetry.tracer_provider if telemetry else None,
         meter_provider=telemetry.meter_provider if telemetry else None,
     )
@@ -181,6 +203,9 @@ class Access:
 {%- if use_files %}
         files: The native files' apps that run, which grantr installs.
 {%- endif %}
+{%- if use_artifactr %}
+        gateway: The models a message may name, whose ``models:allowed`` grantr keeps.
+{%- endif %}
     """
 
     def __init__(
@@ -193,6 +218,9 @@ class Access:
         telemetry: TelemetryHandle | None = None,
 {%- if use_files %}
         files: Sequence[str] = (),
+{%- endif %}
+{%- if use_artifactr %}
+        gateway: GatewaySettings | None = None,
 {%- endif %}
     ) -> None:
         self._verifier = verifier
@@ -208,9 +236,17 @@ class Access:
             else InMemoryStorage()
         )
 {%- if use_files %}
-        self.grants = grants or build_grants(storage, name=name, telemetry=telemetry, files=files)
+        self.grants = grants or build_grants(
+            storage, name=name, telemetry=telemetry, files=files{% if use_artifactr %}, gateway=gateway{% endif %}
+        )
+{%- else %}
+{%- if use_artifactr %}
+        self.grants = grants or build_grants(
+            storage, name=name, telemetry=telemetry, gateway=gateway
+        )
 {%- else %}
         self.grants = grants or build_grants(storage, name=name, telemetry=telemetry)
+{%- endif %}
 {%- endif %}
 
     async def migrate(self, database: Database) -> None:

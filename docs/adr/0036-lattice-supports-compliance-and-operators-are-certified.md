@@ -42,7 +42,7 @@ The owner decided (2026-10-28):
   - the owner: lattice, the operator, or shared.
 - **Every lattice-owned control produces evidence automatically.** A control without evidence isn't finished. Evidence is collected on a compliance page and exported as a bundle (#1057).
 - **Docs never say "compliant", "certified" or "HIPAA-ready".** They say lattice *supports* a framework and link the matrix. A docs check enforces the wording.
-- **Data classes drive the controls.** Egress, retention, redaction, residency, audit of reads and HIPAA mode all key off a data's class (#1044). Model providers are treated as subprocessors, and they receive a class only where policy allows.
+- **Data classes drive the controls.** Egress, retention, redaction, residency, audit of reads and HIPAA mode all key off a data's class (#1044). Model providers are treated as subprocessors, and they receive a class only where policy allows. The gateway's PII guardrails apply to every model call, on inputs and outputs, with an action set per class (#1058).
 - **Strict modes only narrow.** HIPAA mode (#1055) and high-risk AI declarations (#1056) are settings that make other settings stricter, through the settings model of ADR-0030. They never add a separate build.
 - **Order:** GDPR controls first, then the shared SOC 2 and ISO 27001 controls, then HIPAA mode. The EU AI Act items ride alongside.
 - **Certifying a hosted lattice is out of scope.** If a hosted offering is ever run, its SOC 2 audit and BAAs are a separate decision.
@@ -103,5 +103,6 @@ Option B is a claim lattice can't back. Option C is honest but leaves operators 
 
 1. [ ] Write the control matrix and shared-responsibility table, with the wording check (#1043).
 2. [ ] Build data classes and the egress policy per class (#1044).
-3. [ ] Build the remaining controls in the epic's order (#1045–#1056).
-4. [ ] Build the compliance page and evidence bundle (#1057).
+3. [ ] Put the gateway's PII guardrails on every request and route, on inputs and outputs, and measure them (#1058).
+4. [ ] Build the remaining controls in the epic's order (#1045–#1056).
+5. [ ] Build the compliance page and evidence bundle (#1057).

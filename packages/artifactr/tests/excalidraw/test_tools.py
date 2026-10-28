@@ -74,7 +74,7 @@ async def thread(ws: Workspace) -> Thread:
 
 
 @pytest.fixture
-async def runners() -> AsyncIterator[list[Runner[None]]]:
+async def runners(_no_task_left: None) -> AsyncIterator[list[Runner[None]]]:
     made: list[Runner[None]] = []
     yield made
     for runner in made:

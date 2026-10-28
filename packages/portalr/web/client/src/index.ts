@@ -43,7 +43,7 @@ export type * as ReflexrApi from "./generated/reflexr.openapi";
 export type * as ReflexrRulesV1 from "./generated/reflexr.rules.v1";
 export type * as ReflexrV1 from "./generated/reflexr.v1";
 export type * as RelayrApi from "./generated/relayr.openapi";
-export { changedIntegrations, type IntegrationKey, useEnabled } from "./integrations";
+export { changedIntegrations, type IntegrationKey, namedOf, useEnabled } from "./integrations";
 export {
   type AdminLanding,
   administered,

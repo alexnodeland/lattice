@@ -147,7 +147,7 @@ class Site(BaseModel):
     @field_validator("links")
     @classmethod
     def _links(cls, links: dict[str, str]) -> dict[str, str]:
-        """Refuse a link for no integration's key, or one at no web address of its own."""
+        """Refuse a link with no valid integration key, or at no web address of its own."""
         return _link_urls(links)
 
     @field_validator("origin")
@@ -282,8 +282,8 @@ def _link_urls(links: dict[str, str]) -> dict[str, str]:
     """Each connected app's URL on its web origin as a browser compares it, its path kept.
 
     Raises:
-        ValueError: If a key is no integration's, or a URL has no web origin, or a query or
-            fragment.
+        ValueError: If a key isn't a valid integration key, or a URL has no web origin, or a
+            query or fragment.
     """
     return _urls(links, "")
 
@@ -298,7 +298,7 @@ def _urls(urls: dict[str, str], whose: str) -> dict[str, str]:
     kept: dict[str, str] = {}
     for key, url in urls.items():
         if not KEY.fullmatch(key):
-            raise ValueError(f"{key} is no integration: its key is a name or family:name")
+            raise ValueError(f"{key} isn't a valid integration key: a name or family:name")
         what = f"{key}{whose}"
         parts = urlsplit(url)
         if parts.query or parts.fragment:

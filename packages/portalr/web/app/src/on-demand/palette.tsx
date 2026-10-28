@@ -6,7 +6,7 @@
  * the way it was opened from (`finalFocus`, the bar's magnifier).
  */
 
-import { type Artifactr, INTEGRATIONS } from "@portalr/client";
+import { type Artifactr, INTEGRATIONS, namedOf } from "@portalr/client";
 import { Button, type Glyph, glyphs, Icon, PaletteFrame, RunStatus } from "@portalr/ui";
 import { type ReactNode, type RefObject, useId, useState } from "react";
 
@@ -126,15 +126,18 @@ export function Palette({
           },
         ]
       : []),
-    ...INTEGRATIONS.filter(({ key }) => links[key])
-      .map(({ key, description }) => ({ key, label: `Open ${description.split(":")[0]}` }))
+    ...Object.entries(links)
+      .map(([key, to]) => {
+        const description = INTEGRATIONS.find((known) => known.key === key)?.description ?? "";
+        return { key, to, label: `Open ${namedOf({ key, description }).name}` };
+      })
       .filter(({ label }) => matches(label))
-      .map(({ key, label }) => ({
+      .map(({ key, to, label }) => ({
         key,
         group: "Connected apps",
         label,
         icon: glyphs.externalLink,
-        to: links[key] as string,
+        to,
         away: true,
         end: <span className="sr-only">, opens in a new tab</span>,
       })),
@@ -143,9 +146,11 @@ export function Palette({
   const follow = (choice: Choice | undefined) => {
     if (choice) {
       onOpenChange(false);
-      choice.away
-        ? window.open(choice.to, "_blank", "noopener,noreferrer")
-        : go(choice.to, choice.hash);
+      if (choice.away) {
+        window.open(choice.to, "_blank", "noopener,noreferrer");
+      } else {
+        go(choice.to, choice.hash);
+      }
     }
   };
   const option = (index: number) => `${list}-${index}`;

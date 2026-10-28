@@ -79,7 +79,8 @@ export function SearchPalette({
   const { queries, config } = useRouteContext({ from: "/_signed/t/$tenant/w/$workspace" });
   const navigate = useNavigate();
   const { state } = useWorkspace();
-  // What grantr says is on in the workspace: never a default, so no app is linked that isn't on.
+  // Read raw, not through `useEnabled`, whose registry defaults would link an app that is off
+  // before grantr answers or where it can't (portalr ADR-0088).
   const { data: on } = useQuery(queries.grantr.enabledIntegrations(tenant, workspace));
   // The artifacts' titles, as the Artifacts page reads them, read once the palette is opened.
   const { data: read } = useQuery({

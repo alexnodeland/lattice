@@ -229,13 +229,13 @@ def test_a_link_is_kept_on_its_origin_its_path_kept_and_moved_beside_on_its_port
 @pytest.mark.parametrize(
     ("links", "said"),
     [
-        ({"Not A Key": "https://a.example"}, "no integration"),
+        ({"Not A Key": "https://a.example"}, "isn't a valid integration key"),
         ({"tracker:plane": "http://plane.lan:8090"}, "https, or http on loopback"),
-        ({"tracker:plane": "https://user:pw@plane.example"}, "tracker:plane"),
+        ({"tracker:plane": "https://user:pw@plane.example"}, "with no user or password"),
         ({"tracker:plane": "https://*.example"}, "no wildcard"),
         ({"tracker:plane": "https://plane.example/?a=1"}, "no query or fragment"),
         ({"tracker:plane": "https://plane.example/a/../b"}, "no empty, . or .. segment"),
-        ({"tracker:plane": "javascript:alert(1)"}, "tracker:plane"),
+        ({"tracker:plane": "javascript:alert(1)"}, "not 'javascript:': a host"),
     ],
 )
 def test_a_link_at_no_web_address_of_its_own_is_refused(links: dict[str, str], said: str) -> None:

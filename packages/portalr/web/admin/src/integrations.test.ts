@@ -1,6 +1,6 @@
-import { INTEGRATIONS } from "@portalr/client";
+import { INTEGRATIONS, namedOf } from "@portalr/client";
 import { expect, test } from "vitest";
-import { levelOf, namedOf, rowsOf, settersOf, sourceOf } from "./integrations";
+import { levelOf, rowsOf, settersOf, sourceOf } from "./integrations";
 
 const ALICE = { on: true, by: { kind: "user", id: "alice" }, at: "2026-10-17T09:00:00Z" } as const;
 const OFF = { ...ALICE, on: false };

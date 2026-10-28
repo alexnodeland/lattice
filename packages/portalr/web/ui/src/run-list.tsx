@@ -107,7 +107,7 @@ export function RunList({
                 {attempts && (
                   <td className="text-muted" data-num="">
                     {/* The first attempt goes without saying. */}
-                    {run.attempts !== 1 && run.attempts}
+                    {(run.attempts ?? 0) > 1 && run.attempts}
                   </td>
                 )}
                 {feedback && (
@@ -143,10 +143,10 @@ export function RunList({
                 </span>
               }
               meta={
-                (started || (attempts && run.attempts !== 1)) && (
+                (started || (attempts && (run.attempts ?? 0) > 1)) && (
                   <span className="flex flex-wrap items-center gap-3">
                     {started && run.started}
-                    {attempts && run.attempts !== 1 && <span>Attempt {run.attempts}</span>}
+                    {attempts && (run.attempts ?? 0) > 1 && <span>Attempt {run.attempts}</span>}
                   </span>
                 )
               }

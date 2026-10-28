@@ -72,7 +72,7 @@ function Workspaces() {
       }
       account={<AppAccount />}
     >
-      <PageHeader title={tenant} meta="The workspaces you can open here" />
+      <PageHeader title={tenant} />
       {workspaces.length === 0 ? (
         <p>There is no workspace here you can open.</p>
       ) : (
@@ -87,7 +87,7 @@ function Workspaces() {
                   {workspace}
                 </RowLink>
               }
-              end={
+              meta={
                 <Tracks label={`${workspace}'s areas`}>
                   {AREAS.map(({ to, label, icon }) => (
                     <TrackLink

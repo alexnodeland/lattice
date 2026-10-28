@@ -36,6 +36,11 @@ const field = (page: Page) => page.getByRole("textbox", { name: "Rule, as reflex
 
 /** Fill the field with the rule's JSON, and send it with the button. */
 async function send(page: Page, rule: string, button: string) {
+  // Installing is folded under its button until asked (portalr ADR-0085).
+  const install = page.getByRole("button", { name: "Install a rule…" });
+  if ((await install.count()) > 0 && (await install.getAttribute("aria-expanded")) === "false") {
+    await install.click();
+  }
   await field(page).fill(rule);
   await page.getByRole("button", { name: button }).click();
 }

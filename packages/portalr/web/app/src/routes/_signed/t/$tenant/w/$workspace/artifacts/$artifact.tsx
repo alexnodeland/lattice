@@ -196,7 +196,7 @@ function Artifact() {
             )}
             <ArtifactContent
               kind={latest.kind}
-              data={latest.data}
+              data={untitled(latest.data, title)}
               shown={{ id, version: latest.version, archived: latest.archived }}
               renderers={RENDERERS}
             />
@@ -260,6 +260,22 @@ function Artifact() {
       </section>
     </section>
   );
+}
+
+/**
+ * A note's words without their first heading where it is the page's title, so the title isn't
+ * said twice, once over the page and again over the card (portalr ADR-0085).
+ */
+function untitled(
+  data: Readonly<Record<string, unknown>>,
+  title: string | null,
+): Readonly<Record<string, unknown>> {
+  const text = data.text;
+  if (title === null || typeof text !== "string") {
+    return data;
+  }
+  const [first, ...rest] = text.split("\n");
+  return first?.trim() === `# ${title}` ? { ...data, text: rest.join("\n").trimStart() } : data;
 }
 
 function NotFound() {

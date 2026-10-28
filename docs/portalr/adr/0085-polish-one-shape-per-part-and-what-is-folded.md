@@ -32,10 +32,21 @@ And the owner's decisions on the audit's questions:
 - **Tokens** are behind a disclosure for everyone: the strip says its status, phase, elapsed time and Stop; "Tokens" opens the chips.
 - **Bytes.** The app's initial ceiling isn't raised. What this pays with: Streamdown's classes for the parts portalr turns off (its code and diagram toolbars, the link modal, the diagram's full screen, the download menu) are left out of the stylesheet (`@source not inline`), the dead `Mark` is deleted, and the new looks reuse the kit's classes.
 
+And from the owner's review of the after shots:
+
+- **The threads' search is a glyph until asked:** a "Search threads" icon button on the filters' row (or "/"); opened, a field that takes the focus and the row's room, folded back by Escape or Close; a query folded away stays applied, as a chip that clears it.
+- **Tucked away:** the list pages' lines under their titles (Threads, Artifacts, Proposals, Runs, Rules, a tenant's workspaces), installing a rule (behind "Install a rule…"), a note's first heading where it repeats the page's title, the strip above an approval (its card says it waits), and the privacy links' long words ("How sharing works", "How recording works", the glyph saying it opens apart, which amends RFC-0008's wording).
+- **A failed turn says what happened in words** for a provider's error (overloaded, limited, too slow): "The model was overloaded, so it couldn't answer. Nothing was lost.", with Try again; the error's own text stays under Details.
+- **A workspace's track** is the row's width on a phone, each cell its glyph over its word, 44px to a finger; the row keeps its chevron. "Name it first…" is an outlined button with its glyph, kept as its form opens so the composer's row keeps its shape; the keys' hint is the composer's description where it isn't shown.
+- **Who may set the mode but not post** has the toggle where the composer would be.
+- **Wide empty states:** a dashed empty state is the column's width.
+
+The layout pass, after this one and on the design exploration's direction: actions in the corners (a top-right cluster, the thumb's bottom corner on a phone), side panes on wide screens in place of stacked sections, and fewer bordered boxes per screen.
+
 Two of the audit's findings were the fixture's, not the product's: a turn ended by Stop is `stopped`, never `cancelled` (artifactr's `RunEnded`), and an approval's `app` is the server's title ("WordCraft"), so "into your WordCraft" reads right; "the site" was the fixture's.
 
 ## Consequences
 
 - Every screenshot baseline and computed-style snapshot of a changed part moves.
 - A kit of its own keeps its tokens; the sign-in card's radius and padding hold from the small breakpoint, and a phone shows the form on its gutter.
-- Not done: the phone search's collapse behind its glyph (the field wraps to its own row instead), a run's own detail page, and the approval's tick drawn into the card's corner.
+- Not done: a run's own detail page.

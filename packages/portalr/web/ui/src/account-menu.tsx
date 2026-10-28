@@ -125,6 +125,7 @@ function PrivacySwitch({
       {pending && <Note>{pending}</Note>}
       <Menu.LinkItem href={guide} target="_blank" rel="noopener noreferrer" className={item}>
         {words.link}
+        <span className="sr-only"> (opens in a new tab)</span>
         <Icon icon={glyphs.externalLink} className="shrink-0 text-muted" />
       </Menu.LinkItem>
     </>
@@ -168,7 +169,9 @@ export function AccountMenu({
       <Menu.Trigger
         aria-label={`Account: ${name}`}
         className={cn(
-          "inline-flex min-w-0 items-center gap-2 rounded-(--header-trigger-radius) p-1 pr-2 font-medium text-fg text-sm hover:bg-wash",
+          // Where its name is hidden, the bar's, the trigger is the avatar's circle, its wash too, in
+          // both UIs alike (portalr ADR-0085); beside the name, the header's trigger shape.
+          "inline-flex min-w-0 items-center gap-2 rounded-(--header-trigger-radius) p-1 pr-2 font-medium text-fg text-sm hover:bg-wash max-lg:rounded-full",
           RING,
           FEEDBACK,
         )}
@@ -244,7 +247,7 @@ export function AccountMenu({
                       label: "Share how I use the app",
                       about:
                         "Which pages you open, never what you write. Turning it off deletes what you shared.",
-                      link: "What is shared, and how it is kept (opens in a new tab)",
+                      link: "How sharing works",
                     }}
                     pending={!analytics.given && analytics.deleting ? STILL_DELETING : undefined}
                     guide={analytics.guide}

@@ -49,7 +49,7 @@ const WORDS = {
   label: "Record my sessions to improve the app",
   about:
     "Records the layout of the pages you visit and where you click. All text and anything you type is hidden, and chats, files, mini apps and Access are never recorded. Turning it off deletes your recordings.",
-  link: "What is recorded, and how it is kept (opens in a new tab)",
+  link: "How recording works",
   pending: STILL_DELETING,
 };
 

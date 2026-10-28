@@ -41,6 +41,7 @@ export function FileChooser({
 }) {
   const input = useId();
   const described = useId();
+  const listed = useId();
   // How deep a drag is inside the zone: entering a child enters before the zone is left, so the
   // zone is marked from the first enter until the last leave, without flickering in between.
   const [depth, setDepth] = useState(0);
@@ -88,7 +89,7 @@ export function FileChooser({
           accept={accept}
           multiple={multiple}
           disabled={disabled}
-          aria-describedby={described}
+          aria-describedby={types ? `${described} ${listed}` : described}
           // Cleared as the picker opens, so choosing the same file again is a change too, and the
           // input says what was chosen until then.
           onClick={(event) => {
@@ -115,7 +116,7 @@ export function FileChooser({
       </p>
       {types && (
         <Disclosure summary="Supported files" className="w-full text-muted text-xs">
-          {types}
+          <span id={listed}>{types}</span>
         </Disclosure>
       )}
     </fieldset>

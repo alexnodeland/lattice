@@ -42,7 +42,7 @@ export function PageHeader({
     // line, at every width, never wrapped under it; then the line about it.
     <header className="flex flex-col gap-1">
       {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs trail={breadcrumbs} />}
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <h1
           id={id}
           ref={ref}

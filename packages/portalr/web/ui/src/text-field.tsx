@@ -42,7 +42,7 @@ export function SearchField({
 }: Omit<ComponentProps<"input">, "className" | "type"> & { label: string; className?: string }) {
   return (
     <span className={cn("relative flex min-w-0 items-center", className)}>
-      <Icon icon={glyphs.search} className="pointer-events-none absolute left-2 text-muted" />
+      <Icon icon={glyphs.search} className="pointer-events-none absolute start-2 text-muted" />
       <input
         type="search"
         aria-label={label}

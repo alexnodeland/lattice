@@ -45,7 +45,12 @@ test("files chosen together are sent one after another, each of its kind, and sa
   const { screen } = await open(PAGE, serving(offered()));
   const input = screen.getByLabelText("Upload files");
   await expect.element(input).toHaveAttribute("accept", ".docx,.dwg,.dxf,.DXF,.fcproj");
-  await expect.element(input).toHaveAccessibleDescription("Or drop them here · up to 1 kB");
+  // What it takes is said whole, though its list is folded under Supported files (portalr ADR-0085).
+  await expect
+    .element(input)
+    .toHaveAccessibleDescription(
+      "Or drop them here · up to 1 kB .docx, .dwg, .dxf, .DXF, up to 1 kB each; .fcproj, up to 500 bytes each.",
+    );
   await input.upload([new File(["one"], "brief.docx"), new File(["two"], "plan.dwg")]);
   const first = await sent(1);
   expect(first.url).toMatch(/^\/artifactr\/v1\/workspaces\/notes\/files\?/);

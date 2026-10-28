@@ -3,7 +3,7 @@ import { render } from "vitest-browser-react";
 import { Messages } from "./chat";
 import { RunFailed } from "./run-failed";
 
-test("a failed turn says why in words, the run's own short error with it, and can be tried again", async () => {
+test("a failed turn says why in words, the run's own under Details, and can be tried again", async () => {
   const onRetry = vi.fn(async () => ({ outcome: "done" }) as const);
   const screen = await render(
     <Messages>
@@ -19,25 +19,30 @@ test("a failed turn says why in words, the run's own short error with it, and ca
     .toHaveTextContent(
       "The assistant couldn't finish. The model kept calling a tool in a way the tool refused, and ran out of tries.",
     );
-  // Short, the error is said in the alert itself, with no Details to open.
+  await expect.element(screen.getByText(/exceeded max retries/)).not.toBeVisible();
+  await screen.getByText("Details").click();
   await expect.element(screen.getByText(/exceeded max retries/)).toBeVisible();
-  expect(screen.getByText("Details").elements()).toHaveLength(0);
   await screen.getByRole("button", { name: "Try again" }).click();
   expect(onRetry).toHaveBeenCalledOnce();
 });
 
-test("a long error, or one of several lines, waits under Details", async () => {
-  const screen = await render(
-    <Messages>
-      <RunFailed reason={null} error={"Traceback (most recent call last):\n  boom"} />
-      <RunFailed reason={null} error={`ModelHTTPError: ${"overloaded ".repeat(20)}`} />
-    </Messages>,
-  );
-  expect(screen.getByText("Details").elements()).toHaveLength(2);
-  await expect.element(screen.getByText(/Traceback/)).not.toBeVisible();
-  await screen.getByText("Details").first().click();
-  await expect.element(screen.getByText(/Traceback/)).toBeVisible();
-});
+for (const [error, said] of [
+  ["ModelHTTPError: status_code: 529, model_name: claude, body: overloaded", "overloaded"],
+  ["status_code: 429, rate limit exceeded", "taking no more requests"],
+  ["ReadTimeout: the request timed out", "took too long"],
+] as const) {
+  test(`a provider's error is said in words, its text under Details: ${said}`, async () => {
+    const screen = await render(
+      <Messages>
+        <RunFailed reason={null} error={error} />
+      </Messages>,
+    );
+    const note = screen.getByRole("note").element();
+    expect(note.querySelector("p")?.textContent).toContain(said);
+    await expect.element(screen.getByText(error)).not.toBeVisible();
+    expect(screen.getByText("Details").elements()).toHaveLength(1);
+  });
+}
 
 test("a failure further up, or one without a reason, is a note, with no way to try again", async () => {
   const screen = await render(
@@ -51,7 +56,7 @@ test("a failure further up, or one without a reason, is a note, with no way to t
   expect(unusable?.textContent).toContain("The model answered in a way the turn couldn't use.");
   expect(plain?.textContent).toContain("Something went wrong before it answered.");
   expect(unknown?.textContent).toContain("Something went wrong before it answered.");
-  await expect.element(screen.getByText("Boom")).toBeVisible();
+  expect(screen.getByText("Details").elements()).toHaveLength(1);
   expect(screen.getByRole("button", { name: "Try again" }).elements()).toHaveLength(0);
   expect(screen.getByRole("alert").elements()).toHaveLength(0);
 });

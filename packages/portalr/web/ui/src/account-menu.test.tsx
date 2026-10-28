@@ -229,7 +229,7 @@ test("the switch is beside a link to what is shared, and says when a deletion is
   );
   await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
   const link = screen.getByRole("menuitem", {
-    name: "What is shared, and how it is kept (opens in a new tab)",
+    name: "How sharing works (opens in a new tab)",
   });
   await expect.element(link).toHaveAttribute("href", GUIDE);
   await expect
@@ -263,7 +263,7 @@ const WORDS = {
   label: "Record my sessions to improve the app",
   about:
     "Records the layout of the pages you visit and where you click. All text and anything you type is hidden, and chats, files, mini apps and Access are never recorded. Turning it off deletes your recordings.",
-  link: "What is recorded, and how it is kept (opens in a new tab)",
+  link: "How recording works",
   pending: "Deleting your recordings hasn't finished yet. It will be retried until it is done.",
 };
 const REPLAY_GUIDE = `${GUIDE}#session-replay`;
@@ -358,7 +358,7 @@ test("the recording switch is beside a link to what is recorded, which opens in 
   const screen = await render(withReplay({ given: true }, { given: false }));
   await screen.getByRole("button", { name: "Account: Alex Nodeland" }).click();
   const link = screen.getByRole("menuitem", {
-    name: "What is recorded, and how it is kept (opens in a new tab)",
+    name: "How recording works (opens in a new tab)",
   });
   await expect.element(link).toHaveAttribute("href", REPLAY_GUIDE);
   await expect.element(link).toHaveAttribute("target", "_blank");

@@ -183,10 +183,7 @@ function Runs() {
           things (a thread's title, a rule, a tracker item) and a comment on a run are blocked in
           their cells, and every other text on it is masked (portalr ADR-0077). */}
       <i hidden data-portalr-replay="allow" />
-      <PageHeader
-        title="Runs"
-        meta={`The agent's turns and the rules' runs in ${workspace}, newest first`}
-      />
+      <PageHeader title="Runs" />
       <div className="flex flex-col gap-3">
         <SectionTitle>The agent's turns</SectionTitle>
         <Connection

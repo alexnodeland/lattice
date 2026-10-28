@@ -17,4 +17,4 @@ export const FEEDBACK =
  * an approval; no margin column, no rule down the side.
  */
 export const ASKING =
-  "relative before:absolute before:top-(--question-pad) before:start-0 before:h-5 before:w-0.5 before:rounded-e-full before:bg-accent before:content-[''] before:forced-color-adjust-none forced-colors:before:bg-system-highlight";
+  "relative before:absolute before:top-(--question-pad) before:start-2 before:h-5 before:w-0.5 before:rounded-e-full before:bg-accent before:content-[''] before:forced-color-adjust-none forced-colors:before:bg-system-highlight";

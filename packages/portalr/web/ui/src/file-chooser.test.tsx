@@ -159,6 +159,10 @@ test("which files are taken is folded under Supported files, out of the way of t
     />,
   );
   await expect.element(screen.getByText(/\.docx, \.pdf/)).not.toBeVisible();
+  // Folded, the list is still the input's description.
+  await expect
+    .element(screen.getByLabelText("Upload files"))
+    .toHaveAccessibleDescription("Or drop them here · up to 26 MB .docx, .pdf, up to 26 MB each.");
   await screen.getByRole("button", { name: "Supported files" }).click();
   await expect.element(screen.getByText(/\.docx, \.pdf/)).toBeVisible();
 });

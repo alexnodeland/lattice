@@ -100,14 +100,16 @@ export function RowLink({ render, className, ...props }: RowLinkProps) {
 
 /**
  * A compact track of ways on, such as a workspace's areas (portalr ADR-0085): a segment's look,
- * flat on the quiet wash, each a link with its glyph and its word, the word shown from the small
- * breakpoint, so five fit a phone's row; below it each is named by its word alone.
+ * flat on the quiet wash, each a link with its glyph and its word; on a phone the track is the
+ * row's width, each cell its glyph over its word, a finger's 44px tall. It sits above a row's
+ * stretched link, so each is its own target.
  */
 export function Tracks({ label, children }: { label: string; children: ReactNode }) {
   return (
     <nav
       aria-label={label}
-      className="inline-flex gap-0.5 self-start rounded-(--segmented-radius) border border-line bg-subtle p-(--segmented-pad)"
+      data-track=""
+      className="relative z-10 mt-1 inline-flex gap-0.5 self-start rounded-(--segmented-radius) border border-line bg-subtle p-(--segmented-pad) max-sm:flex max-sm:self-stretch"
     >
       {children}
     </nav>
@@ -130,14 +132,14 @@ export function TrackLink({
     props: {
       "aria-label": children,
       className: cn(
-        "inline-flex items-center gap-1.5 rounded-(--segmented-item-radius) px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:text-fg",
+        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-(--segmented-item-radius) px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:text-fg max-sm:flex-1 max-sm:flex-col",
         RING,
         FEEDBACK,
       ),
       children: (
         <>
           <Icon icon={icon} />
-          <span aria-hidden="true" className="max-sm:hidden">
+          <span aria-hidden="true" className="max-w-full truncate text-xs">
             {children}
           </span>
         </>

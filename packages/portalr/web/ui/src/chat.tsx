@@ -633,6 +633,7 @@ export function Composer({
   keep?: boolean;
 }) {
   const [text, setText] = useState("");
+  const hint = useId();
   const box = useRef<HTMLTextAreaElement>(null);
   const { pending, unsent, send: sending } = useSending();
   // A draft not yet sent: leaving the page, or reloading it, asks first.
@@ -703,7 +704,7 @@ export function Composer({
         <Field.Label className="sr-only">Message</Field.Label>
         <Field.Control
           ref={box}
-          render={<textarea rows={2} enterKeyHint="send" />}
+          render={<textarea rows={2} enterKeyHint="send" aria-describedby={hint} />}
           value={text}
           placeholder="Write to the assistant"
           onValueChange={(value) => setText(String(value))}
@@ -713,12 +714,10 @@ export function Composer({
       </Field.Root>
       <div className="flex items-center justify-between gap-2 px-2.5 pb-1">
         {attach}
-        {/* The keys' hint where the row has room: not beside a thread's Attach and mode. */}
-        {!attach && (
-          <span className="text-muted text-xs max-sm:hidden">
-            Enter sends, Shift+Enter starts a new line
-          </span>
-        )}
+        {/* The keys' hint, the words' description: shown where the row has room, said always. */}
+        <span id={hint} className={cn("text-muted text-xs", attach ? "sr-only" : "max-sm:hidden")}>
+          Enter sends, Shift+Enter starts a new line
+        </span>
         <Button
           type="submit"
           className="ml-auto"
@@ -1166,7 +1165,11 @@ export function RunStrip({
     // `min-w-0`: a fieldset is otherwise never narrower than its content, as at 200% text.
     <fieldset
       aria-label="This turn"
-      className="m-0 flex min-w-0 flex-wrap items-center gap-3 rounded-(--card-radius) border border-line bg-surface px-3 py-2"
+      // While it waits, the request under it is the surface; the strip is a quiet line above it.
+      className={cn(
+        "m-0 flex min-w-0 flex-wrap items-center gap-3 rounded-(--card-radius) border border-line bg-surface px-3 py-2",
+        run.status === "paused" && "border-transparent bg-transparent",
+      )}
     >
       {/* Its status, then what it does and for how long, then its counts: one left edge. */}
       <span className="flex min-w-40 flex-1 flex-col items-start gap-1">

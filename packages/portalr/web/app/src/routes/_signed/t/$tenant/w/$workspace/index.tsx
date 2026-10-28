@@ -6,6 +6,9 @@ import {
   Button,
   Composer,
   EmptyState,
+  glyphs,
+  Icon,
+  IconButton,
   PageHeader,
   plainTitle,
   Row,
@@ -128,6 +131,19 @@ function Threads() {
     return { outcome: "done" as const };
   };
   const [naming, setNaming] = useState(false);
+  const [searching, setSearching] = useState(q !== "");
+  // "/" opens the search from anywhere on the page but a field.
+  useEffect(() => {
+    const slash = (event: KeyboardEvent) => {
+      const at = event.target as HTMLElement | null;
+      if (event.key === "/" && !at?.closest("input, textarea, [contenteditable]")) {
+        event.preventDefault();
+        setSearching(true);
+      }
+    };
+    addEventListener("keydown", slash);
+    return () => removeEventListener("keydown", slash);
+  }, []);
   const live = snapshot.status === "live";
   // What waits on a person across the workspace's threads (portalr ADR-0080): calls to approve
   // first, the riskier before the rest, then questions; each opens its thread at the request.
@@ -161,14 +177,47 @@ function Threads() {
   const listed = words
     ? shown.filter((thread) => (thread.title || "Untitled").toLocaleLowerCase().includes(words))
     : shown;
-  const finding = all.length > 0 && (
-    <div className="flex flex-wrap items-center gap-3">
+  // The search is a glyph until asked (portalr ADR-0085): opened, a field that takes the row's
+  // room; Escape or Close folds it back, and what it holds stays applied, as a chip that clears it.
+  const searchField = searching ? (
+    <span className="flex min-w-48 flex-1 items-center gap-1">
       <SearchField
         label="Search threads"
         value={typed}
+        // Opened by the reader, the field takes the focus.
+        autoFocus
         onChange={(event) => setTyped(event.currentTarget.value)}
-        className="min-w-48 flex-1"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            setSearching(false);
+          }
+        }}
+        className="flex-1"
       />
+      <IconButton label="Close search" icon={glyphs.x} onClick={() => setSearching(false)} />
+    </span>
+  ) : (
+    <>
+      <IconButton label="Search threads" icon={glyphs.search} onClick={() => setSearching(true)} />
+      {q && (
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-label={`Clear the search for ${q}`}
+          onClick={() => {
+            setTyped("");
+            view({ q: "" });
+          }}
+        >
+          “{q}”
+          <Icon icon={glyphs.x} className="size-3.5" />
+        </Button>
+      )}
+    </>
+  );
+  const finding = all.length > 0 && (
+    <div className="flex flex-wrap items-center gap-3">
+      {searchField}
       <SegmentedFilter<Shown>
         label="Show"
         value={show}
@@ -190,12 +239,18 @@ function Threads() {
         onSend={write}
         keep
         attach={
-          // A quieter way in, inside the composer's row (portalr ADR-0085): name it, then start it.
-          !naming && (
-            <Button variant="ghost" size="sm" disabled={!live} onClick={() => setNaming(true)}>
-              Name it first…
-            </Button>
-          )
+          // A quieter way in, inside the composer's row (portalr ADR-0085): name it, then start
+          // it. It stays as the form opens, so the row keeps its shape.
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!live}
+            aria-expanded={naming}
+            onClick={() => setNaming((was) => !was)}
+          >
+            <Icon icon={glyphs.plus} className="size-3.5" />
+            Name it first…
+          </Button>
         }
       />
       {naming && (
@@ -210,10 +265,7 @@ function Threads() {
   );
   return (
     <>
-      <PageHeader
-        title="Threads"
-        meta={`The threads in ${workspace}, the most recently active first`}
-      />
+      <PageHeader title="Threads" />
       {starting}
       <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
       {needed.length > 0 && (
@@ -294,7 +346,7 @@ function Threads() {
                       <span
                         role="img"
                         aria-label="Moved since you read it"
-                        className="absolute left-2 top-1/2 size-2 -translate-y-1/2 rounded-full bg-accent forced-color-adjust-none forced-colors:bg-system-text"
+                        className="absolute start-2 top-1/2 size-2 -translate-y-1/2 rounded-full bg-accent forced-color-adjust-none forced-colors:bg-system-text"
                       />
                     )}
                     <RowLink

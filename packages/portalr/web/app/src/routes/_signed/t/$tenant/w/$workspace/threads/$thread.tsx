@@ -311,6 +311,14 @@ function Chat() {
     atLoad?.id === id &&
     !atLoad.waiting.has(latestRequest.tool_call_id);
   const toQuestion = () => toRequest(latestRequest?.tool_call_id);
+  // The agent's mode, where the reader may set it: in the composer's row, or alone without one.
+  const mode = allowed.has("artifactr:set_thread_mode") && (
+    <ModeSwitch
+      mode={thread.mode}
+      disabled={snapshot.status !== "live"}
+      onChange={(chosen) => stream.send({ type: "set_thread_mode", thread_id: id, mode: chosen })}
+    />
+  );
 
   return (
     <section
@@ -454,19 +462,23 @@ function Chat() {
       </Messages>
       {active.map((run) => (
         <div key={run.id} className="flex flex-col gap-2">
-          <RunStrip
-            run={run}
-            history={sentBefore(run.started)}
-            {...(run.status === "running" &&
-              allowed.has("artifactr:stop_run") && {
-                onStop: () => stream.send({ type: "stop_run", run_id: run.id }),
+          {/* An approval waits in its own card, which says so: no strip above it too (ADR-0085). */}
+          {(run.status === "running" ||
+            run.requests.some((request) => request.kind !== "approval")) && (
+            <RunStrip
+              run={run}
+              history={sentBefore(run.started)}
+              {...(run.status === "running" &&
+                allowed.has("artifactr:stop_run") && {
+                  onStop: () => stream.send({ type: "stop_run", run_id: run.id }),
+                })}
+              // The way to what is asked, a question up the log or a form, which may be long; an
+              // approval sits short under the strip, and needs none (portalr ADR-0085).
+              {...(run.requests.some((request) => request.kind !== "approval") && {
+                onQuestion: toQuestion,
               })}
-            // The way to what is asked, a question up the log or a form, which may be long; an
-            // approval sits short under the strip, and needs none (portalr ADR-0085).
-            {...(run.requests.some((request) => request.kind !== "approval") && {
-              onQuestion: toQuestion,
-            })}
-          />
+            />
+          )}
           {[
             ...run.requests
               .filter((request) => request.tool_name !== ASK_USER)
@@ -519,15 +531,7 @@ function Chat() {
                   files={dropped}
                 />
                 {/* The agent's mode, a setting of the thread's, beside what is sent to it (portalr ADR-0085). */}
-                {allowed.has("artifactr:set_thread_mode") && (
-                  <ModeSwitch
-                    mode={thread.mode}
-                    disabled={snapshot.status !== "live"}
-                    onChange={(mode) =>
-                      stream.send({ type: "set_thread_mode", thread_id: id, mode })
-                    }
-                  />
-                )}
+                {mode}
                 {/* A phone's thumb bar: the request's next step, at the row's end (portalr ADR-0082). */}
                 {latestRequest !== undefined && (
                   <ThumbBar target={`request-${latestRequest.tool_call_id}`} />
@@ -538,7 +542,11 @@ function Chat() {
         </ComposerDock>
       )}
       {snapshot.status !== "closed" && !allowed.has("artifactr:post_message") && (
-        <Uploader context={context} tenant={tenant} workspace={workspace} thread={id} />
+        <>
+          {/* Who may set the mode but not post has it on its own, where the composer would be. */}
+          {mode}
+          <Uploader context={context} tenant={tenant} workspace={workspace} thread={id} />
+        </>
       )}
     </section>
   );

@@ -275,7 +275,7 @@ test("a row whose name is a link and whose end is empty shows the kit's chevron;
   expect(getComputedStyle(chevron(rows[2] as Element) as Element).display).toBe("none");
 });
 
-test("a track of ways on: each link named by its word, which a phone's width leaves to its glyph", async () => {
+test("a track of ways on: each link named by its word, on a phone its glyph over its word", async () => {
   onTestFinished(() => page.viewport(414, 896));
   await page.viewport(1280, 800);
   const screen = await render(
@@ -292,6 +292,7 @@ test("a track of ways on: each link named by its word, which a phone's width lea
   await expect.element(nav.getByRole("link", { name: "Runs" })).toBeVisible();
   await expect.element(nav.getByText("Rules")).toBeVisible();
   await page.viewport(390, 800);
-  await expect.element(nav.getByText("Rules")).not.toBeVisible();
-  await expect.element(nav.getByRole("link", { name: "Rules" })).toBeVisible();
+  const rules = nav.getByRole("link", { name: "Rules" });
+  await expect.element(nav.getByText("Rules")).toBeVisible();
+  await expect.poll(() => getComputedStyle(rules.element()).flexDirection).toBe("column");
 });

@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
+import { Breadcrumbs } from "./breadcrumbs";
 import { Button } from "./button";
 import { PageHeader } from "./page-header";
 import { token } from "./test/colours";
@@ -9,7 +10,7 @@ test("a page header's title is the page's one heading, with its way back, its li
   const screen = await render(
     <PageHeader
       title="Launch plan"
-      breadcrumbs={[{ label: "Threads", href: "#threads" }]}
+      breadcrumbs={<Breadcrumbs trail={[{ label: "Threads", href: "#threads" }]} />}
       meta="Started by you"
       actions={<button type="button">More</button>}
     />,

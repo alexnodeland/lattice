@@ -4,7 +4,6 @@ import {
   Button,
   ButtonLink,
   ConfirmDialog,
-  CRUMB,
   Disclosure,
   NotFound as NotFoundPage,
   PageHeader,
@@ -186,18 +185,6 @@ function RulePage() {
       <PageHeader
         id="rule"
         title={name}
-        breadcrumbs={[
-          {
-            label: "Rules",
-            render: (
-              <Link
-                to="/t/$tenant/w/$workspace/rules"
-                params={{ tenant, workspace }}
-                activeOptions={CRUMB}
-              />
-            ),
-          },
-        ]}
         meta={
           stored
             ? `Stored in this workspace, version ${held.version}.`

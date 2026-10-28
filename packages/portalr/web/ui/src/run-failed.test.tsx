@@ -28,8 +28,8 @@ test("a failed turn says why in words, the run's own under Details, and can be t
 
 for (const [error, said] of [
   ["ModelHTTPError: status_code: 529, model_name: claude, body: overloaded", "overloaded"],
-  ["status_code: 429, rate limit exceeded", "taking no more requests"],
-  ["ReadTimeout: the request timed out", "took too long"],
+  ["status_code: 429, rate limit exceeded", "limiting requests"],
+  ["ReadTimeout: the request timed out", "didn't answer in time"],
 ] as const) {
   test(`a provider's error is said in words, its text under Details: ${said}`, async () => {
     const screen = await render(
@@ -85,4 +85,19 @@ test("a failure the thread says is live is announced, whoever may try again", as
     .toContain("The turn stopped answering, and was given up.");
   expect(screen.getByRole("alert").elements()).toHaveLength(1);
   expect(screen.getByRole("note").elements()).toHaveLength(1);
+});
+
+test("no sentence claims that nothing was lost, and a tool's timeout isn't blamed on the model", async () => {
+  const screen = await render(
+    <Messages>
+      <RunFailed reason={null} error="ToolError: the tool fetch_page timed out" />
+      <RunFailed reason={null} error="status_code: 529, overloaded" />
+    </Messages>,
+  );
+  const said = screen
+    .getByRole("note")
+    .elements()
+    .map((note) => note.querySelector("p")?.textContent);
+  expect(said[0]).toContain("Something went wrong before it answered.");
+  expect(said.join(" ")).not.toContain("Nothing was lost");
 });

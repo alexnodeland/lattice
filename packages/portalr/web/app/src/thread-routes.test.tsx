@@ -232,15 +232,16 @@ test("Try again refused as already posted, by another tab, says nothing went wro
   expect(screen.getByText("That wasn't done: the server refused it.").elements()).toHaveLength(0);
 });
 
-test("the breadcrumb names the place above as a link, never as the page shown", async () => {
+test("a thread's page is marked in Threads, its way back up, with no breadcrumb", async () => {
   const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, {
     artifactrLog: LOG,
   });
-  const trail = screen.getByRole("navigation", { name: "Breadcrumb" });
-  await expect.element(trail.getByRole("link").first()).toBeVisible();
-  for (const crumb of trail.getByRole("link").elements()) {
-    expect(crumb.getAttribute("aria-current")).toBeNull();
-  }
+  const threads = screen
+    .getByRole("navigation", { name: "Workspace" })
+    .first()
+    .getByRole("link", { name: "Threads" });
+  await expect.element(threads).toHaveAttribute("aria-current", "true");
+  expect(screen.getByRole("navigation", { name: "Breadcrumb" }).elements()).toHaveLength(0);
 });
 
 test("Try again refused in words alone, without the typed reason, is a refusal", async () => {

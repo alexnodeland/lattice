@@ -16,7 +16,6 @@ import {
   ButtonLink,
   Composer,
   ComposerDock,
-  CRUMB,
   Message,
   Messages,
   ModeSwitch,
@@ -42,7 +41,15 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { CatchBoundary, createFileRoute, Link, useRouterState } from "@tanstack/react-router";
-import { type ReactNode, Suspense, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  Suspense,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { author, unnamedPeople } from "../../../../../../../author";
 import { usePosting } from "../../../../../../../posting";
 import { RENDERERS } from "../../../../../../../renderers";
@@ -81,6 +88,13 @@ const TENANT = { kind: "tenant" } as const;
 
 /** The composer's choice of model, loaded as the composer first takes the focus (portalr ADR-0086). */
 const loadPicker = () => import("../../../../../../../on-demand/model-picker");
+/** From this width a thread's artifact, and an approval, sit beside it (portalr ADR-0087). */
+const SPLIT = "(min-width: 1100px)";
+const splitChanges = (changed: () => void) => {
+  const query = matchMedia(SPLIT);
+  query.addEventListener("change", changed);
+  return () => query.removeEventListener("change", changed);
+};
 
 /**
  * A thread's chat: its messages, its runs as they go, its proposals, and a message to post where
@@ -138,14 +152,6 @@ function readsFor(
 
 function Chat() {
   const { tenant, workspace, thread: id } = Route.useParams();
-  const crumbs = [
-    {
-      label: "Threads",
-      render: (
-        <Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} activeOptions={CRUMB} />
-      ),
-    },
-  ];
   const context = Route.useRouteContext();
   const { queries, queryClient, user, config } = context;
   const me = useMe(queries, user, tenant);
@@ -169,6 +175,7 @@ function Chat() {
   const { threads, runs, proposals, artifacts } = snapshot.state;
   const thread = threads[id];
   const { posting, post } = usePosting(thread?.messages);
+  const wide = useSyncExternalStore(splitChanges, () => matchMedia(SPLIT).matches);
   // Files dropped on the composer, for the uploader it holds (portalr ADR-0080).
   const [dropped, setDropped] = useState<FileList | null>(null);
   // The model the next message names, or null for the default (portalr ADR-0086): the models,
@@ -281,7 +288,7 @@ function Chat() {
   if (!allowed.has("artifactr:read_threads")) {
     return (
       <>
-        <PageHeader title={thread.title || "Untitled"} breadcrumbs={crumbs} />
+        <PageHeader title={thread.title || "Untitled"} />
         <Alert tone="error">This isn't available to you any more.</Alert>
       </>
     );
@@ -294,6 +301,18 @@ function Chat() {
   const inline = Object.values(artifacts).filter(
     (artifact) => artifact.threadId === id && rendererFor(artifact.kind, RENDERERS).inline,
   );
+  // Wide, the thread's latest artifact and what waits for approval sit beside it, in a pane of
+  // their own, the approval's Deny and Approve in its corner (portalr ADR-0087).
+  const approvals = active.flatMap((run) =>
+    run.requests.flatMap((request) => (request.kind === "approval" ? [{ run, request }] : [])),
+  );
+  const beside = wide
+    ? inline.reduce<(typeof inline)[number] | undefined>(
+        (latest, artifact) => (latest && latest.seq > artifact.seq ? latest : artifact),
+        undefined,
+      )
+    : undefined;
+  const split = beside !== undefined || (wide && approvals.length > 0);
 
   const give = (message: Artifactr.Message) => (up: boolean, comment: string | null) =>
     stream.send({
@@ -349,15 +368,58 @@ function Chat() {
     />
   );
 
-  return (
+  const canPost = snapshot.status !== "closed" && allowed.has("artifactr:post_message");
+  // A turn's strip, while it works or waits on a question: while it works, above the composer,
+  // where the reader writes and stops it (portalr ADR-0087); while it waits, above what it asks,
+  // which a phone's thumb bar answers. An approval waits in its own card, which says so: no strip
+  // above it too (ADR-0085).
+  const strip = (run: Artifactr.Run) =>
+    (run.status === "running" || run.requests.some((request) => request.kind !== "approval")) && (
+      <RunStrip
+        key={run.id}
+        run={run}
+        history={sentBefore(run.started)}
+        {...(run.status === "running" &&
+          allowed.has("artifactr:stop_run") && {
+            onStop: () => stream.send({ type: "stop_run", run_id: run.id }),
+          })}
+        // The way to what is asked, a question up the log or a form, which may be long; an
+        // approval sits short under the strip, and needs none (portalr ADR-0085).
+        {...(run.requests.some((request) => request.kind !== "approval") && {
+          onQuestion: toQuestion,
+        })}
+      />
+    );
+  const asked = (
+    run: Artifactr.Run,
+    request: ArtifactrV1.DeferredRequest,
+    by: string | undefined,
+  ) => (
+    <div
+      key={request.tool_call_id}
+      id={`request-${request.tool_call_id}`}
+      tabIndex={-1}
+      className="outline-none"
+    >
+      <Request
+        request={request}
+        {...(by !== undefined && { answeredBy: by })}
+        // The newest request waiting takes the focus if it arrived while the page was
+        // open, never one already answered, nor one waiting when the page was shown.
+        focus={request === latestRequest && arrived}
+        onAnswer={answer(run, request)}
+      />
+    </div>
+  );
+  const chat = (
     <section
       aria-labelledby="thread"
       data-portalr-replay="block"
-      className="mx-auto flex w-full max-w-190 flex-col gap-6"
+      // The composer at the window's foot, under however few messages (portalr ADR-0087).
+      className={`flex min-w-0 flex-1 flex-col gap-6 ${split ? "" : "mx-auto w-full max-w-190"}`}
     >
       <PageHeader
         title={thread.title || "Untitled"}
-        breadcrumbs={crumbs}
         id="thread"
         actions={
           (allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
@@ -417,7 +479,7 @@ function Chat() {
               );
             }
             case "artifact":
-              return (
+              return entry.artifact === beside ? null : (
                 <ThreadArtifact
                   key={entry.updatedBy ? `call:${entry.updatedBy}` : `art:${entry.artifact.id}`}
                   context={context}
@@ -492,49 +554,20 @@ function Chat() {
       </Messages>
       {active.map((run) => (
         <div key={run.id} className="flex flex-col gap-2">
-          {/* An approval waits in its own card, which says so: no strip above it too (ADR-0085). */}
-          {(run.status === "running" ||
-            run.requests.some((request) => request.kind !== "approval")) && (
-            <RunStrip
-              run={run}
-              history={sentBefore(run.started)}
-              {...(run.status === "running" &&
-                allowed.has("artifactr:stop_run") && {
-                  onStop: () => stream.send({ type: "stop_run", run_id: run.id }),
-                })}
-              // The way to what is asked, a question up the log or a form, which may be long; an
-              // approval sits short under the strip, and needs none (portalr ADR-0085).
-              {...(run.requests.some((request) => request.kind !== "approval") && {
-                onQuestion: toQuestion,
-              })}
-            />
-          )}
+          {(!canPost || run.status !== "running") && strip(run)}
           {picker && <picker.AnsweredBy place={place} run={run} />}
           {[
             ...run.requests
-              .filter((request) => request.tool_name !== ASK_USER)
+              .filter(
+                (request) =>
+                  request.tool_name !== ASK_USER && !(split && request.kind === "approval"),
+              )
               .map((request) => ({ request, by: undefined })),
             // A form stays where it was asked once it is answered, until its run ends, and says by whom.
             ...run.answered
               .filter(({ request }) => request.tool_name === ASK_FORM)
               .map(({ request, actor }) => ({ request, by: author(actor, me, names) })),
-          ].map(({ request, by }) => (
-            <div
-              key={request.tool_call_id}
-              id={`request-${request.tool_call_id}`}
-              tabIndex={-1}
-              className="outline-none"
-            >
-              <Request
-                request={request}
-                {...(by !== undefined && { answeredBy: by })}
-                // The newest request waiting takes the focus if it arrived while the page was
-                // open, never one already answered, nor one waiting when the page was shown.
-                focus={request === latestRequest && arrived}
-                onAnswer={answer(run, request)}
-              />
-            </div>
-          ))}
+          ].map(({ request, by }) => asked(run, request, by))}
         </div>
       ))}
       {proposed.map((proposal) => (
@@ -546,8 +579,9 @@ function Chat() {
           }
         />
       ))}
-      {snapshot.status !== "closed" && allowed.has("artifactr:post_message") && (
-        <ComposerDock>
+      {canPost && (
+        <ComposerDock className="mt-auto flex flex-col gap-2">
+          {active.filter((run) => run.status === "running").map(strip)}
           {/* The composer's first focus loads the model picker (portalr ADR-0086). */}
           <div className="contents" ref={composer}>
             <Composer
@@ -593,6 +627,34 @@ function Chat() {
         </>
       )}
     </section>
+  );
+  return split ? (
+    <div className="grid flex-1 grid-cols-2 gap-8">
+      {chat}
+      <aside
+        aria-label="Beside the thread"
+        className="sticky top-(--header-clearance) -my-6 flex self-start h-[calc(100dvh-var(--header-clearance))] flex-col gap-4 overflow-y-auto border-line border-s py-6 ps-8"
+      >
+        {beside && (
+          <ul>
+            <ThreadArtifact
+              context={context}
+              me={me}
+              tenant={tenant}
+              workspace={workspace}
+              artifact={beside}
+            />
+          </ul>
+        )}
+        {approvals.length > 0 && (
+          <div className="sticky bottom-0 mt-auto ms-auto flex w-full max-w-md flex-col gap-2 shadow-(--dialog-shadow)">
+            {approvals.map(({ run, request }) => asked(run, request, undefined))}
+          </div>
+        )}
+      </aside>
+    </div>
+  ) : (
+    chat
   );
 }
 

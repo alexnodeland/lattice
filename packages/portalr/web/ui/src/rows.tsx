@@ -100,39 +100,55 @@ export function RowLink({ render, className, ...props }: RowLinkProps) {
 
 /**
  * A compact track of ways on, such as a workspace's areas (portalr ADR-0085): a segment's look,
- * flat on the quiet wash, each a link with its glyph and its word; on a phone the track is the
- * row's width, each cell its glyph over its word, a finger's 44px tall. It sits above a row's
- * stretched link, so each is its own target.
+ * flat on the quiet wash, each a link with its glyph and its word, the current one raised as a
+ * chosen segment is (ADR-0087); on a phone the track is the row's width, each cell its glyph over
+ * its word, a finger's 44px tall. It sits above a row's stretched link, so each is its own target.
  */
-export function Tracks({ label, children }: { label: string; children: ReactNode }) {
+export function Tracks({
+  label,
+  className,
+  children,
+}: {
+  label: string;
+  className?: string;
+  children: ReactNode;
+}) {
   return (
     <nav
       aria-label={label}
       data-track=""
-      className="relative z-10 mt-1 inline-flex gap-0.5 self-start rounded-(--segmented-radius) border border-line bg-subtle p-(--segmented-pad) max-sm:flex max-sm:self-stretch"
+      className={cn(
+        "relative z-10 inline-flex gap-0.5 self-start rounded-(--segmented-radius) border border-line bg-subtle p-(--segmented-pad) max-sm:flex max-sm:self-stretch",
+        className,
+      )}
     >
       {children}
     </nav>
   );
 }
 
-/** One of a track's links, the router's through `render`. */
+/**
+ * One of a track's links, the router's through `render`, which marks the current one with
+ * `aria-current`; with how many wait there, said in its name and beside its word.
+ */
 export function TrackLink({
   render,
   icon,
+  count,
   children,
 }: {
   render: ReactElement;
   icon: Glyph;
+  count?: number;
   children: string;
 }) {
   return useRender({
     defaultTagName: "a",
     render,
     props: {
-      "aria-label": children,
+      "aria-label": count ? `${children}, ${count} waiting for you` : children,
       className: cn(
-        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-(--segmented-item-radius) px-1 py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:text-fg max-sm:flex-auto max-sm:flex-col",
+        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-(--segmented-item-radius) px-1 py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:text-fg aria-[current]:bg-surface aria-[current]:text-fg aria-[current]:shadow-(--card-shadow) max-sm:flex-auto max-sm:flex-col sm:px-(--segmented-item-pad-x)",
         RING,
         FEEDBACK,
       ),
@@ -141,6 +157,7 @@ export function TrackLink({
           <Icon icon={icon} />
           <span aria-hidden="true" className="max-w-full truncate text-xs">
             {children}
+            {count ? <span className="ms-1 text-accent tabular-nums">{count}</span> : null}
           </span>
         </>
       ),

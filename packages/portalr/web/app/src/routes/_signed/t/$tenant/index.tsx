@@ -88,7 +88,7 @@ function Workspaces() {
                 </RowLink>
               }
               meta={
-                <Tracks label={`${workspace}'s areas`}>
+                <Tracks label={`${workspace}'s areas`} className="mt-1">
                   {AREAS.map(({ to, label, icon }) => (
                     <TrackLink
                       key={label}

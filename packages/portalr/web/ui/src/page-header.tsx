@@ -1,5 +1,4 @@
 import { type ReactNode, useEffect, useRef } from "react";
-import { Breadcrumbs, type Crumb } from "./breadcrumbs";
 import { cn } from "./cn";
 import { TYPE } from "./type";
 
@@ -21,8 +20,11 @@ export function PageHeader({
   mono?: boolean;
   /** The heading's id, for a region it names. */
   id?: string;
-  /** The places above this page, outermost first: the way back up. */
-  breadcrumbs?: readonly Crumb[];
+  /**
+   * The places above this page, a `Breadcrumbs`: the way back up, where the frame doesn't mark it
+   * (the app's bar marks the current area, portalr ADR-0087).
+   */
+  breadcrumbs?: ReactNode;
   meta?: ReactNode;
   actions?: ReactNode;
   /**
@@ -41,7 +43,7 @@ export function PageHeader({
     // One shape (portalr ADR-0085): the places above, then the title with the actions on its
     // line, at every width, never wrapped under it; then the line about it.
     <header className="flex flex-col gap-1">
-      {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs trail={breadcrumbs} />}
+      {breadcrumbs}
       <div className="flex items-center justify-between gap-3">
         <h1
           id={id}

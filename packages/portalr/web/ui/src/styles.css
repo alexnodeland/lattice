@@ -11,6 +11,12 @@
  * doesn't scan of itself, so without this its buttons and cards would have no style.
  */
 @source "./";
+/*
+ * Less admin's rail and its navigation, which the app doesn't draw (portalr ADR-0087): their
+ * classes are `rail.css`'s, which admin imports in place of this.
+ */
+@source not "./rail-shell.tsx";
+@source not "./side-nav.tsx";
 /* Streamdown renders with Tailwind classes of its own, which Tailwind finds here. */
 @source "../node_modules/streamdown/dist/*.js";
 /*
@@ -151,12 +157,14 @@
   }
 
   /*
-   * Below lg the frame's header is pinned to the top of the window: what a link or the keyboard
-   * scrolls to stops below it. At lg it is the rail beside the page, and takes no room above; a
-   * page without the frame has nothing pinned, so keeps none either.
+   * The frame's header is pinned to the top of the window: what a link or the keyboard scrolls to
+   * stops below it. The app's bar is pinned at every width; admin's, at lg, is the rail beside the
+   * page, and takes no room above; a page without the frame has nothing pinned, so keeps none.
    */
   html:has([data-frame-header]) {
     scroll-padding-top: calc(var(--header-clearance) + env(safe-area-inset-top));
+  }
+  html:has([data-rail]) {
     @variant lg {
       scroll-padding-top: 0;
     }

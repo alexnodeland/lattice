@@ -130,7 +130,8 @@ export function ActionsMenu({
   const { pending, thumb, why } = useThumbs(onThumbs ?? NO_THUMBS);
   return (
     <div className="flex min-w-0 flex-col items-end gap-1">
-      <span className={unseen ? "sr-only start-0" : "contents"}>
+      {/* Unseen, it shows once the keyboard reaches it, never as an invisible stop. */}
+      <span className={unseen ? "sr-only start-0 has-focus-visible:not-sr-only" : "contents"}>
         <Menu
           label={label}
           icon={glyphs.more}

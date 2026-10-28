@@ -1,10 +1,9 @@
 import { useMe } from "@portalr/client";
 import {
   Ago,
-  ASK_FORM,
-  ASK_USER,
   Button,
   Composer,
+  ComposerDock,
   EmptyState,
   glyphs,
   Icon,
@@ -15,31 +14,37 @@ import {
   RowLink,
   Rows,
   RunStatus,
-  SearchField,
-  SectionTitle,
   SegmentedFilter,
-  StatusBadge,
+  Table,
   TextField,
 } from "@portalr/ui";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useActionState, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import {
+  type KeyboardEvent,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { author } from "../../../../../../author";
 import { alreadyMade, messageId } from "../../../../../../posting";
-import { readSeen, subscribeToSeen } from "../../../../../../seen";
+import { useOpenSearch } from "../../../../../../search";
+import { markSeen, readSeen, subscribeToSeen } from "../../../../../../seen";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
 
 type Shown = "all" | "needs" | "working";
 
 /**
- * The workspace's threads, the most recently active first, and a new one. The URL carries the
- * search (`q`) and the filter (`show`), so a view is kept on reload and can be shared.
+ * The workspace's threads, the most recently active first, as a table from 1024 pixels
+ * and rows below it, and a new one, written to the agent in the composer docked at the page's
+ * foot (portalr ADR-0087). The URL carries the filter (`show`), so a view is kept on reload and
+ * can be shared; finding a thread by its title is the palette's.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace/")({
   component: Threads,
-  validateSearch: (search: Record<string, unknown>): { q?: string; show?: Shown } => ({
-    ...(typeof search.q === "string" && search.q !== "" && { q: search.q }),
-    ...((search.show === "needs" || search.show === "working") && { show: search.show }),
-  }),
+  validateSearch: (search: Record<string, unknown>): { show?: Shown } =>
+    search.show === "needs" || search.show === "working" ? { show: search.show } : {},
 });
 
 function Threads() {
@@ -49,35 +54,13 @@ function Threads() {
   const stream = useStream();
   const snapshot = useWorkspace();
   const navigate = useNavigate();
-  const { q = "", show = "all" } = Route.useSearch();
-  // What is typed is the page's own at once; the URL follows after a pause, trimmed, so each
-  // keystroke isn't a navigation; a URL that changes under it, as Back does, is taken up.
-  const [typed, setTyped] = useState(q);
-  useEffect(() => {
-    setTyped((now) => (now.trim() === q ? now : q));
-  }, [q]);
-  const view = (change: { q?: string; show?: Shown }) =>
+  const { show = "all" } = Route.useSearch();
+  const view = (chosen: Shown) =>
     void navigate({
       to: ".",
-      search: (was) => {
-        const next = { ...was, ...change };
-        return {
-          ...(next.q && { q: next.q }),
-          ...(next.show && next.show !== "all" && { show: next.show }),
-        };
-      },
+      search: chosen === "all" ? {} : { show: chosen },
       replace: true,
     });
-  const viewNow = useRef(view);
-  viewNow.current = view;
-  useEffect(() => {
-    const want = typed.trim();
-    if (want === q) {
-      return;
-    }
-    const timer = setTimeout(() => viewNow.current({ q: want }), 200);
-    return () => clearTimeout(timer);
-  }, [typed, q]);
   const toThread = (thread: string) =>
     navigate({
       to: "/t/$tenant/w/$workspace/threads/$thread",
@@ -131,246 +114,243 @@ function Threads() {
     return { outcome: "done" as const };
   };
   const [naming, setNaming] = useState(false);
-  const [searching, setSearching] = useState(q !== "");
-  // "/" opens the search from anywhere on the page but a field.
+  // On a phone the composer waits behind the band's New thread, as does a thread asked for from
+  // the palette ("#new"): either opens it and takes the focus to its words (portalr ADR-0087).
+  const [composing, setComposing] = useState(false);
+  const compose = () => {
+    setComposing(true);
+    requestAnimationFrame(() =>
+      document.querySelector<HTMLElement>("[data-composer-dock] textarea")?.focus(),
+    );
+  };
+  const hash = useRouterState({ select: (state) => state.location.hash });
+  const asked = useRef(compose);
+  asked.current = compose;
   useEffect(() => {
-    const slash = (event: KeyboardEvent) => {
-      const at = event.target as HTMLElement | null;
-      if (event.key === "/" && !at?.closest("input, textarea, [contenteditable]")) {
-        event.preventDefault();
-        setSearching(true);
-      }
-    };
-    addEventListener("keydown", slash);
-    return () => removeEventListener("keydown", slash);
-  }, []);
+    if (hash === "new") {
+      asked.current();
+    }
+  }, [hash]);
+  const openSearch = useOpenSearch();
+  const band = useRef<HTMLButtonElement>(null);
   const live = snapshot.status === "live";
-  // What waits on a person across the workspace's threads (portalr ADR-0080): calls to approve
-  // first, the riskier before the rest, then questions; each opens its thread at the request.
-  const needed = Object.values(snapshot.state.runs)
-    .filter((run) => run.status === "paused")
-    .flatMap((run) => run.requests.map((request) => ({ request, thread: run.threadId })))
-    // A thread the stream hasn't shown the reader is one they can't see: no way to a not-found.
-    .filter(({ thread }) => snapshot.state.threads[thread] !== undefined)
-    .map(({ request, thread }) => {
-      const question = request.tool_name === ASK_USER || request.tool_name === ASK_FORM;
-      const risk = request.review?.risk;
-      const rank = question ? 3 : risk === "network" ? 0 : risk === undefined ? 2 : 1;
-      const title = snapshot.state.threads[thread]?.title || "Untitled";
-      return { request, thread, title, rank, question, risk };
-    })
-    .sort((a, b) => a.rank - b.rank);
   // Each thread's run that is going, or waits on someone, said beside it.
   const going = new Map(
     Object.values(snapshot.state.runs)
       .filter((run) => run.status === "running" || run.status === "paused")
       .map((run) => [run.threadId, run.status] as const),
   );
-  // Searched by title and filtered by state (portalr ADR-0080); a thread this browser has read
-  // that has moved since is marked. One never opened here is not: nothing is known of it.
+  // Filtered by state (portalr ADR-0080); a thread this browser has read that has moved since is
+  // marked. One never opened here is not: nothing is known of it.
   const seen = useSyncExternalStore(subscribeToSeen, () => readSeen(tenant, workspace));
   const all = Object.values(snapshot.state.threads).sort((a, b) => b.active - a.active);
   const needs = all.filter((thread) => going.get(thread.id) === "paused");
   const working = all.filter((thread) => going.get(thread.id) === "running");
-  const shown = show === "needs" ? needs : show === "working" ? working : all;
-  const words = q.trim().toLocaleLowerCase();
-  const listed = words
-    ? shown.filter((thread) => (thread.title || "Untitled").toLocaleLowerCase().includes(words))
-    : shown;
-  // The search is a glyph until asked (portalr ADR-0085): opened, a field that takes the row's
-  // room; Escape or Close folds it back, and what it holds stays applied, as a chip that clears it.
-  const searchField = searching ? (
-    <span className="flex min-w-48 flex-1 items-center gap-1">
-      <SearchField
-        label="Search threads"
-        value={typed}
-        // Opened by the reader, the field takes the focus.
-        autoFocus
-        onChange={(event) => setTyped(event.currentTarget.value)}
-        onKeyDown={(event) => {
-          if (event.key === "Escape") {
-            setSearching(false);
-          }
-        }}
-        className="flex-1"
-      />
-      <IconButton label="Close search" icon={glyphs.x} onClick={() => setSearching(false)} />
-    </span>
-  ) : (
-    <>
-      <IconButton label="Search threads" icon={glyphs.search} onClick={() => setSearching(true)} />
-      {q && (
-        <Button
-          variant="secondary"
-          size="sm"
-          aria-label={`Clear the search for ${q}`}
-          onClick={() => {
-            setTyped("");
-            view({ q: "" });
-          }}
-        >
-          “{q}”
-          <Icon icon={glyphs.x} className="size-3.5" />
-        </Button>
-      )}
-    </>
+  const listed = show === "needs" ? needs : show === "working" ? working : all;
+  const rows = listed.map((thread) => {
+    const last = thread.messages.at(-1);
+    return {
+      thread,
+      title: thread.title || "Untitled",
+      status: going.get(thread.id),
+      // Who spoke last and what they said: what tells two threads of one title apart.
+      said: last && `${author(last.actor, me)}: ${plainTitle(last.content) ?? "…"}`,
+      when: thread.activeAt && <Ago at={thread.activeAt} />,
+      moved: seen[thread.id] !== undefined && thread.active > (seen[thread.id] ?? 0),
+      link: (
+        <Link
+          to="/t/$tenant/w/$workspace/threads/$thread"
+          params={{ tenant, workspace, thread: thread.id }}
+        />
+      ),
+    };
+  });
+  // Unread: a mark in the working colour in the row's own start padding, at the row's middle, so
+  // the titles, and the lines under them, share one left edge (portalr ADR-0085).
+  const unread = (
+    <span
+      role="img"
+      aria-label="Moved since you read it"
+      className="absolute start-2 top-1/2 size-2 -translate-y-1/2 rounded-full bg-accent forced-color-adjust-none forced-colors:bg-system-text"
+    />
   );
-  const finding = all.length > 0 && (
-    <div className="flex flex-wrap items-center gap-3">
-      {searchField}
-      <SegmentedFilter<Shown>
-        label="Show"
-        value={show}
-        onValueChange={(chosen) => view({ show: chosen })}
-        segments={[
-          { value: "all", label: "All", count: all.length },
-          { value: "needs", label: "Needs you", count: needs.length },
-          { value: "working", label: "Working", count: working.length },
-        ]}
-      />
-    </div>
-  );
-  // Shown whatever the connection's state, so words kept through its closing stay in view, to
-  // send once it is connected again or to copy; disabled until it is live.
-  const starting = (
-    <div className="flex flex-col gap-3">
-      <Composer
-        disabled={!live}
-        onSend={write}
-        keep
-        attach={
-          // A quieter way in, inside the composer's row (portalr ADR-0085): name it, then start
-          // it. It stays as the form opens, so the row keeps its shape.
-          <Button
-            variant="secondary"
-            size="sm"
-            disabled={!live}
-            aria-expanded={naming}
-            onClick={() => setNaming((was) => !was)}
-          >
-            <Icon icon={glyphs.plus} className="size-3.5" />
-            Name it first…
-          </Button>
-        }
-      />
-      {naming && (
-        <form className="flex flex-wrap items-end gap-2" action={start}>
-          <TextField label="New thread" name="title" error={refused} required autoFocus />
-          <Button type="submit" disabled={!live} pending={pending}>
-            Start
-          </Button>
-        </form>
-      )}
-    </div>
+  const filter = all.length > 0 && (
+    <SegmentedFilter<Shown>
+      label="Show"
+      value={show}
+      onValueChange={view}
+      segments={[
+        { value: "all", label: "All", count: all.length },
+        { value: "needs", label: "Needs you", count: needs.length },
+        { value: "working", label: "Working", count: working.length },
+      ]}
+    />
   );
   return (
     <>
-      <PageHeader title="Threads" />
-      {starting}
+      {/* The filter on the title's line, in its corner; on a phone, the row under it. */}
+      <PageHeader
+        title="Threads"
+        actions={filter && <div className="max-sm:hidden">{filter}</div>}
+      />
+      {filter && <div className="sm:hidden">{filter}</div>}
       <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
-      {needed.length > 0 && (
-        <section aria-labelledby="needs-you" className="flex flex-col gap-3">
-          <SectionTitle id="needs-you">
-            Needs you{" "}
-            <span className="font-normal text-muted text-sm tabular-nums">{needed.length}</span>
-          </SectionTitle>
-          <Rows label="Needs you">
-            {needed.map(({ request, thread, title, question, risk }) => (
-              <Row
-                key={request.tool_call_id}
-                name={
-                  <RowLink
-                    render={
-                      <Link
-                        to="/t/$tenant/w/$workspace/threads/$thread"
-                        params={{ tenant, workspace, thread }}
-                        hash={`request-${request.tool_call_id}`}
-                      />
-                    }
-                  >
-                    {question ? "A question" : `Approve ${request.tool_name}`}
-                  </RowLink>
-                }
-                meta={`in ${title}`}
-                end={
-                  risk !== undefined ? (
-                    <StatusBadge tone="retrying">
-                      {risk === "network" ? "Downloads from the internet" : "Runs code"}
-                    </StatusBadge>
-                  ) : (
-                    <StatusBadge tone="waiting">Waiting for you</StatusBadge>
-                  )
-                }
-              />
-            ))}
-          </Rows>
-        </section>
-      )}
-      {finding}
       {live && all.length === 0 && (
         <EmptyState title="No threads yet">
-          Write to the agent above to start one, or name one first.
+          Write to the agent below to start one, or name one first.
         </EmptyState>
       )}
       {live && all.length > 0 && listed.length === 0 && (
-        <EmptyState title="No thread matches">
-          None of the threads is {show === "all" ? "named so" : "in that state and named so"}.
-        </EmptyState>
+        <EmptyState title="No thread here">None of the threads is in that state.</EmptyState>
       )}
-      {listed.length > 0 && (
-        <Rows label="Threads">
-          {listed.map((thread) => {
-            const status = going.get(thread.id);
-            const last = thread.messages.at(-1);
-            // Who spoke last and what they said, and when: what tells two threads of one title apart.
-            const said = last && `${author(last.actor, me)}: ${plainTitle(last.content) ?? "…"}`;
-            const when = thread.activeAt && <Ago at={thread.activeAt} />;
-            return (
-              <Row
-                key={thread.id}
-                meta={
-                  (said || when) && (
-                    <>
-                      {said && <span id={`${thread.id}-said`}>{said}</span>}
-                      {said && when && " · "}
+      {rows.length > 0 && (
+        // A table from 1024 pixels, its arrows moving from one thread's link to the
+        // next's, and rows below it (portalr ADR-0087).
+        <div className="contents">
+          <div className="max-lg:hidden">
+            <Table caption="Threads">
+              <thead>
+                <tr>
+                  <th scope="col">Thread</th>
+                  <th scope="col">Last message</th>
+                  <th scope="col">Status</th>
+                  <th scope="col" data-num="">
+                    Active
+                  </th>
+                  <th scope="col">
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody onKeyDown={arrows}>
+                {rows.map(({ thread, title, status, said, when, moved, link }) => (
+                  <tr key={thread.id} className="group relative">
+                    <th scope="row" className="w-[35%]">
+                      {moved && unread}
+                      <RowLink render={link}>{title}</RowLink>
+                    </th>
+                    <td className="max-w-0 truncate text-muted">{said}</td>
+                    <td>{status && <RunStatus status={status} />}</td>
+                    <td data-num="" className="whitespace-nowrap text-muted">
                       {when}
-                    </>
-                  )
-                }
-                name={
-                  <span className="block">
-                    {/* Unread: a mark in the working colour in the row's own start padding, at the
-                        row's middle, so the title and the line under it share one left edge
-                        (portalr ADR-0085). */}
-                    {seen[thread.id] !== undefined && thread.active > (seen[thread.id] ?? 0) && (
-                      <span
-                        role="img"
-                        aria-label="Moved since you read it"
-                        className="absolute start-2 top-1/2 size-2 -translate-y-1/2 rounded-full bg-accent forced-color-adjust-none forced-colors:bg-system-text"
-                      />
-                    )}
-                    <RowLink
-                      // Described by what was said last, not by a time that moves.
-                      {...(said && { "aria-describedby": `${thread.id}-said` })}
-                      render={
-                        <Link
-                          to="/t/$tenant/w/$workspace/threads/$thread"
-                          params={{ tenant, workspace, thread: thread.id }}
-                        />
-                      }
-                    >
-                      {thread.title || "Untitled"}
-                    </RowLink>
-                  </span>
-                }
-                end={status && <RunStatus status={status} />}
-              />
-            );
-          })}
-        </Rows>
+                    </td>
+                    <td className="w-0">
+                      {moved && (
+                        <span className="block fine:opacity-0 fine:group-focus-within:opacity-100 fine:group-hover:opacity-100">
+                          <IconButton
+                            label="Mark as read"
+                            icon={glyphs.check}
+                            onClick={() => markSeen(tenant, workspace, thread.id, thread.active)}
+                          />
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+          <div className="lg:hidden">
+            <Rows label="Threads">
+              {rows.map(({ thread, title, status, said, when, moved, link }) => (
+                <Row
+                  key={thread.id}
+                  meta={
+                    (said || when) && (
+                      <>
+                        {said && <span id={`${thread.id}-said`}>{said}</span>}
+                        {said && when && " · "}
+                        {when}
+                      </>
+                    )
+                  }
+                  name={
+                    <span className="block">
+                      {moved && unread}
+                      <RowLink
+                        // Described by what was said last, not by a time that moves.
+                        {...(said && { "aria-describedby": `${thread.id}-said` })}
+                        render={link}
+                      >
+                        {title}
+                      </RowLink>
+                    </span>
+                  }
+                  end={status && <RunStatus status={status} />}
+                />
+              ))}
+            </Rows>
+          </div>
+        </div>
       )}
+      {/* At the page's foot, where a thread is written in (portalr ADR-0087): shown whatever the
+          connection's state, so words kept through its closing stay in view, to send once it is
+          connected again or to copy; disabled until it is live. On a phone, a band of the search
+          and New thread stands in its place until New thread opens it. */}
+      <ComposerDock className="mt-auto">
+        {!composing && (
+          <div className="hidden gap-2 phone:flex">
+            <Button
+              ref={band}
+              variant="secondary"
+              className="flex-1 justify-start font-normal text-muted"
+              onClick={() => openSearch?.(band)}
+            >
+              <Icon icon={glyphs.search} />
+              Search or go to…
+            </Button>
+            <Button aria-label="New thread" onClick={compose}>
+              <Icon icon={glyphs.plus} />
+            </Button>
+          </div>
+        )}
+        <div className={composing ? "flex flex-col gap-3" : "flex flex-col gap-3 phone:hidden"}>
+          <Composer
+            disabled={!live}
+            onSend={write}
+            keep
+            attach={
+              // A quieter way in, inside the composer's row (portalr ADR-0085): name it, then
+              // start it. It stays as the form opens, so the row keeps its shape.
+              <Button
+                variant="secondary"
+                size="sm"
+                disabled={!live}
+                aria-expanded={naming}
+                onClick={() => setNaming((was) => !was)}
+              >
+                <Icon icon={glyphs.plus} className="size-3.5" />
+                Name it first…
+              </Button>
+            }
+          />
+          {naming && (
+            <form className="flex flex-wrap items-end gap-2" action={start}>
+              <TextField label="New thread" name="title" error={refused} required autoFocus />
+              <Button type="submit" disabled={!live} pending={pending}>
+                Start
+              </Button>
+            </form>
+          )}
+        </div>
+      </ComposerDock>
     </>
   );
+}
+
+/** From a thread's link, the arrows go to the next thread's or the one before's. */
+function arrows(event: KeyboardEvent<HTMLElement>) {
+  const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+  const from = event.target;
+  if (step === undefined || !(from instanceof HTMLAnchorElement)) {
+    return;
+  }
+  const links = [...(from.closest("tbody")?.querySelectorAll<HTMLAnchorElement>("th > a") ?? [])];
+  const to = links[links.indexOf(from) + step];
+  if (to) {
+    event.preventDefault();
+    to.focus();
+  }
 }
 
 const newThreadId = () => `thr_${crypto.randomUUID().replaceAll("-", "")}`;

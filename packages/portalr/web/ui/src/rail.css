@@ -1,0 +1,8 @@
+/*
+ * The kit's styles with admin's rail and its navigation (portalr ADR-0087): `styles.css` leaves
+ * their classes out, as the app, whose frame is a bar along the top, draws neither; admin, and the
+ * kit's own tests, import this in its place.
+ */
+@import "./styles.css";
+@source "./rail-shell.tsx";
+@source "./side-nav.tsx";

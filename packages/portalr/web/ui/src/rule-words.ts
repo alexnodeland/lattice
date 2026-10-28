@@ -1,7 +1,7 @@
 /**
  * A reflexr rule in words, stage by stage, in the order reflexr runs them (portalr ADR-0017): the
  * event types it is on, the filter, the pattern, dedupe and throttle, the scope, the action, and
- * how it retries; a setting left off its default, such as `start`, as itself. Each stage is lines, nested as `all`, `any` and `not` nest; a part of a
+ * how it retries; any other setting it holds, such as `start`, as itself. Each stage is lines, nested as `all`, `any` and `not` nest; a part of a
  * shape it doesn't know is its JSON, in its place, so a newer rule still reads. The rule's shape is
  * reflexr's schema's, generated; it is read here defensively, since a draft is data.
  */
@@ -34,15 +34,12 @@ type Obj = Readonly<Record<string, unknown>>;
 
 const json = (value: unknown): Line => ({ said: JSON.stringify(value) ?? "null", json: true });
 
-const UNITS: readonly (readonly [string, string])[] = [
-  ["Y", "year"],
-  ["M", "month"],
-  ["W", "week"],
-  ["D", "day"],
-  ["H", "hour"],
-  ["m", "minute"],
-  ["S", "second"],
-];
+/** The units of a duration, in the order ISO 8601 writes them. */
+const UNITS = ["year", "month", "week", "day", "hour", "minute", "second"];
+
+/** A list in words: "a, b and c", or "a, b or c". */
+const listed = (items: readonly string[], last: string) =>
+  items.length < 2 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} ${last} ${items.at(-1)}`;
 
 const ISO =
   /^P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+(?:\.\d+)?)S)?)?$/;
@@ -53,16 +50,11 @@ export function duration(value: unknown): string {
   if (found === null || value === "P" || value === "PT") {
     return typeof value === "string" ? value : JSON.stringify(value);
   }
-  const words = UNITS.flatMap(([, unit], at) => {
+  const words = UNITS.flatMap((unit, at) => {
     const n = found[at + 1];
     return n === undefined || Number(n) === 0 ? [] : [`${n} ${unit}${n === "1" ? "" : "s"}`];
   });
-  if (words.length === 0) {
-    return "no time";
-  }
-  return words.length === 1
-    ? (words[0] ?? "")
-    : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`;
+  return words.length === 0 ? "no time" : listed(words, "and");
 }
 
 const OPS: Record<R.Op, string> = {
@@ -81,9 +73,6 @@ const OPS: Record<R.Op, string> = {
 const value = (v: unknown) => JSON.stringify(v) ?? "null";
 
 /** A list in words: "a, b or c". */
-const either = (items: readonly string[]) =>
-  items.length < 2 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} or ${items.at(-1)}`;
-
 const strings = (v: unknown): v is readonly string[] =>
   Array.isArray(v) && v.length > 0 && v.every((each) => typeof each === "string");
 
@@ -95,7 +84,7 @@ export function filterLine(filter: unknown): Line {
   const f = filter as Obj & { kind?: unknown };
   switch (f.kind) {
     case "on":
-      return strings(f.types) ? { said: `the event is ${either(f.types)}` } : json(filter);
+      return strings(f.types) ? { said: `the event is ${listed(f.types, "or")}` } : json(filter);
     case "where": {
       const { field, op } = f as Partial<R.WhereFilter>;
       if (typeof field !== "string" || typeof op !== "string" || !(op in OPS)) {
@@ -130,10 +119,13 @@ function split(filter: unknown): { types: readonly string[]; rest: readonly unkn
   if (on(filter)) {
     return { types: filter.types, rest: [] };
   }
+  // One `on` beside other filters gives the event types; several are each a filter, which must
+  // all hold, as reflexr reads `all`.
   if (isObject(filter) && filter.kind === "all" && Array.isArray(filter.of)) {
     const of: readonly unknown[] = filter.of;
-    if (of.some(on)) {
-      return { types: of.filter(on).flatMap((each) => each.types), rest: of.filter((e) => !on(e)) };
+    const ons = of.filter(on);
+    if (ons.length === 1 && ons[0]) {
+      return { types: ons[0].types, rest: of.filter((e) => !on(e)) };
     }
   }
   return { types: [], rest: filter === undefined ? [] : [filter] };
@@ -152,7 +144,11 @@ function patternLines(pattern: unknown): readonly Line[] {
       return [{ said: "each event" }];
     case "count":
       return typeof p.at_least === "number"
-        ? [{ said: `${p.at_least} or more within ${duration(p.within)}` }]
+        ? [
+            {
+              said: `fires when ${p.at_least} arrive within ${duration(p.within)}, then starts over`,
+            },
+          ]
         : [json(pattern)];
     case "sequence":
       return Array.isArray(p.steps)
@@ -180,7 +176,7 @@ const unknown = (object: Obj, known: readonly string[], under = ""): Line[] =>
     .filter(([key]) => !known.includes(key))
     .map(([key, v]) => ({ ...json(v), term: `${under}${key}` }));
 
-/** A rule's keys the stages say; any other, such as `start` or `ordering`, is said as itself, under more. */
+/** A rule's keys the stages say; any other the rule holds, such as `start` or `ordering`, is said as itself, under more. */
 const RULE = ["name", "description", "enabled", "when", "then", "scope", "retry", "timeout"];
 const WHEN = ["filter", "pattern", "dedupe", "throttle"];
 const THEN = ["action", "params"];
@@ -196,7 +192,7 @@ function retries(retry: unknown): Stage {
   const said =
     attempts === 1
       ? "1 attempt, no retries"
-      : `up to ${attempts} attempts, ${duration(r.backoff ?? "PT1S")} apart, ×${r.multiplier ?? 2} each time, at most ${duration(r.max_backoff ?? "PT5M")}`;
+      : `up to ${attempts} attempts, ${duration(r.backoff ?? "PT1S")} apart, ×${r.multiplier ?? 2} each time, at most ${duration(r.max_backoff ?? "PT5M")} apart`;
   return { name: "retries", lines: [{ said }, ...(isObject(retry) ? unknown(retry, RETRY) : [])] };
 }
 
@@ -213,6 +209,27 @@ export function stages(rule: Obj): readonly Stage[] {
   const scope = isObject(rule.scope) ? rule.scope.fields : [];
   const params = isObject(then.params) ? Object.entries(then.params) : [];
   return [
+    // Whether it runs, said only where it doesn't, and what it is for, where it says.
+    ...(rule.enabled === undefined || rule.enabled === true
+      ? []
+      : [
+          {
+            name: "status",
+            lines: [rule.enabled === false ? { said: "disabled" } : json(rule.enabled)],
+          },
+        ]),
+    ...(rule.description === undefined || rule.description === ""
+      ? []
+      : [
+          {
+            name: "description",
+            lines: [
+              typeof rule.description === "string"
+                ? { said: rule.description }
+                : json(rule.description),
+            ],
+          },
+        ]),
     {
       name: "event types",
       lines:
@@ -223,12 +240,18 @@ export function stages(rule: Obj): readonly Stage[] {
     { name: "pattern", lines: patternLines(when.pattern) },
     optional(
       when.dedupe,
-      (d) => (strings(d.key) ? `once per ${d.key.join(", ")} within ${duration(d.within)}` : null),
+      (d) =>
+        strings(d.key)
+          ? `once per ${d.key.join(", ")} within ${duration(d.within)}, per scope`
+          : null,
       "dedupe",
     ),
     optional(
       when.throttle,
-      (t) => (typeof t.at_most === "number" ? `at most ${t.at_most} per ${duration(t.per)}` : null),
+      (t) =>
+        typeof t.at_most === "number"
+          ? `at most ${t.at_most} per ${duration(t.per)}, per scope`
+          : null,
       "throttle",
     ),
     rule.scope === undefined || (Array.isArray(scope) && scope.length === 0)

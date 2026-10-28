@@ -126,6 +126,22 @@ const LOG = [
         },
       },
     },
+  ), // An edit whose patch doesn't apply: an array's `length` isn't an index.
+  at(
+    10,
+    { kind: "system", id: "relayr:rule-drift" },
+    {
+      type: "proposal_created",
+      proposal_id: "prop_bad",
+      rationale: null,
+      change: {
+        type: "edit_artifact",
+        artifact_id: "rule_1",
+        base_version: 1,
+        summary: "A patch that can't apply",
+        patch: { kind: "json_patch", ops: [{ op: "remove", path: "/rule/scope/fields/length" }] },
+      },
+    },
   ),
 ];
 

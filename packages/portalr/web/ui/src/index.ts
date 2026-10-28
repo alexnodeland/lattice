@@ -102,6 +102,7 @@ export { type Glyph, glyphs } from "./icons";
 export { IntegrationList, type IntegrationRow, type IntegrationSource } from "./integration-list";
 export { IntegrationsContext, type IsEnabled } from "./integrations";
 export { type Column, ItemTable } from "./item-table";
+export { JsonView } from "./json-view";
 export { type LineReveal, LogList } from "./log-list";
 export { Markdown } from "./markdown";
 export { Lockup, type Ui } from "./marks";

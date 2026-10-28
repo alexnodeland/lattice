@@ -44,7 +44,7 @@ function Lines({ lines, depth = 0 }: { lines: readonly Line[]; depth?: number })
   return (
     <ul
       className={cn(
-        "m-0 flex min-w-0 list-none flex-col gap-1 p-0",
+        "m-0 flex min-w-0 flex-col gap-1 p-0",
         depth > 0 && "border-line border-s ps-3",
       )}
     >
@@ -69,17 +69,12 @@ export function RulePipeline({ rule }: { rule: Readonly<Record<string, unknown>>
   return (
     <ol
       aria-label="The rule, stage by stage"
-      className="m-0 flex list-none flex-col divide-y divide-line rounded-(--card-radius) border border-line bg-surface p-0 text-sm"
+      className="m-0 flex flex-col divide-y divide-line rounded-(--card-radius) border border-line bg-surface p-0 text-sm"
     >
       {stages(rule).map((stage: Stage) => (
-        <li
-          key={stage.name}
-          className="flex flex-col gap-x-4 gap-y-0.5 px-(--card-pad) py-2 sm:flex-row"
-        >
-          <span className={cn(TYPE.labelQuiet, "shrink-0 first-letter:uppercase sm:w-32")}>
-            {stage.name}
-          </span>
-          <div className={cn("min-w-0 flex-1", stage.none ? "text-muted" : "text-fg")}>
+        <li key={stage.name} className="flex flex-col gap-0.5 px-4 py-2">
+          <span className={cn(TYPE.labelQuiet, "first-letter:uppercase")}>{stage.name}</span>
+          <div className={cn("min-w-0", stage.none ? "text-muted" : "text-fg")}>
             <Lines lines={stage.lines} />
           </div>
         </li>

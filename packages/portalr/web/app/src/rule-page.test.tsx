@@ -47,10 +47,12 @@ test("a code rule is shown as its pipeline, its JSON folded under it", async () 
   expect(stage(screen, "retries")).toMatch(/^up to 3 attempts/);
   expect(stage(screen, "more")).toBe('start: "beginning"');
   await expect.element(screen.getByText("Disabled", { exact: true })).toBeVisible();
-  const json = screen.getByRole("button", { name: "The rule, as reflexr's JSON" });
+  const json = screen.getByRole("button", { name: "The rule, as JSON" });
   await expect.element(json).toHaveAttribute("aria-expanded", "false");
   await json.click();
-  await expect.element(screen.getByText(/"max_attempts": 3/)).toBeVisible();
+  const folded = screen.getByRole("region", { name: "rule's JSON" });
+  await expect.element(folded).toBeVisible();
+  expect(folded.element().textContent).toContain("max_attempts 3");
 });
 
 test("a rule of another shape shows that part as JSON, in its place, and the defaults it leaves", async () => {

@@ -144,7 +144,7 @@ test("each pattern kind is said in words", () => {
   expect(said(withWhen({ pattern: { kind: "each" } }), "pattern")).toBe("each event");
   expect(
     said(withWhen({ pattern: { kind: "count", at_least: 3, within: "PT1M" } }), "pattern"),
-  ).toBe("3 or more within 1 minute");
+  ).toBe("fires when 3 arrive within 1 minute, then starts over");
   expect(
     said(
       withWhen({
@@ -168,10 +168,10 @@ test("each pattern kind is said in words", () => {
 });
 
 test("throttle, dedupe and scope say what they are, or that there is none", () => {
-  expect(said(RULE, "throttle")).toBe("at most 1 per 15 minutes");
+  expect(said(RULE, "throttle")).toBe("at most 1 per 15 minutes, per scope");
   expect(said(withWhen({}), "throttle")).toBe("none");
   expect(said(withWhen({ dedupe: { key: ["ticket"], within: "PT1H" } }), "dedupe")).toBe(
-    "once per ticket within 1 hour",
+    "once per ticket within 1 hour, per scope",
   );
   expect(said(RULE, "scope")).toBe("per service");
   expect(said({ ...RULE, scope: { fields: ["service", "region"] } }, "scope")).toBe(
@@ -187,7 +187,7 @@ test("an action is its name, and its params as fields; retries have reflexr's de
   const notify = { ...RULE, ...action('{"action": "notify"}') };
   expect(said(notify, "action")).toBe("notify");
   expect(said(RULE, "retries")).toBe(
-    "up to 5 attempts, 1 second apart, ×2 each time, at most 5 minutes",
+    "up to 5 attempts, 1 second apart, ×2 each time, at most 5 minutes apart",
   );
   expect(said({ ...RULE, retry: { max_attempts: 1 } }, "retries")).toBe("1 attempt, no retries");
 });
@@ -199,14 +199,14 @@ test("a part it doesn't know is JSON in its place, and the rest still reads", as
     priority: "high",
   };
   expect(said(newer, "pattern")).toBe('{"kind":"rate","per":"PT1M"}');
-  expect(said(newer, "throttle")).toBe("at most 1 per 15 minutes");
+  expect(said(newer, "throttle")).toBe("at most 1 per 15 minutes, per scope");
   expect(said(newer, "more")).toBe('priority: "high"\nwhen.window: "PT5M"');
   const filter = filterLine({ kind: "all", of: [{ kind: "near", field: "geo" }] });
   expect(stageText([filter])).toBe('all of\n  {"kind":"near","field":"geo"}');
 
   const screen = await render(<RulePipeline rule={newer} />);
   await expect.element(screen.getByText('{"kind":"rate","per":"PT1M"}')).toBeVisible();
-  await expect.element(screen.getByText("at most 1 per 15 minutes")).toBeVisible();
+  await expect.element(screen.getByText("at most 1 per 15 minutes, per scope")).toBeVisible();
 });
 
 test("a rule artifact shows what its preview found, its pipeline and its JSON to copy", async () => {
@@ -221,7 +221,9 @@ test("a rule artifact shows what its preview found, its pipeline and its JSON to
   const pipeline = screen.getByRole("list", { name: "The rule, stage by stage" });
   await expect.element(pipeline).toBeVisible();
   await expect.element(screen.getByText("portal:ticket.opened")).toBeVisible();
-  await expect.element(screen.getByText("3 or more within 1 minute")).toBeVisible();
+  await expect
+    .element(screen.getByText("fires when 3 arrive within 1 minute, then starts over"))
+    .toBeVisible();
   await screen.getByRole("button", { name: "The rule, as JSON" }).click();
   await expect.element(screen.getByRole("button", { name: /Copy/ })).toBeVisible();
   expect(await axeViolations(screen.container)).toEqual([]);
@@ -297,5 +299,51 @@ test("an edit names each stage it changes, with what it was and what it would be
   // What didn't change isn't named.
   expect(screen.getByRole("region", { name: "pattern" }).query()).toBeNull();
   expect(screen.getByRole("region", { name: "action" }).query()).toBeNull();
+  expect(await axeViolations(screen.container)).toEqual([]);
+});
+
+test("a disabled rule says so first, and a description is said; any other setting it holds is said as itself", () => {
+  const off = {
+    ...RULE,
+    enabled: false,
+    description: "Page on fire.",
+    start: "now",
+    ordering: "none",
+  };
+  expect(
+    stages(off)
+      .map((stage) => stage.name)
+      .slice(0, 3),
+  ).toEqual(["status", "description", "event types"]);
+  expect(said(off, "status")).toBe("disabled");
+  expect(said(off, "description")).toBe("Page on fire.");
+  expect(said(off, "more")).toBe('start: "now"\nordering: "none"');
+  expect(stages({ ...RULE, enabled: true }).some((stage) => stage.name === "status")).toBe(false);
+  expect(said({ ...RULE, enabled: "yes" }, "status")).toBe('"yes"');
+});
+
+test("several event types at the top are a filter, all of which must hold, as reflexr reads all", () => {
+  const two = withWhen({
+    filter: { kind: "all", of: [on, { kind: "on", types: ["portal:ticket.closed"] }] },
+  });
+  expect(said(two, "event types")).toBe("any event");
+  expect(said(two, "filter")).toBe(
+    "all of\n  the event is portal:ticket.opened\n  the event is portal:ticket.closed",
+  );
+});
+
+test("an edit of only whether it runs, or only its description, is a change", async () => {
+  const screen = await render(
+    <ProposedChanges
+      before={{ rule: RULE }}
+      after={{ rule: { ...RULE, enabled: false, description: "Quiet for now." } }}
+      renderer={rule}
+      compare={compare}
+    />,
+  );
+  const status = screen.getByRole("region", { name: "status" });
+  expect(status.element().textContent).toContain("added: disabled");
+  const description = screen.getByRole("region", { name: "description" });
+  expect(description.element().textContent).toContain("added: Quiet for now.");
   expect(await axeViolations(screen.container)).toEqual([]);
 });

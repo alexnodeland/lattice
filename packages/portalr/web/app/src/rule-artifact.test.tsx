@@ -19,7 +19,9 @@ test("in its thread, a rule is its pipeline, with what its preview found, and an
   const { screen } = await open("/t/acme/w/notes/threads/thr_r", serve, () => null, WORLD);
   const card = screen.getByRole("listitem", { name: "ops.page_on_severe_tickets" });
   await expect.element(card.getByText(FIRED, { exact: true })).toBeVisible();
-  await expect.element(card.getByText("3 or more within 10 minutes").first()).toBeVisible();
+  await expect
+    .element(card.getByText("fires when 3 arrive within 10 minutes, then starts over").first())
+    .toBeVisible();
   await expect.element(card.getByText("severity ≥ 7").first()).toBeVisible();
   const edit = screen.getByRole("region", { name: "Proposal: Edit the rule" });
   const throttle = edit.getByRole("region", { name: "throttle" });
@@ -70,6 +72,24 @@ test("a patch applies as artifactr applies it, and one that doesn't gives nothin
   expect(applyPatch(data, [{ op: "add", path: "/no/such", value: 1 }])).toBeNull();
   expect(applyPatch(data, [{ op: "frobnicate", path: "/x" }])).toBeNull();
   expect(applyPatch(data, [{ op: "add", path: "", value: 1 }])).toBeNull();
+  // An array's index is digits alone: not `length`, nor `1.0`, `1e0` or ` 1`.
+  for (const index of ["length", "1.0", "1e0", " 1", "01", "-1"]) {
+    expect(applyPatch(data, [{ op: "remove", path: `/rule/a/${index}` }]), index).toBeNull();
+  }
+  // Nothing reaches a prototype.
+  for (const key of ["__proto__", "constructor", "prototype"]) {
+    expect(
+      applyPatch(data, [{ op: "add", path: `/rule/${key}`, value: { polluted: 1 } }]),
+    ).toBeNull();
+    expect(applyPatch(data, [{ op: "add", path: `/${key}/x`, value: 1 }])).toBeNull();
+  }
+  expect(({} as Record<string, unknown>).polluted).toBeUndefined();
+  // An add or a replace without a value, and ops that aren't a list of ops, don't apply.
+  expect(applyPatch(data, [{ op: "add", path: "/rule/z" }])).toBeNull();
+  expect(applyPatch(data, [{ op: "replace", path: "/rule/a" }])).toBeNull();
+  expect(applyPatch(data, [null])).toBeNull();
+  expect(applyPatch(data, "ops")).toBeNull();
+  expect(applyPatch(null, [])).toBeNull();
 });
 
 test("a drift proposed back from reflexr, on the Proposals page, names the stage it changes", async () => {
@@ -82,4 +102,15 @@ test("a drift proposed back from reflexr, on the Proposals page, names the stage
   expect(scope.element().textContent).toContain("removed: service");
   expect(scope.element().textContent).toContain("added: team");
   expect(drift.getByRole("region", { name: "throttle" }).query()).toBeNull();
+  await expect.element(drift.getByText("Compared with version 2, the latest.")).toBeVisible();
+});
+
+test("an edit whose patch can't apply says so, against which version, with its changes as sent", async () => {
+  const { screen } = await open("/t/acme/w/notes/proposals", serve, () => null, WORLD);
+  const bad = screen.getByRole("region", { name: "Proposal: A patch that can't apply" });
+  await expect
+    .element(bad.getByText("Couldn't work out what this changes in version 1.", { exact: false }))
+    .toBeVisible();
+  await expect.element(bad.getByText("json_patch", { exact: false })).toBeVisible();
+  expect(bad.element().textContent).toContain("/rule/scope/fields/length");
 });

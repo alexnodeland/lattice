@@ -4,10 +4,10 @@ import {
   Button,
   ButtonLink,
   ConfirmDialog,
-  Disclosure,
   NotFound as NotFoundPage,
   PageHeader,
   RulePipeline,
+  rule,
   StatusBadge,
   TextField,
 } from "@portalr/ui";
@@ -145,52 +145,47 @@ function RulePage() {
         }
       />
       {unarchived && <Alert tone="error">{unarchived}</Alert>}
-      <div className="flex flex-wrap items-center gap-2">
-        <StatusBadge tone={held.rule.enabled === false ? "stopped" : "done"}>
-          {held.rule.enabled === false ? "Disabled" : "Enabled"}
-        </StatusBadge>
-        <p>{held.rule.description || "No description."}</p>
-      </div>
-      {/* What it does, as the pipeline it runs, above its JSON (portalr ADR-0017). */}
-      <RulePipeline rule={held.rule as Record<string, unknown>} />
+      <StatusBadge tone={held.rule.enabled === false ? "stopped" : "done"} className="self-start">
+        {held.rule.enabled === false ? "Disabled" : "Enabled"}
+      </StatusBadge>
+      {/* What it is for and does, as the pipeline it runs: above its JSON, folded, or the field
+          that edits it (portalr ADR-0017). */}
       {stored && allowed.has("reflexr:update_rule") ? (
-        <form aria-label="Edit the rule" className="flex flex-col gap-2" action={save}>
-          {current > base && (
-            <Alert tone="info">
-              <span className="flex flex-wrap items-center gap-2">
-                Version {current} was saved since you opened this.
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    setText(shown(held.rule));
-                    setBase(current);
-                  }}
-                >
-                  Load version {current}
-                </Button>
-              </span>
-            </Alert>
-          )}
-          <TextField
-            label="Rule, as reflexr's JSON"
-            value={text}
-            onValueChange={setText}
-            error={refused}
-            render={<textarea rows={20} wrap="off" className="font-mono" spellCheck={false} />}
-            required
-          />
-          <Button type="submit" disabled={saving} className="self-start">
-            Save
-          </Button>
-        </form>
+        <>
+          <RulePipeline rule={held.rule as Record<string, unknown>} />
+          <form aria-label="Edit the rule" className="flex flex-col gap-2" action={save}>
+            {current > base && (
+              <Alert tone="info">
+                <span className="flex flex-wrap items-center gap-2">
+                  Version {current} was saved since you opened this.
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      setText(shown(held.rule));
+                      setBase(current);
+                    }}
+                  >
+                    Load version {current}
+                  </Button>
+                </span>
+              </Alert>
+            )}
+            <TextField
+              label="Rule, as reflexr's JSON"
+              value={text}
+              onValueChange={setText}
+              error={refused}
+              render={<textarea rows={20} wrap="off" className="font-mono" spellCheck={false} />}
+              required
+            />
+            <Button type="submit" disabled={saving} className="self-start">
+              Save
+            </Button>
+          </form>
+        </>
       ) : (
-        // Its JSON, folded until asked (portalr ADR-0085).
-        <Disclosure summary="The rule, as reflexr's JSON">
-          <pre className="whitespace-pre-wrap break-words rounded-(--card-radius) border border-line bg-surface p-4 font-mono text-xs">
-            {shown(held.rule)}
-          </pre>
-        </Disclosure>
+        rule.render({ rule: held.rule })
       )}
     </section>
   );

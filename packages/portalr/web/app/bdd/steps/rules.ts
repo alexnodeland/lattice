@@ -108,8 +108,8 @@ When("they open their rule", async ({ page, scenario }) => {
 Then("they can't edit or archive it", async ({ page }) => {
   // It reads as the pipeline it runs; its JSON is folded under it (portalr ADR-0017).
   await expect(page.getByRole("list", { name: "The rule, stage by stage" })).toBeVisible();
-  await page.getByRole("button", { name: "The rule, as reflexr's JSON" }).click();
-  await expect(page.getByText(/"description"/)).toBeVisible();
+  await page.getByRole("button", { name: "The rule, as JSON" }).click();
+  await expect(page.getByRole("region", { name: "rule's JSON" })).toBeVisible();
   await expect(field(page)).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Archive" })).toHaveCount(0);
 });

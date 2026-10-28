@@ -1,20 +1,23 @@
 /**
  * What a proposal of a `rule` would do, under its card (portalr ADR-0017): a new rule as its
  * pipeline, and an edit as what it changes, stage by stage, as a revision's changes are said,
- * against the version it was made on. A proposal of another kind, or an edit whose version can't
- * be read or whose patch doesn't apply, adds nothing.
+ * against the version it was made on, which it names. An edit whose version can't be read or whose
+ * patch doesn't apply says so, with its changes as sent. A proposal of another kind adds nothing.
  */
 
 import type { Artifactr } from "@portalr/client";
 import { changes } from "@portalr/client/diff";
-import { Disclosure, ProposedChanges, RulePipeline, rule } from "@portalr/ui";
+import { type Data, JsonView, ProposedChanges, RulePipeline, rule } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import type { Context } from "./context";
 import { applyPatch } from "./json-patch";
 
-const isObject = (value: unknown): value is Readonly<Record<string, unknown>> =>
-  typeof value === "object" && value !== null && !Array.isArray(value);
+/** A proposed rule artifact's rule, or null. */
+const proposedRule = (change: { kind: string; data: Data }) =>
+  change.kind === "rule" && typeof change.data.rule === "object" && change.data.rule !== null
+    ? (change.data.rule as Data)
+    : null;
 
 type Edit = Extract<NonNullable<Artifactr.Proposal["change"]>, { type: "edit_artifact" }>;
 
@@ -27,18 +30,33 @@ function RuleEdit({
 }) {
   const read = useQuery(context.queries.artifactr.revisions(tenant, workspace, edit.artifact_id));
   const before = read.data?.find((revision) => revision.version === edit.base_version)?.data;
+  const latest = read.data?.reduce((most, revision) => Math.max(most, revision.version), 0);
   const after = useMemo(
-    () =>
-      isObject(before) && edit.patch.kind === "json_patch"
-        ? applyPatch(before, edit.patch.ops as Readonly<Record<string, unknown>>[])
-        : null,
+    () => (edit.patch.kind === "json_patch" ? applyPatch(before, edit.patch.ops) : null),
     [before, edit.patch],
   );
+  if (read.isPending) {
+    return null;
+  }
+  // A version that can't be read gives no patch applied either.
+  const failed = after === null;
   return (
-    isObject(before) &&
-    after !== null && (
-      <ProposedChanges before={before} after={after} renderer={rule} compare={changes} />
-    )
+    <div className="flex flex-col gap-2">
+      <p className="text-muted text-sm">
+        {failed ? "Couldn't work out what this changes in" : "Compared with"} version{" "}
+        {edit.base_version}
+        {failed
+          ? ". Its changes, as sent:"
+          : latest === edit.base_version
+            ? ", the latest."
+            : `; the latest is ${latest}.`}
+      </p>
+      {failed ? (
+        <JsonView data={edit.patch} name="changes" />
+      ) : (
+        <ProposedChanges before={before as Data} after={after} renderer={rule} compare={changes} />
+      )}
+    </div>
   );
 }
 
@@ -56,14 +74,10 @@ export function RuleProposal({
   place: { context: Context; tenant: string; workspace: string };
 }) {
   const { change } = proposal;
-  if (change?.type === "create_artifact" && change.kind === "rule" && isObject(change.data.rule)) {
-    // Once it is decided, the rule is the artifact's, or was turned down: folded, to look back on.
-    const pipeline = <RulePipeline rule={change.data.rule} />;
-    return proposal.status === "open" ? (
-      pipeline
-    ) : (
-      <Disclosure summary="The rule it proposed">{pipeline}</Disclosure>
-    );
+  // A new rule, while it is open: once decided, it is the artifact's, or was turned down.
+  if (change?.type === "create_artifact" && proposal.status === "open") {
+    const drafted = proposedRule(change);
+    return drafted && <RulePipeline rule={drafted} />;
   }
   if (change?.type === "edit_artifact" && kind === "rule") {
     return <RuleEdit edit={change} place={place} />;

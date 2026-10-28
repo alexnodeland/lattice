@@ -208,6 +208,14 @@
     padding-right: env(safe-area-inset-right);
     padding-left: env(safe-area-inset-left);
   }
+  /*
+   * A phone's tab bar (portalr ADR-0087), and the search that takes its place, keep the home
+   * indicator clear.
+   */
+  [data-tab-bar],
+  [data-docked] {
+    padding-bottom: calc(var(--space-1) + env(safe-area-inset-bottom));
+  }
   [data-composer-dock] {
     padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
   }
@@ -299,4 +307,12 @@
   .flip-in:not([hidden]) {
     animation: flip-in var(--duration-moderate) var(--ease-out);
   }
+}
+
+/*
+ * With the keyboard up the composer is what is used, and a phone's tab bar gives way (portalr
+ * ADR-0087): outside the layers, so it outranks the bar's own `phone:flex`.
+ */
+:root[data-keyboard] [data-tab-bar] {
+  display: none;
 }

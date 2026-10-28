@@ -29,7 +29,6 @@ import {
 } from "react";
 import { author } from "../../../../../../author";
 import { alreadyMade, messageId } from "../../../../../../posting";
-import { useOpenSearch } from "../../../../../../search";
 import { markSeen, readSeen, subscribeToSeen } from "../../../../../../seen";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
 
@@ -114,7 +113,7 @@ function Threads() {
     return { outcome: "done" as const };
   };
   const [naming, setNaming] = useState(false);
-  // On a phone the composer waits behind the band's New thread, as does a thread asked for from
+  // On a phone the composer waits behind the title row's New, as does a thread asked for from
   // the palette ("#new"): either opens it and takes the focus to its words (portalr ADR-0087).
   const [composing, setComposing] = useState(false);
   const compose = () => {
@@ -131,8 +130,6 @@ function Threads() {
       asked.current();
     }
   }, [hash]);
-  const openSearch = useOpenSearch();
-  const band = useRef<HTMLButtonElement>(null);
   const live = snapshot.status === "live";
   // Each thread's run that is going, or waits on someone, said beside it.
   const going = new Map(
@@ -193,7 +190,21 @@ function Threads() {
       {/* The filter on the title's line, in its corner; on a phone, the row under it. */}
       <PageHeader
         title="Threads"
-        actions={filter && <div className="max-sm:hidden">{filter}</div>}
+        actions={
+          <>
+            {filter && <div className="max-sm:hidden">{filter}</div>}
+            {/* A phone's way to start one, at the title's end (portalr ADR-0087). */}
+            <Button
+              aria-label="New thread"
+              title="New thread"
+              className="hidden phone:flex"
+              onClick={compose}
+            >
+              <Icon icon={glyphs.plus} />
+              New
+            </Button>
+          </>
+        }
       />
       {filter && <div className="sm:hidden">{filter}</div>}
       <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
@@ -291,25 +302,9 @@ function Threads() {
       )}
       {/* At the page's foot, where a thread is written in (portalr ADR-0087): shown whatever the
           connection's state, so words kept through its closing stay in view, to send once it is
-          connected again or to copy; disabled until it is live. On a phone, a band of the search
-          and New thread stands in its place until New thread opens it. */}
+          connected again or to copy; disabled until it is live. On a phone it waits behind the
+          title row's New (portalr ADR-0087), and the foot is the tab bar's. */}
       <ComposerDock className="mt-auto">
-        {!composing && (
-          <div className="hidden gap-2 phone:flex">
-            <Button
-              ref={band}
-              variant="secondary"
-              className="flex-1 justify-start font-normal text-muted"
-              onClick={() => openSearch?.(band)}
-            >
-              <Icon icon={glyphs.search} />
-              Search or go to…
-            </Button>
-            <Button aria-label="Start a thread" onClick={compose}>
-              <Icon icon={glyphs.plus} />
-            </Button>
-          </div>
-        )}
         <div className={composing ? "flex flex-col gap-3" : "flex flex-col gap-3 phone:hidden"}>
           <Composer
             disabled={!live}

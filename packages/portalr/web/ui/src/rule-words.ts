@@ -1,7 +1,7 @@
 /**
  * A reflexr rule in words, stage by stage, in the order reflexr runs them (portalr ADR-0017): the
  * event types it is on, the filter, the pattern, dedupe and throttle, the scope, the action, and
- * how it retries and runs. Each stage is lines, nested as `all`, `any` and `not` nest; a part of a
+ * how it retries; a setting left off its default, such as `start`, as itself. Each stage is lines, nested as `all`, `any` and `not` nest; a part of a
  * shape it doesn't know is its JSON, in its place, so a newer rule still reads. The rule's shape is
  * reflexr's schema's, generated; it is read here defensively, since a draft is data.
  */
@@ -170,7 +170,7 @@ function optional(part: unknown, say: (part: Obj) => string | null, name: string
   if (part === undefined || part === null) {
     return { name, lines: [{ said: "none" }], none: true };
   }
-  const said = isObject(part) ? say(part) : null;
+  const said = typeof part === "string" ? duration(part) : isObject(part) ? say(part) : null;
   return { name, lines: [said === null ? json(part) : { said }] };
 }
 
@@ -180,10 +180,8 @@ const unknown = (object: Obj, known: readonly string[], under = ""): Line[] =>
     .filter(([key]) => !known.includes(key))
     .map(([key, v]) => ({ ...json(v), term: `${under}${key}` }));
 
-const RULE = [
-  ...["name", "description", "enabled", "when", "then", "scope", "retry", "timeout"],
-  ...["start", "ordering", "on_dead_letter"],
-];
+/** A rule's keys the stages say; any other, such as `start` or `ordering`, is said as itself, under more. */
+const RULE = ["name", "description", "enabled", "when", "then", "scope", "retry", "timeout"];
 const WHEN = ["filter", "pattern", "dedupe", "throttle"];
 const THEN = ["action", "params"];
 const RETRY = ["max_attempts", "backoff", "multiplier", "max_backoff"];
@@ -198,7 +196,7 @@ function retries(retry: unknown): Stage {
   const said =
     attempts === 1
       ? "1 attempt, no retries"
-      : `up to ${attempts} attempts, ${duration(r.backoff ?? "PT1S")} apart at first, ×${r.multiplier ?? 2} each time, at most ${duration(r.max_backoff ?? "PT5M")}`;
+      : `up to ${attempts} attempts, ${duration(r.backoff ?? "PT1S")} apart, ×${r.multiplier ?? 2} each time, at most ${duration(r.max_backoff ?? "PT5M")}`;
   return { name: "retries", lines: [{ said }, ...(isObject(retry) ? unknown(retry, RETRY) : [])] };
 }
 
@@ -214,22 +212,14 @@ export function stages(rule: Obj): readonly Stage[] {
   });
   const scope = isObject(rule.scope) ? rule.scope.fields : [];
   const params = isObject(then.params) ? Object.entries(then.params) : [];
-  const ran = [
-    rule.start === "beginning" ? "from the log's beginning" : "from now on",
-    rule.ordering === "none" ? "in any order" : "in order, per scope",
-    rule.on_dead_letter === "block"
-      ? "a run that fails for good holds its scope"
-      : "a run that fails for good is set aside",
-  ];
   return [
     {
       name: "event types",
-      lines: types.length > 0 ? types.map((type) => ({ said: type })) : [{ said: "any event" }],
+      lines:
+        types.length > 0 ? types.map((said) => ({ said, json: true })) : [{ said: "any event" }],
       none: types.length === 0,
     },
-    filter.length > 0
-      ? { name: "filter", lines: filter }
-      : { name: "filter", lines: [{ said: "none" }], none: true },
+    filter.length > 0 ? { name: "filter", lines: filter } : optional(null, () => null, "filter"),
     { name: "pattern", lines: patternLines(when.pattern) },
     optional(
       when.dedupe,
@@ -258,10 +248,7 @@ export function stages(rule: Obj): readonly Stage[] {
       ],
     },
     retries(rule.retry),
-    typeof rule.timeout === "string"
-      ? { name: "timeout", lines: [{ said: duration(rule.timeout) }] }
-      : optional(rule.timeout, () => null, "timeout"),
-    { name: "runs", lines: ran.map((said) => ({ said })) },
+    optional(rule.timeout, () => null, "timeout"),
     ...((): Stage[] => {
       const more = [...unknown(rule, RULE), ...unknown(when, WHEN, "when.")];
       return more.length > 0 ? [{ name: "more", lines: more }] : [];

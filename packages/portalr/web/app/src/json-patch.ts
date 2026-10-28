@@ -1,7 +1,9 @@
 /**
  * A JSON Patch (RFC 6902) applied to a copy of an artifact's data, as artifactr applies an edit's:
  * what a proposed edit would make, to show beside what it was made against. A patch that doesn't
- * apply gives null, and the proposal is shown without it.
+ * apply gives null, and the proposal is shown without it. It applies the ops artifactr's `diff`
+ * writes (Python jsonpatch's `make_patch`: add, remove, replace and move); any other op doesn't
+ * apply.
  */
 
 type Json = unknown;
@@ -36,15 +38,6 @@ function parent(root: Json, pointer: string): [Container, string] | null {
     at = (at as Record<string, Json>)[token];
   }
   return isContainer(at) ? [at, last] : null;
-}
-
-function get(root: Json, pointer: string): Json | undefined {
-  const found = parent(root, pointer);
-  if (found === null) {
-    return pointer === "" ? root : undefined;
-  }
-  const [at, key] = found;
-  return Object.hasOwn(at, key) ? (at as Record<string, Json>)[key] : undefined;
 }
 
 function remove(root: Json, pointer: string): Json | undefined {
@@ -95,7 +88,6 @@ export function applyPatch(
     if (path === null || path === "") {
       return null;
     }
-    const copy = (pointer: string) => structuredClone(get(root, pointer));
     const ok = (() => {
       switch (op.op) {
         case "add":
@@ -108,12 +100,6 @@ export function applyPatch(
           const moved = from === null ? undefined : remove(root, from);
           return moved !== undefined && add(root, path, moved);
         }
-        case "copy": {
-          const copied = from === null ? undefined : copy(from);
-          return copied !== undefined && add(root, path, copied);
-        }
-        case "test":
-          return JSON.stringify(get(root, path)) === JSON.stringify(op.value);
         default:
           return false;
       }

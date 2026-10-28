@@ -45,7 +45,7 @@ test("a code rule is shown as its pipeline, its JSON folded under it", async () 
   expect(stage(screen, "scope")).toBe("per ticket");
   expect(stage(screen, "action")).toBe('triageto: "oncall"');
   expect(stage(screen, "retries")).toMatch(/^up to 3 attempts/);
-  expect(stage(screen, "runs")).toMatch(/^from the log's beginning/);
+  expect(stage(screen, "more")).toBe('start: "beginning"');
   await expect.element(screen.getByText("Disabled", { exact: true })).toBeVisible();
   const json = screen.getByRole("button", { name: "The rule, as reflexr's JSON" });
   await expect.element(json).toHaveAttribute("aria-expanded", "false");
@@ -60,7 +60,7 @@ test("a rule of another shape shows that part as JSON, in its place, and the def
   expect(stage(screen, "action")).toBe("notify");
   expect(stage(screen, "scope")).toBe("one scope");
   expect(stage(screen, "retries")).toMatch(/^up to 5 attempts/);
-  expect(stage(screen, "runs")).toMatch(/^from now on/);
+  expect(stage(screen, "more")).toBe("when.all: []");
   await expect.element(screen.getByText("Enabled", { exact: true })).toBeVisible();
 });
 

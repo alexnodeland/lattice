@@ -59,17 +59,27 @@ test("a patch applies as artifactr applies it, and one that doesn't gives nothin
       { op: "add", path: "/rule/a/0", value: 0 },
       { op: "replace", path: "/rule/b/x~1y", value: 5 },
       { op: "move", from: "/rule/b/t~0", path: "/rule/c" },
-      { op: "copy", from: "/rule/c", path: "/rule/d" },
       { op: "remove", path: "/rule/a/1" },
-      { op: "test", path: "/rule/d", value: 2 },
     ]),
-  ).toEqual({ rule: { a: [0, 2, 3], b: { "x/y": 5 }, c: 2, d: 2 } });
+  ).toEqual({ rule: { a: [0, 2, 3], b: { "x/y": 5 }, c: 2 } });
   expect(data).toEqual({ rule: { a: [1, 2], b: { "x/y": 1, "t~": 2 } } });
   expect(applyPatch(data, [{ op: "remove", path: "/rule/zz" }])).toBeNull();
   expect(applyPatch(data, [{ op: "test", path: "/rule/a", value: [] }])).toBeNull();
+  expect(applyPatch(data, [{ op: "move", path: "/x" }])).toBeNull();
   expect(applyPatch(data, [{ op: "add", path: "/rule/a/9", value: 1 }])).toBeNull();
   expect(applyPatch(data, [{ op: "add", path: "/no/such", value: 1 }])).toBeNull();
-  expect(applyPatch(data, [{ op: "copy", path: "/x" }])).toBeNull();
   expect(applyPatch(data, [{ op: "frobnicate", path: "/x" }])).toBeNull();
   expect(applyPatch(data, [{ op: "add", path: "", value: 1 }])).toBeNull();
+});
+
+test("a drift proposed back from reflexr, on the Proposals page, names the stage it changes", async () => {
+  const { screen } = await open("/t/acme/w/notes/proposals", serve, () => null, WORLD);
+  const drift = screen.getByRole("region", {
+    name: "Proposal: Bring the rule in line with reflexr",
+  });
+  const scope = drift.getByRole("region", { name: "scope" });
+  await expect.element(scope).toBeVisible();
+  expect(scope.element().textContent).toContain("removed: service");
+  expect(scope.element().textContent).toContain("added: team");
+  expect(drift.getByRole("region", { name: "throttle" }).query()).toBeNull();
 });

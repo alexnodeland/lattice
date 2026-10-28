@@ -61,7 +61,6 @@ test("the stages come in reflexr's order, each always there", () => {
     "action",
     "retries",
     "timeout",
-    "runs",
   ]);
   expect(said(RULE, "event types")).toBe("portal:ticket.opened");
   expect(said(RULE, "filter")).toBe("severity ≥ 7");
@@ -188,7 +187,7 @@ test("an action is its name, and its params as fields; retries have reflexr's de
   const notify = { ...RULE, ...action('{"action": "notify"}') };
   expect(said(notify, "action")).toBe("notify");
   expect(said(RULE, "retries")).toBe(
-    "up to 5 attempts, 1 second apart at first, ×2 each time, at most 5 minutes",
+    "up to 5 attempts, 1 second apart, ×2 each time, at most 5 minutes",
   );
   expect(said({ ...RULE, retry: { max_attempts: 1 } }, "retries")).toBe("1 attempt, no retries");
 });

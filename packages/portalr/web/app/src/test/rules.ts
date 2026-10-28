@@ -106,6 +106,27 @@ const LOG = [
     },
   }),
   at(8, agent, { type: "run_ended", run_id: "run_1", thread_id: "thr_r", status: "completed" }),
+  // relayr's rule-drift: the rule changed in reflexr directly, proposed back to its artifact by
+  // the system, from no thread.
+  at(
+    9,
+    { kind: "system", id: "relayr:rule-drift" },
+    {
+      type: "proposal_created",
+      proposal_id: "prop_drift",
+      rationale: "The rule was changed in reflexr directly.",
+      change: {
+        type: "edit_artifact",
+        artifact_id: "rule_1",
+        base_version: 2,
+        summary: "Bring the rule in line with reflexr",
+        patch: {
+          kind: "json_patch",
+          ops: [{ op: "replace", path: "/rule/scope/fields/0", value: "team" }],
+        },
+      },
+    },
+  ),
 ];
 
 export const serve = async (request: Request, path: string) => {

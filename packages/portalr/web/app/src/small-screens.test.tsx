@@ -50,18 +50,18 @@ for (const [what, path, seen, signedOut] of ROUTES) {
 }
 
 // A rule drafted in a thread, and its page: the pipeline, an edit's changes, and the JSON opened.
-const RULES: [string, string][] = [
-  ["a thread with a rule and an edit of it", "/t/acme/w/notes/threads/thr_r"],
-  ["a rule's page", "/t/acme/w/notes/artifacts/rule_1"],
+const RULES: [string, string, string][] = [
+  ["a thread with a rule and an edit of it", "/t/acme/w/notes/threads/thr_r", "The rule, as JSON"],
+  ["a rule's page", "/t/acme/w/notes/artifacts/rule_1", "The rule, as JSON"],
+  ["the proposals, a rule's among them", "/t/acme/w/notes/proposals", "The rule it proposed"],
 ];
-for (const [what, path] of RULES) {
+for (const [what, path, fold] of RULES) {
   for (const width of WIDTHS) {
     test(`${what} at ${width}px is never wider than the page`, async () => {
       await page.viewport(width, 900);
       const { screen } = await open(path, rules.serve, () => null, rules.WORLD);
+      await screen.getByRole("button", { name: fold }).first().click();
       await expect.element(screen.getByText("per service").first()).toBeVisible();
-      await screen.getByRole("button", { name: "The rule, as JSON" }).first().click();
-      await expect.element(screen.getByRole("button", { name: /Copy/ }).first()).toBeVisible();
       const found = wider();
       expect(found, found.join("\n")).toEqual([]);
       expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);

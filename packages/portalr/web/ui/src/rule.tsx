@@ -18,8 +18,7 @@ import { type Line, type Stage, stages, stageText } from "./rule-words";
 import { TYPE } from "./type";
 
 /** What a rule's preview found, from its proposal's rationale, where it said: "It would have fired 3 times since …". */
-const FIRED =
-  /It would have fired \d+ times? since \d{4}-\d{2}-\d{2}(?:, among the newest events)?\./;
+const FIRED = /It would have fired \d[^\n]*/;
 
 /**
  * What the preview of `artifact`'s newest accepted proposal found, or null: relayr's `draft_rule`
@@ -81,19 +80,7 @@ export function RulePipeline({ rule }: { rule: Readonly<Record<string, unknown>>
             {stage.name}
           </span>
           <div className={cn("min-w-0 flex-1", stage.none ? "text-muted" : "text-fg")}>
-            {stage.name === "event types" && !stage.none ? (
-              <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
-                {stage.lines.map((line) => (
-                  <li key={line.said}>
-                    <code className="break-all rounded-sm bg-wash px-1 font-mono text-xs">
-                      {line.said}
-                    </code>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <Lines lines={stage.lines} />
-            )}
+            <Lines lines={stage.lines} />
           </div>
         </li>
       ))}
@@ -102,7 +89,7 @@ export function RulePipeline({ rule }: { rule: Readonly<Record<string, unknown>>
 }
 
 /** The stages that can be several lines, compared line by line. */
-const LINED = new Set(["event types", "filter", "pattern", "action", "retries", "runs", "more"]);
+const LINED = new Set(["event types", "filter", "pattern", "action", "retries", "more"]);
 
 /** A rule artifact's rule, or null where its data hold none. */
 const ruleOf = (data: Data) => (isObject(data.rule) ? data.rule : null);

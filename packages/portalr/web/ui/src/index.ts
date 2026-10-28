@@ -118,12 +118,7 @@ export { Plain } from "./plain";
 export { Popover } from "./popover";
 export { Progress } from "./progress";
 export { Questions, type QuestionsAnswer } from "./questions";
-<<<<<<< HEAD
 export { RailShell } from "./rail-shell";
-export { type Compare, type More, type RevisionShown, Revisions } from "./revisions";
-||||||| parent of 42c6c4e4 (feat(portalr): show a rule as its pipeline, in threads, proposals and the Rules page)
-export { type Compare, type More, type RevisionShown, Revisions } from "./revisions";
-=======
 export {
   type Compare,
   type More,
@@ -131,7 +126,6 @@ export {
   type RevisionShown,
   Revisions,
 } from "./revisions";
->>>>>>> 42c6c4e4 (feat(portalr): show a rule as its pipeline, in threads, proposals and the Rules page)
 export { Row, RowLink, Rows, TrackLink, Tracks } from "./rows";
 export { FiredContext, firedOf, RulePipeline, rule } from "./rule";
 export { RunFailed } from "./run-failed";

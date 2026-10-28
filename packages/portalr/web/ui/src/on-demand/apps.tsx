@@ -363,11 +363,16 @@ export function Running({
           }
           const { kind, message, stack } = report.params;
           if (kind === "error" || kind === "rejection") {
-            setFault((now) => ({
-              message: String(message ?? ""),
-              stack: String(stack ?? ""),
-              stopped: now?.stopped ?? null,
-            }));
+            // The error it stopped after is kept: a later one, as a tap on the broken game, isn't it.
+            setFault((now) =>
+              now?.stopped
+                ? now
+                : {
+                    message: String(message ?? ""),
+                    stack: String(stack ?? ""),
+                    stopped: now?.stopped ?? null,
+                  },
+            );
           }
           setProblems((now) => (now.includes(line) ? now : [...now, line]));
         },

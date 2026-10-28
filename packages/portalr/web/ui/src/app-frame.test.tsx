@@ -493,6 +493,10 @@ test("an app whose frames stopped after its error says so, with the error and it
     .toBeVisible();
   await expect.element(card.getByText(/^boot: drawn=something/)).toBeVisible();
   expect(await axeViolations(screen.container)).toEqual([]);
+  // A later error, as a tap on the broken game throws, isn't the one it stopped after.
+  fromFrame(frame, { method: APP_ERROR, params: { kind: "error", message: "TypeError: tapped" } });
+  await expect.element(screen.getByText("error: TypeError: tapped")).toBeInTheDocument();
+  await expect.element(card.getByText(PACMAN, { exact: true })).toBeVisible();
   // Frames came back, as after a tap that starts the game again: still running, not stopped.
   fromFrame(frame, { method: APP_STOPPED, params: { stopped: "no" } });
   await expect.element(screen.getByText(RUNNING)).toBeVisible();

@@ -162,8 +162,8 @@ test("a thread shows its messages, the reader's on the wash, its calls and quest
     log.getByRole("listitem", { name: "You" }).first().element(),
     log.getByRole("listitem", { name: "Assistant" }).element(),
   ];
-  // Both at the start of the line: the reader's words on the quiet wash, the agent's unboxed.
-  expect(getComputedStyle(mine).alignSelf).toBe("flex-start");
+  // The reader's words on the quiet wash at the end of the line, the agent's unboxed at its start.
+  expect(getComputedStyle(mine).alignSelf).toBe("flex-end");
   expect(getComputedStyle(theirs).alignSelf).toBe("flex-start");
   const words = (item: Element) => getComputedStyle(item.querySelector(":scope > div") as Element);
   expect(words(mine).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");

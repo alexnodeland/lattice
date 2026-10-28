@@ -201,7 +201,7 @@ def test_the_deployment_audit_shows_tenant_creations_as_the_runbook_says() -> No
 def test_the_look_the_guides_describe_is_the_kits() -> None:
     tokens = (WEB / "ui" / "src" / "tokens.css").read_text()
     base = (WEB / "ui" / "src" / "base.css").read_text()
-    shell = (WEB / "ui" / "src" / "app-shell.tsx").read_text()
+    shell = (WEB / "ui" / "src" / "rail-shell.tsx").read_text()
     admin = text("guides/admin.md")
     # Admin is compact, and the app is not: 2.25rem and 3rem rows, at 16px to the rem.
     assert 'data-density={ui === "admin" ? "compact" : undefined}' in shell

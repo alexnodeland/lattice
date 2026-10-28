@@ -27,7 +27,7 @@ function Page() {
     <div className="flex flex-col gap-6 p-4">
       <PageHeader
         title="A thread whose title runs on and on past the width of any phone there is"
-        breadcrumbs={[{ label: "Threads", href: "#" }]}
+        breadcrumbs={<Breadcrumbs trail={[{ label: "Threads", href: "#" }]} />}
         actions={
           <>
             <Button variant="secondary">Share…</Button>

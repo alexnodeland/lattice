@@ -1,11 +1,11 @@
 import { expect, test } from "vitest";
 import { commands, page } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { AppShell } from "./app-shell";
 import { Card } from "./card";
 import { Dialog } from "./dialog";
 import { glyphs } from "./icons";
 import { Menu } from "./menu";
+import { RailShell } from "./rail-shell";
 
 /** A box-shadow's alpha, and whether its colour is black, from the computed value in either colour syntax. */
 function shadowOf(element: Element) {
@@ -67,14 +67,14 @@ test("the shadow is a whisper of a neutral in light, and black and heavier in da
 
 test("a drawer casts its shadow too", async () => {
   const screen = await render(
-    <AppShell
+    <RailShell
       home={<a href="#home" />}
       switcher={<span>switcher</span>}
       account={<span>account</span>}
       nav={<nav>nav</nav>}
     >
       page
-    </AppShell>,
+    </RailShell>,
   );
   await page.viewport(390, 800);
   await screen.getByRole("button", { name: "Menu" }).click();

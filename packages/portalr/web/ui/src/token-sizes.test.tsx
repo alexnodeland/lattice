@@ -9,12 +9,12 @@
 import { expect, onTestFinished, test } from "vitest";
 import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { AppShell } from "./app-shell";
 import { Checkbox } from "./checkbox";
 import { Dialog } from "./dialog";
 import { glyphs } from "./icons";
 import { Menu } from "./menu";
 import { Progress } from "./progress";
+import { RailShell } from "./rail-shell";
 import { Switch } from "./switch";
 import { Table } from "./table";
 
@@ -67,9 +67,9 @@ test("the drawer is the drawer's width", async () => {
   await page.viewport(390, 900);
   onTestFinished(() => page.viewport(414, 896));
   const screen = await render(
-    <AppShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>alice</span>}>
+    <RailShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>alice</span>}>
       Content
-    </AppShell>,
+    </RailShell>,
   );
   await screen.getByRole("button", { name: "Menu" }).click();
   // 19rem, or 85% of a window narrower than it.

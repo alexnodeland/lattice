@@ -1,11 +1,11 @@
 /**
- * admin's frame: ui's AppShell with admin's mark, its own tenant switch, the areas of where the
+ * admin's frame: ui's RailShell with admin's mark, its own tenant switch, the areas of where the
  * admin is, and the account. A tenant's owners and admins switch between their tenants; an
  * operator also to every tenant, where only the deployment's areas show (portalr ADR-0021).
  */
 
 import type { Signed } from "@portalr/client";
-import { Account, AppShell, TenantSwitcher } from "@portalr/ui";
+import { Account, RailShell, TenantSwitcher } from "@portalr/ui";
 import { Link, useNavigate } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
@@ -28,7 +28,7 @@ export function Frame({
 }) {
   const navigate = useNavigate();
   return (
-    <AppShell
+    <RailShell
       ui="admin"
       home={<Link to="/" />}
       switcher={
@@ -43,6 +43,6 @@ export function Frame({
       account={<Account signed={signed} />}
     >
       {children}
-    </AppShell>
+    </RailShell>
   );
 }

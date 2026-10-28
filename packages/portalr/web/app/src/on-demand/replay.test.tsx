@@ -218,7 +218,7 @@ test("a page's main is blocked unless the page marks itself, and recorded empty"
 
 test("a main with a page that marks itself allow is recorded, its text masked", async () => {
   document.body.innerHTML = `
-    <main id="listed"><div id="content"><i hidden data-portalr-replay="allow"></i><p>Cormorant said it</p></div></main>`;
+    <main id="listed"><i hidden data-portalr-replay="allow"></i><p>Cormorant said it</p></main>`;
   const { api, posted } = relay();
   recorder(api).start();
   await expect
@@ -235,17 +235,16 @@ test("what the page blocks is an empty box, and the blocked selector names what 
     <section data-portalr-replay="block"></section><iframe></iframe><div role="dialog"></div>
     <div role="alertdialog"></div><div role="dialog"><div data-drawer=""></div></div><p></p>`;
   const blocked = [...document.querySelectorAll(BLOCKED)].map((each) => each.tagName.toLowerCase());
-  expect(blocked).toEqual(["section", "iframe", "div", "div"]);
+  expect(blocked).toEqual(["section", "iframe", "div", "div", "div"]);
   document.body.innerHTML = '<main id="a"></main>';
   expect(document.querySelector("main")?.matches(BLOCKED)).toBe(true);
-  document.body.innerHTML = '<main><div><i data-portalr-replay="allow"></i></div></main>';
+  document.body.innerHTML = '<main><i data-portalr-replay="allow"></i></main>';
   expect(document.querySelector("main")?.matches(BLOCKED)).toBe(false);
-  document.body.innerHTML =
-    '<main><div><section><i data-portalr-replay="allow"></i></section></div></main>';
+  document.body.innerHTML = '<main><div><i data-portalr-replay="allow"></i></div></main>';
   expect(document.querySelector("main")?.matches(BLOCKED), "a mark deeper opens nothing").toBe(
     true,
   );
-  document.body.innerHTML = '<main><div><i data-portalr-replay="allow"></i></div></main>';
+  document.body.innerHTML = '<main><i data-portalr-replay="allow"></i></main>';
   expect(document.querySelector("main")?.matches(BLOCKED)).toBe(false);
 });
 

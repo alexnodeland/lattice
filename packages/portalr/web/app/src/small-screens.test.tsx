@@ -31,7 +31,15 @@ for (const [what, path, seen, signedOut] of ROUTES) {
         signedOut: signedOut ?? false,
       });
       for (const words of seen) {
-        await expect.element(screen.getByText(words, { exact: false }).first()).toBeVisible();
+        // The first one shown: the threads are a table on a wide page and rows on a narrow one.
+        await expect
+          .poll(() =>
+            screen
+              .getByText(words, { exact: false })
+              .elements()
+              .some((element) => element.checkVisibility()),
+          )
+          .toBe(true);
       }
       const found = wider();
       expect(found, found.join("\n")).toEqual([]);

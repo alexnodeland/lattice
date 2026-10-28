@@ -300,22 +300,22 @@ export function scrub<T>(value: T, attributes = false): T {
 const ALLOWED = '[data-portalr-replay="allow"]';
 
 /** The page that marks itself allowed, where `main` is unblocked by it. */
-const PAGE = `main > div > ${ALLOWED}`;
+const PAGE = `main > ${ALLOWED}`;
 
 /**
  * What is blocked, recorded as an empty box of its size. It fails closed: the page's `main` is
- * blocked unless the page has marked itself `allow`, as a direct child of the content area
- * (`main > div`), so a page that says nothing, a new one, or a not-found page that echoes an
+ * blocked unless the page has marked itself `allow`, as a direct child of the content area,
+ * `main` itself (portalr ADR-0087), so a page that says nothing, a new one, or a not-found page that echoes an
  * address, is not recorded, and a mark deeper in a page's content opens nothing. Besides: what a
  * page marks `block` (a thread, an artifact, and the cells of a list that name things), every
- * frame (mini apps run in one), and every dialog but the nav drawer's, which holds who has access
- * to a thread.
+ * frame (mini apps run in one), and every dialog: one holds who has access to a thread, and the
+ * palette the workspace's titles. The app's frame has no drawer (portalr ADR-0087).
  */
 export const BLOCKED = [
-  `main:not(:has(> div > ${ALLOWED}))`,
+  `main:not(:has(> ${ALLOWED}))`,
   '[data-portalr-replay="block"]',
   "iframe",
-  '[role="dialog"]:not(:has([data-drawer]))',
+  '[role="dialog"]',
   '[role="alertdialog"]',
 ].join(", ");
 

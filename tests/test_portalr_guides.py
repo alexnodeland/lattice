@@ -452,11 +452,12 @@ def test_the_size_budgets_are_the_adrs() -> None:
     measures = ("initial", "total", "largest")
     for measure in measures:
         assert f"`{measure}`" in adr, measure
-    sizes = re.search(r"Sizes at the time: (.+?)\. Ceilings: (.+?)\.(?:\s|$)", adr)
-    assert sizes, "the ADR states the sizes and the ceilings"
+    stated_at = re.findall(r"Sizes at the time: (.+?)\. Ceilings: (.+?)\.(?:\s|$)", adr)
+    assert stated_at, "the ADR states the sizes and the ceilings"
+    sizes = stated_at[-1]  # the latest figures; earlier ones stay as history
     for ui in budgets:
         stated = {}
-        for label, line in zip(("sizes", "ceilings"), sizes.groups(), strict=True):
+        for label, line in zip(("sizes", "ceilings"), sizes, strict=True):
             found = re.search(rf"{ui} ([\d.]+) / ([\d.]+) / ([\d.]+) kB", line)
             assert found, f"{ui}'s {label}"
             stated[label] = [round(float(n) * 1000) for n in found.groups()]

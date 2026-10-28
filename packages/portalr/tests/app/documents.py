@@ -1,12 +1,15 @@
-"""Native files in portalr's test application: Word documents, read and edited by a stand-in app.
+"""Native files in portalr's test application: Word documents and presentations, read and edited
+by stand-in apps.
 
-WordCraft itself is too large and too slow for the scenarios, so its integration,
-``files:wordcraft``, switches a stand-in: artifactr's ``FakeApp``, whose files are JSON paragraphs.
+WordCraft and DeckCraft themselves are too large and too slow for the scenarios, so each one's
+integration, ``files:wordcraft`` and ``files:deckcraft``, switches a stand-in: artifactr's
+``FakeApp``, whose files are JSON paragraphs.
 A document here is a ``word_document`` whose bytes are the stand-in's, so a scenario checks one out,
 edits it as a person would by saving another of the stand-in's files, and checks it in. The agent
 drafts one with ``draft_document``, which uploads it as the person it acts for: an upload is how a
 person adds a file, and the agent's own would be a proposal, as every agent's change to a native
-file is. Nightly runs the same routes with WordCraft (artifactr's ``test_pilot_live.py``).
+file is. The agent also creates both kinds blank with ``create_native_file``, and proposes what
+goes in them. Nightly runs the same routes with WordCraft (artifactr's ``test_pilot_live.py``).
 
 The stand-in reads every file in this process: it is for trusted files only, as artifactr's
 ``Subprocess`` adapter is, and isolates nothing.
@@ -23,7 +26,7 @@ from artifactr.excalidraw import Diagram
 from artifactr.files.app import FakeApp
 from artifactr.files.blobs import Blobs, once
 from artifactr.files.checkouts import InMemoryCheckouts
-from artifactr.files.manifest import DOCX, WordDocument
+from artifactr.files.manifest import DOCX, Presentation, WordDocument
 from artifactr.files.native import NativeFiles
 from lattice_core.integrations import Integrations
 
@@ -35,14 +38,25 @@ class StandIn(FakeApp):
     integration: str = "files:wordcraft"
 
 
+class DeckStandIn(FakeApp):
+    """artifactr's fake app, switched as DeckCraft is, by ``files:deckcraft``."""
+
+    name: str = "deckcraft"
+    integration: str = "files:deckcraft"
+
+
 def native_files(integrations: Integrations, blobs: Blobs) -> NativeFiles:
-    """The application's native files, kept in `blobs`, read and edited by the stand-in.
+    """The application's native files, kept in `blobs`, read and edited by the stand-ins.
 
     Diagrams keep the images a person puts on them in the same store, which its collection keeps
     while a revision names them (artifactr ADR-0092).
     """
     return NativeFiles(
-        blobs, InMemoryCheckouts(), StandIn(), integrations=integrations, naming=(Diagram,)
+        blobs,
+        InMemoryCheckouts(),
+        {WordDocument: StandIn(), Presentation: DeckStandIn()},
+        integrations=integrations,
+        naming=(Diagram,),
     )
 
 

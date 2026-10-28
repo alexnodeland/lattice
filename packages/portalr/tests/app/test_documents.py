@@ -1,7 +1,8 @@
 """The test application's native files: the agent drafts a document, and waits out a check-out.
 
 The app's scenarios check documents out and in (lattice RFC-0003, phase 4); this holds the test
-application to what they rely on: ``draft`` makes a document the person who asked has, and
+application to what they rely on: ``draft`` makes a document the person who asked has, ``write``
+creates a document and a presentation blank and proposes their words, and
 ``revise`` is told who has it checked out and to plan again after the check-in, and once it is
 checked in, proposes its edit.
 """
@@ -73,6 +74,19 @@ def test_a_drafted_document_waits_out_a_check_out_then_takes_a_proposal(
     assert client.put(url, content=edited, headers=BOB).json()["outcome"] == "applied"
     proposed = answer(client, "thr_docs", f"revise {document}")
     assert proposed.startswith("Done: Proposed as ")
+
+
+def test_a_travel_plan_is_created_blank_twice_and_its_words_proposed(client: TestClient) -> None:
+    started = {"type": "create_thread", "thread_id": "thr_trip"}
+    command: dict[str, Any] = {"type": "command", "command_id": "bob-trip", "command": started}
+    assert client.post(f"{ARTIFACTR}/commands", headers=BOB, json=command).status_code == 200
+    said = answer(client, "thr_trip", "write up a travel plan as a docx and pptx")
+    assert said == "Created the travel plan as a document and slides: both wait for review."
+    events = [each["event"] for each in client.get(f"{ARTIFACTR}/events", headers=BOB).json()]
+    created = [(e["kind"], e["version"]) for e in events if e["type"] == "artifact_created"]
+    assert created == [("word_document", 1), ("presentation", 1)]
+    proposed = [e["change"]["summary"] for e in events if e["type"] == "proposal_created"]
+    assert proposed == ["Write the travel plan", "Write the travel plan's slides"]
 
 
 def test_the_editor_is_a_stand_in_served_under_its_own_policy() -> None:

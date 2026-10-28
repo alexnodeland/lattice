@@ -101,6 +101,8 @@ async def seed(grants: Grants) -> None:
     await grants.grant("acme", "admin", on=workspace("notes"), to=DANA, by=ALICE)
     # Diagrams, off everywhere until switched on, are on in acme's notes (lattice RFC-0006).
     await grants.set_integration("acme", "excalidraw", True, workspace="notes", by=ALICE)
+    # Presentations, off by default, too: the agent creates one there (lattice#874).
+    await grants.set_integration("acme", "files:deckcraft", True, workspace="notes", by=ALICE)
     # olga administers both tenants, to switch between them in admin.
     for tenant, owner in (("acme", ALICE), ("globex", CAROL)):
         await grants.add_member(tenant, OLGA, by=owner)

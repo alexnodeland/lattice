@@ -9,7 +9,9 @@ tighter plan``, is what the note is about, so two proposals aren't one. ``draft`
 Word document about what follows, as ``documents.py`` does, which it names in its answer; ``revise``
 and a document's id make it read the document and edit it by the app's commands, which is a
 proposal, or, while someone has it checked out, an answer that says who, and that it plans again
-after the check-in. ``draw`` makes it draw a flowchart of the stack from Mermaid, a diagram it
+after the check-in. ``write`` makes it create a Word document and a presentation blank, with
+``create_native_file``, and propose what goes in each, as the owner once asked for a travel plan
+(lattice#874). ``draw`` makes it draw a flowchart of the stack from Mermaid, a diagram it
 proposes (lattice RFC-0006). ``wait`` keeps its turn running until it is stopped, and ``fail``
 fails its turn, for admin's count of failed turns. Anything else gets its words back. Each run
 streams, as every run does.
@@ -57,7 +59,7 @@ from artifactr.excalidraw import (
     excalidraw_key_of,
 )
 from artifactr.files.blobs import Blobs
-from artifactr.files.manifest import WordDocument
+from artifactr.files.manifest import Presentation, WordDocument
 from artifactr.files.native import NativeFiles
 from artifactr.files.tools import native_file_tools
 from artifactr.ui import UI_TYPES, ui_checks
@@ -74,6 +76,19 @@ CREATED = re.compile(r"^Done: (?P<note>\S+) is now at version")
 
 VERSION = re.compile(r"^\S+ \(\w+, v(?P<version>\d+)\)")
 """The version an artifact is at, in what ``read_artifact`` tells the agent."""
+
+MADE = re.compile(r"^Created (?P<file>\S+):")
+"""What ``create_native_file`` tells the agent when it has made a file: which one."""
+
+PLAN = {
+    "word_document": (
+        "Write the travel plan",
+        ["Travel plan", "Day 1: Lisbon, the old town.", "Day 2: Sintra by train."],
+    ),
+    "presentation": ("Write the travel plan's slides", ["Travel plan", "Lisbon", "Sintra"]),
+}
+"""What ``write`` creates, in order, and the change it proposes for each: its summary, and the
+paragraphs it adds."""
 
 
 class Note(MarkdownArtifact):
@@ -177,6 +192,8 @@ async def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelRespons
             # The document's id, and none of the change notes that may follow it.
             document = (prompt.split()[1:] or [""])[0]
             return ModelResponse(parts=[ToolCallPart("read_artifact", {"artifact_id": document})])
+        case ["write"]:
+            return ModelResponse(parts=[create_next(messages)])
         case ["draw"]:
             drawn = {"mermaid": STACK, "summary": "the stack", "name": "Stack"}
             return ModelResponse(parts=[ToolCallPart("draw_mermaid", drawn)])
@@ -221,6 +238,10 @@ def after(returned: ToolReturnPart, messages: list[ModelMessage]) -> ModelRespon
     if returned.tool_name == "edit_text":
         note = called(returned, messages)["artifact_id"]
         return ModelResponse(parts=[TextPart(f"Done: proposed an edit to {note}")])
+    if returned.tool_name in ("create_native_file", "edit_native") and first_prompt(
+        messages
+    ).startswith("write"):
+        return write_next(messages)
     if returned.tool_name == "draw_mermaid":
         return ModelResponse(parts=[TextPart("Drew the stack.")])
     if returned.tool_name == "draft_document" and (created := CREATED.search(told)):
@@ -234,6 +255,48 @@ def after(returned: ToolReturnPart, messages: list[ModelMessage]) -> ModelRespon
         }
         return ModelResponse(parts=[ToolCallPart("edit_native", edit)])
     return ModelResponse(parts=[TextPart(f"Done: {told}")])
+
+
+def create_next(messages: list[ModelMessage]) -> ToolCallPart:
+    """``write``'s next file to create: the first of ``PLAN``'s kinds it hasn't."""
+    made = len(calls(messages, "create_native_file"))
+    return ToolCallPart("create_native_file", {"type": list(PLAN)[made], "title": "Travel plan"})
+
+
+def write_next(messages: list[ModelMessage]) -> ModelResponse:
+    """``write``'s next step: create the next file, then propose each one's paragraphs, in turn."""
+    if len(calls(messages, "create_native_file")) < len(PLAN):
+        return ModelResponse(parts=[create_next(messages)])
+    made = [
+        found["file"]
+        for message in messages
+        for part in message.parts
+        if isinstance(part, ToolReturnPart) and part.tool_name == "create_native_file"
+        if (found := MADE.search(part.model_response_str()))
+    ]
+    edited = len(calls(messages, "edit_native"))
+    if edited < len(made):
+        summary, paragraphs = list(PLAN.values())[edited]
+        edit = {
+            "artifact_id": made[edited],
+            "base_version": 1,
+            "commands": [{"name": "add_paragraph", "args": {"text": each}} for each in paragraphs],
+            "summary": summary,
+        }
+        return ModelResponse(parts=[ToolCallPart("edit_native", edit)])
+    return ModelResponse(
+        parts=[TextPart("Created the travel plan as a document and slides: both wait for review.")]
+    )
+
+
+def calls(messages: list[ModelMessage], tool: str) -> list[ToolCallPart]:
+    """The agent's calls of a tool in this turn's conversation, in order."""
+    return [
+        part
+        for message in messages
+        for part in message.parts
+        if isinstance(part, ToolCallPart) and part.tool_name == tool
+    ]
 
 
 def called(returned: ToolReturnPart, messages: list[ModelMessage]) -> dict[str, Any]:
@@ -268,7 +331,9 @@ def build_agent(
             document_tools(workspaces, files),
             diagram_tools(FakeConverter(), integrations=integrations),
         ],
-        capabilities=[ArtifactWorkspace(types=[Note, WordDocument, Diagram], ask=True)],
+        capabilities=[
+            ArtifactWorkspace(types=[Note, WordDocument, Presentation, Diagram], ask=True)
+        ],
     )
 
 
@@ -314,7 +379,7 @@ def collaboration(grants: Grants, blobs: Blobs) -> tuple[Workspaces, Runner[None
     files = native_files(grants, blobs)
     workspaces = Workspaces(
         InMemoryStorage(),
-        types=[Note, WordDocument, Diagram, *UI_TYPES],
+        types=[Note, WordDocument, Presentation, Diagram, *UI_TYPES],
         checks=_together(ui_checks(), excalidraw_checks()),
         authorize=hooks.authorize,
         hidden=hooks.hidden,

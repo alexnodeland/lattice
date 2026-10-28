@@ -1,8 +1,10 @@
 /**
- * A native file the agent created blank, on a phone (portalr ADR-0055): the created card, and its
- * link to the change waiting for review, which focuses that proposal.
+ * A native file the agent created blank, on a phone (portalr ADR-0055): the created card, its link
+ * to the change waiting for review, which focuses that proposal, and that proposal's changes, in
+ * a sheet (portalr ADR-0089).
  */
 
+import axe from "axe-core";
 import { afterEach, expect, test, vi } from "vitest";
 import { open } from "./test/app";
 
@@ -66,7 +68,19 @@ const BLANK = {
   provenance: { source: "blank", app: "deckcraft" },
 };
 
+const SAID = {
+  summary: "Adds 2 slides: Trip and Day 1.",
+  items: [
+    { text: "Adds a slide: “Trip”", name: "slide.new", args: { title: "Trip" } },
+    { text: "Adds a slide: “Day 1”", name: "slide.new", args: { title: "Day 1", body: "Lisbon" } },
+  ],
+  total: 2,
+};
+
 async function serve(request: Request, path: string) {
+  if (path.endsWith("/proposals/prop_1/commands")) {
+    return Response.json(SAID);
+  }
   if (path === "/grantr/v1/checks") {
     return Response.json(((await request.json()) as unknown[]).map(() => true));
   }
@@ -96,4 +110,26 @@ test("on a phone, a file created blank says so, and its link reaches the change 
     .element(screen.getByRole("region", { name: "Proposal: Write the slides" }))
     .toHaveFocus();
   expect(file.getByRole("radio").elements()).toHaveLength(0);
+});
+
+test("on a phone, a proposal's changes open in a sheet, each to its arguments and back", async () => {
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, undefined, {
+    artifactrLog: LOG,
+  });
+  const line = screen.getByRole("button", { name: SAID.summary });
+  await expect.element(line).toHaveAttribute("aria-haspopup", "dialog");
+  await line.click();
+  const sheet = screen.getByRole("dialog", { name: SAID.summary });
+  const day = sheet.getByRole("button", { name: "Adds a slide: “Day 1”" });
+  await expect.element(day).toBeVisible();
+  const { violations } = await axe.run(sheet.element(), { resultTypes: ["violations"] });
+  expect(violations.map((violation) => violation.id)).toEqual([]);
+  await day.click();
+  const back = sheet.getByRole("button", { name: "Back to the changes" });
+  await expect.element(back).toHaveFocus();
+  await expect.element(sheet.getByText('"Lisbon"')).toBeVisible();
+  await back.click();
+  await expect.element(day).toHaveFocus();
+  await sheet.getByRole("button", { name: "Close" }).click();
+  await expect.element(line).toHaveFocus();
 });

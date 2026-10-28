@@ -1,9 +1,11 @@
 /**
  * A native file's proposals on the workspace's proposals, over a stubbed server and a stream that
- * replays them (portalr ADR-0050): how each was made, one outdated that can't be accepted, who has
- * the file, and a proposal's words and pages beside the head's, read once asked for.
+ * replays them (portalr ADR-0050, ADR-0089): what each does in words, how each was made, one
+ * outdated that can't be accepted, who has the file, and a proposal's words and pages beside the
+ * head's, read once asked for.
  */
 
+import axe from "axe-core";
 import { afterEach, expect, test, vi } from "vitest";
 import { proposedOf } from "./native-proposal";
 import { open } from "./test/app";
@@ -67,9 +69,28 @@ const LOG = [
   proposal(4, "p_in", "b", "check_in", "Checked in brief.docx"),
 ];
 
+/** What the agent's edit at the head does, as the server says it from its commands. */
+const SAID = {
+  summary: "Types 22 characters and starts a new paragraph.",
+  items: [
+    { text: "Starts a new paragraph", name: "text.newParagraph", args: {} },
+    {
+      text: "Types “Signed off by the agent.”",
+      name: "text.insert",
+      args: { text: "Signed off by the agent." },
+    },
+  ],
+  total: 3,
+};
+
 function serving(lease: unknown = null) {
   return async (_request: Request, path: string) => {
     switch (path) {
+      case `${AT}/proposals/p_now/commands`:
+        return Response.json(SAID);
+      case `${AT}/proposals/p_in/commands`:
+      case `${AT}/proposals/p_old/commands`:
+        return Response.json({ detail: { type: "invalid_state" } }, { status: 409 });
       case `${AT}/artifacts/doc_1/revisions`:
         return Response.json(REVISIONS);
       case FILE:
@@ -114,6 +135,31 @@ test("an agent's edit at the head is accepted; one against a replaced version is
   await expect.element(old.getByRole("button", { name: "Reject" })).toBeEnabled();
 });
 
+test("an agent's edit says what it does, then each change, its arguments and its commands", async () => {
+  const { screen } = await open(`/t/acme/w/notes/proposals`, serving(), undefined, {
+    artifactrLog: LOG,
+  });
+  const now = card(screen, "Add a sign-off");
+  const line = now.getByRole("button", { name: SAID.summary });
+  await expect.element(line).toHaveAttribute("aria-expanded", "false");
+  await line.click();
+  await expect.element(line).toHaveAttribute("aria-expanded", "true");
+  const changes = now.getByRole("list", { name: "Its changes" });
+  await expect.element(changes).toBeVisible();
+  expect(changes.getByRole("listitem").elements()).toHaveLength(2);
+  await expect.element(now.getByText("And 1 more.")).toBeVisible();
+  await changes.getByRole("button", { name: "Types “Signed off by the agent.”" }).click();
+  await expect.element(changes.getByText('"Signed off by the agent."')).toBeVisible();
+  await now.getByRole("button", { name: "Its commands" }).click();
+  await expect.element(now.getByText('"text.newParagraph"')).toBeVisible();
+  const { violations } = await axe.run(now.element(), { resultTypes: ["violations"] });
+  expect(violations.map((violation) => violation.id)).toEqual([]);
+  // A check-in has no commands to say: its card says nothing of them.
+  const checkedIn = card(screen, "Checked in brief.docx");
+  await expect.element(checkedIn.getByText(/^A check-in kept as a proposal/)).toBeVisible();
+  expect(checkedIn.getByRole("button", { name: /^Types/ }).elements()).toHaveLength(0);
+});
+
 test("a check-in kept as a proposal is compared with the head, words and pages", async () => {
   const { screen, fetched } = await open(`/t/acme/w/notes/proposals`, serving(), undefined, {
     artifactrLog: LOG,
@@ -122,9 +168,10 @@ test("a check-in kept as a proposal is compared with the head, words and pages",
   await expect.element(checkedIn.getByText(/^A check-in kept as a proposal/)).toBeVisible();
   const read = () =>
     fetched.mock.calls.filter(([input]) =>
-      new URL((input as Request).url).pathname.startsWith(`${AT}/proposals/p_in`),
+      new URL((input as Request).url).pathname.startsWith(`${AT}/proposals/p_in/`),
     ).length;
-  expect(read()).toBe(0);
+  // What it does in words is read at once; its words and pages only once asked for.
+  await expect.poll(read).toBe(1);
   await checkedIn.getByText("Compare with version 2 (proposed: 48 kB)").click();
   await expect
     .poll(() => checkedIn.element().querySelector("ins")?.textContent)

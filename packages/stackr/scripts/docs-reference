@@ -745,10 +745,11 @@ def block_litellm_guardrails() -> str:
                 code(params["guardrail"]),
                 code(params["mode"]),
                 "yes" if params.get("default_on") else "no",
+                "tool results" if params.get("scan_only_tool_results") else "every message",
                 ", ".join(checks),
             ]
         )
-    return table(["Guardrail", "Integration", "Mode", "On by default", "Checks"], rows)
+    return table(["Guardrail", "Integration", "Mode", "On by default", "Reads", "Checks"], rows)
 
 
 def settings_rows(prefix: str, node: object) -> Iterator[list[str]]:

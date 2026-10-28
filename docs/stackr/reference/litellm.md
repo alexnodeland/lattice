@@ -44,10 +44,10 @@ Requests choose guardrails with `"guardrails": [...]` in their body.
 
 <!-- generated: litellm-guardrails -->
 
-| Guardrail | Integration | Mode | On by default | Checks |
-|---|---|---|---|---|
-| `pii-mask` | `litellm_content_filter` | `pre_call` | no | email (mask), us_phone (mask), us_ssn (mask), visa (mask), mastercard (mask), amex (mask), aws_access_key (mask), aws_secret_key (mask), github_token (mask) |
-| `prompt-injection` | `litellm_content_filter` | `pre_call` | no | prompt_injection_jailbreak (block at medium), prompt_injection_system_prompt (block at medium), prompt_injection_data_exfiltration (block at medium) |
+| Guardrail | Integration | Mode | On by default | Reads | Checks |
+|---|---|---|---|---|---|
+| `pii-mask` | `litellm_content_filter` | `pre_call` | no | every message | email (mask), us_phone (mask), us_ssn (mask), visa (mask), mastercard (mask), amex (mask), aws_access_key (mask), aws_secret_key (mask), github_token (mask) |
+| `prompt-injection` | `litellm_content_filter` | `pre_call` | no | tool results | prompt_injection_jailbreak (block at medium), prompt_injection_system_prompt (block at medium), prompt_injection_data_exfiltration (block at medium) |
 
 <!-- end generated -->
 

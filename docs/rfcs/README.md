@@ -14,5 +14,6 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 | [0006](0006-excalidraw-diagrams-drawn-live.md) | Excalidraw diagrams, drawn live by people and agents | Implemented, amended by lattice ADR-0026 |
 | [0007](0007-portalr-brand-kits.md) | portalr brand kits | Accepted |
 | [0008](0008-portalr-product-analytics.md) | portalr product analytics | Draft |
+| [0009](0009-templates-for-every-artifact-kind.md) | Templates for every artifact kind | Draft |
 
 To propose one, copy [`template.md`](template.md) to the next number. Each package's series uses the same template.

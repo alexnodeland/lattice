@@ -51,6 +51,12 @@ export const useCoarsePointer = (): boolean => useMedia(COARSE);
 /** Whether this is a phone: narrow, with a finger as a pointer. */
 export const usePhone = (): boolean => useMedia(PHONE);
 
+/**
+ * Whether this is a phone at this moment, read afresh where a choice is made, as a tap's: a query
+ * list kept from before a resize or a turn may not have caught up yet.
+ */
+export const phoneNow = (): boolean => matchMedia(PHONE).matches;
+
 export type Touch = typeof import("./on-demand/touch");
 
 let loading: Promise<Touch> | null = null;

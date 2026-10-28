@@ -436,15 +436,11 @@ test("an app updated by a call is shown again beneath it, at its latest version,
   const rows = [...screen.container.querySelectorAll("[role=log] > ol > li")];
   expect(
     rows.map((row) => row.getAttribute("aria-label") ?? row.textContent?.slice(0, 10)),
-  ).toEqual([
-    expect.stringContaining("create_app"),
-    "Dice",
-    expect.stringContaining("update_app"),
-    "Dice",
-  ]);
-  const details = screen.getByRole("button", { name: /update_app/ });
+  ).toEqual(["Made an ap", "Dice", "Updated an", "Dice"]);
+  const details = screen.getByRole("button", { name: "Updated an app: 1 tool call" });
   await expect.element(details).toHaveAttribute("aria-expanded", "false");
   await details.click();
+  await screen.getByRole("list", { name: "Tool calls" }).getByRole("button").click();
   await expect.element(screen.getByText("Done: app_1 is now at version 2.")).toBeVisible();
   // Read again later, at a later version, the running card shows it.
   versions = [...versions, revision("app_1", 3, "Dice")];
@@ -486,12 +482,12 @@ test("an app updated twice runs in its newest card alone; each before says its v
 });
 
 test.each([
-  ["running", undefined, false, "Running"],
-  ["failed", ["error", "No app app_1."], true, "Failed"],
-  ["proposed", ["ok", "Proposed as prop_1. A person will review it."], true, "Done"],
-  ["cut short", ["ok", "Done: app_1 is now at vers…"], true, "Done"],
-  ["naming no artifact known", ["ok", "Done: app_9 is now at version 2."], true, "Done"],
-  ["naming a note", ["ok", "Done: note_1 is now at version 2."], true, "Done"],
+  ["running", undefined, false, "Updating an app…"],
+  ["failed", ["error", "No app app_1."], true, "Updated an app · 1 failed"],
+  ["proposed", ["ok", "Proposed as prop_1. A person will review it."], true, "Updated an app"],
+  ["cut short", ["ok", "Done: app_1 is now at vers…"], true, "Updated an app"],
+  ["naming no artifact known", ["ok", "Done: app_9 is now at version 2."], true, "Updated an app"],
+  ["naming a note", ["ok", "Done: note_1 is now at version 2."], true, "Updated an app"],
 ] as const)(
   "an update_app call %s is a call, as any other, with nothing beneath",
   async (_, update, ended, word) => {
@@ -513,8 +509,10 @@ test.each([
       },
     );
     await expect.element(screen.getByRole("listitem", { name: "Dice" })).toBeInTheDocument();
-    const row = screen.getByRole("button", { name: /^update_app/ });
-    await vi.waitFor(() => expect(row.element().textContent).toContain(word));
+    // Its own quiet line, in plain words, saying how it went.
+    await expect
+      .element(screen.getByRole("button", { name: `${word}: 1 tool call` }))
+      .toBeInTheDocument();
     expect(screen.getByRole("listitem", { name: "Dice" }).all()).toHaveLength(1);
   },
 );

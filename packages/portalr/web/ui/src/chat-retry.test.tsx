@@ -75,7 +75,7 @@ test("a call keys its add-on by being open, so a failed load is tried again as i
     </ToolCalls>,
   );
   expect(keys().at(-1)).toEqual([false, false]);
-  await screen.getByText("a").click();
+  await screen.getByRole("button", { name: /^Used a tool/ }).click();
   expect(keys().at(-1)).toEqual([true, true]);
 });
 

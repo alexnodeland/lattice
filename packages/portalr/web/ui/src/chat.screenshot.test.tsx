@@ -1,6 +1,6 @@
 /**
  * The chat's look, pinned by screenshots (portalr ADR-0053): the reader's messages and the
- * agent's on their sides, a run's tool calls with one open, the agent's questions, open and
+ * agent's on their sides, a run's tool calls, folded and opened, the agent's questions, open and
  * answered, a turn that is thinking, and one that failed. Wide and narrow, in each scheme. Like the
  * gallery's, the baselines are Linux's, made in CI.
  */
@@ -33,7 +33,8 @@ async function matches(name: string) {
 
 test("a thread: sides, questions, tool calls with one open, and thinking, wide", async () => {
   const screen = await shown(900, <Thread />);
-  await screen.getByText("draft_rule").first().click(); // the ledger's summary names its latest call
+  // The quiet line opened, a failed call among its calls.
+  await screen.getByRole("button", { name: /· 1 failed: 2 tool calls$/ }).click();
   await matches("chat-wide");
 });
 

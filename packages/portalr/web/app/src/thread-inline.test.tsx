@@ -97,6 +97,10 @@ const DATA: Record<string, readonly [string, Record<string, unknown>]> = {
   doc_1: ["word_document", manifest("brief.docx", DOCX, "Brief\nFees", 3)],
   book_1: ["workbook", manifest("figures.xlsx", XLSX, "Costs (A1:B3)\nPlan", null)],
   book_2: ["workbook", manifest("budget.xlsx", XLSX, "Budget", null)],
+  new_1: [
+    "word_document",
+    { ...manifest("Travel plan.docx", DOCX, "", 1), provenance: { source: "blank" } },
+  ],
 };
 
 /** A file's status, as native files' routes answer it. */
@@ -131,8 +135,10 @@ const CHECKOUT = {
 
 interface World {
   flags?: Record<string, boolean>;
-  status?: (id: string) => Response;
+  status?: (id: string) => Response | undefined;
   held?: { lease: unknown };
+  /** An artifact's revisions, where they aren't its one version in `DATA`. */
+  revisions?: (id: string) => unknown[] | undefined;
 }
 
 /** The server: every check allowed, each artifact's revisions, files' routes as `world` says. */
@@ -146,6 +152,10 @@ function serving(world: World = {}) {
     }
     const revisions = /\/artifacts\/(\w+)\/revisions$/.exec(path)?.[1];
     if (revisions !== undefined) {
+      const given = world.revisions?.(revisions);
+      if (given !== undefined) {
+        return Response.json(given);
+      }
       const [kind, data] = DATA[revisions] ?? ["note", {}];
       return Response.json([
         { artifact_id: revisions, version: 1, kind, data, archived: false, actor: AGENT },
@@ -170,7 +180,7 @@ function serving(world: World = {}) {
         }
         return Response.json(CHECKOUT, { status: 201 });
       }
-      if (/^\/versions\/1\/pages\/[12]$/.test(rest)) {
+      if (/^\/versions\/[12]\/pages\/[12]$/.test(rest)) {
         return new Response(PNG);
       }
       if (rest === "/versions/1/text") {
@@ -330,6 +340,85 @@ test("a native file is read a page at a time, with its outline and words, and do
   await expect
     .element(file.getByRole("button", { name: "Check out and open WordCraft" }))
     .toBeVisible();
+});
+
+/** The agent's proposal, `seq`th in the log, of what it wrote into `new_1`; resolved, if `decision`. */
+const filling = (seq: number, decision?: "accept" | "reject") => [
+  logged(seq, {
+    type: "proposal_created",
+    proposal_id: "prop_1",
+    thread_id: "thr_1",
+    run_id: "run_1",
+    rationale: null,
+    change: {
+      type: "edit_artifact",
+      artifact_id: "new_1",
+      base_version: 1,
+      summary: "Write the travel plan",
+      patch: { kind: "json_patch", ops: [] },
+    },
+  }),
+  ...(decision
+    ? [
+        logged(
+          seq + 1,
+          { type: "proposal_resolved", proposal_id: "prop_1", artifact_id: "new_1", decision },
+          ALICE,
+        ),
+      ]
+    : []),
+];
+
+test("a file the agent created blank says so, and links to its changes waiting for review", async () => {
+  const { screen } = await open(THREAD, serving(), undefined, {
+    artifactrLog: [...thread([["new_1", "word_document"]]), ...filling(4)],
+  });
+  const file = screen.getByRole("listitem", { name: "Travel plan.docx" });
+  await expect.element(file.getByText("Word document", { exact: true })).toBeVisible();
+  const waiting = file.getByRole("link", {
+    name: "The agent's changes are waiting for your review.",
+  });
+  await expect.element(waiting).toHaveAttribute("href", "#proposal-prop_1");
+  await expect.element(file.getByText(/^Created empty\./)).toBeVisible();
+  // Nothing of an empty file is shown: no preview, views, size or check-out.
+  expect(file.getByRole("radio").elements()).toHaveLength(0);
+  expect(file.getByText(/version 1/).elements()).toHaveLength(0);
+  expect(file.getByRole("button", { name: /Check out/ }).elements()).toHaveLength(0);
+  await waiting.click();
+  await expect.element(screen.getByRole("region", { name: /^Proposal: / })).toBeVisible();
+  expect(document.activeElement?.id).toBe("proposal-prop_1");
+});
+
+test("a file created blank with no change waiting says only that it was created", async () => {
+  const { screen } = await open(THREAD, serving(), undefined, {
+    artifactrLog: [...thread([["new_1", "word_document"]]), ...filling(4, "reject")],
+  });
+  const file = screen.getByRole("listitem", { name: "Travel plan.docx" });
+  await expect.element(file.getByText("Created empty.", { exact: true })).toBeVisible();
+  expect(file.getByRole("link", { name: /waiting/ }).elements()).toHaveLength(0);
+});
+
+test("once its changes are accepted, a file created blank is read in the same place", async () => {
+  const [kind, data] = DATA.new_1 ?? ["", {}];
+  const written = { ...data, outline: "Day 1\nDay 2", provenance: { source: "commands" } };
+  const { screen } = await open(
+    THREAD,
+    serving({
+      revisions: (id) =>
+        id === "new_1"
+          ? [
+              { artifact_id: id, version: 1, kind, data, archived: false, actor: AGENT },
+              { artifact_id: id, version: 2, kind, data: written, archived: false, actor: ALICE },
+            ]
+          : undefined,
+      status: (id) => (id === "new_1" ? Response.json(statusOf(id, { version: 2 })) : undefined),
+    }),
+    undefined,
+    { artifactrLog: [...thread([["new_1", "word_document"]]), ...filling(4, "accept")] },
+  );
+  const file = screen.getByRole("listitem", { name: "Travel plan.docx" });
+  await expect.element(file.getByText("48 kB · 1 page · version 2")).toBeVisible();
+  expect(file.getByText(/Created empty/).elements()).toHaveLength(0);
 });
 
 test("a workbook, whose app renders no page, shows its sheets' cells", async () => {

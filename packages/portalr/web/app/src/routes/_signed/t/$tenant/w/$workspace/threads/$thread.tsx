@@ -301,6 +301,10 @@ function Chat() {
     (run) => run.threadId === id && (run.status === "running" || run.status === "paused"),
   );
   const proposed = Object.values(proposals).filter((proposal) => proposal.threadId === id);
+  /** The thread's open proposal that would change an artifact, if there is one. */
+  const waitingOn = (artifact: string) =>
+    proposed.find((proposal) => proposal.status === "open" && proposedOn(proposal) === artifact)
+      ?.id ?? null;
   // The artifacts made here whose kind the thread shows, each once, where it was made.
   const inline = Object.values(artifacts).filter(
     (artifact) => artifact.threadId === id && rendererFor(artifact.kind, RENDERERS).inline,
@@ -498,6 +502,7 @@ function Chat() {
                   workspace={workspace}
                   artifact={entry.artifact}
                   fired={firedOf(Object.values(proposals), entry.artifact.id)}
+                  waiting={waitingOn(entry.artifact.id)}
                   {...(entry.superseded && { superseded: entry.superseded })}
                 />
               );
@@ -583,19 +588,26 @@ function Chat() {
         </div>
       ))}
       {proposed.map((proposal) => (
-        <ProposalCard
+        // Where a file created blank links to the change that fills it.
+        <div
           key={proposal.id}
-          proposal={proposal}
-          onRespond={(decision) =>
-            stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision })
-          }
+          id={`proposal-${proposal.id}`}
+          tabIndex={-1}
+          className="outline-none"
         >
-          <RuleProposal
+          <ProposalCard
             proposal={proposal}
-            kind={artifacts[proposedOn(proposal) ?? ""]?.kind}
-            place={{ context, tenant, workspace }}
-          />
-        </ProposalCard>
+            onRespond={(decision) =>
+              stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision })
+            }
+          >
+            <RuleProposal
+              proposal={proposal}
+              kind={artifacts[proposedOn(proposal) ?? ""]?.kind}
+              place={{ context, tenant, workspace }}
+            />
+          </ProposalCard>
+        </div>
       ))}
       {canPost && (
         // While an approval waits in the column, the dock stays in the flow under it, so it never
@@ -688,6 +700,7 @@ function Chat() {
               tenant={tenant}
               workspace={workspace}
               artifact={beside}
+              waiting={waitingOn(beside.id)}
             />
           </ul>
         )}

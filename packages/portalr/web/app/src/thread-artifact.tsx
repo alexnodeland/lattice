@@ -4,7 +4,9 @@
  * its own page and, but for an app, which has its own, a full view. A mini app runs there, as the
  * person viewing the thread, under the kill switch; a form is sent from there, as that person; and
  * a native file is read there a page at a time, and checked out, or edited, as on its page. An
- * app runs in its newest card in the thread alone; one before it says which version it was.
+ * app runs in its newest card in the thread alone; one before it says which version it was. A
+ * native file the agent made blank, and nothing since, says it was created, and that the agent's
+ * changes wait for review where they do, rather than show an empty file (portalr ADR-0055).
  */
 
 import type { Artifactr } from "@portalr/client";
@@ -17,6 +19,7 @@ import {
   factsOf,
   InlineArtifact,
   Reading,
+  TextLink,
 } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -33,6 +36,24 @@ import { titleOf } from "./titles";
 /** What people call an artifact of a kind: a native file by its type, any other by its kind. */
 export function kindName(kind: string, data: Readonly<Record<string, unknown>>): string {
   return NATIVE.has(kind) && factsOf(data).type !== "File" ? factsOf(data).type : kindWords(kind);
+}
+
+/**
+ * Whether a revision is the blank file its app made for the agent, with no version after it: what
+ * the agent writes into it is a proposal until accepted, so the file has nothing to show yet.
+ */
+export function createdBlank(revision: {
+  version: number;
+  data: Readonly<Record<string, unknown>>;
+}): boolean {
+  const { provenance } = revision.data;
+  return (
+    revision.version === 1 &&
+    typeof provenance === "object" &&
+    provenance !== null &&
+    "source" in provenance &&
+    provenance.source === "blank"
+  );
 }
 
 /** Words written as capitals in a kind's name. */
@@ -53,6 +74,7 @@ export function ThreadArtifact({
   me,
   superseded,
   fired = null,
+  waiting = null,
 }: {
   context: Context;
   tenant: string;
@@ -64,6 +86,8 @@ export function ThreadArtifact({
   superseded?: number;
   /** What a rule's preview found, from the proposal that made it, where one said. */
   fired?: string | null;
+  /** The id of a proposal of the thread's, open, that would change it, where there is one. */
+  waiting?: string | null;
 }) {
   const { queries } = context;
   const apps = useAppHost(context, tenant, workspace);
@@ -107,6 +131,19 @@ export function ThreadArtifact({
         </div>
       ) : latest === undefined ? (
         <Reading>Loading the {artifact.kind}…</Reading>
+      ) : native && createdBlank(latest) ? (
+        // Its name and kind are the header's; the change that fills it is the proposal's.
+        <p className="text-muted text-sm">
+          Created empty.
+          {waiting !== null && (
+            <>
+              {" "}
+              <TextLink href={`#proposal-${waiting}`}>
+                The agent's changes are waiting for your review.
+              </TextLink>
+            </>
+          )}
+        </p>
       ) : native ? (
         <NativeInline
           place={{ context, tenant, workspace, artifact: artifact.id }}

@@ -1,13 +1,13 @@
 import { expect, test } from "vitest";
 import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { AppShell } from "./app-shell";
 import { Button } from "./button";
+import { RailShell } from "./rail-shell";
 import { Table } from "./table";
 
 function Members({ ui }: { ui: "app" | "admin" }) {
   return (
-    <AppShell ui={ui} home={<a href="#home" />} switcher={<span>s</span>} account={<span>a</span>}>
+    <RailShell ui={ui} home={<a href="#home" />} switcher={<span>s</span>} account={<span>a</span>}>
       <Table caption="Members">
         <tbody>
           <tr>
@@ -24,7 +24,7 @@ function Members({ ui }: { ui: "app" | "admin" }) {
           </tr>
         </tbody>
       </Table>
-    </AppShell>
+    </RailShell>
   );
 }
 

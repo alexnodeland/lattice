@@ -6,7 +6,6 @@
 import type { Artifactr, ArtifactrV1 } from "@portalr/client";
 import { AccountMenu } from "../account-menu";
 import { Alert } from "../alert";
-import { AppShell } from "../app-shell";
 import { Breadcrumbs } from "../breadcrumbs";
 import { Button, ButtonLink, type ButtonVariant } from "../button";
 import { Card } from "../card";
@@ -24,6 +23,7 @@ import { Menu } from "../menu";
 import { PageHeader } from "../page-header";
 import { Progress } from "../progress";
 import { Questions } from "../questions";
+import { RailShell } from "../rail-shell";
 import { Row, RowLink, Rows } from "../rows";
 import { RunFailed } from "../run-failed";
 import { SectionTitle } from "../section-title";
@@ -44,7 +44,7 @@ import { RunSteps, ToolCall, ToolCalls } from "../tool-call";
 
 export function Gallery() {
   return (
-    <AppShell
+    <RailShell
       home={<a href="#home" />}
       switcher={
         <Switcher
@@ -171,7 +171,7 @@ export function Gallery() {
           An artifact appears here when the agent makes one.
         </EmptyState>
       </div>
-    </AppShell>
+    </RailShell>
   );
 }
 
@@ -192,7 +192,7 @@ export function Sharing() {
 /** admin's frame, with its tenant switch and Home's cards, each in a state it can show. */
 export function AdminGallery() {
   return (
-    <AppShell
+    <RailShell
       ui="admin"
       home={<a href="#home" />}
       switcher={
@@ -250,7 +250,7 @@ export function AdminGallery() {
           Reading…
         </StatCard>
       </div>
-    </AppShell>
+    </RailShell>
   );
 }
 
@@ -520,7 +520,7 @@ export function Sheet() {
 
 export function Rowed({ ui }: { ui: "app" | "admin" }) {
   return (
-    <AppShell
+    <RailShell
       ui={ui}
       home={<a href="#home" />}
       switcher={<span>acme</span>}
@@ -550,7 +550,7 @@ export function Rowed({ ui }: { ui: "app" | "admin" }) {
           </tbody>
         </Table>
       </div>
-    </AppShell>
+    </RailShell>
   );
 }
 

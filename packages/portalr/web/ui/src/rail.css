@@ -1,0 +1,31 @@
+/*
+ * The kit's styles with admin's rail and its navigation (portalr ADR-0087): `styles.css` leaves
+ * their classes out, as the app, whose frame is a bar along the top, draws neither; admin, and the
+ * kit's own tests, import this in its place.
+ */
+@import "./styles.css";
+@source "./rail-shell.tsx";
+@source "./side-nav.tsx";
+@source "./breadcrumbs.tsx";
+@source "./integration-list.tsx";
+@source "./log-list.tsx";
+@source "./tab-nav.tsx";
+@source "./trace-view.tsx";
+@source "./tracker.tsx";
+@source "./error-state.tsx";
+@source "./ansi.tsx";
+
+@layer base {
+  /* At lg admin's frame is the rail beside the page, and takes no room above it. */
+  html:has([data-rail]) {
+    @variant lg {
+      scroll-padding-top: 0;
+    }
+  }
+  /* The drawer stands over the page: it keeps the top, the bottom and its own side clear. */
+  [data-frame-drawer] {
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top));
+    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
+    padding-left: calc(var(--space-3) + env(safe-area-inset-left));
+  }
+}

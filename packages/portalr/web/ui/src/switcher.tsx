@@ -82,10 +82,11 @@ export function Switcher({
       >
         {where ? (
           <>
-            <span aria-hidden="true" className="truncate font-medium text-muted">
+            {/* At 360 pixels and under, the workspace alone; the tenant is in the menu (ADR-0087). */}
+            <span aria-hidden="true" className="truncate font-medium text-muted tiny:hidden">
               {where.tenant}
             </span>
-            <span aria-hidden="true" className="font-normal text-muted">
+            <span aria-hidden="true" className="font-normal text-muted tiny:hidden">
               /
             </span>
             <span aria-hidden="true" className="truncate">

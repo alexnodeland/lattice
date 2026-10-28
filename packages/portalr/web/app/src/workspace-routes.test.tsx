@@ -5,7 +5,7 @@
  */
 
 import { afterEach, expect, test, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { open } from "./test/app";
 
 const FLAGS = "/grantr/v1/tenants/acme/workspaces/notes/enabled-integrations";
@@ -88,7 +88,7 @@ test("a thread refused as it is written keeps the words in the composer", async 
   expect(router.state.location.pathname).toBe("/t/acme/w/notes");
 });
 
-test("what waits on a person across the workspace is listed first, approvals before questions, each opening its thread at the request", async () => {
+test("what waits on a person across the workspace is counted in the bar's corner, a link to those threads", async () => {
   const at = (seq: number, actor: unknown, event: unknown) => ({
     type: "event",
     seq,
@@ -147,19 +147,16 @@ test("what waits on a person across the workspace is listed first, approvals bef
     () => null,
     { artifactrLog: log },
   );
-  const needed = screen.getByRole("list", { name: "Needs you" });
-  const rows = needed.getByRole("listitem");
-  await expect.element(rows).toHaveLength(2);
+  // The bar's corner counts what waits, in the threads the reader can see, and goes to them
+  // (portalr ADR-0087).
+  const waiting = screen.getByRole("link", { name: "2 need you" });
+  await expect.element(waiting).toHaveAttribute("href", "/t/acme/w/notes?show=needs");
   await expect
-    .element(rows.nth(0))
-    .toHaveTextContent("Approve run_scriptin InvoicesDownloads from the internet");
-  await expect.element(rows.nth(1)).toHaveTextContent("A questionin LaunchWaiting for you");
-  await expect
-    .element(rows.nth(0).getByRole("link"))
-    .toHaveAttribute("href", "/t/acme/w/notes/threads/thr_2#request-a1");
+    .element(screen.getByRole("navigation", { name: "Workspace" }).first())
+    .toBeInTheDocument();
 });
 
-test("the threads are searched by title and filtered by state, the view kept in the URL, and one read here that has moved since is marked", async () => {
+test("the threads are filtered by state, the view kept in the URL, found from the palette, and one read here that has moved since is marked", async () => {
   const at = (seq: number, actor: unknown, event: unknown) => ({
     type: "event",
     seq,
@@ -198,31 +195,64 @@ test("the threads are searched by title and filtered by state, the view kept in 
       .getByRole("img", { name: "Moved since you read it" })
       .elements(),
   ).toHaveLength(0);
-  // The search is a glyph until asked; opened, its field takes the focus (portalr ADR-0085).
-  expect(screen.getByRole("searchbox").elements()).toHaveLength(0);
-  await screen.getByRole("button", { name: "Search threads" }).click();
-  const field = screen.getByRole("searchbox", { name: "Search threads" });
+  // Search is the bar's magnifier, the palette, opened by it or by "/" (portalr ADR-0087); its
+  // field finds a thread by its title, Enter goes to it, and Escape gives the focus back.
+  const magnifier = screen.getByRole("button", { name: "Search", exact: true });
+  await expect.element(magnifier).toHaveAttribute("aria-expanded", "false");
+  // Held as the element: while the palette is open the page behind it is out of the
+  // accessibility tree, the magnifier with it.
+  const trigger = magnifier.element();
+  await magnifier.click();
+  const field = screen.getByRole("combobox", { name: "Search or go to" });
+  await expect.element(field).toBeVisible();
+  expect(trigger.getAttribute("aria-expanded")).toBe("true");
   await expect.element(field).toHaveFocus();
   await field.fill("inv");
-  await expect.element(threads.getByRole("listitem")).toHaveLength(1);
-  await expect.poll(() => router.state.location.search).toEqual({ q: "inv" });
-  // Folded by Escape, what it holds stays applied, as a chip that clears it.
+  await expect
+    .element(screen.getByRole("option", { name: "Invoices" }))
+    .toHaveAttribute("aria-selected", "true");
+  // Its groups are named, each by exactly its heading, and a choice is followed by a click as by
+  // Enter.
+  await expect.element(screen.getByRole("group", { name: "Threads" })).toBeVisible();
+  await field.fill("");
+  const groups = [...document.querySelectorAll('[role="listbox"] fieldset')];
+  expect(groups.length).toBeGreaterThan(1);
+  for (const group of groups) {
+    const ids = (group.getAttribute("aria-labelledby") ?? "").split(/\s+/);
+    expect(ids).toHaveLength(1);
+    const heading = document.getElementById(ids[0] ?? "");
+    expect(heading?.textContent).toBe(group.querySelector("div")?.textContent);
+  }
+  await expect.element(screen.getByRole("group", { name: "Go to" })).toBeVisible();
   await userEvent.keyboard("{Escape}");
-  expect(screen.getByRole("searchbox").elements()).toHaveLength(0);
-  await expect.element(threads.getByRole("listitem")).toHaveLength(1);
-  await screen.getByRole("button", { name: "Clear the search for inv" }).click();
-  await expect.element(threads.getByRole("listitem")).toHaveLength(2);
-  // "/" opens it again, and Close folds it.
+  await expect.element(magnifier).toHaveFocus();
+  await magnifier.click();
+  await screen.getByRole("combobox", { name: "Search or go to" }).fill("rules");
+  await screen.getByRole("option", { name: "Rules" }).click();
+  await expect.poll(() => router.state.location.pathname).toBe("/t/acme/w/notes/rules");
+  await router.navigate({
+    to: "/t/$tenant/w/$workspace",
+    params: { tenant: "acme", workspace: "notes" },
+  });
+  (document.activeElement as HTMLElement).blur();
+  // "/" opens it from the page, never with Ctrl held.
+  await userEvent.keyboard("{Control>}/{/Control}");
+  expect(screen.getByRole("combobox").elements()).toHaveLength(0);
+  (document.activeElement as HTMLElement).blur();
   await userEvent.keyboard("/");
-  await expect.element(screen.getByRole("searchbox", { name: "Search threads" })).toHaveFocus();
-  await screen.getByRole("button", { name: "Close search" }).click();
-  expect(screen.getByRole("searchbox").elements()).toHaveLength(0);
+  await expect.element(screen.getByRole("combobox", { name: "Search or go to" })).toHaveFocus();
+  await userEvent.keyboard("inv{Enter}");
+  await expect.poll(() => router.state.location.pathname).toBe("/t/acme/w/notes/threads/thr_2");
+  await router.navigate({
+    to: "/t/$tenant/w/$workspace",
+    params: { tenant: "acme", workspace: "notes" },
+  });
   await screen.getByRole("radio", { name: /^Working/ }).click();
   await expect.element(threads.getByRole("listitem")).toHaveLength(1);
   await expect.element(threads.getByRole("listitem").filter({ hasText: "Launch" })).toBeVisible();
   await expect.poll(() => router.state.location.search).toEqual({ show: "working" });
   await screen.getByRole("radio", { name: /^Needs you/ }).click();
-  await expect.element(screen.getByText("No thread matches")).toBeVisible();
+  await expect.element(screen.getByText("No thread here")).toBeVisible();
   localStorage.removeItem("portalr:seen:acme/notes");
 });
 
@@ -282,4 +312,36 @@ test("a first message refused after its thread was made keeps the words, and sen
   await expect
     .poll(() => router.state.location.pathname)
     .toBe(`/t/acme/w/notes/threads/${sent[0]?.thread_id}`);
+});
+
+test("from 1024 pixels the threads are a table whose links Tab reaches, and the arrows move between", async () => {
+  const at = (seq: number, event: unknown) => ({
+    type: "event",
+    seq,
+    id: `evt_${seq}`,
+    ts: "2026-10-20T00:00:00Z",
+    workspace_id: "notes",
+    actor: { kind: "user", id: "alice" },
+    event,
+  });
+  await page.viewport(1280, 800);
+  const { screen } = await open(
+    "/t/acme/w/notes",
+    async (_request, path) => (path === FLAGS ? Response.json({}) : undefined),
+    () => null,
+    {
+      artifactrLog: [
+        at(1, { type: "thread_created", thread_id: "thr_1", title: "Launch" }),
+        at(2, { type: "thread_created", thread_id: "thr_2", title: "Invoices" }),
+      ],
+    },
+  );
+  const table = screen.getByRole("table", { name: "Threads" });
+  const invoices = table.getByRole("link", { name: "Invoices" });
+  await expect.element(invoices).toBeVisible();
+  expect(invoices.element().tabIndex).toBe(0);
+  expect(table.element().querySelectorAll("[tabindex='-1']")).toHaveLength(0);
+  (invoices.element() as HTMLElement).focus();
+  await userEvent.keyboard("{ArrowDown}");
+  await expect.element(table.getByRole("link", { name: "Launch" })).toHaveFocus();
 });

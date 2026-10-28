@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { render } from "vitest-browser-react";
-import { AppShell } from "./app-shell";
 import { PageHeader } from "./page-header";
+import { RailShell } from "./rail-shell";
 import { SectionTitle } from "./section-title";
 import { StatCard } from "./stat-card";
 
@@ -64,9 +64,9 @@ test("a card's figure keeps its decimal point tight, and lines its digits up", a
 test("a page's content is no wider than the page width, and is centred on a wide screen", async () => {
   const screen = await render(
     <div style={{ width: 1800 }}>
-      <AppShell home={<a href="#home" />} switcher={<span>s</span>} account={<span>a</span>}>
+      <RailShell home={<a href="#home" />} switcher={<span>s</span>} account={<span>a</span>}>
         <p>Content</p>
-      </AppShell>
+      </RailShell>
     </div>,
   );
   const content = screen.getByText("Content").element().parentElement as HTMLElement;

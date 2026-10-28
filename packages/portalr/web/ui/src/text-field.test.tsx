@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { contrast, token } from "./test/colours";
-import { SearchField, TextField } from "./text-field";
+import { TextField } from "./text-field";
 
 test("a text field is named by its label, and takes what is typed", async () => {
   const screen = await render(<TextField label="Email" type="email" />);
@@ -57,14 +57,4 @@ test("a refused field's edge is the failed colour, and the failed mark stands be
   expect(mark.tagName.toLowerCase()).toBe("svg");
   expect(mark.getAttribute("aria-hidden")).toBe("true");
   expect(getComputedStyle(mark).color).toBe(token("status-failed"));
-});
-
-test("a search field is named by its words, which are its placeholder, beside the kit's glyph", async () => {
-  const screen = await render(<SearchField label="Search threads" />);
-  const input = screen.getByRole("searchbox", { name: "Search threads" });
-  await expect.element(input).toHaveAttribute("placeholder", "Search threads");
-  await expect.element(input).toHaveAttribute("enterkeyhint", "search");
-  expect(screen.container.querySelector("svg[data-glyph]")).not.toBeNull();
-  await input.fill("plan");
-  await expect.element(input).toHaveValue("plan");
 });

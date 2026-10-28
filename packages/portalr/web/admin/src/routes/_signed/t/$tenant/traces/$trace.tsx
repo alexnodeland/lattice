@@ -1,5 +1,6 @@
 import { outline, said, type Trace, wholeTrace } from "@portalr/client";
 import {
+  Breadcrumbs,
   CRUMB,
   EmptyState,
   PageHeader,
@@ -84,12 +85,16 @@ function Body({ trace }: { trace: string }) {
   const header = (
     <PageHeader
       title="Trace"
-      breadcrumbs={[
-        {
-          label: "Traces",
-          render: <Link to="/t/$tenant/traces" params={{ tenant }} activeOptions={CRUMB} />,
-        },
-      ]}
+      breadcrumbs={
+        <Breadcrumbs
+          trail={[
+            {
+              label: "Traces",
+              render: <Link to="/t/$tenant/traces" params={{ tenant }} activeOptions={CRUMB} />,
+            },
+          ]}
+        />
+      }
       meta={trace}
     />
   );

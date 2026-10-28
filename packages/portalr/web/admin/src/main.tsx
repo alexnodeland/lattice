@@ -1,4 +1,4 @@
-import "@portalr/ui/styles.css";
+import "@portalr/ui/rail.css";
 import {
   type Config,
   createApi,

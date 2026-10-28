@@ -159,8 +159,10 @@ Forms, dashboards and mini apps are switched on and off per workspace by an inte
 
 | Component | What it is |
 |---|---|
-| `AppShell` | The frame: a rail from 1024 pixels, a bar and a drawer below, and the mark of `app` or `admin` |
-| `SideNav`, `NavLink` | The areas, the current one marked, with how many wait for the reader |
+| `AppShell` | The app's frame: one bar along the top, with the areas on it from 1024 pixels and as the page's first row below, the search and what waits in its corner (ADR-0087) |
+| `RailShell` | admin's frame: a rail from 1024 pixels, a bar and a drawer below; its classes are `rail.css`'s |
+| `PaletteFrame` | A palette's dialog near the top of the window, for the app's search |
+| `SideNav`, `NavLink` | admin's areas on its rail, the current one marked, with how many wait for the reader |
 | `Switcher` | The tenant and the workspace, or the tenant alone, and a menu of the others |
 | `AccountMenu` | Who is signed in, their scheme, and signing out |
 | `PageHeader` | A page's way back, its one heading, a line about it, and its actions, set in the kit's type scale (`type.ts`: weights stop at 600), under a page width that centres a wide screen's content |

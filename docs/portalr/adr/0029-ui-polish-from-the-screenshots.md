@@ -1,6 +1,6 @@
 # ADR-0029: UI polish from the screenshots: one width rule, titles, a violet focus ring
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0087](0087-a-command-first-layout-a-top-bar-a-palette-a-table-and-a-split-view.md) (full width, no drawer in the app)
 **Date:** 2026-10-15
 **Deciders:** Alex Nodeland
 

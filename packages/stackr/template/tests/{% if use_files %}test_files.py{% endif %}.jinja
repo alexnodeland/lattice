@@ -31,12 +31,12 @@ from fastapi.testclient import TestClient
 from starlette.requests import HTTPConnection
 
 from artifactr import InMemoryStorage, UserActor, Workspaces
-from artifactr.core import Actor, TenantId
+from artifactr.core import Actor, TenantId, artifact_types
 {%- if use_diagrams %}
 from artifactr.excalidraw import Diagram
 {%- endif %}
 from artifactr.fastapi import ResolveActor
-from artifactr.files import DOCX, FakeApp, WordDocument
+from artifactr.files import DOCX, FakeApp, NativeFile, WordDocument
 from artifactr.files.app import Inspection
 from artifactr.files.blobs import once
 from artifactr.files.worker import Limits, worker_app
@@ -45,7 +45,14 @@ from lattice_core.integrations import Defaults
 
 from {{ package_name }} import files as files_module
 from {{ package_name }}.database import open_database
-from {{ package_name }}.files import TENDED, TENDER, Files, Tended
+from {{ package_name }}.files import (
+    FILE_INSTRUCTIONS,
+    TENDED,
+    TENDER,
+    TYPES,
+    Files,
+    Tended,
+)
 from {{ package_name }}.settings import (
     CRAFTS,
     FilesSettings,
@@ -57,7 +64,7 @@ from {{ package_name }}.settings import (
     Uploads,
 )
 
-from conftest import TENANT, Script, app, bearer, settings
+from conftest import TENANT, Script, app, bearer, say, {% if access == 'grantr' %}seeded, {% endif %}settings, wait_for
 
 TOKEN = "a-workers-token-of-32-characters-or-more"
 WORDCRAFT = FilesSettings(crafts=("wordcraft",), tokens={"wordcraft": TOKEN})
@@ -240,6 +247,51 @@ def test_the_application_mounts_native_files_while_an_app_runs(script: Script) -
         missing = client.get("/artifactr/v1/workspaces/main/files/a_missing")
     assert missing.status_code == 404
     assert missing.json() != {"detail": "Not Found"}, "artifactr's refusal, not a missing route"
+
+
+def test_every_native_type_lattice_registers_has_a_pinned_app() -> None:
+    assert list(TYPES) == list(CRAFTS), "copier.yml's crafts make both"
+    registered = {t for t in artifact_types().values() if issubclass(t, NativeFile)}
+    assert registered == set(TYPES.values()), "a type the agent could be offered, with no app"
+
+
+def test_every_native_type_has_the_propose_write_policy() -> None:
+    # Which the agent is told: a person reviews each of its edits of a file, whatever the mode.
+    assert {t.write_policy for t in TYPES.values()} == {"propose"}
+
+
+@pytest.mark.parametrize("craft", list(CRAFTS))
+def test_the_agent_can_create_each_running_apps_files_and_is_told_so(craft: str) -> None:
+    files = Files(FilesSettings(crafts=(craft,), tokens={craft: TOKEN}), integrations=Defaults())
+    assert files.native is not None
+    assert files.native.extensions(TYPES[craft]), f"{craft}'s type has a format to create"
+    assert files.instructions() == [FILE_INSTRUCTIONS]
+    assert files.toolsets(), "native files' tools, create_native_file among them"
+
+
+def test_with_no_app_running_the_agent_is_told_nothing_of_native_files() -> None:
+    assert Files(FilesSettings(), integrations=Defaults()).instructions() == []
+
+
+def test_the_agent_is_offered_create_native_file_and_told_how_to_write_it(script: Script) -> None:
+    config = replace(settings(), files=WORDCRAFT)
+    script.steps.append(say("I made it."))
+    application = app(script, config, workers=workers(){% if access == 'grantr' %}, grants=seeded(files=WORDCRAFT.crafts){% endif %})
+    with TestClient(application, headers=bearer()) as client:
+        base = "/artifactr/v1/workspaces/main/commands"
+
+        def command(**body: object) -> None:
+            frame = {"type": "command", "command_id": f"cmd_{body['type']}", "command": body}
+            assert client.post(base, json=frame).json()["ok"]
+
+        command(type="create_thread", thread_id="t1")
+        command(type="post_message", thread_id="t1", content="Write up a travel plan as a docx")
+        ended = "/artifactr/v1/workspaces/main/events"
+        wait_for(lambda: any(e["event"]["type"] == "run_ended" for e in client.get(ended).json()))
+    [offered] = script.tools
+    assert {"create_native_file", "find_commands", "edit_native"} <= set(offered)
+    told = script.requests[0][0].instructions or ""  # type: ignore[union-attr]
+    assert FILE_INSTRUCTIONS in told
 
 
 @pytest.mark.parametrize(

@@ -10,7 +10,7 @@ import asyncio
 import contextlib
 import socket
 import time
-from collections.abc import AsyncIterator, Callable, {% if access == 'grantr' %}Coroutine, {% endif %}Iterator
+from collections.abc import AsyncIterator, Callable, {% if access == 'grantr' %}Coroutine, {% endif %}Iterator{% if access == 'grantr' and use_files %}, Sequence{% endif %}
 {%- if access == 'grantr' %}
 from concurrent.futures import ThreadPoolExecutor
 {%- endif %}
@@ -123,6 +123,8 @@ class Script:
         self.steps = list(steps)
         self.settings: list[dict[str, Any]] = []
         self.requests: list[list[ModelMessage]] = []
+        self.tools: list[list[str]] = []
+        """The names of the tools each request offered."""
         self.delay = 0.0
 
     @property
@@ -132,6 +134,7 @@ class Script:
     async def _respond(self, messages: list[ModelMessage], info: AgentInfo) -> ModelResponse:
         self.settings.append(dict(info.model_settings or {}))
         self.requests.append(messages)
+        self.tools.append([tool.name for tool in info.function_tools])
         await asyncio.sleep(self.delay)
         return self.steps.pop(0)
 
@@ -153,12 +156,14 @@ async def _seed(grants: Grants) -> None:
     await grants.provision_tenant("globex", owner="carol")
 
 
-def seeded({% if use_artifactr %}gateway: GatewaySettings | None = None{% endif %}) -> Grants:
+def seeded({% if use_artifactr %}gateway: GatewaySettings | None = None{% endif %}{% if use_files %}, files: Sequence[str] = (){% endif %}) -> Grants:
     """grantr in memory, with acme, initech and globex; seeded in a thread, from any test.{% if use_artifactr %}
 
-    It knows the models ``gateway`` lists, if given, as the application would.
+    It knows the models ``gateway`` lists, if given, as the application would{% if use_files %}, and
+    installs the native files' apps ``files`` names{% endif %}.
     """{% else %}"""{% endif %}
-    grants = build_grants(InMemoryStorage(), name=Settings().service_name{% if use_artifactr %}, gateway=gateway{% endif %})
+    name = Settings().service_name
+    grants = build_grants(InMemoryStorage(), name=name{% if use_artifactr %}, gateway=gateway{% endif %}{% if use_files %}, files=files{% endif %})
     in_thread(_seed(grants))
     return grants
 

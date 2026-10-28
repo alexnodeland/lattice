@@ -176,9 +176,15 @@ export function Palette({
       </div>
       <div id={list} role="listbox" aria-label="Results" className="overflow-y-auto p-1.5">
         {choices.length === 0 && <p className="px-2.5 py-2 text-muted text-sm">Nothing matches.</p>}
-        {[...groups].map(([group, members]) => (
-          <fieldset key={group} aria-labelledby={`${list}-${group}`} className="m-0 border-0 p-0">
-            <div id={`${list}-${group}`} className="px-2.5 pt-2 pb-1 text-muted text-xs">
+        {[...groups].map(([group, members], place) => (
+          // A fieldset is a group to assistive technology, which a listbox may hold; the lint takes
+          // no `role="group"` on another element, and the repository takes no suppression.
+          <fieldset
+            key={group}
+            aria-labelledby={`${list}-group-${place}`}
+            className="m-0 border-0 p-0"
+          >
+            <div id={`${list}-group-${place}`} className="px-2.5 pt-2 pb-1 text-muted text-xs">
               {group}
             </div>
             {members.map(({ choice, index }) => (

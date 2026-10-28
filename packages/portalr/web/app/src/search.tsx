@@ -16,18 +16,28 @@ import { useWorkspace } from "./workspace";
 /** The palette, loaded the first time it is opened (portalr ADR-0087). */
 const loadPalette = () => import("./on-demand/palette");
 
-/** A Mac, where Ctrl+K in a field is the system's: kill to the line's end. */
+/**
+ * A Mac, where Ctrl+K in a field is the system's: kill to the line's end. `navigator.platform` is
+ * read in the browser alone, and says "MacIntel" on an iPad too, which has the same binding.
+ */
 const MAC = /Mac|iP(hone|ad|od)/.test(navigator.platform);
 
 /**
  * Whether a key opens the palette (portalr ADR-0087): ⌘K anywhere, a field too; Ctrl+K outside a
  * field, and in one too but on a Mac, where it is the field's own; "/" outside a field. Never with
- * another modifier held, and never over a dialog or a menu already open.
+ * another modifier held, over a dialog or a menu already open, for a key already taken, or while an
+ * input method composes.
  */
 export function opensPalette(event: KeyboardEvent, mac = MAC): boolean {
+  // A key a part has already taken, or one an input method is composing with, is theirs.
+  if (event.defaultPrevented || event.isComposing) {
+    return false;
+  }
   const field =
     event.target instanceof Element &&
-    event.target.closest("input, textarea, select, [contenteditable]") !== null;
+    event.target.closest(
+      'input, textarea, select, [contenteditable]:not([contenteditable="false"])',
+    ) !== null;
   const k =
     event.key.toLowerCase() === "k" &&
     !(event.altKey || event.shiftKey) &&

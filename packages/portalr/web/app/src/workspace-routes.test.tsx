@@ -211,8 +211,19 @@ test("the threads are filtered by state, the view kept in the URL, found from th
   await expect
     .element(screen.getByRole("option", { name: "Invoices" }))
     .toHaveAttribute("aria-selected", "true");
-  // Its groups are named, and a choice is followed by a click as by Enter.
+  // Its groups are named, each by exactly its heading, and a choice is followed by a click as by
+  // Enter.
   await expect.element(screen.getByRole("group", { name: "Threads" })).toBeVisible();
+  await field.fill("");
+  const groups = [...document.querySelectorAll('[role="listbox"] fieldset')];
+  expect(groups.length).toBeGreaterThan(1);
+  for (const group of groups) {
+    const ids = (group.getAttribute("aria-labelledby") ?? "").split(/\s+/);
+    expect(ids).toHaveLength(1);
+    const heading = document.getElementById(ids[0] ?? "");
+    expect(heading?.textContent).toBe(group.querySelector("div")?.textContent);
+  }
+  await expect.element(screen.getByRole("group", { name: "Go to" })).toBeVisible();
   await userEvent.keyboard("{Escape}");
   await expect.element(magnifier).toHaveFocus();
   await magnifier.click();

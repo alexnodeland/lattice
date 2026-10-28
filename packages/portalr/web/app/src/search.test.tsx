@@ -44,3 +44,19 @@ for (const role of ["dialog", "alertdialog", "menu"]) {
     expect(opensPalette(key({ key: "k", metaKey: true }))).toBe(false);
   });
 }
+
+test("a key already taken, or one an input method composes with, opens nothing", () => {
+  const taken = key({ key: "k", metaKey: true, cancelable: true });
+  taken.preventDefault();
+  expect(opensPalette(taken)).toBe(false);
+  expect(opensPalette(key({ key: "/", isComposing: true }))).toBe(false);
+});
+
+test('an element that says contenteditable="false" is no field: "/" opens the palette there', () => {
+  const plain = document.createElement("div");
+  plain.setAttribute("contenteditable", "false");
+  expect(opensPalette(key({ key: "/" }, plain))).toBe(true);
+  const editable = document.createElement("div");
+  editable.setAttribute("contenteditable", "");
+  expect(opensPalette(key({ key: "/" }, editable))).toBe(false);
+});

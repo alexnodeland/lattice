@@ -4,10 +4,15 @@ import { account } from "./app";
 import { started, Then, When } from "./fixtures";
 import { email, password, signIn } from "./people";
 
-/** The workspace's threads, once its log has been read: naming one is enabled only then. */
+/**
+ * The workspace's threads, once its log has been read: naming one is enabled only then. A table
+ * from 1024 pixels, rows below it (portalr ADR-0087): whichever is shown.
+ */
 async function threads(page: Page) {
   await expect(page.getByRole("button", { name: "Name it first…" })).toBeEnabled();
-  return page.getByRole("list", { name: "Threads" });
+  return page
+    .getByRole("table", { name: "Threads" })
+    .or(page.getByRole("list", { name: "Threads" }));
 }
 
 const dialog = (page: Page) => page.getByRole("dialog", { name: "Share the thread" });

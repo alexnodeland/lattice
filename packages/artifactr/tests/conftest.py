@@ -49,11 +49,35 @@ async def _no_task_left() -> AsyncIterator[None]:
     under whichever test the garbage collector happens to run in.
     """
     yield
+    await cancel_what_is_left()
+
+
+async def cancel_what_is_left() -> None:
+    """Cancel every task but this one and SQLAlchemy's closes, and await them all.
+
+    SQLAlchemy closes a session or a connection in a task of its own, which it shields: the
+    close is left to end, and whoever awaits it, cancelled, raises once it has. Cancelled
+    itself, the close would stop partway, its connection never returned to the pool, to be
+    collected under a later test, and on PostgreSQL holding its transaction's locks meanwhile
+    (issue #836).
+    """
     current = asyncio.current_task()
     left = [task for task in asyncio.all_tasks() if task is not current and not task.done()]
     for task in left:
-        task.cancel()
+        if not _shielded(task):
+            task.cancel()
     await asyncio.gather(*left, return_exceptions=True)
+
+
+def _shielded(task: asyncio.Task[object]) -> bool:
+    """Whether the task closes a SQLAlchemy session or connection.
+
+    SQLAlchemy's asyncio extension runs one, shielded, as `__aexit__` closes; lattice-core's
+    `to_the_end(session.close())` does too.
+    """
+    frame = getattr(task.get_coro(), "cr_frame", None)
+    module = frame.f_globals.get("__name__", "") if frame is not None else ""
+    return module.startswith("sqlalchemy.ext.asyncio.")
 
 
 @pytest.fixture(autouse=True)

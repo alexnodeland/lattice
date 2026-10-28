@@ -112,7 +112,8 @@ jobs:
       - run: moon run :image
 
   # Each crafting app's fidelity (lattice RFC-0003, phase 2): its pinned CLI opens and saves each
-  # file of its corpus, and the matrix of what it kept, feature by feature, is the run's summary.
+  # file of its corpus, and the matrix of what it kept, feature by feature, is the run's summary;
+  # and the agent creates a blank file through its worker, which opens, and proposes a first edit.
   # The apps are those with a corpus, which a test holds this list to.
   fidelity:
     name: Fidelity (${{ matrix.app }})

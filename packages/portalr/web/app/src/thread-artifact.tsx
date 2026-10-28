@@ -12,6 +12,7 @@ import {
   Alert,
   AppHostContext,
   ArtifactContent,
+  FiredContext,
   FormHostContext,
   factsOf,
   InlineArtifact,
@@ -51,6 +52,7 @@ export function ThreadArtifact({
   artifact,
   me,
   superseded,
+  fired = null,
 }: {
   context: Context;
   tenant: string;
@@ -60,6 +62,8 @@ export function ThreadArtifact({
   me: string;
   /** For an app shown again further down: the version this card was, shown without running. */
   superseded?: number;
+  /** What a rule's preview found, from the proposal that made it, where one said. */
+  fired?: string | null;
 }) {
   const { queries } = context;
   const apps = useAppHost(context, tenant, workspace);
@@ -114,18 +118,20 @@ export function ThreadArtifact({
       ) : (
         <FormHostContext value={forms}>
           <AppHostContext value={apps}>
-            {latest.kind === "app" && (
-              <KillSwitch queries={queries} tenant={tenant} workspace={workspace} />
-            )}
-            <ArtifactContent
-              kind={latest.kind}
-              data={latest.data}
-              // The version is the read's, which the app's state and a form's submission are
-              // written on; archiving is the log's, which arrives before the read again, so an
-              // archived app stops at once.
-              shown={{ id: artifact.id, version: latest.version, archived: artifact.archived }}
-              renderers={RENDERERS}
-            />
+            <FiredContext value={fired}>
+              {latest.kind === "app" && (
+                <KillSwitch queries={queries} tenant={tenant} workspace={workspace} />
+              )}
+              <ArtifactContent
+                kind={latest.kind}
+                data={latest.data}
+                // The version is the read's, which the app's state and a form's submission are
+                // written on; archiving is the log's, which arrives before the read again, so an
+                // archived app stops at once.
+                shown={{ id: artifact.id, version: latest.version, archived: artifact.archived }}
+                renderers={RENDERERS}
+              />
+            </FiredContext>
           </AppHostContext>
         </FormHostContext>
       )}

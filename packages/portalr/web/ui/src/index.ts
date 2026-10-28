@@ -102,6 +102,7 @@ export { type Glyph, glyphs } from "./icons";
 export { IntegrationList, type IntegrationRow, type IntegrationSource } from "./integration-list";
 export { IntegrationsContext, type IsEnabled } from "./integrations";
 export { type Column, ItemTable } from "./item-table";
+export { JsonView } from "./json-view";
 export { type LineReveal, LogList } from "./log-list";
 export { Markdown } from "./markdown";
 export { Lockup, type Ui } from "./marks";
@@ -119,8 +120,15 @@ export { Popover } from "./popover";
 export { Progress } from "./progress";
 export { Questions, type QuestionsAnswer } from "./questions";
 export { RailShell } from "./rail-shell";
-export { type Compare, type More, type RevisionShown, Revisions } from "./revisions";
+export {
+  type Compare,
+  type More,
+  ProposedChanges,
+  type RevisionShown,
+  Revisions,
+} from "./revisions";
 export { Row, RowLink, Rows, TrackLink, Tracks } from "./rows";
+export { FiredContext, firedOf, RulePipeline, rule } from "./rule";
 export { RunFailed } from "./run-failed";
 export { RuleRunStatus, RunList, type RunParts } from "./run-list";
 export { safeHref } from "./safe-href";

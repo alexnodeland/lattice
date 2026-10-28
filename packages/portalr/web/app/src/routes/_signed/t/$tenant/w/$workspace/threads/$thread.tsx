@@ -16,6 +16,7 @@ import {
   ButtonLink,
   Composer,
   ComposerDock,
+  firedOf,
   Message,
   Messages,
   ModeSwitch,
@@ -23,6 +24,7 @@ import {
   PageHeader,
   ProposalCard,
   prefetchStreaming,
+  proposedOn,
   Questions,
   Request,
   RunFailed,
@@ -53,6 +55,7 @@ import {
 import { author, unnamedPeople } from "../../../../../../../author";
 import { usePosting } from "../../../../../../../posting";
 import { RENDERERS } from "../../../../../../../renderers";
+import { RuleProposal } from "../../../../../../../rule-proposal";
 import { markSeen } from "../../../../../../../seen";
 import { ShareDialog } from "../../../../../../../share-dialog";
 import { ThreadArtifact } from "../../../../../../../thread-artifact";
@@ -493,6 +496,7 @@ function Chat() {
                   tenant={tenant}
                   workspace={workspace}
                   artifact={entry.artifact}
+                  fired={firedOf(Object.values(proposals), entry.artifact.id)}
                   {...(entry.superseded && { superseded: entry.superseded })}
                 />
               );
@@ -584,7 +588,13 @@ function Chat() {
           onRespond={(decision) =>
             stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision })
           }
-        />
+        >
+          <RuleProposal
+            proposal={proposal}
+            kind={artifacts[proposedOn(proposal) ?? ""]?.kind}
+            place={{ context, tenant, workspace }}
+          />
+        </ProposalCard>
       ))}
       {canPost && (
         // While an approval waits in the column, the dock stays in the flow under it, so it never

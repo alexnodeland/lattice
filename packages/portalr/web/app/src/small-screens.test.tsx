@@ -8,6 +8,7 @@ import { page } from "vitest/browser";
 import { open } from "./test/app";
 import { serve, WORLD } from "./test/notes";
 import { wider } from "./test/overflow";
+import * as rules from "./test/rules";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -40,6 +41,30 @@ for (const [what, path, seen, signedOut] of ROUTES) {
               .some((element) => element.checkVisibility()),
           )
           .toBe(true);
+      }
+      const found = wider();
+      expect(found, found.join("\n")).toEqual([]);
+      expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(window.innerWidth);
+    });
+  }
+}
+
+// A rule drafted in a thread, and its page: the pipeline, an edit's changes, and the JSON opened.
+const RULES: [string, string, string][] = [
+  ["a thread with a rule and an edit of it", "/t/acme/w/notes/threads/thr_r", "The rule, as JSON"],
+  ["a rule's page", "/t/acme/w/notes/artifacts/rule_1", "The rule, as JSON"],
+  ["the proposals, a rule's among them", "/t/acme/w/notes/proposals", ""],
+];
+for (const [what, path, fold] of RULES) {
+  for (const width of WIDTHS) {
+    test(`${what} at ${width}px is never wider than the page`, async () => {
+      await page.viewport(width, 900);
+      const { screen } = await open(path, rules.serve, () => null, rules.WORLD);
+      if (fold) {
+        await screen.getByRole("button", { name: fold }).first().click();
+        await expect.element(screen.getByText("per service").first()).toBeVisible();
+      } else {
+        await expect.element(screen.getByText("Couldn't work out", { exact: false })).toBeVisible();
       }
       const found = wider();
       expect(found, found.join("\n")).toEqual([]);

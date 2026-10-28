@@ -202,14 +202,14 @@ Then("the file says {string}", async ({ page }, text: string) => {
 
 Then("its latest version is {int}", async ({ page }, version: number) => {
   await page.reload();
-  await expect(page.getByText(`word_document, version ${version}`)).toBeVisible();
+  await expect(page.getByText(new RegExp(`word_document · v${version}\\b`))).toBeVisible();
 });
 
 When("they accept the assistant's proposal there", async ({ page }) => {
   const proposal = page.getByRole("region", { name: /^Proposal:/ });
   await expect(proposal).toContainText("You have the file checked out");
   await proposal.getByRole("button", { name: "Accept" }).click();
-  await expect(page.getByText("word_document, version 2")).toBeVisible();
+  await expect(page.getByText(/word_document · v2\b/)).toBeVisible();
 });
 
 Then(

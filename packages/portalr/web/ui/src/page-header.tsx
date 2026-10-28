@@ -4,8 +4,8 @@ import { cn } from "./cn";
 import { TYPE } from "./type";
 
 /**
- * The top of a page: the places above it, its one heading, a line about it, and its actions, which wrap
- * beneath the heading on a narrow screen.
+ * The top of a page: the places above it, its one heading with its actions on the same line, and
+ * a line about it. The actions are few and compact, an icon button where words would crowd.
  */
 export function PageHeader({
   title,
@@ -38,20 +38,22 @@ export function PageHeader({
     }
   }, [focus]);
   return (
-    <header className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3 pb-1">
-      <div className="flex min-w-0 flex-col gap-1">
-        {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs trail={breadcrumbs} />}
+    // One shape (portalr ADR-0085): the places above, then the title with the actions on its
+    // line, at every width, never wrapped under it; then the line about it.
+    <header className="flex flex-col gap-1">
+      {breadcrumbs && breadcrumbs.length > 0 && <Breadcrumbs trail={breadcrumbs} />}
+      <div className="flex items-center justify-between gap-3">
         <h1
           id={id}
           ref={ref}
           tabIndex={focus ? -1 : undefined}
-          className={cn(TYPE.page, mono && "font-mono")}
+          className={cn(TYPE.page, "min-w-0 break-words", mono && "font-mono")}
         >
           {title}
         </h1>
-        {meta && <p className={TYPE.meta}>{meta}</p>}
+        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
       </div>
-      {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
+      {meta && <p className={TYPE.meta}>{meta}</p>}
     </header>
   );
 }

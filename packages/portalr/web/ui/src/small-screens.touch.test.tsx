@@ -134,7 +134,11 @@ function Attach() {
 test("a menu and a popover sit as sheets too, and keep their roles", async () => {
   const screen = await render(
     <div className="p-4">
-      <Menu label="Thread actions" items={[{ label: "Share…", onSelect: vi.fn() }]} />
+      <Menu
+        label="Thread actions"
+        icon={glyphs.more}
+        items={[{ label: "Share…", onSelect: vi.fn() }]}
+      />
       <Attach />
     </div>,
   );
@@ -290,7 +294,11 @@ function Floating() {
   const [open, setOpen] = useState(false);
   return (
     <div className="p-4">
-      <Menu label="Thread actions" items={[{ label: "Share…", onSelect: vi.fn() }]} />
+      <Menu
+        label="Thread actions"
+        icon={glyphs.more}
+        items={[{ label: "Share…", onSelect: vi.fn() }]}
+      />
       <AccountMenu
         name="alice"
         appearance="system"

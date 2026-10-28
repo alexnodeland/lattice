@@ -58,8 +58,11 @@ test("working stops turning when motion is reduced", async () => {
   const screen = await render(<StatusBadge tone="working">Working</StatusBadge>);
   const glyph = screen.getByText("Working").element().firstElementChild as Element;
   expect(getComputedStyle(glyph).animationName).toBe("spin");
+  // Turning, an arc; still, a whole ring, never an arc frozen into a "c" (portalr ADR-0085).
+  expect(getComputedStyle(glyph).borderRightColor).not.toBe(getComputedStyle(glyph).borderTopColor);
   await commands.reduceMotion(true);
   expect(getComputedStyle(glyph).animationName).toBe("none");
+  expect(getComputedStyle(glyph).borderRightColor).toBe(getComputedStyle(glyph).borderTopColor);
 });
 
 test("still, working keeps a shape of its own, apart from queued's", async () => {

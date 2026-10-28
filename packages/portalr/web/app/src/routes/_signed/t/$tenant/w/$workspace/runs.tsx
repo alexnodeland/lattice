@@ -1,7 +1,7 @@
 import { allowedIn, filedBy, thumbs, useMe, workspaceOf } from "@portalr/client";
 import {
+  Ago,
   CommandButton,
-  Moment,
   PageHeader,
   RuleRunStatus,
   RunList,
@@ -9,7 +9,6 @@ import {
   RunStatus,
   SectionTitle,
   TextLink,
-  Thumbs,
   TrackerItems,
 } from "@portalr/ui";
 import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
@@ -99,22 +98,19 @@ function Runs() {
       </span>
     ),
     // A start the log gave no readable time for is left blank, never "Invalid Date".
-    started: readable(run.startedAt) && <Moment at={run.startedAt} />,
-    feedback: turnFeedback && (
-      <span data-portalr-replay="block">
-        <Thumbs
-          given={thumbs(run.feedback, me)}
-          onThumbs={(up, comment) =>
+    started: readable(run.startedAt) && <Ago at={run.startedAt} />,
+    feedback: turnFeedback
+      ? {
+          given: thumbs(run.feedback, me),
+          onThumbs: (up: boolean, comment: string | null) =>
             artifactr.send({
               type: "give_feedback",
               feedback_type: "thumbs",
               target: { kind: "turn", run_id: run.id },
               value: comment === null ? { up } : { up, comment },
-            })
-          }
-        />
-      </span>
-    ),
+            }),
+        }
+      : null,
     actions: run.status === "running" && allowed.has("artifactr:stop_run") && (
       <CommandButton onSend={() => artifactr.send({ type: "stop_run", run_id: run.id })}>
         Stop
@@ -147,21 +143,18 @@ function Runs() {
         </span>
       ),
       attempts: run.attempt,
-      feedback: runFeedback && (
-        <span data-portalr-replay="block">
-          <Thumbs
-            given={thumbs(run.feedback, me)}
-            onThumbs={(up, comment) =>
+      feedback: runFeedback
+        ? {
+            given: thumbs(run.feedback, me),
+            onThumbs: (up: boolean, comment: string | null) =>
               reflexr.send({
                 type: "give_feedback",
                 feedback_type: "thumbs",
                 target: { kind: "run", run_id: run.id },
                 value: comment === null ? { up } : { up, comment },
-              })
-            }
-          />
-        </span>
-      ),
+              }),
+          }
+        : null,
       actions: (retry || skip || cancel) && (
         <>
           {retry && (
@@ -190,10 +183,7 @@ function Runs() {
           things (a thread's title, a rule, a tracker item) and a comment on a run are blocked in
           their cells, and every other text on it is masked (portalr ADR-0077). */}
       <i hidden data-portalr-replay="allow" />
-      <PageHeader
-        title="Runs"
-        meta={`The agent's turns and the rules' runs in ${workspace}, newest first`}
-      />
+      <PageHeader title="Runs" />
       <div className="flex flex-col gap-3">
         <SectionTitle>The agent's turns</SectionTitle>
         <Connection

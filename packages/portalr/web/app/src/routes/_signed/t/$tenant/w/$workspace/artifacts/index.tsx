@@ -39,7 +39,7 @@ function Artifacts() {
     .sort(newestFirst);
   return (
     <>
-      <PageHeader title="Artifacts" meta={`What the agent and people make in ${workspace}`} />
+      <PageHeader title="Artifacts" />
       <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
       <Uploader context={context} tenant={tenant} workspace={workspace} />
       {snapshot.status === "live" && listed.length === 0 && (

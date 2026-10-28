@@ -30,6 +30,7 @@ import {
   RunSteps,
   RunStrip,
   rendererFor,
+  StatusBadge,
   Streaming,
   ThumbBar,
 } from "@portalr/ui";
@@ -310,39 +311,38 @@ function Chat() {
     atLoad?.id === id &&
     !atLoad.waiting.has(latestRequest.tool_call_id);
   const toQuestion = () => toRequest(latestRequest?.tool_call_id);
+  // The agent's mode, where the reader may set it: in the composer's row, or alone without one.
+  const mode = allowed.has("artifactr:set_thread_mode") && (
+    <ModeSwitch
+      mode={thread.mode}
+      disabled={snapshot.status !== "live"}
+      onChange={(chosen) => stream.send({ type: "set_thread_mode", thread_id: id, mode: chosen })}
+    />
+  );
 
   return (
     <section
       aria-labelledby="thread"
       data-portalr-replay="block"
-      className="flex max-w-190 flex-col gap-6"
+      className="mx-auto flex w-full max-w-190 flex-col gap-6"
     >
       <PageHeader
         title={thread.title || "Untitled"}
         breadcrumbs={crumbs}
         id="thread"
         actions={
-          <>
-            {snapshot.status !== "closed" && allowed.has("artifactr:set_thread_mode") && (
-              <ModeSwitch
-                mode={thread.mode}
-                disabled={snapshot.status !== "live"}
-                onChange={(mode) => stream.send({ type: "set_thread_mode", thread_id: id, mode })}
-              />
-            )}
-            {(allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
-              <CatchBoundary
-                getResetKey={() => id}
-                errorComponent={() => (
-                  <Alert tone="error">Who has access to it couldn't be read.</Alert>
-                )}
-              >
-                <Suspense fallback={null}>
-                  <Access tenant={tenant} workspace={workspace} thread={id} allowed={allowed} />
-                </Suspense>
-              </CatchBoundary>
-            )}
-          </>
+          (allowed.has("grantr:grant") || allowed.has("grantr:restrict")) && (
+            <CatchBoundary
+              getResetKey={() => id}
+              errorComponent={() => (
+                <Alert tone="error">Who has access to it couldn't be read.</Alert>
+              )}
+            >
+              <Suspense fallback={null}>
+                <Access tenant={tenant} workspace={workspace} thread={id} allowed={allowed} />
+              </Suspense>
+            </CatchBoundary>
+          )
         }
       />
       <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the thread" />
@@ -409,10 +409,11 @@ function Chat() {
                     author="Assistant"
                   />
                 ),
-                // A line of the log, which announces it: the one end nothing else says.
+                // A line of the log, which announces it: the one end nothing else says, as the
+                // status mark and word the Runs page shows (portalr ADR-0085).
                 entry.run.status === "stopped" && (
-                  <li key={`${entry.run.id}-stopped`} className="self-start text-muted text-xs">
-                    Stopped here.
+                  <li key={`${entry.run.id}-stopped`} className="self-start">
+                    <StatusBadge tone="stopped">Stopped</StatusBadge>
                   </li>
                 ),
               ];
@@ -461,15 +462,23 @@ function Chat() {
       </Messages>
       {active.map((run) => (
         <div key={run.id} className="flex flex-col gap-2">
-          <RunStrip
-            run={run}
-            history={sentBefore(run.started)}
-            {...(run.status === "running" &&
-              allowed.has("artifactr:stop_run") && {
-                onStop: () => stream.send({ type: "stop_run", run_id: run.id }),
+          {/* An approval waits in its own card, which says so: no strip above it too (ADR-0085). */}
+          {(run.status === "running" ||
+            run.requests.some((request) => request.kind !== "approval")) && (
+            <RunStrip
+              run={run}
+              history={sentBefore(run.started)}
+              {...(run.status === "running" &&
+                allowed.has("artifactr:stop_run") && {
+                  onStop: () => stream.send({ type: "stop_run", run_id: run.id }),
+                })}
+              // The way to what is asked, a question up the log or a form, which may be long; an
+              // approval sits short under the strip, and needs none (portalr ADR-0085).
+              {...(run.requests.some((request) => request.kind !== "approval") && {
+                onQuestion: toQuestion,
               })}
-            {...(run.requests.length > 0 && { onQuestion: toQuestion })}
-          />
+            />
+          )}
           {[
             ...run.requests
               .filter((request) => request.tool_name !== ASK_USER)
@@ -521,6 +530,8 @@ function Chat() {
                   attach
                   files={dropped}
                 />
+                {/* The agent's mode, a setting of the thread's, beside what is sent to it (portalr ADR-0085). */}
+                {mode}
                 {/* A phone's thumb bar: the request's next step, at the row's end (portalr ADR-0082). */}
                 {latestRequest !== undefined && (
                   <ThumbBar target={`request-${latestRequest.tool_call_id}`} />
@@ -531,7 +542,11 @@ function Chat() {
         </ComposerDock>
       )}
       {snapshot.status !== "closed" && !allowed.has("artifactr:post_message") && (
-        <Uploader context={context} tenant={tenant} workspace={workspace} thread={id} />
+        <>
+          {/* Who may set the mode but not post has it on its own, where the composer would be. */}
+          {mode}
+          <Uploader context={context} tenant={tenant} workspace={workspace} thread={id} />
+        </>
       )}
     </section>
   );
@@ -668,9 +683,11 @@ function Sharing({
   const changed = <A,>(answer: Promise<A>) => changedAccess(queryClient, tenant, answer);
   const canShare = allowed.has("grantr:grant");
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex items-center gap-2">
       {isRestricted && (
-        <p className="text-muted text-sm">Restricted to the people it's shared with</p>
+        <p className="text-muted text-xs">
+          Restricted<span className="sr-only"> to the people it's shared with</span>
+        </p>
       )}
       <ThreadMenu
         restricted={isRestricted}

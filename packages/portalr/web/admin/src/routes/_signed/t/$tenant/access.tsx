@@ -35,17 +35,20 @@ function Parts({ children }: { children: ReactNode }) {
   return (
     <>
       <PageHeader title="Access" meta="Who may see and do what in the tenant" />
-      <TabNav label="Access">
-        {PARTS.filter(({ reads }) => allowed.has(reads)).map(({ part, label }) => (
-          <TabLink
-            key={part}
-            render={<Link to={`/t/$tenant/access/${part}`} params={{ tenant }} />}
-          >
-            {label}
-          </TabLink>
-        ))}
-      </TabNav>
-      {children}
+      {/* The tabs with the part's toolbar close under them, one group (portalr ADR-0085). */}
+      <div className="flex flex-col gap-4">
+        <TabNav label="Access">
+          {PARTS.filter(({ reads }) => allowed.has(reads)).map(({ part, label }) => (
+            <TabLink
+              key={part}
+              render={<Link to={`/t/$tenant/access/${part}`} params={{ tenant }} />}
+            >
+              {label}
+            </TabLink>
+          ))}
+        </TabNav>
+        {children}
+      </div>
     </>
   );
 }

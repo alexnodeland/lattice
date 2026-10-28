@@ -5,6 +5,7 @@
  */
 
 import { afterEach, expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { open } from "./test/app";
 
 const FLAGS = "/grantr/v1/tenants/acme/workspaces/notes/enabled-integrations";
@@ -197,10 +198,25 @@ test("the threads are searched by title and filtered by state, the view kept in 
       .getByRole("img", { name: "Moved since you read it" })
       .elements(),
   ).toHaveLength(0);
-  await screen.getByRole("searchbox", { name: "Search threads" }).fill("inv");
+  // The search is a glyph until asked; opened, its field takes the focus (portalr ADR-0085).
+  expect(screen.getByRole("searchbox").elements()).toHaveLength(0);
+  await screen.getByRole("button", { name: "Search threads" }).click();
+  const field = screen.getByRole("searchbox", { name: "Search threads" });
+  await expect.element(field).toHaveFocus();
+  await field.fill("inv");
   await expect.element(threads.getByRole("listitem")).toHaveLength(1);
   await expect.poll(() => router.state.location.search).toEqual({ q: "inv" });
-  await screen.getByRole("searchbox", { name: "Search threads" }).fill("");
+  // Folded by Escape, what it holds stays applied, as a chip that clears it.
+  await userEvent.keyboard("{Escape}");
+  expect(screen.getByRole("searchbox").elements()).toHaveLength(0);
+  await expect.element(threads.getByRole("listitem")).toHaveLength(1);
+  await screen.getByRole("button", { name: "Clear the search for inv" }).click();
+  await expect.element(threads.getByRole("listitem")).toHaveLength(2);
+  // "/" opens it again, and Close folds it.
+  await userEvent.keyboard("/");
+  await expect.element(screen.getByRole("searchbox", { name: "Search threads" })).toHaveFocus();
+  await screen.getByRole("button", { name: "Close search" }).click();
+  expect(screen.getByRole("searchbox").elements()).toHaveLength(0);
   await screen.getByRole("radio", { name: /^Working/ }).click();
   await expect.element(threads.getByRole("listitem")).toHaveLength(1);
   await expect.element(threads.getByRole("listitem").filter({ hasText: "Launch" })).toBeVisible();

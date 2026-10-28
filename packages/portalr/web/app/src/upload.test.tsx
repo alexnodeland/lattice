@@ -45,10 +45,11 @@ test("files chosen together are sent one after another, each of its kind, and sa
   const { screen } = await open(PAGE, serving(offered()));
   const input = screen.getByLabelText("Upload files");
   await expect.element(input).toHaveAttribute("accept", ".docx,.dwg,.dxf,.DXF,.fcproj");
+  // What it takes is said whole, though its list is folded under Supported files (portalr ADR-0085).
   await expect
     .element(input)
     .toHaveAccessibleDescription(
-      ".docx, .dwg, .dxf, .DXF, up to 1 kB each; .fcproj, up to 500 bytes each. Or drop them here.",
+      "Or drop them here · up to 1 kB .docx, .dwg, .dxf, .DXF, up to 1 kB each; .fcproj, up to 500 bytes each.",
     );
   await input.upload([new File(["one"], "brief.docx"), new File(["two"], "plan.dwg")]);
   const first = await sent(1);
@@ -192,7 +193,7 @@ test("with every app off the chooser says why and takes nothing", async () => {
   await expect
     .element(input)
     .toHaveAccessibleDescription(
-      "No app for files is on in this workspace: an admin can switch one on in its integrations. Or drop them here.",
+      "Or drop them here · No app for files is on in this workspace: an admin can switch one on in its integrations.",
     );
 });
 

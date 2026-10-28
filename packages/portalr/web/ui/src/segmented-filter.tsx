@@ -25,6 +25,7 @@ export function SegmentedFilter<V extends string>({
   value,
   onValueChange,
   disabled = false,
+  size = "md",
   ...written
 }: {
   name?: string;
@@ -33,6 +34,8 @@ export function SegmentedFilter<V extends string>({
   onValueChange: (value: V) => void;
   /** Shown as chosen, and not to be changed. */
   disabled?: boolean;
+  /** `sm` for a setting in a row of controls, such as the composer's (portalr ADR-0085). */
+  size?: "md" | "sm";
 } & (
   | {
       /** Write the group's name above it, as a field's, with a hint beneath. */
@@ -62,14 +65,16 @@ export function SegmentedFilter<V extends string>({
             segment.count === undefined ? undefined : `${segment.label}, ${segment.count}`
           }
           className={cn(
-            "inline-flex cursor-default items-center gap-1.5 rounded-(--segmented-item-radius) px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:not-data-disabled:text-fg data-checked:bg-surface data-checked:font-semibold data-checked:text-fg data-checked:shadow-(--card-shadow) data-disabled:cursor-not-allowed data-disabled:text-muted",
+            "inline-flex cursor-default items-center gap-1.5 rounded-(--segmented-item-radius) px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) font-medium text-muted hover:not-data-disabled:text-fg data-checked:bg-surface data-checked:font-semibold data-checked:text-fg data-checked:shadow-(--card-shadow) data-disabled:cursor-not-allowed data-disabled:text-muted",
+            size === "sm" ? "text-xs" : "text-sm",
             RING,
             FEEDBACK,
           )}
         >
           {segment.label}
+          {/* A count in the sans, on its digits, as every count is (portalr ADR-0085). */}
           {segment.count !== undefined && (
-            <span aria-hidden="true" className="font-mono font-normal text-xs tabular-nums">
+            <span aria-hidden="true" className="font-normal text-xs tabular-nums">
               {segment.count}
             </span>
           )}

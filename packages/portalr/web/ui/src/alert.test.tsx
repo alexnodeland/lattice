@@ -51,7 +51,7 @@ test("each tone has a shape of its own beside its words, hidden from assistive t
   expect(new Set(shapes).size).toBe(3);
 });
 
-test("its words are in the ink and read on the surface; the colour is the edge, a mark", async () => {
+test("its words are in the ink and read on the surface; the colour is its one mark, the shape", async () => {
   const screen = await render(
     <div>
       {TONES.map((tone) => (
@@ -61,13 +61,17 @@ test("its words are in the ink and read on the surface; the colour is the edge, 
       ))}
     </div>,
   );
-  const edges = { info: token("edge"), warn: token("status-warn"), error: token("status-failed") };
+  const marks = { info: token("muted"), warn: token("status-warn"), error: token("status-failed") };
   for (const tone of TONES) {
-    const style = getComputedStyle(screen.getByText(tone).element().parentElement as Element);
+    const alert = screen.getByText(tone).element().parentElement as Element;
+    const style = getComputedStyle(alert);
     expect(style.color).toBe(token("fg"));
     expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(7);
-    expect(style.borderLeftColor).toBe(edges[tone]);
-    expect(contrast(style.borderLeftColor, token("surface"))).toBeGreaterThanOrEqual(3);
+    // One signal (portalr ADR-0085): the edge is the hairline all round, the shape takes the tone.
+    expect(style.borderLeftColor).toBe(style.borderTopColor);
+    const mark = getComputedStyle(alert.querySelector("svg") as Element).color;
+    expect(mark).toBe(marks[tone]);
+    expect(contrast(mark, token("surface"))).toBeGreaterThanOrEqual(3);
   }
 });
 

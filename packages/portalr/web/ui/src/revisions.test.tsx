@@ -1,5 +1,5 @@
 import { expect, test, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page as browser, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { type AppHost, AppHostContext } from "./app-frame";
 import { markdown } from "./artifacts";
@@ -36,26 +36,49 @@ const APP_REVISIONS = [
   app(2, "Dice game", '<button id="roll">Roll the die</button>\n<p id="score"></p>'),
 ];
 
-function shown(
+/** The list, with its newest revision opened, as a reader opens it (all are closed at first). */
+async function shown(
   revisions: readonly RevisionShown[],
-  { enabled = () => true, apps = host() }: { enabled?: IsEnabled; apps?: AppHost | null } = {},
+  {
+    enabled = () => true,
+    apps = host(),
+    open = true,
+  }: { enabled?: IsEnabled; apps?: AppHost | null; open?: boolean } = {},
 ) {
-  return render(
+  const screen = await render(
     <IntegrationsContext value={enabled}>
       <AppHostContext value={apps}>
         <Revisions id="art_1" revisions={revisions} renderers={RENDERERS} compare={compare} />
       </AppHostContext>
     </IntegrationsContext>,
   );
+  if (open) {
+    await openNewest();
+  }
+  return screen;
 }
 
-test("newest first, the latest open and the rest closed, each saying who, when and what", async () => {
-  const screen = await shown(APP_REVISIONS);
+/** Open the newest revision, the list's first. */
+const openNewest = () =>
+  userEvent.click(
+    browser
+      .getByRole("list", { name: "Revisions" })
+      .getByRole("button", { name: /^Version/ })
+      .first(),
+  );
+
+test("newest first, all closed until one is opened, each saying who, when and what", async () => {
+  const screen = await shown(APP_REVISIONS, { open: false });
   const list = screen.getByRole("list", { name: "Revisions" });
   const latest = list.getByRole("listitem").nth(0);
   const first = list.getByRole("listitem").nth(1);
   await expect.element(latest).toHaveAccessibleName("Version 2");
   await expect.element(first).toHaveAccessibleName("Version 1");
+  // Its history is read on request (portalr ADR-0085): nothing is open as the list is shown.
+  await expect
+    .element(latest.getByRole("button", { name: /^Version 2/ }))
+    .toHaveAttribute("aria-expanded", "false");
+  await openNewest();
   await expect
     .element(latest.getByRole("button", { name: /^Version 2/ }))
     .toHaveAttribute("aria-expanded", "true");
@@ -165,6 +188,7 @@ test("an archived app's revisions run nothing: they have no Preview", async () =
       </AppHostContext>
     </IntegrationsContext>,
   );
+  await openNewest();
   const latest = screen.getByRole("listitem", { name: "Version 2" });
   expect(
     latest
@@ -305,6 +329,7 @@ test("archived while its preview runs, an app's revision stops it and gives up t
     </IntegrationsContext>
   );
   const screen = await render(revisions(false));
+  await openNewest();
   const latest = screen.getByRole("listitem", { name: "Version 2" });
   await userEvent.click(latest.getByRole("tab", { name: "Preview" }));
   await userEvent.click(latest.getByRole("button", { name: "Run version 2" }));
@@ -325,6 +350,7 @@ test("revisions read again, with the same data, are not compared again", async (
     <Revisions id="art_1" revisions={revisions} renderers={RENDERERS} compare={counted} />
   );
   const screen = await render(list(APP_REVISIONS));
+  await openNewest();
   await expect.element(screen.getByRole("tab", { name: "Changes" })).toBeVisible();
   const calls = counted.mock.calls.length;
   expect(calls).toBeGreaterThan(0);
@@ -334,7 +360,7 @@ test("revisions read again, with the same data, are not compared again", async (
   expect(counted.mock.calls.length).toBe(calls);
 });
 
-test("one revision is open at a time: opening another closes it, and a newer one opens as it arrives", async () => {
+test("one revision is open at a time: opening another closes it, and a newer one arriving changes neither", async () => {
   const screen = await shown(APP_REVISIONS);
   const summary = (name: string) =>
     screen
@@ -358,7 +384,8 @@ test("one revision is open at a time: opening another closes it, and a newer one
       </AppHostContext>
     </IntegrationsContext>,
   );
-  await expect.poll(() => summary("Version 3").getAttribute("aria-expanded")).toBe("true");
-  expect(summary("Version 1").getAttribute("aria-expanded")).toBe("false");
+  // What the reader opened stays open; the new one waits closed, at the top (portalr ADR-0085).
+  await expect.poll(() => summary("Version 3").getAttribute("aria-expanded")).toBe("false");
+  expect(summary("Version 1").getAttribute("aria-expanded")).toBe("true");
   expect(summary("Version 2").getAttribute("aria-expanded")).toBe("false");
 });

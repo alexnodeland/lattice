@@ -7,12 +7,14 @@
 import { type DragEvent, type ReactNode, useId, useState } from "react";
 import { buttonLook } from "./button";
 import { cn } from "./cn";
+import { Disclosure } from "./disclosure";
 import { Icon } from "./icon";
 import { glyphs } from "./icons";
 
 export function FileChooser({
   label,
   hint,
+  types,
   accept,
   multiple = false,
   disabled = false,
@@ -21,8 +23,10 @@ export function FileChooser({
 }: {
   /** What the file is, such as "The edited file". */
   label: string;
-  /** What to choose, and where it came from. */
+  /** What to choose, and where it came from: a few words, beside "Or drop them here". */
   hint?: ReactNode;
+  /** Which files are taken, in full, folded under "Supported files" (portalr ADR-0085). */
+  types?: ReactNode;
   /** The types the input offers, such as `.docx`; a dropped file of another is still given. */
   accept?: string | undefined;
   /** Whether several files may be chosen or dropped at once. */
@@ -37,6 +41,7 @@ export function FileChooser({
 }) {
   const input = useId();
   const described = useId();
+  const listed = useId();
   // How deep a drag is inside the zone: entering a child enters before the zone is left, so the
   // zone is marked from the first enter until the last leave, without flickering in between.
   const [depth, setDepth] = useState(0);
@@ -67,20 +72,15 @@ export function FileChooser({
       onDrop={dropped}
       data-over={over || undefined}
       className={cn(
-        "flex min-w-0 flex-col items-start gap-2 rounded-(--card-radius) border border-edge border-dashed bg-surface p-(--card-pad) text-fg text-sm data-over:border-accent data-over:bg-wash forced-colors:data-over:border-system-highlight",
+        "flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2 rounded-(--card-radius) border border-edge border-dashed bg-surface p-(--card-pad) text-fg text-sm data-over:border-accent data-over:bg-wash forced-colors:data-over:border-system-highlight",
         disabled && "border-line text-muted",
         className,
       )}
     >
-      <label htmlFor={input} className="flex items-center gap-2 font-semibold">
-        <Icon icon={glyphs.fileUp} />
-        {label}
-      </label>
       {/*
        * The input itself is out of sight, so the browser's own button and its "No file chosen"
-       * aren't drawn: the keyboard and assistive technology still reach it, named by its label
-       * and by the kit button beside it, its second label, which shows its focus and opens it on
-       * a click (portalr ADR-0049).
+       * aren't drawn: the keyboard and assistive technology still reach it, named by its label,
+       * the kit button that shows its focus and opens it on a click (portalr ADR-0049).
        */}
       <span className="flex items-center">
         <input
@@ -89,7 +89,7 @@ export function FileChooser({
           accept={accept}
           multiple={multiple}
           disabled={disabled}
-          aria-describedby={described}
+          aria-describedby={types ? `${described} ${listed}` : described}
           // Cleared as the picker opens, so choosing the same file again is a change too, and the
           // input says what was chosen until then.
           onClick={(event) => {
@@ -103,17 +103,22 @@ export function FileChooser({
           // So the button's own disabled look holds, its hover and press with it.
           data-disabled={disabled || undefined}
           className={cn(
-            buttonLook("secondary", "sm"),
+            buttonLook("secondary"),
             "cursor-pointer peer-focus-visible:outline-(length:--focus-width) peer-focus-visible:outline-focus",
           )}
         >
-          {multiple ? "Choose files" : "Choose a file"}
+          <Icon icon={glyphs.fileUp} />
+          {label}
         </label>
       </span>
       <p id={described} className="text-muted">
-        {hint}
-        {hint && " "}Or drop {multiple ? "them" : "it"} here.
+        Or drop {multiple ? "them" : "it"} here{hint && <> · {hint}</>}
       </p>
+      {types && (
+        <Disclosure summary="Supported files" className="w-full text-muted text-xs">
+          <span id={listed}>{types}</span>
+        </Disclosure>
+      )}
     </fieldset>
   );
 }

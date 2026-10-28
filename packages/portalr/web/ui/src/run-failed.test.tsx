@@ -15,7 +15,7 @@ test("a failed turn says why in words, the run's own under Details, and can be t
     </Messages>,
   );
   await expect
-    .element(screen.getByRole("alert").getByRole("paragraph"))
+    .element(screen.getByRole("alert").getByRole("paragraph").first())
     .toHaveTextContent(
       "The assistant couldn't finish. The model kept calling a tool in a way the tool refused, and ran out of tries.",
     );
@@ -25,6 +25,24 @@ test("a failed turn says why in words, the run's own under Details, and can be t
   await screen.getByRole("button", { name: "Try again" }).click();
   expect(onRetry).toHaveBeenCalledOnce();
 });
+
+for (const [error, said] of [
+  ["ModelHTTPError: status_code: 529, model_name: claude, body: overloaded", "overloaded"],
+  ["status_code: 429, rate limit exceeded", "taking no more requests"],
+  ["ReadTimeout: the request timed out", "took too long"],
+] as const) {
+  test(`a provider's error is said in words, its text under Details: ${said}`, async () => {
+    const screen = await render(
+      <Messages>
+        <RunFailed reason={null} error={error} />
+      </Messages>,
+    );
+    const note = screen.getByRole("note").element();
+    expect(note.querySelector("p")?.textContent).toContain(said);
+    await expect.element(screen.getByText(error)).not.toBeVisible();
+    expect(screen.getByText("Details").elements()).toHaveLength(1);
+  });
+}
 
 test("a failure further up, or one without a reason, is a note, with no way to try again", async () => {
   const screen = await render(

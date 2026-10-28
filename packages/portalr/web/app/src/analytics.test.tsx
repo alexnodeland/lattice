@@ -177,7 +177,7 @@ test("a deletion still owed is read from the relay, as a reload reads it, and sh
   await expect
     .element(
       screen.getByRole("menuitem", {
-        name: "What is shared, and how it is kept (opens in a new tab)",
+        name: "How sharing works (opens in a new tab)",
       }),
     )
     .toHaveAttribute("href", expect.stringContaining("/portalr/guides/privacy/"));

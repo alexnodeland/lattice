@@ -165,6 +165,8 @@
     button,
     [role="button"],
     [data-button],
+    [role="radio"],
+    [data-track] a,
     select,
     input:not([type="checkbox"], [type="radio"])
   ) {

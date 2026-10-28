@@ -537,8 +537,8 @@ function CheckIn({
   return (
     <div className="flex flex-col gap-3">
       <FileChooser
-        label="The edited file"
-        hint={`The file you saved from ${app}, up to ${fileSize(status.limit)}.`}
+        label="Choose the edited file"
+        hint={`the one you saved from ${app}, up to ${fileSize(status.limit)}`}
         accept={extension}
         disabled={sending !== null}
         onFile={choose}

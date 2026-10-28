@@ -4,6 +4,7 @@ import { render } from "vitest-browser-react";
 import { AppShell } from "./app-shell";
 import { Card } from "./card";
 import { Dialog } from "./dialog";
+import { glyphs } from "./icons";
 import { Menu } from "./menu";
 
 /** A box-shadow's alpha, and whether its colour is black, from the computed value in either colour syntax. */
@@ -23,7 +24,11 @@ test("a card casts a faint shadow, and a menu casts more", async () => {
   const screen = await render(
     <>
       <Card>A card</Card>
-      <Menu label="Actions" items={[{ label: "Open", onSelect: () => undefined }]} />
+      <Menu
+        label="Actions"
+        icon={glyphs.more}
+        items={[{ label: "Open", onSelect: () => undefined }]}
+      />
     </>,
   );
   const card = screen.getByText("A card").element();

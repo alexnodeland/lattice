@@ -195,8 +195,9 @@ The UIs read this first. It is public, so it holds no secret:
 | `people` | Whether the router names people by email: true where `people` was passed |
 | `editors` | Each native file's app's hosted editor, by its integration, such as `files:wordcraft`: pass `editors={...}` in `Site` where you serve one on an origin of its own ([ADR-0049](adr/0049-checking-a-native-file-out-and-in.md)). Empty by default |
 | `apps` | The origin mini apps run on: pass `apps=` in `Site` where you serve their sandbox, below. `null` by default, and apps are then shown as their label and summary |
+| `links` | Each connected app an integration brings, by its key, at its address, such as `{"tracker:plane": "http://127.0.0.1:8090/"}`: pass `links=` in `Site`. The admin opens it beside the integration's switch, and the palette lists it where the integration is on ([ADR-0088](adr/0088-connected-apps-opened-from-the-admin-and-the-palette.md)). Empty by default |
 | `origin` | The portal's own origin, where you pass `origin=` in `Site`; `null` by default, and the UIs then trust the address they are at ([ADR-0084](adr/0084-several-portal-origins-an-allow-list-aliases-and-a-union-policy.md)) |
-| `aliases` | Each other origin the portal is reached at, such as a tailnet name beside its loopback address, to the apps' origin and the editors beside it, `{"apps": ..., "editors": {...}}`: pass `aliases={extra: beside(portal, extra, apps=..., editors=...)}` in `Site`, and give `SandboxOrigin` and each `editor_app` every origin. The UIs use the place of the address they are at, and at one named nowhere say where to open the portal. Empty by default |
+| `aliases` | Each other origin the portal is reached at, such as a tailnet name beside its loopback address, to the apps' origin and the editors beside it, `{"apps": ..., "editors": {...}, "links": {...}}`: pass `aliases={extra: beside(portal, extra, apps=..., editors=..., links=...)}` in `Site`, and give `SandboxOrigin` and each `editor_app` every origin. The UIs use the place of the address they are at, and at one named nowhere say where to open the portal. Empty by default |
 | `brand` | The deployment's brand kit: its hash, identity, words, and where its stylesheet and marks are served. Pass `brand=Path(...)` in `Site` to point at a kit's folder ([lattice RFC-0007](../rfcs/0007-portalr-brand-kits.md)); it is read and checked as the site is made. `null` by default, for portalr's own look. The UIs draw the kit's mark and the product's name in the header, and its words when signing in; what a kit does not reach yet is listed in the RFC's "Not yet". `portalr brand init` starts a kit and `portalr brand validate` checks one: see [white-labelling the portal](guides/white-labelling.md) |
 
 ```python
@@ -204,7 +205,7 @@ from httpx import ASGITransport, AsyncClient
 
 async with AsyncClient(transport=ASGITransport(app=app), base_url="http://app") as client:
     config = (await client.get("/portalr/config.json")).json()
-    assert sorted(config) == ["aliases", "apps", "brand", "editors", "origin", "people", "readers", "replay", "supabase", "surfaces"]
+    assert sorted(config) == ["aliases", "apps", "brand", "editors", "links", "origin", "people", "readers", "replay", "supabase", "surfaces"]
     assert config["readers"]["tempo"] is False
     assert config["people"] is True
 ```

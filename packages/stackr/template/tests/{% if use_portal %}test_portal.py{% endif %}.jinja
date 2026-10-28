@@ -229,8 +229,9 @@ def test_the_links_are_read_from_the_environment() -> None:
     assert read('{"tracker:plane": "http://127.0.0.1:8090/"}') == {
         "tracker:plane": "http://127.0.0.1:8090/"
     }
-    with pytest.raises(ValueError, match="PORTAL_LINKS must be a JSON object"):
-        read("[]")
+    for wrong in ("[]", "{plane"):
+        with pytest.raises(ValueError, match="PORTAL_LINKS must be a JSON object"):
+            read(wrong)
 
 
 def test_the_portals_other_origins_need_its_own(script: Script, ui: Path) -> None:

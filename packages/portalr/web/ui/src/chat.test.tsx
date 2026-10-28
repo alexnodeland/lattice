@@ -1270,7 +1270,18 @@ test("where the pointer can't hover, a message's actions are a menu, which a lon
     </Messages>,
   );
   expect(screen.getByRole("button", { name: "Copy as Markdown" }).elements()).toHaveLength(0);
-  await screen.getByRole("button", { name: "Message actions" }).click();
+  // No "…" under every message (portalr ADR-0085): its button is a screen reader's alone, and
+  // nothing is drawn beneath the words.
+  const trigger = screen.getByRole("button", { name: "Message actions" });
+  const item = screen.getByRole("listitem").element();
+  const drawn = [...item.querySelectorAll("button")].filter(
+    (button) => button.closest(".sr-only") === null,
+  );
+  expect(getComputedStyle(trigger.element().closest(".sr-only") as Element).clipPath).not.toBe(
+    "none",
+  );
+  expect(drawn).toHaveLength(0);
+  trigger.element().dispatchEvent(new MouseEvent("click", { bubbles: true }));
   const menu = screen.getByRole("menu");
   await expect.element(menu.getByRole("menuitem", { name: "Copy as Markdown" })).toBeVisible();
   await menu.getByRole("menuitemcheckbox", { name: "Helpful" }).click();

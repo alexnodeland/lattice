@@ -113,7 +113,10 @@ export function ActionsMenu({
   items = [],
   open,
   onOpenChange,
+  unseen = false,
 }: {
+  /** Whether its button is for a screen reader alone, as where a long press opens it. */
+  unseen?: boolean;
   /** The menu's name, such as "Artifact actions". */
   label: string;
   given: Thumb | null;
@@ -127,32 +130,34 @@ export function ActionsMenu({
   const { pending, thumb, why } = useThumbs(onThumbs ?? NO_THUMBS);
   return (
     <div className="flex min-w-0 flex-col items-end gap-1">
-      <Menu
-        label={label}
-        icon={glyphs.more}
-        {...(open !== undefined && { open })}
-        {...(onOpenChange && { onOpenChange })}
-        items={[
-          ...items,
-          ...(onThumbs
-            ? [
-                // The one already given is given: choosing it again sends nothing.
-                {
-                  label: "Helpful",
-                  checked: given?.up === true,
-                  disabled: pending,
-                  onSelect: () => given?.up !== true && thumb(true),
-                },
-                {
-                  label: "Not helpful",
-                  checked: given?.up === false,
-                  disabled: pending,
-                  onSelect: () => given?.up !== false && thumb(false),
-                },
-              ]
-            : []),
-        ]}
-      />
+      <span className={unseen ? "sr-only" : "contents"}>
+        <Menu
+          label={label}
+          icon={glyphs.more}
+          {...(open !== undefined && { open })}
+          {...(onOpenChange && { onOpenChange })}
+          items={[
+            ...items,
+            ...(onThumbs
+              ? [
+                  // The one already given is given: choosing it again sends nothing.
+                  {
+                    label: "Helpful",
+                    checked: given?.up === true,
+                    disabled: pending,
+                    onSelect: () => given?.up !== true && thumb(true),
+                  },
+                  {
+                    label: "Not helpful",
+                    checked: given?.up === false,
+                    disabled: pending,
+                    onSelect: () => given?.up !== false && thumb(false),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </span>
       {onThumbs && why(given)}
     </div>
   );
@@ -325,7 +330,8 @@ export function Message({
       </div>
       <div
         className={cn(
-          "flex min-h-7 flex-wrap items-start gap-1",
+          "flex flex-wrap items-start gap-1",
+          !menu && "min-h-7",
           // Where the pointer hovers, the actions show as it rests on the message, or the keyboard
           // reaches them; the row keeps its height, so nothing moves. What was said stays shown.
           !sending &&
@@ -343,14 +349,18 @@ export function Message({
           <span className={TYPE.note}>Sending…</span>
         ) : menu ? (
           <>
-            <ActionsMenu
-              label="Message actions"
-              given={thumbs}
-              {...(onThumbs && { onThumbs })}
-              items={[{ label: "Copy as Markdown", onSelect: copy }]}
-              open={opened}
-              onOpenChange={setOpened}
-            />
+            {/* No glyph under every message (portalr ADR-0085): a long press opens the sheet;
+                the trigger is there for a screen reader alone. */}
+            <span className="sr-only">
+              <ActionsMenu
+                label="Message actions"
+                given={thumbs}
+                {...(onThumbs && { onThumbs })}
+                items={[{ label: "Copy as Markdown", onSelect: copy }]}
+                open={opened}
+                onOpenChange={setOpened}
+              />
+            </span>
             <span role="status" className="sr-only">
               {said}
             </span>

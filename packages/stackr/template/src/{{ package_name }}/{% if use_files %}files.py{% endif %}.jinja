@@ -9,7 +9,9 @@ native files are off: no route is mounted, and the agent has no tools for them.
 
 - ``/artifactr/v1/workspaces/{w}/files/...``: a file's head, check-out and check-in, and each
   version's bytes, words and pages, beside artifactr's routes
-- the agent's tools: ``read_native``, ``read_review``, ``find_commands`` and ``edit_native``
+- the agent's tools: ``create_native_file``, ``read_native``, ``read_review``, ``find_commands``
+  and ``edit_native``, and its instructions for them: that a file is made empty and written by its
+  edits, each a proposal a person reviews
 
 Each app is an integration of its own, ``files:<app>``, switched per workspace like any other.
 {%- if use_diagrams %}
@@ -87,6 +89,18 @@ TYPES: Final[Mapping[str, type[NativeFile]]] = {
 {%- endfor %}
 }
 """The native type each app keeps."""
+
+
+FILE_INSTRUCTIONS: Final = """\
+You can create files of any type `create_native_file` lists. Never say you can't create files.
+
+- A file is created empty: in the same turn, find its commands with `find_commands`, then put \
+its content in with `edit_native`, in as few batches as you can: each is a proposal a person \
+reviews.
+- Your edits of these files are proposals, in Ask and Auto alike: the file stays empty until a \
+person accepts one. Say the content waits for review, never that the file is written.
+"""
+"""What the agent is told of native files while any app runs."""
 
 
 def worker_url(craft: str) -> str:
@@ -221,6 +235,10 @@ class Files:
             )
 {%- endif %}
         return found
+
+    def instructions(self) -> list[str]:
+        """The agent's instructions for native files, while any app runs."""
+        return [FILE_INSTRUCTIONS] if self.native else []
 
     async def migrate(self, database: Database) -> None:
         """Upgrade the database to native files' tables, as its owner, even with no app running.

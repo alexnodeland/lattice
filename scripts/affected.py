@@ -13,7 +13,8 @@ every project that depends on one, all the way down, from moon's project graph, 
 task in each that has it.
 
 A task in ONE_AT_A_TIME runs in one project after another, rather than all at once. Otherwise
-the projects tagged BROWSER run theirs first, in a `moon run` of their own, and then the rest.
+the projects tagged BROWSER run theirs first, each in a `moon run` of its own, one after
+another, and then the rest together.
 """
 
 import argparse
@@ -30,7 +31,9 @@ ONE_AT_A_TIME = frozenset({"bdd"})
 
 # The projects whose tests run in Chromium. Chromium fails every request it has in flight when a
 # network interface comes or goes, as a container's does when another project's tests start or
-# stop one, and a test file's import failed with ERR_NETWORK_CHANGED (#254). So they run apart.
+# stop one, and a test file's import failed with ERR_NETWORK_CHANGED (#254). So they run apart:
+# and one at a time, as three Chromium suites on one runner made every browser test two to four
+# times slower, and a phone test past its 15 s (#875).
 BROWSER = "browser"
 
 
@@ -50,13 +53,13 @@ def batches(task: str, targets: list[str], browser: Collection[str] = ()) -> lis
     """How a task's targets run, each batch its own `moon run`, one after another.
 
     Each alone if the task is in ONE_AT_A_TIME; otherwise those of the projects in `browser`
-    first, and then the rest.
+    first, each alone, and then the rest together.
     """
     if task in ONE_AT_A_TIME:
         return [[target] for target in targets]
     first = [target for target in targets if target.split(":")[0] in browser]
     rest = [target for target in targets if target not in first]
-    return [batch for batch in (first, rest) if batch]
+    return [[target] for target in first] + ([rest] if rest else [])
 
 
 def targets_of(

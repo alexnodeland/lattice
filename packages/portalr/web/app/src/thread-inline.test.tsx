@@ -3,7 +3,8 @@
  * ADR-0055): a note, with its full view; a form, sent from the thread as the reader; a native
  * file, a page at a time, its outline and its words, a workbook's cells, its download, and, where
  * its app is off or its routes aren't served, read only or its manifest alone; and a file whose
- * app's build hands it over, edited in its editor framed in the thread, each save checked in.
+ * app's build hands it over, edited in its editor framed in the thread, each save checked in. A
+ * file made blank whose content waits in a proposal says only that it was created.
  */
 
 import { afterEach, expect, test, vi } from "vitest";
@@ -11,7 +12,7 @@ import { userEvent } from "vitest/browser";
 import DIAGRAM from "../../ui/csp/diagram.json";
 import { open } from "./test/app";
 import { AT, FLAGS, PNG, Upload } from "./test/files";
-import { kindName } from "./thread-artifact";
+import { blankOf, kindName } from "./thread-artifact";
 
 const THREAD = "/t/acme/w/notes/threads/thr_1";
 const AGENT = { kind: "agent", thread_id: "thr_1", run_id: "run_1" };
@@ -97,7 +98,51 @@ const DATA: Record<string, readonly [string, Record<string, unknown>]> = {
   doc_1: ["word_document", manifest("brief.docx", DOCX, "Brief\nFees", 3)],
   book_1: ["workbook", manifest("figures.xlsx", XLSX, "Costs (A1:B3)\nPlan", null)],
   book_2: ["workbook", manifest("budget.xlsx", XLSX, "Budget", null)],
+  blank_1: [
+    "word_document",
+    { ...manifest("brief.docx", DOCX, "", 1), provenance: { source: "blank", app: "wordcraft" } },
+  ],
 };
+
+/** The agent's proposal of `doc`'s content, at `seq`, and, if given, its resolution after it. */
+const proposing = (seq: number, doc: string, decision?: "accept" | "reject") => [
+  logged(seq, {
+    type: "proposal_created",
+    proposal_id: "prop_1",
+    thread_id: "thr_1",
+    run_id: "run_1",
+    rationale: null,
+    change: {
+      type: "edit_artifact",
+      artifact_id: doc,
+      base_version: 1,
+      summary: "Write the brief",
+      patch: {
+        kind: "json_patch",
+        ops: [
+          { op: "test", path: "/content/sha256", value: "a".repeat(64) },
+          { op: "replace", path: "/provenance", value: { source: "commands" } },
+        ],
+      },
+    },
+  }),
+  ...(decision
+    ? [
+        logged(
+          seq + 1,
+          {
+            type: "proposal_resolved",
+            proposal_id: "prop_1",
+            artifact_id: doc,
+            thread_id: "thr_1",
+            decision,
+            proposed_by: AGENT,
+          },
+          ALICE,
+        ),
+      ]
+    : []),
+];
 
 /** A file's status, as native files' routes answer it. */
 const statusOf = (id: string, overrides: Record<string, unknown> = {}) => {
@@ -299,6 +344,47 @@ test("an untitled artifact is named by its kind", async () => {
   });
   const entry = screen.getByRole("listitem", { name: "Submission" });
   await expect.element(entry.getByText("Soup")).toBeVisible();
+});
+
+test("a file is blank as its app made it, and only then", () => {
+  expect(blankOf({ provenance: { source: "blank" } })).toBe(true);
+  expect(blankOf({ provenance: { source: "commands" } })).toBe(false);
+  expect(blankOf({ provenance: "blank" })).toBe(false);
+  expect(blankOf({})).toBe(false);
+});
+
+test("a file made blank whose content waits in a proposal says it was created, not its blank pages", async () => {
+  const { screen } = await open(THREAD, serving(), undefined, {
+    artifactrLog: [...thread([["blank_1", "word_document"]]), ...proposing(4, "blank_1")],
+  });
+  const file = screen.getByRole("listitem", { name: "brief.docx" });
+  await expect.element(file.getByText("Word document", { exact: true })).toBeVisible();
+  await expect.element(file.getByText(/^Created\. Its content waits in a proposal/)).toBeVisible();
+  await expect.element(file.getByRole("link", { name: "Open its page" })).toBeVisible();
+  expect(file.getByRole("img").elements()).toHaveLength(0);
+  expect(file.getByRole("button", { name: "Download" }).elements()).toHaveLength(0);
+  expect(file.getByRole("button", { name: "Full view" }).elements()).toHaveLength(0);
+  // The proposal itself is where it is accepted.
+  const proposal = screen.getByRole("region", { name: "Proposal: Write the brief" });
+  await expect.element(proposal.getByRole("button", { name: "Accept" })).toBeVisible();
+});
+
+test("a file made blank is read as it is once no proposal waits on it", async () => {
+  const { screen } = await open(THREAD, serving(), undefined, {
+    artifactrLog: [...thread([["blank_1", "word_document"]]), ...proposing(4, "blank_1", "reject")],
+  });
+  const file = screen.getByRole("listitem", { name: "brief.docx" });
+  await expect.element(file.getByRole("img", { name: "Page 1 of 1" })).toBeVisible();
+  expect(file.getByText(/^Created\./).elements()).toHaveLength(0);
+});
+
+test("a file with content is read as it is while a proposal waits on it", async () => {
+  const { screen } = await open(THREAD, serving(), undefined, {
+    artifactrLog: [...thread([["doc_1", "word_document"]]), ...proposing(4, "doc_1")],
+  });
+  const file = screen.getByRole("listitem", { name: "brief.docx" });
+  await expect.element(file.getByRole("img", { name: "Page 1 of 3" })).toBeVisible();
+  expect(file.getByText(/^Created\./).elements()).toHaveLength(0);
 });
 
 test("a native file is read a page at a time, with its outline and words, and downloaded", async () => {

@@ -60,7 +60,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0052](0052-artifacts-inline-in-their-thread.md) | Artifacts inline in their thread, a mini app first | Accepted |
 | [0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) | The chat's questions, tool calls, sides, failures and streaming | Accepted, amended by 0079, 0080, 0081 and 0083 |
 | [0054](0054-readable-revisions.md) | Readable revisions: per kind, in parts, one preview running | Accepted |
-| [0055](0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md) | Every kind inline in its thread, and a native file read and edited there | Accepted, amended by 0084 |
+| [0055](0055-every-kind-inline-and-a-native-file-read-and-edited-in-its-thread.md) | Every kind inline in its thread, and a native file read and edited there | Accepted, amended by 0084 and 0088 |
 | [0056](0056-brand-kits-token-layers-loading-and-validation.md) | Brand kits: three token layers, a kit loaded per deployment, and validation in Python | Accepted |
 | [0057](0057-brand-kits-motion-and-tokens-as-the-only-override.md) | Brand kits: a motion system with guard rails, and tokens as the only override | Accepted |
 | [0058](0058-a-new-version-offered-to-a-stale-tab.md) | A new version offered to a stale tab | Accepted |
@@ -93,5 +93,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0085](0085-polish-one-shape-per-part-and-what-is-folded.md) | Polish: one shape per part, and what is folded | Accepted |
 | [0086](0086-the-composer-chooses-the-model-of-the-next-turn.md) | The composer chooses the model of the next turn | Accepted |
 | [0087](0087-a-command-first-layout-a-top-bar-a-palette-a-table-and-a-split-view.md) | A command-first layout: a top bar, a palette, a table and a split view | Accepted |
+| [0088](0088-a-file-made-blank-says-it-was-created-until-its-content-is-accepted.md) | A file made blank says it was created, until its content is accepted | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

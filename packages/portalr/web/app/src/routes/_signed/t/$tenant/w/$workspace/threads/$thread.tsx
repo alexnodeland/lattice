@@ -301,6 +301,11 @@ function Chat() {
     (run) => run.threadId === id && (run.status === "running" || run.status === "paused"),
   );
   const proposed = Object.values(proposals).filter((proposal) => proposal.threadId === id);
+  /** How many open proposals would change an artifact. */
+  const waitingOn = (artifact: string) =>
+    Object.values(proposals).filter(
+      (proposal) => proposal.status === "open" && proposedOn(proposal) === artifact,
+    ).length;
   // The artifacts made here whose kind the thread shows, each once, where it was made.
   const inline = Object.values(artifacts).filter(
     (artifact) => artifact.threadId === id && rendererFor(artifact.kind, RENDERERS).inline,
@@ -498,6 +503,7 @@ function Chat() {
                   workspace={workspace}
                   artifact={entry.artifact}
                   fired={firedOf(Object.values(proposals), entry.artifact.id)}
+                  waiting={waitingOn(entry.artifact.id)}
                   {...(entry.superseded && { superseded: entry.superseded })}
                 />
               );
@@ -688,6 +694,7 @@ function Chat() {
               tenant={tenant}
               workspace={workspace}
               artifact={beside}
+              waiting={waitingOn(beside.id)}
             />
           </ul>
         )}

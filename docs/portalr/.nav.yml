@@ -99,6 +99,7 @@ nav:
   - adr/0085-polish-one-shape-per-part-and-what-is-folded.md
   - adr/0086-the-composer-chooses-the-model-of-the-next-turn.md
   - adr/0087-a-command-first-layout-a-top-bar-a-palette-a-table-and-a-split-view.md
+  - adr/0088-a-file-made-blank-says-it-was-created-until-its-content-is-accepted.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

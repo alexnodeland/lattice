@@ -4,7 +4,9 @@
  * its own page and, but for an app, which has its own, a full view. A mini app runs there, as the
  * person viewing the thread, under the kill switch; a form is sent from there, as that person; and
  * a native file is read there a page at a time, and checked out, or edited, as on its page. An
- * app runs in its newest card in the thread alone; one before it says which version it was.
+ * app runs in its newest card in the thread alone; one before it says which version it was. A
+ * native file an agent made blank, whose content waits in a proposal, says only that it was
+ * created until the proposal is accepted (portalr ADR-0088).
  */
 
 import type { Artifactr } from "@portalr/client";
@@ -35,6 +37,16 @@ export function kindName(kind: string, data: Readonly<Record<string, unknown>>):
   return NATIVE.has(kind) && factsOf(data).type !== "File" ? factsOf(data).type : kindWords(kind);
 }
 
+/** Whether a native file is as its app made it blank, before anything was written to it. */
+export function blankOf(data: Readonly<Record<string, unknown>>): boolean {
+  const { provenance } = data;
+  return (
+    typeof provenance === "object" &&
+    provenance !== null &&
+    (provenance as Readonly<Record<string, unknown>>).source === "blank"
+  );
+}
+
 /** Words written as capitals in a kind's name. */
 const CAPITALS: Readonly<Record<string, string>> = { pdf: "PDF", cad: "CAD", svg: "SVG" };
 
@@ -53,6 +65,7 @@ export function ThreadArtifact({
   me,
   superseded,
   fired = null,
+  waiting = 0,
 }: {
   context: Context;
   tenant: string;
@@ -64,6 +77,8 @@ export function ThreadArtifact({
   superseded?: number;
   /** What a rule's preview found, from the proposal that made it, where one said. */
   fired?: string | null;
+  /** How many open proposals would change it. */
+  waiting?: number;
 }) {
   const { queries } = context;
   const apps = useAppHost(context, tenant, workspace);
@@ -86,6 +101,21 @@ export function ThreadArtifact({
   // Where a native file puts its download, in the header beside its page and its full view,
   // once it is read and served (portalr ADR-0061).
   const [actions, setActions] = useState<HTMLElement | null>(null);
+  if (native && latest && waiting > 0 && blankOf(latest.data)) {
+    // Its blank pages would read as what the agent made: until its content is accepted, the card
+    // says it was made, and the proposal says what it would hold (portalr ADR-0088).
+    return (
+      <InlineArtifact name={name} open={open}>
+        <p className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-muted text-xs">{kindName(latest.kind, latest.data)}</span>
+          <span className="break-words font-semibold text-fg text-sm">{name}</span>
+        </p>
+        <p className="text-muted text-sm">
+          Created. Its content waits in a proposal in this thread: accept it to see the file here.
+        </p>
+      </InlineArtifact>
+    );
+  }
   return (
     <InlineArtifact
       name={name}

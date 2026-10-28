@@ -85,6 +85,8 @@ The thread shows what each kind's page shows, as far as a message can hold it: i
 
 > **Amended (2026-10-28):** a mini app is shown again beneath each `update_app` call that updated it, so the thread carries the app where it changed, not only where it was made. The call's row stays above it, folded, as `create_app`'s does, with its arguments and result; beneath it the same card as where the app was made, at its latest version, through the same renderer, frame and apps' origin (ADR-0051). Only a call that returned "Done: <id> is now at version N." for an app the workspace holds is shown so: one running, failed, refused, or only proposed is a call, as any other. An app runs in its newest card in the thread alone, at its latest version, so a thread read later shows what the app is now; each card before it shows the app's name and the version it made, with no frame, and says a newer version runs below. The result's words are artifactr's `describe_outcome`, cut by `_clip`: one cut short is a call alone.
 
+> **Amended (2026-10-28) by [ADR-0088](0088-a-file-made-blank-says-it-was-created-until-its-content-is-accepted.md):** a native file whose latest version is blank, as its app made it, with an open proposal to change it, is drawn as a card that says it was created and points to the proposal, with no page, download, editor or full view; once no proposal waits on it, it is drawn as before.
+
 ## Action items
 
 1. [x] `inline` on every kit renderer; `InlineArtifact`'s kind and full view; `useFullView`.

@@ -17,6 +17,7 @@ from typing import Protocol
 import pytest
 from sqlalchemy import URL, make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.pool import QueuePool
 
 from artifactr.sql import create_sqlite_engine, migrate
 
@@ -55,10 +56,17 @@ class Database:
         cancelled partway leaves it, would be collected later, failing whichever test runs
         then, and on PostgreSQL holding its transaction's locks on the schema meanwhile.
         """
-        checked_out = [engine.pool.checkedout() for engine in self.engines]  # pyright: ignore[reportAttributeAccessIssue]
+        checked_out = [_checked_out(engine) for engine in self.engines]
         for engine in self.engines:
             await engine.dispose()
         assert not any(checked_out), f"connections left checked out: {checked_out}"
+
+
+def _checked_out(engine: AsyncEngine) -> int:
+    """How many of the engine's connections are checked out of its pool."""
+    pool = engine.pool
+    assert isinstance(pool, QueuePool), f"a pool that counts its connections, not {pool}"
+    return pool.checkedout()
 
 
 @asynccontextmanager

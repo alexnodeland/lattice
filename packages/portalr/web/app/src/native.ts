@@ -12,6 +12,10 @@ export interface Native {
   readonly integration: IntegrationKey;
 }
 
+/** A value's fields, if it is an object, or none: a manifest's or a patch's part, read safely. */
+export const fields = (value: unknown): Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null ? (value as Readonly<Record<string, unknown>>) : {};
+
 /** A manifest's text blob's digest, if it names one. */
 const textOf = (data: Readonly<Record<string, unknown>>): string | null => {
   const text = data.text;

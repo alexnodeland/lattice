@@ -108,7 +108,10 @@ async def test_every_type_is_created_blank_and_then_edited_by_proposal(kind: str
     name = (await ws.get(NativeFile, file.id)).data.name
     noun = TYPES[kind].noun or f"a {kind.replace('_', ' ')}"
     assert script.tool_returns(1) == [
-        f"Created {file.id}: {noun} named {name}, at version 1. Edit it with edit_native."
+        f"Created {file.id}: {noun} named {name}, at version 1. "
+        "It is empty: edit it with edit_native. An edit that is proposed waits for a "
+        "person's review, and the file stays empty until it is accepted, so tell the person "
+        "it waits for review."
     ]
     assert script.tool_returns(2)[0].startswith("Proposed as ")
     assert (file.kind, file.version) == (kind, 1), "the edit waits for review"

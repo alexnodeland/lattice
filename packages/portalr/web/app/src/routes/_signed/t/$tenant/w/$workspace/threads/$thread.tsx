@@ -301,6 +301,13 @@ function Chat() {
     (run) => run.threadId === id && (run.status === "running" || run.status === "paused"),
   );
   const proposed = Object.values(proposals).filter((proposal) => proposal.threadId === id);
+  /** The thread's open proposals that would change an artifact: the first, to review in order. */
+  const waitingOn = (artifact: string) => {
+    const open = proposed.filter(
+      (proposal) => proposal.status === "open" && proposedOn(proposal) === artifact,
+    );
+    return open[0] ? { first: open[0].id, count: open.length } : null;
+  };
   // The artifacts made here whose kind the thread shows, each once, where it was made.
   const inline = Object.values(artifacts).filter(
     (artifact) => artifact.threadId === id && rendererFor(artifact.kind, RENDERERS).inline,
@@ -498,6 +505,7 @@ function Chat() {
                   workspace={workspace}
                   artifact={entry.artifact}
                   fired={firedOf(Object.values(proposals), entry.artifact.id)}
+                  waiting={waitingOn(entry.artifact.id)}
                   {...(entry.superseded && { superseded: entry.superseded })}
                 />
               );
@@ -585,6 +593,8 @@ function Chat() {
       {proposed.map((proposal) => (
         <ProposalCard
           key={proposal.id}
+          // Where a file created blank links to the change that fills it.
+          id={`proposal-${proposal.id}`}
           proposal={proposal}
           onRespond={(decision) =>
             stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision })
@@ -688,6 +698,7 @@ function Chat() {
               tenant={tenant}
               workspace={workspace}
               artifact={beside}
+              waiting={waitingOn(beside.id)}
             />
           </ul>
         )}

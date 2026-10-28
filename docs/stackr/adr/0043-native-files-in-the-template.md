@@ -88,7 +88,7 @@ Three things settled the shape:
   - the release's licence files, and each notice `CRAFTS` declares, PdfCraft's OCR models' attribution and licences among them, are in the image;
   - a request without its token is refused;
   - the worker runs the app at its pinned version;
-  - a new file is made, read back as the app's format, and rendered (FreeCAD and FigCraft are given a shape first);
+  - a new file is made, read back as the app's format, and rendered (FreeCAD and FigCraft are given a shape first, FilmCraft a sequence and EffectCraft a composition, each with a title);
   - a zip whose one part inflates to 1 GiB, a file past the 256 MiB limit and bytes of no format each end within the deadline, in a typed failure. The zip is a bomb to an app whose files are zips; one whose files aren't (PDF, DXF, PSD, SVG, FreeCAD's) refuses it at its first bytes, so for those it shows only that refusal, and their own hostile files are each app's corpus's ([files ADR-0011](../../artifactr/files/adr/0011-a-gate-for-each-app.md)'s second action item).
 - **That nothing outlives a call:** a `sleep` its user started in a session of its own, a file in `/tmp` and a directory sealed with mode 000 holding a file, each seen there before the probe's calls, are gone after them.
 - **Each editor's shim** has `frame-ancestors` naming the portal it was given.

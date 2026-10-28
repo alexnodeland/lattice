@@ -8,7 +8,13 @@ SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
 def solid(width: int, height: int, rgb: bytes) -> bytes:
-    """A `width` by `height` PNG, every pixel the 3-byte colour `rgb`."""
+    """A `width` by `height` PNG, every pixel the 3-byte colour `rgb`.
+
+    Raises:
+        ValueError: If `rgb` isn't three bytes.
+    """
+    if len(rgb) != 3:
+        raise ValueError(f"a colour is three bytes, not {len(rgb)}")
 
     def chunk(kind: bytes, data: bytes) -> bytes:
         body = kind + data

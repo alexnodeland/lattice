@@ -30,8 +30,8 @@ LISTED: Final = re.compile(
 )
 """A line of `list_commands`: its id, `*` if undoable, label, menu, shortcut and parameters."""
 
-EMPTY: Final = "refused: the current page is empty: nothing to render"
-"""How FigCraft's `screenshot` refuses a page with no layers, as `AppFailed` words it."""
+EMPTY: Final = "the current page is empty: nothing to render"
+"""How FigCraft's `screenshot` refuses a page with no layers: its own words, seen on 0.6.0."""
 
 BACKGROUND: Final = re.compile(r"#(?P<rgb>[0-9A-Fa-f]{6})(?:[0-9A-Fa-f]{2})?")
 """A page's background, `#RRGGBB` or `#RRGGBBAA`; a blank page is drawn opaque, as a canvas is."""
@@ -89,18 +89,21 @@ class Subprocess(ToolsDialect):
         """Go to the page, from 1, and draw it, its longer side at most `PREVIEW` times `scale`.
 
         A page with nothing on it has no bounds, so FigCraft refuses to draw it. It is drawn as
-        what is there, its background: a square of the largest side a drawn page could have,
-        since a canvas page has no size of its own. A blank design is new, not damaged.
+        what is there, its background: a square of side `PREVIEW` times `scale`, at most
+        `PREVIEW`, since a canvas page has no size of its own and a blank one no detail. A blank
+        design is new, not damaged.
         """
         await server.call("run_command", command="page.select", params={"index": page - 1})
         side = max(1, round(PREVIEW * scale))
         try:
             return await server.png("screenshot", maxSize=side)
         except AppFailed as failed:
-            if str(failed) != EMPTY:
+            if failed.failure != "refused" or str(failed) != f"refused: {EMPTY}":
                 raise
         design = _Design.model_validate(await server.json("inspect_document", allPages=True))
-        return solid(side, side, _rgb(design.pages[page - 1].background))
+        shown = design.pages[page - 1].background if page <= len(design.pages) else ""
+        blank = min(side, PREVIEW)
+        return solid(blank, blank, _rgb(shown))
 
     @override
     async def find(self, server: Server, query: str) -> Sequence[CommandSpec]:

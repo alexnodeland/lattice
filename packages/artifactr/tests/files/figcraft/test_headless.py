@@ -14,11 +14,12 @@ from pathlib import Path
 import pytest
 
 from artifactr.files.app import App, AppCommand, AppFailed
+from artifactr.files.app.png import SIGNATURE, solid
 from artifactr.files.figcraft import Subprocess
 from artifactr.files.manifest import FIGCRAFT
 
 FAKE = Path(__file__).with_name("fake_cli.py")
-PNG = b"\x89PNG\r\n\x1a\n"
+PNG = SIGNATURE
 
 
 @pytest.fixture
@@ -102,6 +103,15 @@ async def test_a_blank_page_is_drawn_as_its_background_not_refused(figcraft: Sub
     odd = AppCommand(name="page.background", args={"color": "transparent"})
     unknown = (await figcraft.apply(None, [odd], deadline=20)).content
     assert pixels(await figcraft.render(unknown, 1, scale=0, deadline=20)) == (1, 1, b"\xff" * 3)
+    assert pixels(await figcraft.render(blank, 1, scale=8, deadline=20))[:2] == (1024, 1024)
+    gone = AppCommand(name="page.unlisted", args={})
+    unlisted = (await figcraft.apply(None, [gone], deadline=20)).content
+    assert pixels(await figcraft.render(unlisted, 1, scale=0, deadline=20)) == (1, 1, b"\xff" * 3)
+
+
+def test_a_colour_is_three_bytes() -> None:
+    with pytest.raises(ValueError, match="three bytes, not 4"):
+        solid(1, 1, b"\x00" * 4)
 
 
 async def test_it_finds_ten_commands_at_most_from_its_lines(figcraft: Subprocess) -> None:

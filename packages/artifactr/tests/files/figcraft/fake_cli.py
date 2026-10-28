@@ -52,6 +52,8 @@ def main() -> None:
                 design["comments"].append(
                     {"id": len(design["comments"]) + 1, "text": params["text"]}
                 )
+            elif step["command"] == "page.unlisted":
+                design["unlisted"] = True
             elif step["command"] == "page.background":
                 design["background"] = params["color"]
             else:
@@ -80,7 +82,7 @@ def main() -> None:
                 "children": [frame] if depth > 1 else [],
             }
         ]
-        return replied({"pages": pages})
+        return replied({"pages": [] if design.get("unlisted") else pages})
 
     @server.tool()
     async def run_command(command: str, params: dict[str, Any] | None = None) -> CallToolResult:

@@ -12,6 +12,7 @@ import zipfile
 import pytest
 
 from artifactr.files.app import AppCommand, AppFailed
+from artifactr.files.app.png import SIGNATURE
 from artifactr.files.figcraft import Subprocess
 from artifactr.files.manifest import FIGCRAFT
 from tests.files.corpus.figcraft.corpus import CORPUS
@@ -64,13 +65,13 @@ async def test_what_figcraft_cant_do_is_refused(figcraft: Subprocess) -> None:
 
 async def test_it_draws_a_canvas_page(figcraft: Subprocess) -> None:
     png = await figcraft.render(CORPUS.source("frames"), 1, scale=0.25, deadline=DEADLINE)
-    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+    assert png.startswith(SIGNATURE)
 
 
 async def test_a_blank_design_draws_its_page_as_its_background(figcraft: Subprocess) -> None:
     blank = (await figcraft.apply(None, [], deadline=DEADLINE)).content
     png = await figcraft.render(blank, 1, scale=0.25, deadline=DEADLINE)
-    assert png.startswith(b"\x89PNG\r\n\x1a\n")
+    assert png.startswith(SIGNATURE)
     assert png[16:24] == bytes.fromhex("0000010000000100")
 
 

@@ -23,6 +23,7 @@ import artifactr.files
 from artifactr.agent import ArtifactWorkspace, Session
 from artifactr.core import UserActor
 from artifactr.files.app import AppCommand
+from artifactr.files.app.png import SIGNATURE
 from artifactr.files.blobs import InMemoryBlobs
 from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.craft import CRAFTS
@@ -155,6 +156,6 @@ async def test_a_blank_file_is_created_opens_and_its_first_edit_is_proposed(app:
         # Its first page, as a person's preview asks for it, if the blank file has one.
         if CRAFTS[app].render and made.data.pages:
             png = await files.render(ws, file.id, 1)
-            assert png.startswith(b"\x89PNG\r\n\x1a\n")
+            assert png.startswith(SIGNATURE)
     finally:
         await worker.aclose()

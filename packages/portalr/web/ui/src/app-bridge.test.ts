@@ -3,6 +3,7 @@ import {
   APP_BOOT,
   APP_ERROR,
   APP_STARTED,
+  APP_STOPPED,
   applyPatch,
   Bridge,
   type BridgeHost,
@@ -549,6 +550,36 @@ test("an app's reports reach the page, at most eight a frame, and count against 
   expect(reports[0]).toEqual({ method: APP_ERROR, params: { kind: "error", message: "boom 0" } });
   expect(posted).toEqual([]);
   expect(started()).toBe(11);
+});
+
+test("an error's stack is kept to 400 characters, and whether the app stopped to a word", () => {
+  expect(
+    readReport(APP_ERROR, {
+      kind: "error",
+      message: "TypeError: x",
+      stack: `step@about:srcdoc:1:2\n${"y".repeat(500)}`,
+    })?.params.stack,
+  ).toBe(`step@about:srcdoc:1:2 ${"y".repeat(378)}`);
+  expect(readReport(APP_STOPPED, { stopped: "yes", frames: 3 })).toEqual({
+    method: APP_STOPPED,
+    params: { stopped: "yes" },
+  });
+  expect(readReport(APP_STOPPED, { stopped: "<script>" })?.params.stopped).toBe("<sc");
+});
+
+test("whether the app stopped passes, with its error, however many reports came before", async () => {
+  const { hear, reports } = bridged();
+  for (let each = 0; each < 12; each += 1) {
+    await hear(reported(APP_ERROR, { kind: "error", message: `noise ${each}` }));
+  }
+  await hear(
+    reported(APP_STOPPED, { stopped: "yes", message: "TypeError: fatal", stack: "loop@x" }),
+  );
+  expect(reports).toHaveLength(MOST_REPORTS + 1);
+  expect(reports.at(-1)).toEqual({
+    method: APP_STOPPED,
+    params: { stopped: "yes", message: "TypeError: fatal", stack: "loop@x" },
+  });
 });
 
 test("an app flooding its reports is quieted like any other message", async () => {

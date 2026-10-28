@@ -11,6 +11,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Alert } from "../alert";
 import {
   APP_BOOT,
+  APP_ERROR,
+  APP_STOPPED,
   Bridge,
   CALLS_A_MINUTE,
   type JsonObject,
@@ -129,12 +131,42 @@ function reportLine({ method, params }: Report, frame: Element, container: numbe
     const { width, height } = frame.getBoundingClientRect();
     return `boot: ${said.join(" ")} outer=${width}x${height} container=${container}`;
   }
-  if (params.message === "Script error.") {
+  if (method === APP_STOPPED) {
+    return params.stopped === "yes"
+      ? "stopped: no frame came in the 2 s after an error"
+      : "running: frames came after an error";
+  }
+  if (params.message === MASKED) {
     return "error: the app threw an error; this browser doesn't say which";
   }
   const where = params.source ? ` at ${params.source}:${params.line ?? 0}` : "";
   const refused = params.blocked ? ` (${params.blocked})` : "";
   return `${params.kind ?? "error"}: ${params.message ?? ""}${where}${refused}`;
+}
+
+/** What WebKit says of an error thrown by a callback the sandbox couldn't wrap. */
+const MASKED = "Script error.";
+
+/**
+ * The app's latest error, as it said it, its line in the report, and whether a frame loop that ran
+ * before it stopped: `true` only where the sandbox saw one stop, never inferred here.
+ */
+type Fault = {
+  readonly message: string;
+  readonly stack: string;
+  readonly line: string;
+  readonly stopped: boolean;
+};
+
+/**
+ * A sentence to hand the assistant: what the app did, and its error, the app's own text. Nothing
+ * is sent: the person pastes it where they choose.
+ */
+function forAssistant({ message, stopped }: Fault): string {
+  const did = stopped ? "The app froze after an error" : "The app threw an error";
+  return message === MASKED
+    ? `${did} that the browser didn't name. Please find the cause and fix it.`
+    : `${did}: ${message.replace(/\.$/, "")}. Please find the cause and fix it.`;
 }
 
 /** A question open, and how its answer, yes or no, reaches the bridge. */
@@ -210,6 +242,9 @@ export function Running({
   // What the app's document reported went wrong, and whether it drew nothing: shown, never kept.
   const [problems, setProblems] = useState<readonly string[]>([]);
   const [blank, setBlank] = useState(false);
+  // The app's latest error, and whether a copy of it for the assistant was made or must be by hand.
+  const [fault, setFault] = useState<Fault | null>(null);
+  const [copied, setCopied] = useState<"done" | "by hand" | null>(null);
   // The app's latest look at what it drew, shown quietly under it once said.
   const [boot, setBoot] = useState<string | null>(null);
   const [run, setRun] = useState({ html: app.html, count: 0 });
@@ -273,6 +308,8 @@ export function Running({
     setProblems([]);
     setBlank(false);
     setBoot(null);
+    setFault(null);
+    setCopied(null);
     time(); // a frame that never loads is timed too
     const { id } = head.current.shown;
     const kept = new StateKeeper(
@@ -329,6 +366,39 @@ export function Running({
             }
             return;
           }
+          const { kind, message, stack, stopped } = report.params;
+          // The error a stopped loop died of comes with the word that it stopped, so no report
+          // before it can crowd it out; a later error, as a tap on the broken game, isn't it.
+          const said = (now: Fault | null, line: string): Fault =>
+            message === undefined || now?.message === message
+              ? { ...(now as Fault), stopped: stopped === "yes" }
+              : {
+                  message: String(message),
+                  stack: String(stack ?? ""),
+                  line,
+                  stopped: stopped === "yes",
+                };
+          if (report.method === APP_STOPPED) {
+            const errorLine = reportLine(
+              { method: APP_ERROR, params: { kind: "error", message: message ?? "" } },
+              element,
+              0,
+            );
+            setFault((now) => (now === null && message === undefined ? now : said(now, errorLine)));
+            return;
+          }
+          if (kind === "error" || kind === "rejection") {
+            setFault((now) =>
+              now?.stopped
+                ? now
+                : {
+                    message: String(message ?? ""),
+                    stack: String(stack ?? ""),
+                    line,
+                    stopped: false,
+                  },
+            );
+          }
           setProblems((now) => (now.includes(line) ? now : [...now, line]));
         },
       },
@@ -372,6 +442,24 @@ export function Running({
   }, [element, host, origin]);
 
   const again = () => setRun({ ...run, count: run.count + 1 });
+  // The sentence to copy by hand, selected once as it is shown, never again on a later render.
+  const byHand = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (copied === "by hand" && byHand.current !== null) {
+      getSelection()?.selectAllChildren(byHand.current);
+    }
+  }, [copied]);
+  // What the card says isn't said again in the report under it.
+  const listed = problems.filter((line) => line !== fault?.line);
+  const looked = fault === null ? boot : null;
+  const copy = async (sentence: string) => {
+    try {
+      await navigator.clipboard.writeText(sentence);
+      setCopied("done");
+    } catch {
+      setCopied("by hand"); // no clipboard here, as over plain HTTP: the sentence is selected instead
+    }
+  };
   const settle = (yes: boolean) => {
     open.current?.settle(yes);
     open.current = null;
@@ -465,16 +553,54 @@ export function Running({
           </span>
         </Alert>
       )}
-      {(problems.length > 0 || boot !== null) && (
+      {fault !== null && (
+        <Alert tone={fault.stopped ? "error" : "warn"}>
+          <span className="flex flex-col items-start gap-2">
+            <span className="font-medium">
+              {fault.stopped ? "The app stopped after an error" : "The app reported an error"}
+            </span>
+            <code className="break-words font-mono text-xs">
+              {fault.message === MASKED ? "This browser doesn't say which error." : fault.message}
+            </code>
+            {(fault.stack || boot) && (
+              <details className="text-muted text-xs">
+                <summary className="min-h-(--disclosure-target) cursor-pointer">Details</summary>
+                <ul className="flex flex-col gap-1 break-words font-mono">
+                  {fault.stack && <li>{fault.stack}</li>}
+                  {boot && <li>{boot}</li>}
+                </ul>
+              </details>
+            )}
+            <span className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={again}>
+                Reload app
+              </Button>
+              <Button variant="secondary" onClick={() => copy(forAssistant(fault))}>
+                Copy the error for the assistant
+              </Button>
+            </span>
+            <span aria-live="polite" className="text-muted text-xs">
+              {copied === "done" && "Copied. Paste it into your message to the assistant."}
+              {copied === "by hand" && "This browser didn't let the page copy. Copy this instead:"}
+            </span>
+            {copied === "by hand" && (
+              <span ref={byHand} className="text-xs">
+                {forAssistant(fault)}
+              </span>
+            )}
+          </span>
+        </Alert>
+      )}
+      {(listed.length > 0 || looked !== null) && (
         <details className="text-muted text-xs">
           <summary>
-            {problems.length > 0 ? "The app reported a problem" : "What the app reported"}
+            {listed.length > 0 ? "The app reported a problem" : "What the app reported"}
           </summary>
           <ul className="mt-1 flex flex-col gap-1 break-all font-mono">
-            {problems.map((line) => (
+            {listed.map((line) => (
               <li key={line}>{line}</li>
             ))}
-            {boot !== null && <li>{boot}</li>}
+            {looked !== null && <li>{looked}</li>}
           </ul>
         </details>
       )}

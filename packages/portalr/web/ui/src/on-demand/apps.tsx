@@ -116,11 +116,15 @@ function hostContext(within: Element, displayMode: DisplayMode): JsonObject {
   };
 }
 
-/** A report as one line of plain text: what it says, where, and what its policy refused. */
-function reportLine({ method, params }: Report): string {
+/**
+ * A report as one line of plain text: what it says, where, and what its policy refused. A look at
+ * what the app drew ends with the size of its frame in the page, `outer`.
+ */
+function reportLine({ method, params }: Report, frame: Element): string {
   if (method === APP_BOOT) {
     const said = Object.entries(params).map(([name, value]) => `${name}=${value}`);
-    return `boot: ${said.join(" ")}`;
+    const { width, height } = frame.getBoundingClientRect();
+    return `boot: ${said.join(" ")} outer=${width}x${height}`;
   }
   if (params.message === "Script error.") {
     return "error: the app threw an error; this browser doesn't say which";
@@ -297,7 +301,7 @@ export function Running({
         },
         reported: (report) => {
           // For the browser's own console, where a person debugging the app looks; nothing else.
-          const line = reportLine(report);
+          const line = reportLine(report, element);
           console.warn(`[app-frame] ${line}`);
           if (report.method === APP_BOOT) {
             setBoot(line);

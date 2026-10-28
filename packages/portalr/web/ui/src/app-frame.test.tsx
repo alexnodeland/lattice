@@ -389,12 +389,14 @@ test("what an app reports went wrong is shown as plain text under it, and said i
   const frame = await frameIn(screen);
   fromFrame(frame, { method: APP_BOOT, params: { drawn: "something", canvases: 1 } });
   await vi.waitFor(() =>
-    expect(warned).toHaveBeenCalledWith("[app-frame] boot: drawn=something canvases=1"),
+    expect(warned).toHaveBeenCalledWith(
+      expect.stringMatching(/^\[app-frame\] boot: drawn=something canvases=1 outer=[\d.]+x[\d.]+$/),
+    ),
   );
   expect(screen.getByText("The app reported a problem").query()).toBeNull();
   const looked = screen.getByText("What the app reported");
   await looked.click();
-  await expect.element(screen.getByText("boot: drawn=something canvases=1")).toBeVisible();
+  await expect.element(screen.getByText(/^boot: drawn=something canvases=1 outer=/)).toBeVisible();
   expect(screen.getByText(DREW_NOTHING, { exact: false }).query()).toBeNull();
   const message = "<b>boom</b> \u202eevil";
   fromFrame(frame, {

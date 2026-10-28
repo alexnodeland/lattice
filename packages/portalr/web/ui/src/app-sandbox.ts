@@ -291,7 +291,7 @@ export function startSandbox(scope: Window): void {
   let app: HTMLIFrameElement | null = null;
   scope.addEventListener("message", (event) => {
     if (app !== null && event.source === app.contentWindow) {
-      const text = relayed(event.data);
+      const text = relayed(sized(scope, app, event.data));
       if (text !== null) {
         scope.parent.postMessage(text, host);
       }
@@ -302,6 +302,9 @@ export function startSandbox(scope: Window): void {
     }
     if (app === null) {
       app = framed(scope.document, event.data);
+      if (app !== null) {
+        fit(scope, app);
+      }
       return;
     }
     if (isObject(event.data) && event.data.method === RESOURCE_READY) {
@@ -325,10 +328,53 @@ function framed(document: Document, data: unknown): HTMLIFrameElement | null {
   frame.setAttribute("sandbox", APP_SANDBOX);
   frame.setAttribute("referrerpolicy", "no-referrer");
   frame.title = isString(title) ? title : "An app";
-  frame.style.cssText = "display:block;width:100%;height:100%;border:0";
+  // Placed against the window, not sized by percentages of a body iOS may lay out at nothing.
+  frame.style.cssText = "position:absolute;inset:0;width:100%;height:100%;border:0";
   frame.srcdoc = appDocument(html);
   document.body.append(frame);
   return frame;
+}
+
+/**
+ * The app's frame sized to the sandbox's window in pixels, now and whenever the window changes:
+ * on iOS a frame sized by percentages alone was laid out at 0 by 0, and an app that fits its
+ * canvas to its window drew nothing to see. A window measured at 0 leaves the frame placed
+ * against it, `inset: 0`, rather than sized to nothing.
+ */
+export function fit(scope: Window, frame: HTMLIFrameElement): void {
+  const root = scope.document.documentElement;
+  const size = () => {
+    const width = root.clientWidth || scope.innerWidth;
+    const height = root.clientHeight || scope.innerHeight;
+    frame.style.width = width > 0 ? `${width}px` : "100%";
+    frame.style.height = height > 0 ? `${height}px` : "100%";
+  };
+  size();
+  scope.addEventListener("resize", size);
+  frame.addEventListener("load", size);
+  const Observer = (scope as Window & { ResizeObserver?: typeof ResizeObserver }).ResizeObserver;
+  if (Observer) {
+    new Observer(size).observe(root);
+  }
+}
+
+/**
+ * The app's look at what it drew, with the sandbox's window and the app's frame as laid out, so a
+ * blank frame says which of them was at nothing. They are the sandbox's: an app's own are replaced.
+ */
+function sized(scope: Window, frame: HTMLIFrameElement, data: unknown): unknown {
+  if (!isObject(data) || data.method !== APP_BOOT || !isObject(data.params)) {
+    return data;
+  }
+  const { width, height } = frame.getBoundingClientRect();
+  const params = {
+    ...data.params,
+    sandboxWidth: scope.innerWidth,
+    sandboxHeight: scope.innerHeight,
+    frameWidth: width,
+    frameHeight: height,
+  };
+  return { ...data, params };
 }
 
 /** What the app sent, as JSON text within `MOST_MESSAGE`; null for what can't be, dropped. */

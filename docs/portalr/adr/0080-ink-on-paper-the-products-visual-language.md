@@ -82,3 +82,5 @@ A phone is a first target, not a narrowing of the desktop. The fundamentals are 
 - Easier: every page inherits the look from the default kit's tokens and the kit's components; a kit of its own re-skins the same anatomy.
 - A deployment on the default kit changes colour. The kit contract holds; the inventory gains two rows (`component.feedback.duration` and `.ease`) and a size (`font.size.3xl`), the schema and the example kits follow, and the validator's rules are unchanged but for the selection's share, 22% to 30%, which base.css mixes the same way (`test_brand_kit.py` holds both).
 - Every screenshot baseline moves with the paper, and the computed-style snapshots with every colour.
+
+> **Amended (2026-10-28) by [ADR-0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md)'s amendment:** a run's calls are no longer a boxed "N steps" group, open while it runs: they are one quiet line in plain words, closed until the reader opens it.

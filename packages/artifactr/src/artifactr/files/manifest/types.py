@@ -102,6 +102,13 @@ class Provenance(BaseModel):
     commands: Blob | None = None
     """The batch of commands that made it, as canonical JSON."""
 
+    agent: str | None = None
+    """The agent that asked for it, as a participant, when a blank file is committed as the
+    person the agent's run acts for: the revision's actor is the person."""
+
+    run_id: str | None = None
+    """That agent's run."""
+
 
 class NativeFile(Artifact, abstract=True):
     """A file in a native format: its manifest. Subclass it once per format.

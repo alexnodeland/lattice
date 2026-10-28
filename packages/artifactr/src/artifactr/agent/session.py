@@ -7,6 +7,7 @@ from pydantic_ai import ModelMessage, ModelMessagesTypeAdapter
 
 from artifactr.core import (
     AgentActor,
+    ArtifactId,
     ExternalAgentActor,
     MessageId,
     RunId,
@@ -84,6 +85,12 @@ class Session[AppDepsT]:
     )
     """What each of the run segment's model requests used, oldest first, as the capability
     counts them: recorded with the segment's end, however it ends (ADR-0096)."""
+
+    made: set[ArtifactId] = field(
+        default_factory=set[ArtifactId], init=False, repr=False, compare=False
+    )
+    """The artifacts the run segment's tools made as the person it acts for, which its watcher
+    doesn't tell it of as the person's: a tool adds an id before it commits."""
 
     @property
     def on_behalf_of(self) -> UserActor | ExternalAgentActor | None:

@@ -6,11 +6,18 @@ refusal told in a sentence.
 from collections.abc import Iterator, Sequence
 
 import pytest
-from pydantic_ai import Agent, ModelMessage, ModelRequest, ModelResponse, ToolReturnPart
+from pydantic_ai import (
+    Agent,
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    ToolReturnPart,
+    UserPromptPart,
+)
 from pydantic_ai.capabilities import AbstractCapability, Instrumentation
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
-from artifactr.agent import ArtifactWorkspace, Session
+from artifactr.agent import ArtifactWorkspace, Runner, Session
 from artifactr.core import Actor, Thread, UserActor, artifact_types
 from artifactr.files.app import AppCommand, AppFailed, FakeApp
 from artifactr.files.app import Applied as Made
@@ -19,7 +26,7 @@ from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.manifest import DXF, Drawing, NativeFile, WordDocument
 from artifactr.files.native import NativeFiles, Pace
 from artifactr.files.tools import native_file_tools
-from artifactr.telemetry.attributes import ARTIFACT_ID
+from artifactr.telemetry.attributes import ARTIFACT_ID, RUN_ID, USER_ID
 from artifactr.workspace import Access, Authorize, InMemoryStorage, Workspace, Workspaces
 from tests.agent.conftest import Script, call, say
 from tests.files.conftest import Switch
@@ -65,8 +72,10 @@ async def run(
     await agent.run("Go.", deps=Session.start(ws, thread.id, app=None, on_behalf_of=person))
 
 
-def create(kind: str = "word_document", title: str = "Trip") -> ModelResponse:
-    return call("create_native_file", type=kind, title=title)
+def create(
+    kind: str = "word_document", title: str = "Trip", call_id: str = "call_1"
+) -> ModelResponse:
+    return call("create_native_file", call_id, type=kind, title=title)
 
 
 def edit_what_was_created(messages: list[ModelMessage]) -> ModelResponse:
@@ -136,7 +145,10 @@ async def test_the_file_is_marked_on_its_tools_span(recorder: Recorder) -> None:
     await run(files, ws, thread, Script(create(), say("Done.")), recorder=recorder)
     [file] = await ws.artifacts(NativeFile)
     [span] = [s for s in recorder.spans() if s.name == "execute_tool create_native_file"]
-    assert attributes(span)[ARTIFACT_ID] == file.id
+    marked = attributes(span)
+    assert marked[ARTIFACT_ID] == file.id
+    assert marked[USER_ID] == "alice", "the person it is committed as"
+    assert marked[RUN_ID], "and the agent's run that asked"
 
 
 @pytest.mark.parametrize(
@@ -161,7 +173,7 @@ async def test_the_file_is_marked_on_its_tools_span(recorder: Recorder) -> None:
             "shortly.",
         ),
     ],
-    ids=["a-worker-down", "a-craft-with-no-blank-file", "busy"],
+    ids=["a-worker-crashed", "a-craft-with-no-blank-file", "busy"],
 )
 async def test_an_app_that_cant_make_it_is_told(
     app: FakeApp, readings: int | None, told: str
@@ -198,7 +210,7 @@ async def test_a_workspace_past_its_quota_is_told() -> None:
 async def test_an_agent_past_its_pace_is_told_when_to_try_again() -> None:
     files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp(), pace=Pace(1))
     ws, thread = await opened()
-    script = Script(create(title="One"), create(title="Two"), say("Done."))
+    script = Script(create(title="One"), create(title="Two", call_id="call_2"), say("Done."))
     await run(files, ws, thread, script)
     [paced] = script.tool_returns(2)
     assert paced.startswith("A Word document wasn't created: too many files are being made: ")
@@ -235,3 +247,79 @@ async def test_a_blank_project_with_no_page_is_still_created() -> None:
     [file] = await ws.artifacts(NativeFile)
     assert script.tool_returns(1)[0].startswith(f"Created {file.id}: a video project named")
     assert (await ws.get(NativeFile, file.id)).data.pages == 0
+
+
+async def test_a_worker_past_its_deadline_is_told() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp(fails="timeout"))
+    ws, thread = await opened()
+    script = Script(create(), say("Done."))
+    await run(files, ws, thread, script)
+    assert script.tool_returns(1)[0].startswith(
+        "The app that makes a Word document is unavailable now: timeout:"
+    )
+
+
+async def test_a_call_retried_makes_one_file_and_spends_no_pace_or_quota() -> None:
+    blobs = InMemoryBlobs(workspace_quota=Quota(files=1))
+    files = NativeFiles(blobs, InMemoryCheckouts(), FakeApp(), pace=Pace(1))
+    ws, thread = await opened()
+    script = Script(create(), create(), say("Done."))
+    await run(files, ws, thread, script)
+    [file] = await ws.artifacts(NativeFile)
+    first, again = script.tool_returns(1)[0], script.tool_returns(2)[0]
+    assert first == again
+    assert first.startswith(f"Created {file.id}: ")
+
+
+async def test_a_run_creates_only_so_many_files() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp())
+    ws, thread = await opened()
+    script = Script(*(create(title=f"T{i}", call_id=f"c{i}") for i in range(3)), say("Done."))
+    agent = Agent(
+        script.model,
+        deps_type=Session[None],
+        toolsets=[native_file_tools(files, creates=2)],
+        capabilities=[ArtifactWorkspace(types=[WordDocument])],
+    )
+    await agent.run("Go.", deps=Session.start(ws, thread.id, app=None, on_behalf_of=ALICE))
+    assert script.tool_returns(3) == [
+        "You have created 2 files in this run: create no more until asked."
+    ]
+    assert len(await ws.artifacts(NativeFile)) == 2
+
+
+async def test_a_hostile_title_is_kept_as_a_safe_name() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp())
+    ws, thread = await opened()
+    title = "../../etc/pa\x07ss\u202ewd\\" + "é" * 400 + ".exe"
+    await run(files, ws, thread, Script(create(title=title), say("Done.")))
+    [file] = await ws.artifacts(NativeFile)
+    name = (await ws.get(NativeFile, file.id)).data.name
+    assert name.endswith(".docx")
+    assert not any(c in name for c in "/\\\x07\u202e")
+    assert len(name) <= 200
+
+
+async def test_the_run_isnt_told_of_its_own_file_as_its_persons() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp())
+    ws, thread = await opened()
+    script = Script(create(), say("Done."))
+    agent = Agent(
+        script.model,
+        deps_type=Session[None],
+        toolsets=[native_file_tools(files)],
+        capabilities=[ArtifactWorkspace(types=[WordDocument])],
+    )
+    runner = Runner(agent, app=None)
+    handle = (await runner.send(ws, thread.id, "Make a document")).run
+    assert handle is not None
+    await handle.wait()
+    await runner.drain()
+    told = [
+        part.content
+        for message in script.requests[1]
+        if isinstance(message, ModelRequest)
+        for part in message.parts
+        if isinstance(part, UserPromptPart)
+    ]
+    assert not any("created" in str(words) for words in told)

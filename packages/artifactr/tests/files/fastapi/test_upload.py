@@ -44,7 +44,15 @@ from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.fastapi import files_router
 from artifactr.files.fastapi.router import Body, Meter, TooSlow
 from artifactr.files.manifest import DOCX, NativeFile, WordDocument
-from artifactr.files.native import CREATE_NATIVE_FILE, FORMATS, Format, Gauge, NativeFiles, Pace
+from artifactr.files.native import (
+    CREATE_NATIVE_FILE,
+    FORMATS,
+    Format,
+    Gauge,
+    NativeFiles,
+    Pace,
+    Paced,
+)
 from artifactr.files.native.formats import PROJECT
 from artifactr.files.worker import Limits, Worker, worker_app
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces, integration_gate
@@ -422,9 +430,18 @@ def test_the_pace_and_places_native_files_carry_are_the_routers_and_an_agents_fi
     world = world_of(per_minute=20, at_once=8, pace=pace, gauge=gauge)
     assert world.upload(FakeApp.file("1")).status_code == 201
     agent = AgentActor(thread_id="t1", run_id="r1", on_behalf_of=UserActor(id="alice"))
-    asyncio.run(world.files.create(world.ws.as_actor(agent), WordDocument, "Trip"))
+
+    async def exhaust() -> None:
+        ws = world.ws.as_actor(agent)
+        await world.files.create(ws, WordDocument, "Trip")
+        with pytest.raises(Paced):
+            await world.files.create(ws, WordDocument, "Again")
+
+    asyncio.run(exhaust())
     refused = world.upload(FakeApp.file("2"))
-    assert (refused.status_code, refused.json()["detail"]["type"]) == (429, "rate_limited")
+    detail = refused.json()["detail"]
+    assert (refused.status_code, detail["type"]) == (429, "rate_limited")
+    assert detail["message"] == f"try again in {detail['retry_after']} seconds"
     with gauge.held(("acme", "user:bob")) as held:
         assert held
         refused = world.upload(FakeApp.file("3"), user="bob")

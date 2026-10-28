@@ -415,25 +415,33 @@ class NativeFiles:
         file_type: type[F],
         name: str,
         *,
+        artifact_id: ArtifactId | None = None,
         thread_id: ThreadId | None = None,
-    ) -> Applied | Proposed:
-        """Create a blank native file of a type, as its app makes one, under a new id.
+    ) -> Applied | Proposed | None:
+        """Create a blank native file of a type, as its app makes one, under an id or a new one.
 
         It is how an agent starts a file to edit (native files ADR-0019). The handle's actor must
         be allowed `artifactr:create_native_file` and `artifactr:create_artifact`, asked before
         anything else. The app makes the file from nothing, `apply` of no commands, in one of
         the tenant's readings, and its format is the one the app names, or the type's only one.
-        The name keeps no path or control character, and takes the format's extension.
+        The name keeps no path or control character, and takes the format's extension. Given
+        the id of a file of this type that is there, it makes nothing, before the app is called
+        or the pace spent, so a call retried after it succeeded makes one file.
 
         An agent's run commits it as the person it acts for, so it is applied, not proposed,
         whatever the type's write policy, and is held to their pace and share of places, as
-        their uploads are: the provenance, `blank`, records that the app made it. The agent's
-        edits of it then follow the policy. A run that acts for no one commits it as
-        itself, and one for a person's client as the client, each under the policy.
+        their uploads are: the provenance, `blank`, records that the app made it, and the agent
+        and its run that asked. The agent's edits of it then follow the policy. A run that acts
+        for no one commits it as itself, and one for a person's client as the client, each
+        under the policy.
+
+        Returns:
+            The new file's outcome, or None if a file of this type has this id already.
 
         Raises:
             Forbidden: If the actor may not create a native file, or an artifact.
             NotEnabled: If the app's integration is off in the workspace.
+            AlreadyExists: If an artifact with this id exists, and isn't a file of this type.
             Paced: If the actor is past their pace, or this process holds every place.
             Busy: If the tenant has as many files being read as it may.
             AppFailed: If the app can't make a blank file: `refused` if it makes none.
@@ -444,6 +452,12 @@ class NativeFiles:
         await ws.check(Access(action=CREATE_NATIVE_FILE))
         await ws.check(Access(action=CREATE_ARTIFACT))
         app = await self._switched_on(ws, file_type)
+        if artifact_id is not None and artifact_id in (await ws.hidden()).artifacts:
+            raise AlreadyExists("artifact", artifact_id)
+        if artifact_id is not None and (made := await _existing(ws, artifact_id)):
+            if not isinstance(made.data, file_type):
+                raise AlreadyExists("artifact", artifact_id)
+            return None
         committer = _creator(ws)
         with self._admitted(committer):
             async with self._turn(ws.tenant_id):
@@ -453,9 +467,16 @@ class NativeFiles:
                 raise TooLarge(most)
             known = self._formats.get(media_type)
             name = file_name(name, "" if known is None else known.extension, self._formats)
-            artifact_id = new_artifact_id()
+            artifact_id = artifact_id or new_artifact_id()
+            asked = ws.actor
+            via = asked if committer is not ws and isinstance(asked, AgentActor) else None
             made = Provenance(
-                source="blank", app=app.name, app_version=app.version, build=app.build
+                source="blank",
+                app=app.name,
+                app_version=app.version,
+                build=app.build,
+                agent=None if via is None else via.participant,
+                run_id=None if via is None else via.run_id,
             )
             manifest = await self._stored(
                 ws,

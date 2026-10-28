@@ -8,6 +8,7 @@ import pytest
 from artifactr.core import (
     Actor,
     AgentActor,
+    AlreadyExists,
     Applied,
     ExternalAgentActor,
     Forbidden,
@@ -15,6 +16,7 @@ from artifactr.core import (
     Proposed,
     UserActor,
     ValidationFailed,
+    Visibility,
 )
 from artifactr.files.app import AppCommand, AppFailed
 from artifactr.files.blobs import InMemoryBlobs, OverQuota, Quota, TooLarge
@@ -55,6 +57,7 @@ async def test_an_agents_file_is_applied_for_its_person_and_its_edit_proposed(
     assert (head.data.name, head.data.content.media_type) == ("Travel plan.docx", DOCX)
     provenance = head.data.provenance
     assert (provenance.source, provenance.app, provenance.base) == ("blank", "fake", None)
+    assert (provenance.agent, provenance.run_id) == (AGENT.participant, "r1"), "who asked"
     assert (await ws.revisions(made.artifact_id))[0].actor == ALICE
     assert await files.read(ws, made.artifact_id, part="text") == b""
     edit = [AppCommand(name="add_paragraph", args={"text": "Day one"})]
@@ -64,7 +67,35 @@ async def test_an_agents_file_is_applied_for_its_person_and_its_edit_proposed(
 
 async def test_a_person_creates_one_directly_too() -> None:
     ws, files = await workspace(ALICE), NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), Naming())
-    assert isinstance(await files.create(ws, WordDocument, "Notes"), Applied)
+    made = await files.create(ws, WordDocument, "Notes")
+    assert isinstance(made, Applied)
+    provenance = (await ws.get(WordDocument, made.artifact_id)).data.provenance
+    assert (provenance.agent, provenance.run_id) == (None, None), "no agent asked"
+
+
+async def test_a_create_retried_by_its_id_makes_one_file_and_spends_nothing() -> None:
+    ws, app = await workspace(), Naming()
+    blobs = InMemoryBlobs(workspace_quota=Quota(files=1))
+    files = NativeFiles(blobs, InMemoryCheckouts(), app, pace=Pace(1))
+    assert isinstance(await files.create(ws, WordDocument, "Trip", artifact_id="a1"), Applied)
+    assert await files.create(ws, WordDocument, "Trip", artifact_id="a1") is None
+    assert app.made == 1, "the app isn't asked again, nor the pace or the quota spent"
+    with pytest.raises(AlreadyExists):
+        await files.create(ws, Drawing, "Plan", artifact_id="a1")
+
+
+async def test_an_id_taken_by_a_hidden_file_is_refused_as_a_taken_one_is() -> None:
+    async def hide(_t: str, _w: str, actor: Actor) -> Visibility:
+        return Visibility(artifacts=frozenset({"a1"} if actor == AGENT else ()))
+
+    workspaces = Workspaces(InMemoryStorage(), hidden=hide)
+    app = Naming()
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), app)
+    alice = await workspaces.open("acme", "w1", actor=ALICE)
+    await files.create(alice, WordDocument, "Trip", artifact_id="a1")
+    with pytest.raises(AlreadyExists):
+        await files.create(alice.as_actor(AGENT), WordDocument, "Trip", artifact_id="a1")
+    assert app.made == 1
 
 
 @pytest.mark.parametrize(

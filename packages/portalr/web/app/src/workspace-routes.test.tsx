@@ -384,11 +384,12 @@ test("the palette lists the connected apps grantr says are on, and opens each in
   const field = screen.getByRole("combobox", { name: "Search or go to" });
   await field.fill("plane");
   await expect
-    .element(screen.getByRole("option", { name: "Open Plane" }))
+    .element(screen.getByRole("option", { name: /^Open Plane\b.*opens in a new tab$/ }))
     .toHaveAttribute("aria-selected", "true");
   await userEvent.keyboard("{Enter}");
   expect(opened).toHaveBeenCalledWith("http://127.0.0.1:8090/", "_blank", "noopener,noreferrer");
-  await expect.element(field).not.toBeInTheDocument();
+  // The palette closes as it opens the app.
+  await expect.poll(() => document.querySelector('[role="combobox"]')).toBeNull();
   opened.mockRestore();
 });
 

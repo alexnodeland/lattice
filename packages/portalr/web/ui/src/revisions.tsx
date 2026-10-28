@@ -269,6 +269,28 @@ function Changes({ changed }: { changed: readonly Changed[] }) {
   );
 }
 
+/**
+ * What a proposed edit would change, part by part, as a revision's Changes say it: the version it
+ * was made against beside what it would make, both through `renderer`.
+ */
+export function ProposedChanges({
+  before,
+  after,
+  renderer,
+  compare,
+}: {
+  before: Data;
+  after: Data;
+  renderer: Renderer;
+  compare: Compare;
+}) {
+  const changed = useMemo(
+    () => changedParts({ renderer, data: after, before: { renderer, data: before } }, compare),
+    [before, after, renderer, compare],
+  );
+  return <Changes changed={changed ?? []} />;
+}
+
 type Tab = "preview" | "source" | "changes";
 
 const TAB =

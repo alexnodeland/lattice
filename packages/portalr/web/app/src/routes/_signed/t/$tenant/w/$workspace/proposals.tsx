@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { NativeProposal } from "../../../../../../files";
 import { NATIVE } from "../../../../../../native";
+import { RuleProposal } from "../../../../../../rule-proposal";
 import { titlesOf } from "../../../../../../titles";
 import { Connection, useStream, useWorkspace } from "../../../../../../workspace";
 
@@ -73,6 +74,11 @@ function Proposals() {
           ) : (
             <ProposalCard key={proposal.id} proposal={proposal} onRespond={onRespond}>
               {link}
+              <RuleProposal
+                proposal={proposal}
+                kind={artifact ? snapshot.state.artifacts[artifact]?.kind : undefined}
+                place={{ context, tenant, workspace }}
+              />
             </ProposalCard>
           );
         })}

@@ -1,6 +1,7 @@
 /**
- * A rule's page reads as a person reads a rule, When and Then first, with its JSON folded beneath
- * (portalr ADR-0085).
+ * A rule's page reads as a person reads a rule, the pipeline it runs, stage by stage, with its JSON
+ * folded beneath, or, for a stored rule one may change, in the field that edits it (portalr
+ * ADR-0017, ADR-0085).
  */
 
 import { afterEach, expect, test, vi } from "vitest";
@@ -29,31 +30,61 @@ const serving = (rules: Record<string, string>) => async (request: Request, path
 const TRIAGE =
   '{"name":"triage","description":"Sort a ticket.","when":{"filter":{"kind":"on","types":["portal:ticket.opened"]},"pattern":{"kind":"each"}},"scope":{"fields":["ticket"]},"then":{"action":"triage","params":{"to":"oncall"}},"retry":{"max_attempts":3},"start":"beginning","enabled":false}';
 
-test("a rule says when it fires and what it does, in words, its JSON folded under them", async () => {
+/** What a stage of the rule's pipeline says. */
+const stage = (screen: Awaited<ReturnType<typeof open>>["screen"], name: string) =>
+  screen
+    .getByRole("list", { name: "The rule, stage by stage" })
+    .getByText(name, { exact: true })
+    .element().nextElementSibling?.textContent;
+
+test("a code rule is shown as its pipeline, its JSON folded under it", async () => {
   const { screen } = await open("/t/acme/w/notes/rules/triage", serving({ triage: TRIAGE }));
-  const term = (name: string) =>
-    screen.getByText(name, { exact: true }).element().nextElementSibling;
-  await expect.element(screen.getByText("portal:ticket.opened, each")).toBeVisible();
-  expect(term("Then")?.textContent).toBe('triage {"to":"oncall"}');
-  expect(term("For each")?.textContent).toBe("ticket");
-  expect(term("Retries")?.textContent).toBe("up to 3 attempts");
-  expect(term("Starts")?.textContent).toBe("from the log's beginning");
-  expect(term("State")?.textContent).toBe("Disabled");
-  const json = screen.getByRole("button", { name: "The rule, as reflexr's JSON" });
+  await expect.element(screen.getByText("portal:ticket.opened", { exact: true })).toBeVisible();
+  expect(stage(screen, "event types")).toBe("portal:ticket.opened");
+  expect(stage(screen, "pattern")).toBe("each event");
+  expect(stage(screen, "scope")).toBe("per ticket");
+  expect(stage(screen, "action")).toBe('triageto: "oncall"');
+  expect(stage(screen, "retries")).toMatch(/^up to 3 attempts/);
+  expect(stage(screen, "more")).toBe('start: "beginning"');
+  await expect.element(screen.getByText("Disabled", { exact: true })).toBeVisible();
+  const json = screen.getByRole("button", { name: "The rule, as JSON" });
   await expect.element(json).toHaveAttribute("aria-expanded", "false");
   await json.click();
-  await expect.element(screen.getByText(/"max_attempts": 3/)).toBeVisible();
+  const folded = screen.getByRole("region", { name: "rule's JSON" });
+  await expect.element(folded).toBeVisible();
+  expect(folded.element().textContent).toContain("max_attempts 3");
 });
 
-test("a rule of another shape says its condition as JSON, and the defaults it leaves", async () => {
+test("a rule of another shape shows that part as JSON, in its place, and the defaults it leaves", async () => {
   const tidy = '{"name":"tidy","when":{"all":[]},"then":{"action":"notify"}}';
   const { screen } = await open("/t/acme/w/notes/rules/tidy", serving({ tidy }));
-  await expect.element(screen.getByText('{"all":[]}')).toBeVisible();
-  const term = (name: string) =>
-    screen.getByText(name, { exact: true }).element().nextElementSibling;
-  expect(term("Then")?.textContent).toBe("notify");
-  expect(term("For each")?.textContent).toBe("the whole workspace");
-  expect(term("Retries")?.textContent).toBe("up to 5 attempts");
-  expect(term("Starts")?.textContent).toBe("from now on");
-  expect(term("State")?.textContent).toBe("Enabled");
+  await expect.element(screen.getByText("when.all: []")).toBeVisible();
+  expect(stage(screen, "action")).toBe("notify");
+  expect(stage(screen, "scope")).toBe("one scope");
+  expect(stage(screen, "retries")).toMatch(/^up to 5 attempts/);
+  expect(stage(screen, "more")).toBe("when.all: []");
+  await expect.element(screen.getByText("Enabled", { exact: true })).toBeVisible();
+});
+
+test("a stored rule shows its pipeline above the field that edits its JSON", async () => {
+  const stored = async (request: Request, path: string) => {
+    if (path === "/grantr/v1/checks") {
+      const asked: unknown[] = await request.json();
+      return Response.json(asked.map(() => true));
+    }
+    if (path.endsWith("/rules/triage")) {
+      return new Response(`{"origin":"stored","version":2,"rule":${TRIAGE}}`, {
+        headers: { "content-type": "application/json" },
+      });
+    }
+    return path.startsWith("/grantr/v1/tenants/acme/") ? Response.json([]) : undefined;
+  };
+  const { screen } = await open("/t/acme/w/notes/rules/triage", stored);
+  await expect.element(screen.getByText("per ticket")).toBeVisible();
+  const field = screen.getByRole("textbox", { name: "Rule, as reflexr's JSON" });
+  await expect.element(field).toBeVisible();
+  const pipeline = screen.getByRole("list", { name: "The rule, stage by stage" }).element();
+  expect(
+    pipeline.compareDocumentPosition(field.element()) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
 });

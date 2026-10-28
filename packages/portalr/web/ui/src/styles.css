@@ -41,6 +41,8 @@
  * would cover most of the page, so the composer's dock stays in the flow (`short:static`).
  */
 @custom-variant short (@media (max-height: 30rem));
+/* The smallest phones, 360 pixels and under: the app's bar names the workspace alone (portalr ADR-0087). */
+@custom-variant tiny (@media (max-width: 22.5rem));
 
 /*
  * A sheet (portalr ADR-0082): what floats, sitting along the bottom of the window on a phone, the

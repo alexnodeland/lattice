@@ -305,7 +305,7 @@ function Threads() {
               <Icon icon={glyphs.search} />
               Search or go to…
             </Button>
-            <Button aria-label="New thread" onClick={compose}>
+            <Button aria-label="Start a thread" onClick={compose}>
               <Icon icon={glyphs.plus} />
             </Button>
           </div>

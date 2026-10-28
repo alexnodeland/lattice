@@ -1,6 +1,6 @@
 /**
  * On a phone, a narrow window with a finger for a pointer, the threads page's foot is a band of
- * the search and New thread, never the composer over the list; and the last thread, scrolled to,
+ * the search and Start a thread, never the composer over the list; and the last thread, scrolled to,
  * sits above the band, uncovered (portalr ADR-0087).
  */
 
@@ -33,13 +33,13 @@ for (const width of [320, 393, 430, 768]) {
     const { screen } = await open("/t/acme/w/notes", serve, () => null, { artifactrLog: LOG });
     const band = screen.getByRole("button", { name: "Search or go to…" });
     await expect.element(band).toBeVisible();
-    await expect.element(screen.getByRole("button", { name: "New thread" })).toBeVisible();
+    await expect.element(screen.getByRole("button", { name: "Start a thread" })).toBeVisible();
     expect(screen.getByRole("textbox", { name: "Message" }).query()).toBeNull();
     window.scrollTo(0, document.documentElement.scrollHeight);
     const last = screen.getByRole("link", { name: "Thread 0" }).element().getBoundingClientRect();
     const foot = band.element().getBoundingClientRect();
     expect(last.bottom).toBeLessThanOrEqual(foot.top);
-    await screen.getByRole("button", { name: "New thread" }).click();
+    await screen.getByRole("button", { name: "Start a thread" }).click();
     await expect.element(screen.getByRole("textbox", { name: "Message" })).toHaveFocus();
   });
 }

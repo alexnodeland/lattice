@@ -5,7 +5,7 @@
 
 import type { Artifactr } from "@portalr/client";
 import { expect, onTestFinished, test, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { axeViolations } from "./test/axe";
 import { RunSteps } from "./tool-call";
@@ -62,4 +62,18 @@ test("the line opens a sheet of the calls, which goes on to a call and back, and
   await userEvent.keyboard("{Escape}");
   await expect.element(sheet).not.toBeInTheDocument();
   await expect.element(line).toHaveFocus();
+});
+
+test("on a phone a tap opens the sheet, never the unfurl, even just after the window changed", async () => {
+  onTestFinished(() => page.viewport(414, 896));
+  await page.viewport(900, 800);
+  const screen = await render(
+    <ul>
+      <RunSteps tools={[["resized_1", tool("fetch", "ok", '{"url": "a"}', "ok")]]} />
+    </ul>,
+  );
+  await page.viewport(393, 852);
+  await screen.getByRole("button", { name: "Fetched a page: 1 tool call" }).click();
+  await expect.element(screen.getByRole("dialog", { name: "Fetched a page" })).toBeVisible();
+  expect(document.querySelectorAll("li > ol[aria-label='Tool calls']")).toHaveLength(0);
 });

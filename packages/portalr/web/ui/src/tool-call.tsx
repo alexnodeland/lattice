@@ -23,7 +23,7 @@ import { SheetHandle, sheet, useSheet } from "./sheet";
 import { RING } from "./states";
 import { StatusBadge, type Tone } from "./status-badge";
 import { callAbout, callLabel, foldSummary } from "./tool-fold";
-import { usePhone } from "./touch";
+import { phoneNow, usePhone } from "./touch";
 import { TYPE } from "./type";
 
 /** How a call is going, as a shape and a word, by the status its run recorded. */
@@ -342,12 +342,16 @@ const opened = new Map<string, boolean>();
 export function RunSteps({ tools }: { tools: readonly (readonly [string, Artifactr.Tool])[] }) {
   const key = tools[0]?.[0] ?? "";
   const phone = usePhone();
-  // A sheet is never opened again by itself, as the thread is shown again: only an unfurl is.
-  const [open, setOpenState] = useState(() => !phone && (opened.get(key) ?? false));
-  const setOpen = (next: boolean) => {
-    if (!phone) opened.set(key, next);
-    setOpenState(next);
+  // How it is open, chosen at the tap from what the window is then: beneath, or a sheet. Only an
+  // unfurl is kept, so a sheet is never opened again by itself as the thread is shown again.
+  const [shown, setShown] = useState<"list" | "sheet" | null>(() =>
+    opened.get(key) ? "list" : null,
+  );
+  const show = (next: "list" | "sheet" | null) => {
+    opened.set(key, next === "list");
+    setShown(next);
   };
+  const open = shown !== null;
   const button = useRef<HTMLButtonElement>(null);
   const panel = useId();
   const calls = tools.map(([, tool]) => tool);
@@ -369,7 +373,7 @@ export function RunSteps({ tools }: { tools: readonly (readonly [string, Artifac
         aria-expanded={open}
         {...(phone ? { "aria-haspopup": "dialog" as const } : { "aria-controls": panel })}
         aria-label={`${label}${marker}: ${count}`}
-        onClick={() => setOpen(!open)}
+        onClick={() => show(open ? null : phoneNow() ? "sheet" : "list")}
         className={cn(
           "flex min-h-(--disclosure-target) max-w-full cursor-pointer items-center gap-1.5 self-start rounded-(--disclosure-radius) text-muted text-xs hover:text-fg phone:min-h-11",
           RING,
@@ -387,13 +391,13 @@ export function RunSteps({ tools }: { tools: readonly (readonly [string, Artifac
         )}
         <Icon
           icon={glyphs.chevronRight}
-          className={`size-3.5 shrink-0 transition-transform duration-(--disclosure-duration) motion-reduce:transition-none rtl:-scale-x-100 ${open && !phone ? "rotate-90" : ""}`}
+          className={`size-3.5 shrink-0 transition-transform duration-(--disclosure-duration) motion-reduce:transition-none rtl:-scale-x-100 ${shown === "list" ? "rotate-90" : ""}`}
         />
       </BaseButton>
       <span role="status" className="sr-only">
         {ended ? `${label}${marker}` : ""}
       </span>
-      {!phone && open && (
+      {shown === "list" && (
         <ol
           id={panel}
           aria-label="Tool calls"
@@ -404,10 +408,10 @@ export function RunSteps({ tools }: { tools: readonly (readonly [string, Artifac
           ))}
         </ol>
       )}
-      {phone && (
+      {(phone || shown === "sheet") && (
         <ToolSheet
-          open={open}
-          onOpenChange={setOpen}
+          open={shown === "sheet"}
+          onOpenChange={(next) => show(next ? "sheet" : null)}
           title={`${label}${marker}`}
           tools={tools}
           finalFocus={button}

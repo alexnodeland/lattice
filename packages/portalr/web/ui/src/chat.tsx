@@ -113,7 +113,10 @@ export function ActionsMenu({
   items = [],
   open,
   onOpenChange,
+  unseen = false,
 }: {
+  /** Whether its button is for a screen reader alone, as where a long press opens it. */
+  unseen?: boolean;
   /** The menu's name, such as "Artifact actions". */
   label: string;
   given: Thumb | null;
@@ -127,32 +130,34 @@ export function ActionsMenu({
   const { pending, thumb, why } = useThumbs(onThumbs ?? NO_THUMBS);
   return (
     <div className="flex min-w-0 flex-col items-end gap-1">
-      <Menu
-        label={label}
-        icon={glyphs.more}
-        {...(open !== undefined && { open })}
-        {...(onOpenChange && { onOpenChange })}
-        items={[
-          ...items,
-          ...(onThumbs
-            ? [
-                // The one already given is given: choosing it again sends nothing.
-                {
-                  label: "Helpful",
-                  checked: given?.up === true,
-                  disabled: pending,
-                  onSelect: () => given?.up !== true && thumb(true),
-                },
-                {
-                  label: "Not helpful",
-                  checked: given?.up === false,
-                  disabled: pending,
-                  onSelect: () => given?.up !== false && thumb(false),
-                },
-              ]
-            : []),
-        ]}
-      />
+      <span className={unseen ? "sr-only start-0" : "contents"}>
+        <Menu
+          label={label}
+          icon={glyphs.more}
+          {...(open !== undefined && { open })}
+          {...(onOpenChange && { onOpenChange })}
+          items={[
+            ...items,
+            ...(onThumbs
+              ? [
+                  // The one already given is given: choosing it again sends nothing.
+                  {
+                    label: "Helpful",
+                    checked: given?.up === true,
+                    disabled: pending,
+                    onSelect: () => given?.up !== true && thumb(true),
+                  },
+                  {
+                    label: "Not helpful",
+                    checked: given?.up === false,
+                    disabled: pending,
+                    onSelect: () => given?.up !== false && thumb(false),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </span>
       {onThumbs && why(given)}
     </div>
   );
@@ -325,7 +330,8 @@ export function Message({
       </div>
       <div
         className={cn(
-          "flex min-h-7 flex-wrap items-start gap-1",
+          "flex flex-wrap items-start gap-1",
+          !menu && "min-h-7",
           // Where the pointer hovers, the actions show as it rests on the message, or the keyboard
           // reaches them; the row keeps its height, so nothing moves. What was said stays shown.
           !sending &&
@@ -343,8 +349,11 @@ export function Message({
           <span className={TYPE.note}>Sending…</span>
         ) : menu ? (
           <>
+            {/* No glyph under every message (portalr ADR-0085): a long press opens the sheet;
+                the trigger is there for a screen reader alone. */}
             <ActionsMenu
               label="Message actions"
+              unseen
               given={thumbs}
               {...(onThumbs && { onThumbs })}
               items={[{ label: "Copy as Markdown", onSelect: copy }]}
@@ -633,6 +642,7 @@ export function Composer({
   keep?: boolean;
 }) {
   const [text, setText] = useState("");
+  const hint = useId();
   const box = useRef<HTMLTextAreaElement>(null);
   const { pending, unsent, send: sending } = useSending();
   // A draft not yet sent: leaving the page, or reloading it, asks first.
@@ -703,7 +713,7 @@ export function Composer({
         <Field.Label className="sr-only">Message</Field.Label>
         <Field.Control
           ref={box}
-          render={<textarea rows={2} enterKeyHint="send" />}
+          render={<textarea rows={2} enterKeyHint="send" aria-describedby={hint} />}
           value={text}
           placeholder="Write to the assistant"
           onValueChange={(value) => setText(String(value))}
@@ -713,7 +723,8 @@ export function Composer({
       </Field.Root>
       <div className="flex items-center justify-between gap-2 px-2.5 pb-1">
         {attach}
-        <span className="text-muted text-xs max-sm:hidden">
+        {/* The keys' hint, the words' description: shown where the row has room, said always. */}
+        <span id={hint} className={cn("text-muted text-xs", attach ? "sr-only" : "max-sm:hidden")}>
           Enter sends, Shift+Enter starts a new line
         </span>
         <Button
@@ -871,9 +882,10 @@ function Question({
     // review: a reviewed approval is read before it is given, never a press away on the bar.
     const plain = !request.review;
     return (
-      <section className={cn(card, ASKING)} aria-label={`Approve ${request.tool_name}?`}>
-        <p>
-          The agent wants to run <code className="font-mono">{request.tool_name}</code>.
+      <section className={cn(card, "gap-3", ASKING)} aria-label={`Approve ${request.tool_name}?`}>
+        {/* A head line, as a question's (portalr ADR-0085): what is asked, then what it does. */}
+        <p className={TYPE.subsection}>
+          Approve <code className="font-mono">{request.tool_name}</code>?
         </p>
         <Review review={request.review ?? {}} />
         {args && (
@@ -881,7 +893,7 @@ function Question({
             {unhidden(JSON.stringify(request.args, null, 2))}
           </pre>
         )}
-        <span className="flex gap-2">
+        <span className="flex gap-2 sm:justify-end">
           <Button
             ref={first}
             disabled={answered}
@@ -1162,7 +1174,11 @@ export function RunStrip({
     // `min-w-0`: a fieldset is otherwise never narrower than its content, as at 200% text.
     <fieldset
       aria-label="This turn"
-      className="m-0 flex min-w-0 flex-wrap items-center gap-3 rounded-(--card-radius) border border-line bg-surface px-3 py-2"
+      // While it waits, the request under it is the surface; the strip is a quiet line above it.
+      className={cn(
+        "m-0 flex min-w-0 flex-wrap items-center gap-3 rounded-(--card-radius) border border-line bg-surface px-3 py-2",
+        run.status === "paused" && "border-transparent bg-transparent",
+      )}
     >
       {/* Its status, then what it does and for how long, then its counts: one left edge. */}
       <span className="flex min-w-40 flex-1 flex-col items-start gap-1">
@@ -1174,6 +1190,7 @@ export function RunStrip({
         {active && (since !== null || (working && addon)) && (
           <span className={`${TYPE.note} flex flex-wrap gap-x-2 tabular-nums`}>
             {working && addon && <addon.Phase run={run} now={at} />}
+            {working && addon && since !== null && <span aria-hidden="true">·</span>}
             {since !== null && (
               <span>
                 {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
@@ -1183,7 +1200,13 @@ export function RunStrip({
           </span>
         )}
         {/* The counts, once the add-on has loaded: the thread loads it as it opens. */}
-        {working && addon && <addon.Tokens run={run} history={history ?? null} />}
+        {/* Folded for everyone (portalr ADR-0085): the strip says how the turn goes; its counts,
+            and the model that answered, are a press away. */}
+        {working && addon && (
+          <Disclosure summary="Tokens" className={TYPE.note}>
+            <addon.Tokens run={run} history={history ?? null} />
+          </Disclosure>
+        )}
       </span>
       <span className="flex shrink-0 items-center gap-2">
         {run.status === "paused" && onQuestion && (
@@ -1198,8 +1221,9 @@ export function RunStrip({
 }
 
 /**
- * The thread's mode in its head (portalr ADR-0080): whether the agent edits artifacts itself or
- * proposes changes for someone to accept, switched where the reader may.
+ * The thread's mode (portalr ADR-0080), a small toggle in the composer's row beside Attach and
+ * Send (ADR-0085): whether the agent edits artifacts itself or proposes changes for someone to
+ * accept, a radio group named "Agent mode", switched where the reader may.
  */
 export function ModeSwitch({
   mode,
@@ -1212,9 +1236,10 @@ export function ModeSwitch({
 }) {
   const { pending, unsent, send } = useSending();
   return (
-    <div className="flex flex-col items-end gap-1">
+    <div className="flex flex-col gap-1">
       <SegmentedFilter
-        label="Mode"
+        label="Agent mode"
+        size="sm"
         value={mode}
         disabled={disabled || pending}
         segments={MODES}
@@ -1226,8 +1251,8 @@ export function ModeSwitch({
 }
 
 const MODES: readonly Segment<Artifactr.Thread["mode"]>[] = [
-  { value: "edit", label: "Agent edits" },
-  { value: "suggest", label: "Agent proposes" },
+  { value: "edit", label: "Edits" },
+  { value: "suggest", label: "Proposes" },
 ];
 
 /** How a run is going, announced as it changes. */

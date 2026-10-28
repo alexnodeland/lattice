@@ -45,8 +45,11 @@ When("they open the note", async ({ page, scenario }) => {
   expect(title).not.toBe(note);
   await link.click();
   await expect(page.getByRole("heading", { level: 1, name: title })).toBeVisible();
-  // Its page shows the id, beside the kind and the version.
-  await expect(artifactPage(page).getByText(note)).toBeVisible();
+  // Its page's line is its kind and version; its id is a press away, in its overflow (portalr ADR-0085).
+  await expect(page).toHaveURL(new RegExp(`/artifacts/${note}$`));
+  await artifactPage(page).getByRole("button", { name: "Artifact actions" }).click();
+  await expect(page.getByRole("menuitem", { name: "Copy id" })).toBeVisible();
+  await page.keyboard.press("Escape");
 });
 
 Then("the note reads {string}", async ({ page }, text: string) => {
@@ -60,6 +63,8 @@ Then(
   "its latest revision removed {string} and added {string}",
   async ({ page }, removed: string, added: string) => {
     const latest = page.getByRole("list", { name: "Revisions" }).getByRole("listitem").first();
+    // Closed until asked (portalr ADR-0085): the reader opens it.
+    await latest.getByRole("button", { name: /^Version/ }).click();
     await expect(latest.getByRole("deletion")).toHaveText(`removed: ${removed}`);
     await expect(latest.getByRole("insertion")).toHaveText(`added: ${added}`);
   },

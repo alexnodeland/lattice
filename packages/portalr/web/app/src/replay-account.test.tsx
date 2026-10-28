@@ -47,7 +47,7 @@ const MENU = /^Account/;
 const SWITCH = "Record my sessions to improve the app";
 const ABOUT =
   "Records the layout of the pages you visit and where you click. All text and anything you type is hidden, and chats, files, mini apps and Access are never recorded. Turning it off deletes your recordings.";
-const LINK = "What is recorded, and how it is kept (opens in a new tab)";
+const LINK = "How recording works (opens in a new tab)";
 const PENDING =
   "Deleting your recordings hasn't finished yet. It will be retried until it is done.";
 const NOT_SAVED = "Your answer wasn't saved, so nothing has changed. Try again.";

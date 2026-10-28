@@ -618,7 +618,11 @@ export function Kit() {
       </Rows>
       <Skeleton className="h-4 w-32" />
       <Progress label="Checking in brief.docx" value={21} max={48} />
-      <Menu label="Actions" items={[{ label: "Open", onSelect: () => undefined }]} />
+      <Menu
+        label="Actions"
+        icon={glyphs.more}
+        items={[{ label: "Open", onSelect: () => undefined }]}
+      />
       <CopyButton text="portalr" what="the name" />
       <span className="flex gap-1">
         <IconButton label="Helpful" icon={glyphs.thumbsUp} aria-pressed />

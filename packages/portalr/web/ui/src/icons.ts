@@ -36,6 +36,7 @@ export const glyphs = {
   plus: g("M8 3v10M3 8h10"),
   check: g("M2.5 9 6 12.5 13.5 3.5"),
   x: g("M3 3l10 10M13 3 3 13"),
+  search: g("M7 12.5a5.5 5.5 0 1 0 0-11 5.5 5.5 0 0 0 0 11M11 11l3.5 3.5"),
   circle: g(circle),
   square: g("M3 3h10v10H3z"),
   squareCheck: g("M3 3h10v10H3zM5.5 8l2 2 3.5-4"),
@@ -51,7 +52,9 @@ export const glyphs = {
   ),
   logOut: g("M7 2.5h6.5v11H7M10 8H2M4.5 5.5 2 8l2.5 2.5"),
   menu: g("M2 4h12M2 8h12M2 12h12"),
-  more: g("M3.5 8h.01M8 8h.01M12.5 8h.01"),
+  more: g(
+    "M3 8a.5.5 0 1 0 1 0a.5.5 0 1 0-1 0M7.5 8a.5.5 0 1 0 1 0a.5.5 0 1 0-1 0M12 8a.5.5 0 1 0 1 0a.5.5 0 1 0-1 0",
+  ),
   maximize: g("M3 3h10v10H3zM6.5 9.5 10 6M7.5 6H10v2.5"),
   minimize: g("M2.5 6.5h4v-4M13.5 9.5h-4v4"),
   maximize2: g("M3 7V3h4M13 9v4H9M3 3l4 4M13 13 9 9"),

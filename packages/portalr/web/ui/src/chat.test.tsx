@@ -1055,6 +1055,11 @@ test("the strip counts the turn's tokens as chips, each estimated and named in f
   const now = new Date();
   const screen = await render(strip({ outputChars: 401 }, now, { history: 4000 }));
   const group = screen.getByRole("group", { name: "This turn" });
+  // Folded for everyone (portalr ADR-0085): the strip stays quiet until Tokens is opened.
+  const tokens = group.getByRole("button", { name: "Tokens" });
+  await expect.element(tokens).toHaveAttribute("aria-expanded", "false");
+  await expect.element(group.getByText("in ~1,000")).not.toBeVisible();
+  await tokens.click();
   await expect.element(group.getByText("in ~1,000")).toBeVisible();
   await expect.element(group.getByText("out ~101")).toBeVisible();
   await expect.element(group.getByText("Input tokens, estimated: 1,000")).toBeInTheDocument();
@@ -1081,6 +1086,7 @@ test("once the provider has counted, the chips are exact, with the cache and rea
   };
   const screen = await render(strip({ outputChars: 401, usage }, now, { history: 4000 }));
   const group = screen.getByRole("group", { name: "This turn" });
+  await group.getByRole("button", { name: "Tokens" }).click();
   await expect.element(group.getByText("in 1,030")).toBeVisible();
   await expect.element(group.getByText("out 40")).toBeVisible();
   await expect.element(group.getByText("Input tokens: 1,030")).toBeInTheDocument();
@@ -1227,9 +1233,9 @@ test("away from the end, the way back to the latest is offered once more arrives
 test("the mode switch sends the mode chosen, and says when it is refused", async () => {
   const onChange = sent("refused");
   const screen = await render(<ModeSwitch mode="edit" onChange={onChange} />);
-  const group = screen.getByRole("radiogroup", { name: "Mode" });
-  await expect.element(group.getByRole("radio", { name: "Agent edits" })).toBeChecked();
-  await group.getByRole("radio", { name: "Agent proposes" }).click();
+  const group = screen.getByRole("radiogroup", { name: "Agent mode" });
+  await expect.element(group.getByRole("radio", { name: "Edits" })).toBeChecked();
+  await group.getByRole("radio", { name: "Proposes" }).click();
   expect(onChange).toHaveBeenCalledWith("suggest");
   await expect.element(screen.getByRole("alert")).toBeVisible();
 });
@@ -1264,7 +1270,15 @@ test("where the pointer can't hover, a message's actions are a menu, which a lon
     </Messages>,
   );
   expect(screen.getByRole("button", { name: "Copy as Markdown" }).elements()).toHaveLength(0);
-  await screen.getByRole("button", { name: "Message actions" }).click();
+  // No "…" under every message (portalr ADR-0085): its button is a screen reader's alone, and
+  // nothing is drawn beneath the words.
+  const trigger = screen.getByRole("button", { name: "Message actions" });
+  const item = screen.getByRole("listitem").element();
+  const drawn = [...item.querySelectorAll("button")].filter(
+    (button) => button.closest(".sr-only") === null,
+  );
+  expect(drawn).toHaveLength(0);
+  trigger.element().dispatchEvent(new MouseEvent("click", { bubbles: true }));
   const menu = screen.getByRole("menu");
   await expect.element(menu.getByRole("menuitem", { name: "Copy as Markdown" })).toBeVisible();
   await menu.getByRole("menuitemcheckbox", { name: "Helpful" }).click();
@@ -1393,6 +1407,7 @@ test("the strip shows its token chips, and says how a turn ended in the same sta
     strip({ phase: "writing", at: now.getTime() }, now, { history: 400 }),
   );
   const group = screen.getByRole("group", { name: "This turn" });
+  await group.getByRole("button", { name: "Tokens" }).click();
   await expect.element(group.getByText("in ~100")).toBeVisible();
   const status = group.getByRole("status").element();
   await screen.rerender(

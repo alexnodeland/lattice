@@ -2,6 +2,8 @@ import { Field } from "@base-ui/react/field";
 import type { ComponentProps, ReactNode } from "react";
 import { cn } from "./cn";
 import { FormField } from "./form-field";
+import { Icon } from "./icon";
+import { glyphs } from "./icons";
 import { FEEDBACK, RING } from "./states";
 
 /** What a field's control shares with a text area's: the kit's edge, its padding, and its states. */
@@ -25,5 +27,31 @@ export function TextField({ label, hint, error = null, className, ...props }: Pr
     <FormField label={label} hint={hint} error={error} className={className}>
       <Field.Control className={control} {...props} />
     </FormField>
+  );
+}
+
+/**
+ * A search field (portalr ADR-0085): the kit's glyph inside its start, its words as the
+ * placeholder and its accessible name, so it sits on a row of filters without a label above it.
+ * The keyboard a phone offers searches.
+ */
+export function SearchField({
+  label,
+  className,
+  ...props
+}: Omit<ComponentProps<"input">, "className" | "type"> & { label: string; className?: string }) {
+  return (
+    <span className={cn("relative flex min-w-0 items-center", className)}>
+      <Icon icon={glyphs.search} className="pointer-events-none absolute start-2 text-muted" />
+      <input
+        type="search"
+        aria-label={label}
+        placeholder={label}
+        enterKeyHint="search"
+        autoComplete="off"
+        className={cn(control, "w-full ps-8")}
+        {...props}
+      />
+    </span>
   );
 }

@@ -123,7 +123,9 @@ function Page() {
 for (const width of [320, 360]) {
   test(`at ${width}px nothing is wider than the page: what would be scrolls inside its box`, async () => {
     await viewport(width, 740);
-    await render(<Page />);
+    const screen = await render(<Page />);
+    // The turn's counts are measured open, as a reader who opens Tokens sees them.
+    await screen.getByRole("button", { name: "Tokens" }).click();
     // What scrolls inside its own box may be wider than the page: its box isn't.
     const scrolls = (element: Element | null): boolean =>
       element !== null &&

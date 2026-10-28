@@ -6,12 +6,16 @@ import {
   Button,
   Composer,
   EmptyState,
+  glyphs,
+  Icon,
+  IconButton,
   PageHeader,
   plainTitle,
   Row,
   RowLink,
   Rows,
   RunStatus,
+  SearchField,
   SectionTitle,
   SegmentedFilter,
   StatusBadge,
@@ -127,6 +131,19 @@ function Threads() {
     return { outcome: "done" as const };
   };
   const [naming, setNaming] = useState(false);
+  const [searching, setSearching] = useState(q !== "");
+  // "/" opens the search from anywhere on the page but a field.
+  useEffect(() => {
+    const slash = (event: KeyboardEvent) => {
+      const at = event.target as HTMLElement | null;
+      if (event.key === "/" && !at?.closest("input, textarea, [contenteditable]")) {
+        event.preventDefault();
+        setSearching(true);
+      }
+    };
+    addEventListener("keydown", slash);
+    return () => removeEventListener("keydown", slash);
+  }, []);
   const live = snapshot.status === "live";
   // What waits on a person across the workspace's threads (portalr ADR-0080): calls to approve
   // first, the riskier before the rest, then questions; each opens its thread at the request.
@@ -160,17 +177,47 @@ function Threads() {
   const listed = words
     ? shown.filter((thread) => (thread.title || "Untitled").toLocaleLowerCase().includes(words))
     : shown;
-  const finding = all.length > 0 && (
-    <div className="flex flex-wrap items-end gap-3">
-      <TextField
-        type="search"
+  // The search is a glyph until asked (portalr ADR-0085): opened, a field that takes the row's
+  // room; Escape or Close folds it back, and what it holds stays applied, as a chip that clears it.
+  const searchField = searching ? (
+    <span className="flex min-w-48 flex-1 items-center gap-1">
+      <SearchField
         label="Search threads"
         value={typed}
+        // Opened by the reader, the field takes the focus.
+        autoFocus
         onChange={(event) => setTyped(event.currentTarget.value)}
-        autoComplete="off"
-        enterKeyHint="search"
-        className="min-w-48 flex-1"
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            setSearching(false);
+          }
+        }}
+        className="flex-1"
       />
+      <IconButton label="Close search" icon={glyphs.x} onClick={() => setSearching(false)} />
+    </span>
+  ) : (
+    <>
+      <IconButton label="Search threads" icon={glyphs.search} onClick={() => setSearching(true)} />
+      {q && (
+        <Button
+          variant="secondary"
+          size="sm"
+          aria-label={`Clear the search for ${q}`}
+          onClick={() => {
+            setTyped("");
+            view({ q: "" });
+          }}
+        >
+          “{q}”
+          <Icon icon={glyphs.x} className="size-3.5" />
+        </Button>
+      )}
+    </>
+  );
+  const finding = all.length > 0 && (
+    <div className="flex flex-wrap items-center gap-3">
+      {searchField}
       <SegmentedFilter<Shown>
         label="Show"
         value={show}
@@ -186,39 +233,46 @@ function Threads() {
   // Shown whatever the connection's state, so words kept through its closing stay in view, to
   // send once it is connected again or to copy; disabled until it is live.
   const starting = (
-    <div className="flex flex-col gap-2">
-      <Composer disabled={!live} onSend={write} keep />
-      <div className="flex flex-wrap items-end gap-2">
-        {naming ? (
-          <form className="flex flex-wrap items-end gap-2" action={start}>
-            <TextField label="New thread" name="title" error={refused} required autoFocus />
-            <Button type="submit" disabled={!live} pending={pending}>
-              Start
-            </Button>
-          </form>
-        ) : (
-          <Button variant="secondary" size="sm" disabled={!live} onClick={() => setNaming(true)}>
+    <div className="flex flex-col gap-3">
+      <Composer
+        disabled={!live}
+        onSend={write}
+        keep
+        attach={
+          // A quieter way in, inside the composer's row (portalr ADR-0085): name it, then start
+          // it. It stays as the form opens, so the row keeps its shape.
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={!live}
+            aria-expanded={naming}
+            onClick={() => setNaming((was) => !was)}
+          >
+            <Icon icon={glyphs.plus} className="size-3.5" />
             Name it first…
           </Button>
-        )}
-      </div>
+        }
+      />
+      {naming && (
+        <form className="flex flex-wrap items-end gap-2" action={start}>
+          <TextField label="New thread" name="title" error={refused} required autoFocus />
+          <Button type="submit" disabled={!live} pending={pending}>
+            Start
+          </Button>
+        </form>
+      )}
     </div>
   );
   return (
     <>
-      <PageHeader
-        title="Threads"
-        meta={`The threads in ${workspace}, the most recently active first`}
-      />
+      <PageHeader title="Threads" />
       {starting}
       <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
       {needed.length > 0 && (
         <section aria-labelledby="needs-you" className="flex flex-col gap-3">
           <SectionTitle id="needs-you">
             Needs you{" "}
-            <span className="font-mono font-normal text-muted text-sm tabular-nums">
-              {needed.length}
-            </span>
+            <span className="font-normal text-muted text-sm tabular-nums">{needed.length}</span>
           </SectionTitle>
           <Rows label="Needs you">
             {needed.map(({ request, thread, title, question, risk }) => (
@@ -284,14 +338,15 @@ function Threads() {
                   )
                 }
                 name={
-                  <span className="relative block ps-4">
-                    {/* Unread: a mark in the working colour in a slot at the row's start, kept so
-                        read and unread titles line up (portalr ADR-0081). */}
+                  <span className="block">
+                    {/* Unread: a mark in the working colour in the row's own start padding, at the
+                        row's middle, so the title and the line under it share one left edge
+                        (portalr ADR-0085). */}
                     {seen[thread.id] !== undefined && thread.active > (seen[thread.id] ?? 0) && (
                       <span
                         role="img"
                         aria-label="Moved since you read it"
-                        className="absolute start-0 top-1/2 size-2 -translate-y-1/2 rounded-full bg-accent forced-color-adjust-none forced-colors:bg-system-text"
+                        className="absolute start-2 top-1/2 size-2 -translate-y-1/2 rounded-full bg-accent forced-color-adjust-none forced-colors:bg-system-text"
                       />
                     )}
                     <RowLink

@@ -1,6 +1,6 @@
 # ADR-0081: Plain: a bright page, one colour, and a mark for what waits
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0085](0085-polish-one-shape-per-part-and-what-is-folded.md) (counts in the sans, a table head without the wash, an alert's one mark)
 **Date:** 2026-10-26
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the rule, the shape, the badges, the rail's current area, the message grammar, the rhythm), [ADR-0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) (the sides), [ADR-0039](0039-elevation-status-colour-states-and-density.md) (a status as a mark and a word)

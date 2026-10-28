@@ -21,6 +21,25 @@ const REASONS: Readonly<Record<string, string>> = {
 };
 
 /**
+ * What a provider's error says, in words a reader can act on (portalr ADR-0070, ADR-0085): the
+ * error itself stays under Details, never in the sentence.
+ */
+const SAID: readonly (readonly [RegExp, string])[] = [
+  [/overloaded|\b529\b/i, "The model was overloaded, so it couldn't answer. Nothing was lost."],
+  [
+    /rate.?limit|\b429\b/i,
+    "The model's provider is taking no more requests for a moment. Nothing was lost.",
+  ],
+  [/time(d)? ?out/i, "The model took too long to answer. Nothing was lost."],
+];
+
+/** Why it failed, in words: its reason's, else its error's, else the kit's sentence. */
+const why = (reason: string | null, error: string | null) =>
+  (reason !== null && REASONS[reason]) ||
+  SAID.find(([pattern]) => error !== null && pattern.test(error))?.[1] ||
+  "Something went wrong before it answered.";
+
+/**
  * A failed turn: what went wrong, the run's own words under "Details" where `error` is given,
  * which the thread gives the person the turn acted for, and "Try again" where `onRetry` is,
  * which it gives its latest turn, or `retryRefused`, why it can't. That one is announced, as it
@@ -47,7 +66,7 @@ export function RunFailed({
         <div className="flex flex-col gap-2">
           <p>
             <span className="font-semibold">The assistant couldn't finish. </span>
-            {(reason !== null && REASONS[reason]) || "Something went wrong before it answered."}
+            {why(reason, error)}
           </p>
           {error && (
             <Disclosure summary="Details" className="text-muted">

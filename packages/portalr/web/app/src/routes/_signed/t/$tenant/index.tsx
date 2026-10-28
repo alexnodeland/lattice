@@ -1,12 +1,25 @@
-import { AppShell, ButtonLink, PageHeader, Row, RowLink, Rows, Switcher } from "@portalr/ui";
+import {
+  AppShell,
+  type Glyph,
+  glyphs,
+  PageHeader,
+  Row,
+  RowLink,
+  Rows,
+  Switcher,
+  TrackLink,
+  Tracks,
+} from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { AppAccount } from "../../../../analytics";
 
 /**
  * The workspaces the caller can open in the tenant, as grantr lists them, in order, in the app's
- * frame: each a card with its name, which opens it, and a link to each of its areas. Nothing is
- * read per workspace; the frame's switcher names the tenant alone.
+ * frame: each a row whose name opens its threads, and a compact track of its areas, each a link
+ * with its glyph, its word beside it from the small breakpoint and its name alone below it, so
+ * five fit a phone's row (portalr ADR-0085). Nothing is read per workspace; the frame's
+ * switcher names the tenant alone.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/")({
   head: ({ params, match }) => ({
@@ -18,13 +31,22 @@ export const Route = createFileRoute("/_signed/t/$tenant/")({
 });
 
 /** A workspace's areas, each a link from its card. */
-const AREAS = [
-  { to: "/t/$tenant/w/$workspace", label: "Threads" },
-  { to: "/t/$tenant/w/$workspace/artifacts", label: "Artifacts" },
-  { to: "/t/$tenant/w/$workspace/proposals", label: "Proposals" },
-  { to: "/t/$tenant/w/$workspace/runs", label: "Runs" },
-  { to: "/t/$tenant/w/$workspace/rules", label: "Rules" },
-] as const;
+const AREAS: readonly {
+  readonly to:
+    | "/t/$tenant/w/$workspace"
+    | "/t/$tenant/w/$workspace/artifacts"
+    | "/t/$tenant/w/$workspace/proposals"
+    | "/t/$tenant/w/$workspace/runs"
+    | "/t/$tenant/w/$workspace/rules";
+  readonly label: string;
+  readonly icon: Glyph;
+}[] = [
+  { to: "/t/$tenant/w/$workspace", label: "Threads", icon: glyphs.messageSquare },
+  { to: "/t/$tenant/w/$workspace/artifacts", label: "Artifacts", icon: glyphs.fileText },
+  { to: "/t/$tenant/w/$workspace/proposals", label: "Proposals", icon: glyphs.workflow },
+  { to: "/t/$tenant/w/$workspace/runs", label: "Runs", icon: glyphs.play },
+  { to: "/t/$tenant/w/$workspace/rules", label: "Rules", icon: glyphs.zap },
+];
 
 function Workspaces() {
   const { tenant } = Route.useParams();
@@ -50,7 +72,7 @@ function Workspaces() {
       }
       account={<AppAccount />}
     >
-      <PageHeader title={tenant} meta="The workspaces you can open here" />
+      <PageHeader title={tenant} />
       {workspaces.length === 0 ? (
         <p>There is no workspace here you can open.</p>
       ) : (
@@ -65,20 +87,18 @@ function Workspaces() {
                   {workspace}
                 </RowLink>
               }
-              end={
-                <ul aria-label={`${workspace}'s areas`} className="flex flex-wrap gap-x-4 gap-y-1">
-                  {AREAS.map(({ to, label }) => (
-                    <li key={label}>
-                      <ButtonLink
-                        variant="ghost"
-                        size="sm"
-                        render={<Link to={to} params={{ tenant, workspace }} />}
-                      >
-                        {label}
-                      </ButtonLink>
-                    </li>
+              meta={
+                <Tracks label={`${workspace}'s areas`}>
+                  {AREAS.map(({ to, label, icon }) => (
+                    <TrackLink
+                      key={label}
+                      icon={icon}
+                      render={<Link to={to} params={{ tenant, workspace }} />}
+                    >
+                      {label}
+                    </TrackLink>
                   ))}
-                </ul>
+                </Tracks>
               }
             />
           ))}

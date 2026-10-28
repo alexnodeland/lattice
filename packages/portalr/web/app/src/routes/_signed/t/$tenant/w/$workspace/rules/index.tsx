@@ -2,6 +2,7 @@ import { allowedIn, keys, refusal, workspaceOf } from "@portalr/client";
 import {
   Button,
   Card,
+  Disclosure,
   Moment,
   PageHeader,
   Row,
@@ -83,10 +84,7 @@ function Rules() {
 
   return (
     <>
-      <PageHeader
-        title="Rules"
-        meta={`What reacts to events in ${workspace}, and the schedules that tick into it`}
-      />
+      <PageHeader title="Rules" />
       <Connection
         snapshot={automation}
         onReconnect={automationStream.reconnect}
@@ -118,12 +116,12 @@ function Rules() {
                   <StatusBadge tone={rule.enabled ? "done" : "stopped"}>
                     {rule.enabled ? "Enabled" : "Disabled"}
                   </StatusBadge>
-                  <span className="text-muted">
+                  <span className="text-muted text-xs">
                     {rule.lag === 0 ? "caught up" : `${rule.lag} behind`}
                   </span>
                 </span>
                 {rule.dead_letters > 0 && (
-                  <span className="text-muted">
+                  <span className="text-muted text-xs">
                     {rule.dead_letters === 1
                       ? "1 dead letter"
                       : `${rule.dead_letters} dead letters`}
@@ -156,23 +154,28 @@ function Rules() {
         )}
       </section>
       {allowed.has("reflexr:install_rule") && (
-        <Card
-          render={<form aria-labelledby="install" action={install} />}
-          className="flex flex-col gap-3"
-        >
-          <SectionTitle id="install">Install a rule</SectionTitle>
-          <TextField
-            label="Rule, as reflexr's JSON"
-            value={text}
-            onValueChange={setText}
-            error={refused}
-            render={<textarea rows={14} wrap="off" className="font-mono" spellCheck={false} />}
-            required
-          />
-          <Button type="submit" pending={pending} className="self-start">
-            Install
-          </Button>
-        </Card>
+        // Folded until asked (portalr ADR-0085): installing is a rare act, its JSON long.
+        <Disclosure summary="Install a rule…" className="flex flex-col">
+          <Card
+            render={<form aria-labelledby="install" action={install} />}
+            className="flex flex-col gap-3"
+          >
+            <SectionTitle id="install">Install a rule</SectionTitle>
+            <TextField
+              label="Rule, as reflexr's JSON"
+              value={text}
+              onValueChange={setText}
+              error={refused}
+              render={
+                <textarea rows={14} wrap="off" className="w-full font-mono" spellCheck={false} />
+              }
+              required
+            />
+            <Button type="submit" pending={pending} className="self-start">
+              Install
+            </Button>
+          </Card>
+        </Disclosure>
       )}
     </>
   );

@@ -49,10 +49,7 @@ export function NavLink({ render, icon, count, children, ...props }: NavLinkProp
             {icon && <Icon icon={icon} />}
             {children}
             {count ? (
-              <span
-                aria-hidden="true"
-                className="ml-auto font-mono text-accent text-xs tabular-nums"
-              >
+              <span aria-hidden="true" className="ml-auto text-accent text-xs tabular-nums">
                 {count}
               </span>
             ) : null}

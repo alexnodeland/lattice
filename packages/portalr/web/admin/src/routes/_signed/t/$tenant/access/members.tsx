@@ -1,4 +1,4 @@
-import { type GrantrApi, type Names, orThrow, refusal } from "@portalr/client";
+import { type GrantrApi, type Names, orThrow, refusal, shortId } from "@portalr/client";
 import { Alert, Button, ConfirmDialog, ItemTable, TextField } from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
@@ -39,6 +39,7 @@ function Members() {
   const yourself = (member: Member) => member.kind === "user" && member.id === user;
   const names = useNames(tenant, peopleIn(members));
   const removes = allowed.has("grantr:remove_member");
+  const said = (id: string, you: boolean) => (you && names(id) === shortId(id) ? "You" : names(id));
 
   const [email, setEmail] = useState("");
   const [invited, invite, inviting] = useActionState(async (_last: Said) => {
@@ -62,7 +63,7 @@ function Members() {
   return (
     <div className="flex flex-col gap-4">
       <Toolbar>
-        <Folded title="Invite someone" action="Invite…">
+        <Folded title="Invite someone" action="Invite…" primary>
           <form className="flex flex-col gap-3" action={invite}>
             <TextField
               label="Email"
@@ -97,7 +98,9 @@ function Members() {
             label: "Member",
             cell: (member) =>
               member.kind === "user" ? (
-                <span title={member.id}>{names(member.id)}</span>
+                // Their email where the deployment names people; where it doesn't, the reader is
+                // "You" and anyone else their id cut short, whole on hover (portalr ADR-0085).
+                <span title={member.id}>{said(member.id, yourself(member))}</span>
               ) : (
                 member.id
               ),

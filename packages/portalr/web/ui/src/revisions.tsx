@@ -1,7 +1,7 @@
 /**
  * An artifact's revisions, readable (portalr ADR-0054): newest first, each a disclosure whose
- * summary says which version it is, who made it, when, and what it changed, the latest open and
- * the rest closed. Open, a revision shows its kind's title and summary where it has them, then
+ * summary says which version it is, who made it, when, and what it changed, all closed until
+ * asked, one open at a time. Open, a revision shows its kind's title and summary where it has them, then
  * its Preview, its Source and its Changes, as tabs: its content through its kind's renderer, its
  * sources numbered and highlighted, and what changed since the previous kept version, part by
  * part, a
@@ -295,9 +295,16 @@ function Opened({
     ...(sources.length > 0 ? [["source", "Source"] as [Tab, string]] : []),
     ...(changed === null ? [] : [["changes", "Changes"] as [Tab, string]]),
   ];
-  // What changed first; for a first version, its source, as its content is shown above the list.
+  // What changed first; for a first version, its preview where it is a document, and its source
+  // where it runs, as an app's is shown running above the list (portalr ADR-0085).
   const first: Tab =
-    changed !== null ? "changes" : sources.length > 0 ? "source" : (tabs[0]?.[0] ?? "preview");
+    changed !== null
+      ? "changes"
+      : !renderer.runs && tabs.some(([value]) => value === "preview")
+        ? "preview"
+        : sources.length > 0
+          ? "source"
+          : (tabs[0]?.[0] ?? "preview");
   const [chosen, setTab] = useState<Tab>(first);
   // A tab that goes, as Preview does when the app is archived or apps are switched off while it
   // is open, gives way to the first: its panel, and a preview running in it, stop.
@@ -435,8 +442,8 @@ function Revision({
 }
 
 /**
- * An artifact's revisions, newest first, whatever order they come in: the latest open, the rest
- * closed, each with what it changed since the previous kept version. `compare` is `client`'s
+ * An artifact's revisions, newest first, whatever order they come in: all closed until one is
+ * opened, each with what it changed since the previous kept version. `compare` is `client`'s
  * `changes`.
  */
 export function Revisions({
@@ -461,13 +468,11 @@ export function Revisions({
 }): ReactNode {
   const [version, run] = useState<number | null>(null);
   const running = useMemo(() => ({ version, run }), [version]);
-  // One revision open at a time (portalr ADR-0080): the latest as the list is first shown, and
-  // a newer one as it arrives; opening another closes it.
+  // One revision open at a time (portalr ADR-0080), and none until asked (ADR-0085): the
+  // artifact itself is above the list, so its history is read on request; opening one closes
+  // another.
   const latest = revisions.reduce((most, revision) => Math.max(most, revision.version), 0);
-  const [opened, setOpened] = useState({ latest, version: latest as number | null });
-  if (opened.latest !== latest) {
-    setOpened({ latest, version: latest });
-  }
+  const [opened, setOpened] = useState<number | null>(null);
   // Each revision beside the one before; what changed is worked out as each is shown or opened.
   const shown = useMemo(() => {
     const ordered = [...revisions].sort((a, b) => a.version - b.version);
@@ -497,8 +502,8 @@ export function Revisions({
             compare={compare}
             archived={archived}
             latest={revision.version === latest}
-            open={revision.version === opened.version}
-            onOpenChange={(open) => setOpened({ latest, version: open ? revision.version : null })}
+            open={revision.version === opened}
+            onOpenChange={(open) => setOpened(open ? revision.version : null)}
             more={() => more?.(revision, before)}
             now={now}
           />

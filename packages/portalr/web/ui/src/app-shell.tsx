@@ -7,7 +7,7 @@ import { backdrop } from "./dialog";
 import { keepTabWithin } from "./full-view";
 import { Icon } from "./icon";
 import { glyphs } from "./icons";
-import { Lockup, Mark, type Ui } from "./marks";
+import { Lockup, type Ui } from "./marks";
 import { SkipLink } from "./skip-link";
 import { FEEDBACK, RING } from "./states";
 
@@ -95,9 +95,9 @@ export function AppShell({
         className="sticky top-0 z-20 flex items-center gap-1 bg-paper px-3 pt-[calc(var(--space-2)+env(safe-area-inset-top))] pb-2 lg:h-dvh lg:flex-col lg:items-stretch lg:gap-4 lg:p-3"
       >
         <Dialog.Root open={open} onOpenChange={setOpen}>
-          <Dialog.Trigger className={`${button} lg:hidden`}>
+          {/* The glyph alone on a phone's bar, which keeps its room for the switcher (portalr ADR-0085). */}
+          <Dialog.Trigger aria-label="Menu" className={`${button} lg:hidden`}>
             <Icon icon={glyphs.menu} />
-            Menu
           </Dialog.Trigger>
           <Dialog.Portal>
             <Dialog.Backdrop className={backdrop} />
@@ -112,7 +112,7 @@ export function AppShell({
               <div className="flex items-center justify-between pl-2">
                 <Dialog.Title className="sr-only">Navigation</Dialog.Title>
                 <Home ui={ui} home={home}>
-                  <Lockup ui={ui} />
+                  <Lockup ui={ui} mono />
                 </Home>
                 <Dialog.Close className={button}>
                   <Icon icon={glyphs.x} />
@@ -127,13 +127,14 @@ export function AppShell({
             </Dialog.Popup>
           </Dialog.Portal>
         </Dialog.Root>
-        <div className="lg:px-2 lg:pt-3 lg:pb-1">
+        {/* The lockup in the one colour, on the rail alone: a phone's bar leaves the mark out
+            (portalr ADR-0085), and the drawer holds the way home. */}
+        <div className="max-lg:hidden lg:px-2 lg:pt-3 lg:pb-1">
           <Home ui={ui} home={home}>
-            <Mark ui={ui} className="lg:hidden" />
-            <Lockup ui={ui} className="max-lg:hidden" />
+            <Lockup ui={ui} mono />
           </Home>
         </div>
-        <div className="ml-1 min-w-0 flex-1 lg:ml-0 lg:flex-none">{switcher}</div>
+        <div className="min-w-0 flex-1 lg:flex-none">{switcher}</div>
         {nav ? (
           <div className="hidden flex-1 overflow-y-auto lg:block">{nav}</div>
         ) : (
@@ -146,7 +147,10 @@ export function AppShell({
         tabIndex={-1}
         className="min-w-0 px-4 py-6 outline-none sm:px-6 lg:px-12 lg:py-10"
       >
-        <div className="mx-auto flex w-full max-w-(--page-width) flex-col gap-8">{children}</div>
+        {/* One rhythm (portalr ADR-0085): 24px between a page's parts on a phone, 32px from the rail. */}
+        <div className="mx-auto flex w-full max-w-(--page-width) flex-col gap-6 lg:gap-8">
+          {children}
+        </div>
       </main>
     </div>
   );

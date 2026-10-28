@@ -137,8 +137,9 @@ test("without removing or revoking, Members has no Remove and Keys no Revoke", a
 test("people come first, and no one is offered their own removal", async () => {
   const { screen } = await open("/t/acme/access/members", TENANT_ACTIONS);
   const rows = screen.getByRole("table", { name: "Members" }).getByRole("rowheader");
-  await expect.element(rows.first()).toHaveTextContent("alice");
-  expect(rows.elements().map((row) => row.textContent)).toEqual(["alice", "bob", "ci"]);
+  // The reader is "You", with their id whole on hover (portalr ADR-0085).
+  await expect.element(rows.first()).toHaveTextContent("You");
+  expect(rows.elements().map((row) => row.textContent)).toEqual(["You", "bob", "ci"]);
   await expect.element(screen.getByRole("button", { name: "Remove bob" })).toBeVisible();
   await expect
     .element(screen.getByRole("button", { name: "Remove alice" }))

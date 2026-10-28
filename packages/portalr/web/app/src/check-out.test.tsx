@@ -81,7 +81,7 @@ const told = async (screen: Screen, text: string | RegExp) => {
 
 /** Choose a file and check it in, as alice. */
 async function checkingIn(screen: Screen, body = "edited") {
-  await screen.getByLabelText("The edited file").upload(new File([body], "brief.docx"));
+  await screen.getByLabelText("Choose the edited file").upload(new File([body], "brief.docx"));
   await expect.element(screen.getByText(/^Chosen:/)).toBeVisible();
   await screen.getByRole("button", { name: "Check in" }).click();
 }
@@ -223,7 +223,9 @@ test("a check-out kept in the tab is checked in after its lease ran out, as a pr
 test("a file past the limit is refused before it is sent", async () => {
   vi.stubGlobal("XMLHttpRequest", Upload);
   const { screen } = await open(PAGE, serving({ lease: MINE, limit: 4 }));
-  await screen.getByLabelText("The edited file").upload(new File(["too long"], "brief.docx"));
+  await screen
+    .getByLabelText("Choose the edited file")
+    .upload(new File(["too long"], "brief.docx"));
   await told(screen, "brief.docx is 8 bytes: the largest file a check-in takes is 4 bytes.");
   await expect.element(screen.getByRole("button", { name: "Check in" })).toBeDisabled();
   expect(Upload.sent).toHaveLength(0);

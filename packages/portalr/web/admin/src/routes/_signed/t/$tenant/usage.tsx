@@ -158,14 +158,21 @@ function Spent({ usage }: { usage: Usage }) {
           blocks={blocksOf(usage, share)}
         />
       )}
-      <BarChart
-        label="Spend per day"
-        index={DAY}
-        series={[{ key: "spend", name: "Spend" }]}
-        data={usage.days.map((day) => ({ day: day.day, spend: day.spend }))}
-        format={dollars}
-        tick={formatDay}
-      />
+      {/* Nothing spent is said, not drawn as an empty axis (portalr ADR-0085). */}
+      {spent === 0 ? (
+        <EmptyState title={`No spend in the last ${usage.days.length} days`}>
+          What the agents spend through LiteLLM is charted here, day by day.
+        </EmptyState>
+      ) : (
+        <BarChart
+          label="Spend per day"
+          index={DAY}
+          series={[{ key: "spend", name: "Spend" }]}
+          data={usage.days.map((day) => ({ day: day.day, spend: day.spend }))}
+          format={dollars}
+          tick={formatDay}
+        />
+      )}
     </>
   );
 }
@@ -178,7 +185,8 @@ function Workspaces({ usage, listed, more }: { usage: Usage; listed: boolean; mo
       <Heading id="by-workspace" level={2} look="subsection">
         By workspace
       </Heading>
-      {usage.workspaces.length > 0 && (
+      {/* A part of a whole needs two parts with something in them; one, or none, is the table's. */}
+      {parts.filter((part) => part.value > 0).length > 1 && (
         <DonutChart label="Spend by workspace" parts={parts} format={dollars} />
       )}
       <ItemTable

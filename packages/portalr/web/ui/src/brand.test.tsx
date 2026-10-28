@@ -4,7 +4,7 @@ import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { AppShell } from "./app-shell";
 import { type Brand, BrandContext, pageTitle } from "./brand";
-import { Lockup, Mark } from "./marks";
+import { Lockup } from "./marks";
 import { NewVersion } from "./new-version";
 import { Plain } from "./plain";
 import { SignIn } from "./sign-in";
@@ -50,15 +50,30 @@ test("the kit's mark for the page's scheme is the one shown, the system's or the
   expect(getComputedStyle(dark as Element).display === "none").toBe(system);
 });
 
-test("the frame's way home is named for the product", async () => {
-  const screen = await render(
-    branded(
-      <AppShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>alice</span>}>
-        Content
-      </AppShell>,
-    ),
+test("the frame's way home is named for the product: on the rail, and in a phone's drawer", async () => {
+  const frame = branded(
+    <AppShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>alice</span>}>
+      Content
+    </AppShell>,
   );
+  await page.viewport(1280, 800);
+  onTestFinished(() => page.viewport(414, 896));
+  let screen = await render(frame);
   await expect.element(screen.getByRole("link", { name: "Nightshade" }).first()).toBeVisible();
+  await screen.unmount();
+  // A phone's bar leaves the mark out for the switcher's room (portalr ADR-0085): it is in the drawer.
+  await page.viewport(390, 800);
+  screen = await render(frame);
+  expect(
+    screen
+      .getByRole("link", { name: "Nightshade" })
+      .elements()
+      .filter((link) => link.checkVisibility()),
+  ).toHaveLength(0);
+  await screen.getByRole("button", { name: "Menu" }).click();
+  await expect
+    .element(page.getByRole("dialog").getByRole("link", { name: "Nightshade" }))
+    .toBeVisible();
 });
 
 test("signing in says the kit's words and its tagline", async () => {
@@ -110,14 +125,6 @@ for (const scheme of ["light", "dark"] as const) {
     expect(marks[0]?.getAttribute("src")).toContain(`mark-${scheme}.svg`);
   });
 }
-
-test("on a phone, the frame's mark is the kit's mark alone", async () => {
-  await page.viewport(390, 800);
-  onTestFinished(() => page.viewport(414, 896));
-  const screen = await render(branded(<Mark />));
-  expect(shown(screen.container)).toHaveLength(1);
-  expect(screen.container.textContent).toBe("");
-});
 
 test("a plain page's way home is named for the product, as it shows", async () => {
   const screen = await render(

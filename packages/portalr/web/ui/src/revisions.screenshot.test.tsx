@@ -123,6 +123,8 @@ async function shown(revisions: readonly RevisionShown[], width: number, forced 
       </div>
     </IntegrationsContext>,
   );
+  // Closed until asked (portalr ADR-0085): the newest is opened, as a reader opens it.
+  await userEvent.click(screen.getByRole("button", { name: /^Version/ }).first());
   await Promise.all([
     document.fonts.load('1em "Schibsted Grotesk"'),
     document.fonts.load('600 1em "Schibsted Grotesk"'),

@@ -9,6 +9,7 @@ test("a menu's trigger opens its actions, each chosen once, and a disabled one n
   const screen = await render(
     <Menu
       label="Thread actions"
+      icon={glyphs.more}
       items={[
         { label: "Share…", onSelect: share },
         { label: "Restrict", onSelect: restrict, disabled: true },

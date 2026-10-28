@@ -317,6 +317,8 @@ export function Uploader({
   for (const kind of on) {
     byLimit.set(kind.limit, [...(byLimit.get(kind.limit) ?? []), ...kind.extensions]);
   }
+  // The most a file may be, said beside the zone; each kind and its own limit, folded.
+  const most = Math.max(0, ...byLimit.keys());
   const sizes = [...byLimit]
     .sort(([a], [b]) => b - a)
     .map(([most, shown]) => `${shown.join(", ")}, up to ${fileSize(most)} each`)
@@ -367,8 +369,9 @@ export function Uploader({
               hint={
                 on.length === 0
                   ? "No app for files is on in this workspace: an admin can switch one on in its integrations."
-                  : `${sizes}.`
+                  : `up to ${fileSize(most)}`
               }
+              types={on.length > 0 && `${sizes}.`}
               accept={extensions.join(",")}
               multiple
               disabled={on.length === 0}
@@ -391,8 +394,9 @@ export function Uploader({
         hint={
           on.length === 0
             ? "No app for files is on in this workspace: an admin can switch one on in its integrations."
-            : `${sizes}.`
+            : `up to ${fileSize(most)}`
         }
+        types={on.length > 0 && `${sizes}.`}
         accept={extensions.join(",")}
         multiple
         disabled={on.length === 0}

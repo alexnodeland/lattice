@@ -33,11 +33,7 @@ function Proposals() {
   );
   return (
     <section aria-labelledby="proposals" className="flex max-w-190 flex-col gap-6">
-      <PageHeader
-        id="proposals"
-        title="Proposals"
-        meta={`Every proposal in ${workspace}, the open ones first`}
-      />
+      <PageHeader id="proposals" title="Proposals" />
       <Connection snapshot={snapshot} onReconnect={stream.reconnect} waiting="the workspace" />
       {snapshot.status === "live" && listed.length === 0 && (
         <EmptyState title="No proposals yet">

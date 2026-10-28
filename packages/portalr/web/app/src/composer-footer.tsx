@@ -8,67 +8,35 @@
  */
 
 import { type Api, type Artifactr, models, type OfferedModel } from "@portalr/client";
-import { Button, Dialog, glyphs, Icon, IconButton, type Sent } from "@portalr/ui";
+import { Button, ChoiceList, Dialog, glyphs, Icon, IconButton, type Sent } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
-import { type ReactNode, useRef, useState } from "react";
+import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { DEFAULT, remember } from "./model-memory";
 
 type Mode = Artifactr.Thread["mode"];
 
-/** The agent's modes, in words, each with what it means in one line. */
-const MODES: readonly (readonly [Mode, string, string])[] = [
-  ["edit", "Auto", "The assistant makes changes itself."],
-  ["suggest", "Ask", "The assistant proposes changes for you to accept."],
-];
+/** The agent's modes, each with what it means in one line. */
+const MODES = [
+  { value: "edit", label: "Auto", line: "The assistant makes changes itself." },
+  { value: "suggest", label: "Ask", line: "The assistant proposes changes for you to accept." },
+] as const satisfies readonly { value: Mode; label: string; line: string }[];
 
 /**
- * A model's one line: there is no description in the list the workspace offers, so it is said
- * from what is known of the model (generic, by its flags).
+ * A model's line: the list the workspace offers carries no description, so only what is known
+ * for sure is said, a fixed line for the default, the fast model and one that thinks first, and
+ * nothing for any other: its name alone.
  */
 const about = (model: OfferedModel) =>
   model.id === DEFAULT
     ? "The workspace's default"
-    : model.reasoning
-      ? "Thinks before it answers"
-      : model.local
-        ? "Runs on this deployment"
-        : model.family || "A model the workspace allows";
+    : model.id === "fast"
+      ? "Small and quick"
+      : model.reasoning
+        ? "Thinks before it answers"
+        : undefined;
 
-const checked = <Icon icon={glyphs.check} className="text-accent" />;
-
-/** A choice in a sheet: a full-width button, its name and line at its start, what it shows at its end. */
-function Choice({
-  name,
-  meta,
-  end,
-  onClick,
-  disabled,
-  chosen,
-}: {
-  /** The one chosen among its set, said as pressed, and shown with a check. */
-  chosen?: boolean;
-  name: string;
-  meta?: ReactNode;
-  end?: ReactNode;
-  onClick: () => void;
-  disabled?: boolean | undefined;
-}) {
-  return (
-    <Button
-      variant="ghost"
-      className="h-auto w-full justify-between whitespace-normal text-start"
-      disabled={disabled}
-      {...(chosen !== undefined && { "aria-pressed": chosen })}
-      onClick={onClick}
-    >
-      <span className="flex min-w-0 flex-col">
-        {name}
-        {meta && <span className="font-normal text-muted text-xs">{meta}</span>}
-      </span>
-      {chosen ? checked : end}
-    </Button>
-  );
-}
+/** A row of the Add sheet: a full-width button, its name at its start, what it shows at its end. */
+const row = "h-auto w-full justify-between whitespace-normal text-start";
 
 export function ComposerFooter({
   api,
@@ -106,8 +74,29 @@ export function ComposerFooter({
   const plus = useRef<HTMLButtonElement>(null);
   const pill = useRef<HTMLButtonElement>(null);
   const files = useRef<HTMLInputElement>(null);
+  const back = useRef<HTMLButtonElement>(null);
+  const modeRow = useRef<HTMLButtonElement>(null);
   const current = offered.find((each) => each.id === (model ?? DEFAULT)) ?? offered[0];
-  const said = MODES.find(([value]) => value === mode)?.[1] ?? mode;
+  const said = MODES.find((each) => each.value === mode)?.label ?? mode;
+  // Into Mode, the focus goes to Back; out of it, to the Mode row it came from.
+  const [moved, setMoved] = useState(false);
+  useEffect(() => {
+    if (moved) {
+      (adding === "mode" ? back : modeRow).current?.focus();
+    }
+  }, [adding, moved]);
+  const view = (next: "add" | "mode") => {
+    setMoved(true);
+    setAdding(next);
+  };
+  // Escape in Mode goes back to Add first; in Add it closes the sheet, as the dialog does.
+  const backOnEscape = (event: KeyboardEvent) => {
+    if (event.key === "Escape" && adding === "mode") {
+      event.preventDefault();
+      event.stopPropagation();
+      view("add");
+    }
+  };
   return (
     <span className="hidden min-w-0 items-center gap-2 phone:flex">
       <IconButton
@@ -115,7 +104,10 @@ export function ComposerFooter({
         label="Add"
         icon={glyphs.plus}
         className="rounded-full"
-        onClick={() => setAdding("add")}
+        onClick={() => {
+          setMoved(false);
+          setAdding("add");
+        }}
       />
       <input
         ref={files}
@@ -144,75 +136,81 @@ export function ComposerFooter({
           <span className="truncate">{current.label}</span>
         </Button>
       )}
-      {/* The mode said where it isn't the default, so a proposal never surprises. */}
-      {mode === "suggest" && <span className="text-muted text-xs">{said}</span>}
+      {/* The mode said where it isn't the default, as a mode, so a proposal never surprises. */}
+      {mode === "suggest" && <span className="text-muted text-xs">Mode: {said}</span>}
       <Dialog
         open={adding !== null}
         onOpenChange={(open) => setAdding(open ? adding : null)}
         title={adding === "mode" ? "Agent mode" : "Add"}
         finalFocus={plus}
       >
-        {adding === "mode" ? (
-          <fieldset aria-label="Agent mode" className="m-0 flex flex-col border-0 p-0">
-            {MODES.map(([value, word, line]) => (
-              <Choice
-                key={value}
-                name={word}
-                meta={line}
-                chosen={value === mode}
+        {/* A wrapper that hears Escape before the dialog does, so Mode goes back first. */}
+        <div onKeyDownCapture={backOnEscape} className="flex flex-col gap-1">
+          {adding === "mode" ? (
+            <>
+              <Button
+                ref={back}
+                variant="ghost"
+                size="sm"
+                className="self-start"
+                onClick={() => view("add")}
+              >
+                <Icon icon={glyphs.chevronLeft} />
+                Back to Add
+              </Button>
+              <ChoiceList
+                label="Agent mode"
+                value={mode}
+                options={MODES}
                 disabled={!onMode}
-                onClick={() => {
-                  void onMode?.(value);
-                  setAdding(null);
-                }}
+                onChange={(value) => void onMode?.(value)}
               />
-            ))}
-          </fieldset>
-        ) : (
-          <div className="flex flex-col">
-            <Choice
-              name="Add files"
-              onClick={() => {
-                setAdding(null);
-                files.current?.click();
-              }}
-            />
-            <Choice
-              name="Mode"
-              end={
-                <span className="flex items-center gap-1 text-muted text-sm">
+            </>
+          ) : (
+            <>
+              <Button
+                variant="ghost"
+                className={row}
+                onClick={() => {
+                  setAdding(null);
+                  // After the sheet has given the focus back, the system's file chooser.
+                  requestAnimationFrame(() => files.current?.click());
+                }}
+              >
+                Add files
+              </Button>
+              <Button ref={modeRow} variant="ghost" className={row} onClick={() => view("mode")}>
+                Mode
+                <span className="flex items-center gap-1 font-normal text-muted text-sm">
                   {said}
                   <Icon icon={glyphs.chevronRight} />
                 </span>
-              }
-              onClick={() => setAdding("mode")}
-            />
-          </div>
-        )}
+              </Button>
+            </>
+          )}
+        </div>
       </Dialog>
       <Dialog
         open={choosing}
         onOpenChange={setChoosing}
         title="Select model"
-        {...(running && { description: "The running turn keeps its model" })}
+        {...(running && { description: "Fixed for this turn" })}
         finalFocus={pill}
       >
-        <fieldset aria-label="Models" className="m-0 flex flex-col border-0 p-0">
-          {offered.map((each) => (
-            <Choice
-              key={each.id}
-              name={each.label}
-              meta={about(each)}
-              chosen={each === current}
-              disabled={running}
-              onClick={() => {
-                remember(thread, each.id);
-                onModel(each.id === DEFAULT ? null : each.id);
-                setChoosing(false);
-              }}
-            />
-          ))}
-        </fieldset>
+        <ChoiceList
+          label="Models"
+          value={current?.id ?? DEFAULT}
+          options={offered.map((each) => ({
+            value: each.id,
+            label: each.label,
+            line: about(each),
+          }))}
+          disabled={running}
+          onChange={(value) => {
+            remember(thread, value);
+            onModel(value === DEFAULT ? null : value);
+          }}
+        />
       </Dialog>
     </span>
   );

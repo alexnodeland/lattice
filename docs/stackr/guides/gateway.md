@@ -138,9 +138,17 @@ Two guardrails are defined once, in the proxy, and chosen per request with `"gua
 | Guardrail | What it does |
 |---|---|
 | `pii-mask` | Masks email addresses, US phone and social security numbers, Visa, Mastercard and Amex card numbers, and AWS and GitHub credentials, before the request reaches the model |
-| `prompt-injection` | Blocks jailbreak, system-prompt and data-exfiltration attempts at medium severity and above, with HTTP 400 naming the guardrail |
+| `prompt-injection` | Blocks jailbreak, system-prompt and data-exfiltration attempts at medium severity and above in tool results, with HTTP 400 naming the guardrail |
 
 Both are LiteLLM's content filter, which is open source and runs in the proxy, with no other service. Attaching guardrails to a team or a key needs LiteLLM's Enterprise licence, so the libraries choose them per request instead, from each workspace's or rule's policy; an application that doesn't ask gets none. `make validate` checks that every guardrail uses an integration that needs no licence, since the proxy starts without a guardrail it can't load, and the smoke test checks that the running proxy loaded both.
+
+`prompt-injection` reads only tool results (`scan_only_tool_results: true`): the text an agent's tools bring back, such as a fetched page or a file's contents. It doesn't read the person's prompt, the system prompt, or the model's own replies and tool arguments, so a request with no tool result isn't scanned. That includes outside text that arrives in those messages instead of through a tool: an email, a document or a web page the person pasted or attached, or that a client puts in a system prompt. The change is the gateway's, so it holds for every client that asks for `prompt-injection`, not only the libraries. Its word lists are a heuristic: a word such as "enter" and one such as "unlimited" in one sentence is a jailbreak to them, so when they read every message, a landing page the model wrote into a tool call blocked the next request of the turn, and every later request of the thread, since each one carries the thread's history ([ADR-0010's amendment](../adr/0010-the-llm-gateway.md#amendment-2026-10-27-prompt-injection-reads-tool-results)). A tool result that repeats such a page can still be blocked: artifactr's `read_artifact` returns a mini app's HTML, so reading a generated app back can block the thread the same way ([#830](https://github.com/alexnodeland/lattice/issues/830)).
+
+A block shows in the proxy's log, with the category and the words that matched:
+
+```sh
+docker compose logs --since 1h litellm 2>&1 | grep -i 'content blocked'
+```
 
 ## Telemetry
 

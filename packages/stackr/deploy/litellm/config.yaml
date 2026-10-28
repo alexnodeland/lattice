@@ -102,11 +102,16 @@ guardrails:
         - {pattern_type: prebuilt, pattern_name: aws_access_key, action: MASK}
         - {pattern_type: prebuilt, pattern_name: aws_secret_key, action: MASK}
         - {pattern_type: prebuilt, pattern_name: github_token, action: MASK}
+  # prompt-injection reads only tool results, the untrusted text an agent
+  # feeds back into the model: not the person's prompt, nor the model's own
+  # replies and tool arguments, whose generated pages tripped its word lists
+  # (ADR-0010's 2026-10-27 amendment).
   - guardrail_name: prompt-injection
     litellm_params:
       guardrail: litellm_content_filter
       mode: pre_call
       default_on: false
+      scan_only_tool_results: true
       categories:
         - {category: prompt_injection_jailbreak, enabled: true, action: BLOCK, severity_threshold: medium}
         - {category: prompt_injection_system_prompt, enabled: true, action: BLOCK, severity_threshold: medium}

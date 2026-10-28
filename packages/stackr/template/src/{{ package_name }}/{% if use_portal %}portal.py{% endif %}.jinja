@@ -297,7 +297,7 @@ class Portal:
 
     @property
     def aliases(self) -> dict[str, Place]:
-        """Where mini apps and the editors are for each of the portal's other origins.
+        """Where mini apps, the editors and the links are for each of the portal's other origins.
 
         Each of ``PORTAL_EXTRA_URLS`` has them beside it, on the ports they have here (portalr
         ADR-0084).
@@ -313,7 +313,13 @@ class Portal:
             raise ValueError(UNNAMED)
         editors: dict[str, str] = {% if use_files %}dict(self._settings.files.editors){% else %}{}{% endif %}
         return {
-            extra: beside(portal.url, extra, apps=portal.apps_url or None, editors=editors)
+            extra: beside(
+                portal.url,
+                extra,
+                apps=portal.apps_url or None,
+                editors=editors,
+                links=dict(portal.links),
+            )
             for extra in portal.extra_urls
         }
 
@@ -334,6 +340,7 @@ class Portal:
                 apps=portal.apps_url,
                 origin=portal.url or None,
                 aliases=self.aliases,
+                links=dict(portal.links),
 {%- if use_files %}
                 editors=dict(self._settings.files.editors),
 {%- endif %}

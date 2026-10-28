@@ -103,6 +103,7 @@ def test_config_json_is_what_the_page_says() -> None:
         "people",
         "editors",
         "apps",
+        "links",
         "origin",
         "aliases",
         "brand",

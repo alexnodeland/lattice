@@ -200,6 +200,40 @@ def test_mini_apps_run_beside_each_of_the_portals_origins(script: Script, ui: Pa
             assert "set-cookie" not in sandbox.headers
 
 
+def test_each_connected_app_is_linked_beside_each_of_the_portals_origins(
+    script: Script, ui: Path
+) -> None:
+    links = {"tracker:plane": "http://127.0.0.1:8090/"}
+    named = with_portal(ui_dir=str(ui), url=PORTAL, extra_urls=(TAILNET,), links=links)
+    with TestClient(app(script, named)) as client:
+        config = client.get("/portalr/config.json").json()
+    assert config["links"] == links
+    assert config["aliases"][TAILNET]["links"] == {"tracker:plane": f"{TAILNET}:8090/"}
+
+
+def test_a_link_at_no_address_of_its_own_fails_the_start(script: Script, ui: Path) -> None:
+    for url, said in (
+        ("http://plane.lan:8090/", "https, or http on loopback"),
+        (f"{PORTAL}/plane/", "give it an origin of its own"),
+    ):
+        named = with_portal(ui_dir=str(ui), url=PORTAL, links={"tracker:plane": url})
+        with pytest.raises(ValueError, match=said):
+            app(script, named)
+
+
+def test_the_links_are_read_from_the_environment() -> None:
+    def read(links: str) -> dict[str, str]:
+        return dict(Settings.from_environ({"PORTAL_LINKS": links}).portal.links)
+
+    assert read("") == {}
+    assert read('{"tracker:plane": "http://127.0.0.1:8090/"}') == {
+        "tracker:plane": "http://127.0.0.1:8090/"
+    }
+    for wrong in ("[]", "{plane"):
+        with pytest.raises(ValueError, match="PORTAL_LINKS must be a JSON object"):
+            read(wrong)
+
+
 def test_the_portals_other_origins_need_its_own(script: Script, ui: Path) -> None:
     with pytest.raises(ValueError, match="PORTAL_EXTRA_URLS needs PORTAL_URL"):
         app(script, with_portal(ui_dir=str(ui), extra_urls=(TAILNET,)))

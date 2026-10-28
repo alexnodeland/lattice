@@ -3,6 +3,7 @@ import { Button } from "./button";
 import { ItemTable } from "./item-table";
 import { Moment } from "./moment";
 import { Switch } from "./switch";
+import { TextLink } from "./text-link";
 
 /**
  * Where an integration's state at a level comes from: its default, the tenant's setting, a setting
@@ -23,6 +24,8 @@ export interface IntegrationRow {
   readonly source: IntegrationSource;
   /** Who set it at this level, as people read them, and when; null where this level hasn't. */
   readonly changed: { readonly by: string; readonly at: string } | null;
+  /** The address of the app it brings, where it brings one and is on here (portalr ADR-0088). */
+  readonly open?: string | undefined;
 }
 
 const SOURCE: Record<IntegrationSource, string> = {
@@ -94,7 +97,14 @@ export function IntegrationList({
           label: "State",
           width: "28%",
           cell: (row) => (
-            <State row={row} level={level} saving={saving.has(row.key)} onSwitch={onSwitch} />
+            <span className="flex flex-col items-start gap-1">
+              <State row={row} level={level} saving={saving.has(row.key)} onSwitch={onSwitch} />
+              {row.open && (
+                <TextLink variant="external" href={row.open} className="text-sm">
+                  Open<span className="sr-only"> {row.name}</span>
+                </TextLink>
+              )}
+            </span>
           ),
         },
         {

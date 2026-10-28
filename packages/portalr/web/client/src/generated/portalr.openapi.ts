@@ -650,6 +650,10 @@ export interface components {
             editors: {
                 [key: string]: string;
             };
+            /** Links */
+            links: {
+                [key: string]: string;
+            };
             /** Origin */
             origin?: string | null;
             /** People */
@@ -1061,6 +1065,13 @@ export interface components {
              * @default {}
              */
             editors: {
+                [key: string]: string;
+            };
+            /**
+             * Links
+             * @default {}
+             */
+            links: {
                 [key: string]: string;
             };
         };

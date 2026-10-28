@@ -358,3 +358,50 @@ test("with a mouse, however narrow, there is no tab bar: the areas are the page'
     .toBeVisible();
   expect((document.querySelector("[data-tab-bar]") as HTMLElement).checkVisibility()).toBe(false);
 });
+
+test("the palette lists the connected apps grantr says are on, and opens each in a new tab, apart (portalr ADR-0088)", async () => {
+  const opened = vi.spyOn(window, "open").mockReturnValue(null);
+  const { screen } = await open(
+    "/t/acme/w/notes",
+    async (_request, path) =>
+      path === FLAGS
+        ? Response.json({ "tracker:plane": true, "tracker:vikunja": false })
+        : undefined,
+    () => null,
+    {
+      links: {
+        "tracker:plane": "http://127.0.0.1:8090/",
+        "tracker:vikunja": "http://127.0.0.1:3456/",
+      },
+    },
+  );
+  await screen.getByRole("button", { name: "Search", exact: true }).click();
+  const apps = screen.getByRole("group", { name: "Connected apps" });
+  await expect.element(apps).toBeVisible();
+  await expect.element(apps.getByRole("option")).toHaveLength(1);
+  // Vikunja is off in this workspace: its link is never shown, though the deployment names it.
+  expect(screen.getByRole("option", { name: /Vikunja/ }).elements()).toHaveLength(0);
+  const field = screen.getByRole("combobox", { name: "Search or go to" });
+  await field.fill("plane");
+  await expect
+    .element(screen.getByRole("option", { name: /^Open Plane\b.*opens in a new tab$/ }))
+    .toHaveAttribute("aria-selected", "true");
+  await userEvent.keyboard("{Enter}");
+  expect(opened).toHaveBeenCalledWith("http://127.0.0.1:8090/", "_blank", "noopener,noreferrer");
+  // The palette closes as it opens the app.
+  await expect.poll(() => document.querySelector('[role="combobox"]')).toBeNull();
+  opened.mockRestore();
+});
+
+test("before grantr answers, or where it can't, no connected app is listed, not even one on by default", async () => {
+  const { screen } = await open(
+    "/t/acme/w/notes",
+    async (_request, path) =>
+      path === FLAGS ? new Response("upstream gone", { status: 503 }) : undefined,
+    () => null,
+    { links: { "tracker:plane": "http://127.0.0.1:8090/" } },
+  );
+  await screen.getByRole("button", { name: "Search", exact: true }).click();
+  await expect.element(screen.getByRole("group", { name: "Go to" })).toBeVisible();
+  expect(screen.getByRole("group", { name: "Connected apps" }).elements()).toHaveLength(0);
+});

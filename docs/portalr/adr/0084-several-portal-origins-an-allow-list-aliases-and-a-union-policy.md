@@ -62,3 +62,5 @@ An allow-list costs one setting and keeps every policy static and explicit, whic
 1. [x] `lattice_core.origins`; the shim, the editor and the sandbox on one origin or several; `Site.origin`, `Site.aliases`, `Place`, `beside`; `config.json`; the union policy.
 2. [x] `deploymentAt`, `?host=` on the shim's URL, the reason at an unknown address; the CSP harness at two origins.
 3. [x] stackr's template and `make tailnet` ([stackr ADR-0042](../../stackr/adr/0042-a-generated-application-as-a-local-product.md), [ADR-0043](../../stackr/adr/0043-native-files-in-the-template.md) and [ADR-0053](../../stackr/adr/0053-run-everything-together.md), amended).
+
+> **Amended (2026-10-28) by [portalr ADR-0088](0088-connected-apps-opened-from-the-admin-and-the-palette.md):** connected apps' links (`Site.links`, `PORTAL_LINKS`) are beside each other origin by the same port-sibling rule as the editors, and `make tailnet` serves each loopback link's port beside the portal, tailnet only, never 8443; `deploymentAt` moved to `@portalr/client`, and returns `links` too.

@@ -49,6 +49,26 @@ export function useEnabled(
 }
 
 /**
+ * An integration's name and what it is, from its sentence: the registry's start with the name,
+ * as in "Mermaid: diagrams written as text in messages, drawn."; one that doesn't is named by
+ * its key.
+ */
+export function namedOf(state: { readonly key: string; readonly description: string }): {
+  name: string;
+  description: string;
+} {
+  const at = state.description.indexOf(": ");
+  if (at < 1) {
+    return { name: state.key, description: state.description };
+  }
+  const rest = state.description.slice(at + 2);
+  return {
+    name: state.description.slice(0, at),
+    description: rest.charAt(0).toUpperCase() + rest.slice(1),
+  };
+}
+
+/**
  * The answer to a setting of an integration, once every read of the tenant's integrations is
  * stale, done or refused: a setting on the tenant changes what each of its workspaces gets.
  */

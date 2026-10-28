@@ -1,6 +1,6 @@
-import { INTEGRATIONS } from "@portalr/client";
+import { INTEGRATIONS, namedOf } from "@portalr/client";
 import { expect, test } from "vitest";
-import { levelOf, namedOf, rowsOf, settersOf, sourceOf } from "./integrations";
+import { levelOf, rowsOf, settersOf, sourceOf } from "./integrations";
 
 const ALICE = { on: true, by: { kind: "user", id: "alice" }, at: "2026-10-17T09:00:00Z" } as const;
 const OFF = { ...ALICE, on: false };
@@ -71,4 +71,14 @@ test("every integration of lattice's registry is named by its sentence's start",
     // Its sentence's first letter is capitalized, and otherwise as written.
     expect(`${name}: ${description}`.toLowerCase()).toBe(known.description.toLowerCase());
   }
+});
+
+test("an integration that is on is opened at its link; one off, or with none, isn't", () => {
+  const links = { "markdown:mermaid": "https://mermaid.example/" };
+  const names = (id: string) => id;
+  expect(rowsOf([state({ enabled: true })], false, names, links)[0]?.open).toBe(
+    "https://mermaid.example/",
+  );
+  expect(rowsOf([state()], false, names, links)[0]?.open).toBeUndefined();
+  expect(rowsOf([state({ enabled: true })], false, names)[0]?.open).toBeUndefined();
 });

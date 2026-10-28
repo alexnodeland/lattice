@@ -390,6 +390,12 @@ class PortalSettings:
             this machine's tailnet name, which ``make tailnet`` writes: each may frame mini apps
             and the editors too, which are beside it on their own ports (portalr ADR-0084). Only
             origins you control; https, or http on loopback; at most eight; with ``url``.
+        links: Each connected app the deployment's integrations bring, by the integration's key,
+            at the address people's browsers reach it, ``PORTAL_LINKS``, a JSON object such as
+            ``{"tracker:plane": "http://127.0.0.1:8090/"}``: the admin opens it beside the
+            integration's switch, and the palette lists it where the integration is on (portalr
+            ADR-0088). Each is held to the editors' rule, and is beside each of ``extra_urls``
+            on the port it has here. None by default.
         tempo_url: Tempo's HTTP API, for traces.
         loki_url: Loki's HTTP API, for logs.
         prometheus_url: prom-label-proxy, in front of Prometheus, for metrics.
@@ -428,6 +434,7 @@ class PortalSettings:
     url: str | None = None
     apps_url: str | None = None
     extra_urls: tuple[str, ...] = ()
+    links: Mapping[str, str] = field(default_factory=dict[str, str])
     tempo_url: str | None = None
     loki_url: str | None = None
     prometheus_url: str | None = None
@@ -457,6 +464,7 @@ class PortalSettings:
             url=env.get("PORTAL_URL"),
             apps_url=env.get("PORTAL_APPS_URL"),
             extra_urls=_extra_urls(env),
+            links=_links(env),
             tempo_url=env.get("PORTAL_TEMPO_URL"),
             loki_url=env.get("PORTAL_LOKI_URL"),
             prometheus_url=env.get("PORTAL_PROMETHEUS_URL"),
@@ -709,7 +717,7 @@ def _tracker_bindings(text: str) -> dict[WorkspaceKey, TrackerBinding]:
 
 
 {% endif -%}
-{% if use_tracker or (use_files and use_portal) -%}
+{% if use_tracker or use_portal -%}
 def _json_object(text: str, name: str) -> dict[str, object]:
     """Parse a setting that is a JSON object."""
     try:
@@ -780,6 +788,17 @@ def _extra_urls(env: Mapping[str, str]) -> tuple[str, ...]:
     if not named.strip():
         return ()
     return origins(named, what="PORTAL_EXTRA_URLS", canonical=env.get("PORTAL_URL") or None)
+
+
+def _links(env: Mapping[str, str]) -> dict[str, str]:
+    """Each connected app's address, ``PORTAL_LINKS``, by its integration: none where it is empty.
+
+    The site checks each, as the application starts (portalr ADR-0088).
+    """
+    named = env.get("PORTAL_LINKS", "")
+    if not named.strip():
+        return {}
+    return {key: str(url) for key, url in _json_object(named, "PORTAL_LINKS").items()}
 
 
 {% endif -%}

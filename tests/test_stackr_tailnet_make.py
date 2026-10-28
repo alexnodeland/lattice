@@ -75,14 +75,33 @@ def test_a_clean_env_reaches_the_script(local: Path) -> None:
     assert calls == ["on 443 http://127.0.0.1:8800 8801 8802"]
 
 
+def test_each_linked_app_on_loopback_is_served_beside_it(local: Path) -> None:
+    env = 'PORTAL_LINKS={"tracker:plane": "http://127.0.0.1:8090/", "tracker:vikunja": "HTTP://127.0.0.1:3456"}\n'
+    status, printed, calls = _make(local, "tailnet", env)
+    assert status == 0, printed
+    assert calls == ["on 443 http://127.0.0.1:8800 8090 3456 8802"]
+
+
 @pytest.mark.parametrize(
     ("env", "why"),
     [
         ("PORTAL_APPS_URL=https://apps.example.com\n", "PORTAL_APPS_URL isn't http://127.0.0.1"),
         ('FILES_EDITORS={"files:gridcraft": "https://e.example:8802/"}\n', "FILES_EDITORS"),
         ("FILES_EDITOR_DOMAIN=example.com\n", "FILES_EDITOR_DOMAIN"),
+        ('PORTAL_LINKS={"tracker:plane": "https://plane.example/"}\n', "PORTAL_LINKS"),
+        ('PORTAL_LINKS={"tracker:plane": "http://localhost:8090/"}\n', "PORTAL_LINKS"),
+        ('PORTAL_LINKS={"tracker:plane": "http://127.0.0.1:8090@evil.example/"}\n', "PORTAL_LINKS"),
+        ('PORTAL_LINKS={"tracker:plane": "HTTPS://Plane.Example/"}\n', "PORTAL_LINKS"),
     ],
-    ids=["apps off loopback", "FILES_EDITORS", "FILES_EDITOR_DOMAIN"],
+    ids=[
+        "apps off loopback",
+        "FILES_EDITORS",
+        "FILES_EDITOR_DOMAIN",
+        "a link off loopback",
+        "a link on localhost",
+        "a link with a user",
+        "a link with an uppercase scheme",
+    ],
 )
 def test_make_tailnet_refuses_before_the_script(local: Path, env: str, why: str) -> None:
     status, printed, calls = _make(local, "tailnet", env)

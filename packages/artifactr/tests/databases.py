@@ -49,8 +49,16 @@ class Database:
         return engine
 
     async def dispose(self) -> None:
+        """Dispose of every engine, after checking that the test returned each connection.
+
+        Disposal closes only the connections in a pool: one still checked out, as a query
+        cancelled partway leaves it, would be collected later, failing whichever test runs
+        then, and on PostgreSQL holding its transaction's locks on the schema meanwhile.
+        """
+        checked_out = [engine.pool.checkedout() for engine in self.engines]  # pyright: ignore[reportAttributeAccessIssue]
         for engine in self.engines:
             await engine.dispose()
+        assert not any(checked_out), f"connections left checked out: {checked_out}"
 
 
 @asynccontextmanager

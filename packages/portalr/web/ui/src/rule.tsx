@@ -75,10 +75,12 @@ export function RulePipeline({ rule }: { rule: Readonly<Record<string, unknown>>
       {stages(rule).map((stage: Stage) => (
         <li
           key={stage.name}
-          className="grid gap-x-4 gap-y-0.5 px-(--card-pad) py-2 sm:grid-cols-[8rem_minmax(0,1fr)]"
+          className="flex flex-col gap-x-4 gap-y-0.5 px-(--card-pad) py-2 sm:flex-row"
         >
-          <span className={cn(TYPE.labelQuiet, "first-letter:uppercase")}>{stage.name}</span>
-          <div className={cn("min-w-0", stage.none ? "text-muted" : "text-fg")}>
+          <span className={cn(TYPE.labelQuiet, "shrink-0 first-letter:uppercase sm:w-32")}>
+            {stage.name}
+          </span>
+          <div className={cn("min-w-0 flex-1", stage.none ? "text-muted" : "text-fg")}>
             {stage.name === "event types" && !stage.none ? (
               <ul className="m-0 flex list-none flex-wrap gap-1.5 p-0">
                 {stage.lines.map((line) => (

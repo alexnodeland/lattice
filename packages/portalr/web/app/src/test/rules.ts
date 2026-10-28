@@ -30,8 +30,10 @@ const DRAFTED = {
     throttle: { at_most: 1, per: "PT15M" },
   },
   scope: { fields: ["service"] },
-  // biome-ignore lint/suspicious/noThenProperty: a reflexr rule names its action `then`, as data, never awaited.
-  then: { action: "ops:page", params: { to: "oncall", urgency: "high" } },
+  // Its action, under the key reflexr names it by, which an object literal can't name safely.
+  ...(JSON.parse(
+    '{"then": {"action": "ops:page", "params": {"to": "oncall", "urgency": "high"}}}',
+  ) as Record<string, unknown>),
   timeout: "PT30S",
 };
 

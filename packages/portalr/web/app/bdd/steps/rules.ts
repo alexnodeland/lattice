@@ -106,8 +106,8 @@ When("they open their rule", async ({ page, scenario }) => {
 });
 
 Then("they can't edit or archive it", async ({ page }) => {
-  // It reads as When and Then; its JSON is folded under them (portalr ADR-0085).
-  await expect(page.getByText("When", { exact: true })).toBeVisible();
+  // It reads as the pipeline it runs; its JSON is folded under it (portalr ADR-0017).
+  await expect(page.getByRole("list", { name: "The rule, stage by stage" })).toBeVisible();
   await page.getByRole("button", { name: "The rule, as reflexr's JSON" }).click();
   await expect(page.getByText(/"description"/)).toBeVisible();
   await expect(field(page)).toHaveCount(0);

@@ -106,9 +106,11 @@ tasks:
 
   # A crafting app's fidelity report (lattice RFC-0003, phase 2): its pinned CLI opens and saves
   # each file of its corpus, feature by feature, and its adapter runs live, as does WordCraft's
-  # check-out pilot over HTTP with the browser build served. CRAFT names the app, wordcraft if
-  # unset; Nightly runs it for each app with a corpus and publishes the matrix. It downloads the
-  # release scripts/craft pins, once. FreeCAD and Blender have no browser build.
+  # check-out pilot over HTTP with the browser build served, and, for an app the stackr template
+  # wires, the agent creates a blank file through its worker and proposes a first edit. CRAFT
+  # names the app, wordcraft if unset; Nightly runs it for each app with a corpus and publishes
+  # the matrix. It downloads the release scripts/craft pins, once. FreeCAD and Blender have no
+  # browser build.
   fidelity:
     description: "Run a crafting app's fidelity report and live tests, on its pinned CLI (CRAFT=app)"
     script: >-

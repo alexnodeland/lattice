@@ -217,7 +217,8 @@ function ToolSheet({
   tools: readonly (readonly [string, Artifactr.Tool])[];
   finalFocus: RefObject<HTMLElement | null>;
 }) {
-  const asSheet = useSheet(open, () => onOpenChange(false));
+  // A drag down closes as Close does, back to the list for the next time.
+  const asSheet = useSheet(open, () => close(false));
   const view = useRetrying(loadJsonView, open, open);
   const [chosen, setChosen] = useState<string | null>(null);
   // The call last opened, whose row takes the focus back from its detail.
@@ -368,19 +369,23 @@ export function RunSteps({
   const words = useShimmer(running);
   // Said once, as a group that was running ends: never as each call does.
   const [ran, setRan] = useState(running);
-  const [ended, setEnded] = useState(false);
+  const marker = failed > 0 ? ` · ${failed} failed` : "";
+  // What is said as the run ends, kept as it was then: a later change to the line says nothing.
+  const [said, setSaid] = useState("");
   if (ran !== running) {
     setRan(running);
-    setEnded(!running);
+    setSaid(running ? "" : `${label}${marker}`);
   }
-  const marker = failed > 0 ? ` · ${failed} failed` : "";
   const count = `${tools.length} tool call${tools.length === 1 ? "" : "s"}`;
   return (
     <li className="flex flex-col">
       <BaseButton
         ref={button}
         aria-expanded={open}
-        {...(phone ? { "aria-haspopup": "dialog" as const } : { "aria-controls": panel })}
+        // What it opens as it is open, or, closed, what a tap here would open.
+        {...((shown ?? (phone ? "sheet" : "list")) === "sheet"
+          ? { "aria-haspopup": "dialog" as const }
+          : { "aria-controls": panel })}
         aria-label={`${label}${marker}: ${count}`}
         onClick={() => show(open ? null : phoneNow() ? "sheet" : "list")}
         className={cn(
@@ -404,7 +409,7 @@ export function RunSteps({
         />
       </BaseButton>
       <span role="status" className="sr-only">
-        {ended ? `${label}${marker}` : ""}
+        {said}
       </span>
       {shown === "list" && (
         <ol

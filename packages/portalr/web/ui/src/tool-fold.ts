@@ -122,7 +122,11 @@ const ABOUT = ["title", "name", "query", "url", "path"];
  */
 export function callAbout(tool: Artifactr.Tool): string {
   if (failed(tool)) {
-    return tool.result.replace(/\s+/g, " ").trim();
+    // Why, in its words, with the ids in it (app_1, prop_2) left for the detail.
+    return tool.result
+      .replace(/\b[a-z]+_\w+\b ?/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
   }
   try {
     const args: unknown = JSON.parse(tool.args);

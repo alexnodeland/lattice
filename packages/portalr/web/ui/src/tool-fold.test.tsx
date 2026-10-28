@@ -202,3 +202,45 @@ test("which groups were opened is kept as the thread is shown again", async () =
     .element(again.getByRole("button", { name: "Looked at a page: 1 tool call" }))
     .toHaveAttribute("aria-expanded", "true");
 });
+
+test("under forced colours a running line has no shimmer", async () => {
+  onTestFinished(() => commands.reduceMotion(true));
+  await commands.reduceMotion(false);
+  const forced = matchMedia("(forced-colors: active)").matches;
+  const screen = await render(
+    <ul>
+      <RunSteps tools={calls(tool("draw", "called"))} running />
+    </ul>,
+  );
+  const words = screen.container.querySelector("button span.truncate") as HTMLElement;
+  expect(words.getAnimations()).toHaveLength(forced ? 0 : 1);
+});
+
+test("unfurled on a desktop, its line controls the list, and a later failure says nothing again", async () => {
+  const group = calls(tool("read_artifact"));
+  const screen = await render(
+    <ul>
+      <RunSteps tools={group} running />
+    </ul>,
+  );
+  await screen.rerender(
+    <ul>
+      <RunSteps tools={group} running={false} />
+    </ul>,
+  );
+  const status = screen.getByRole("status");
+  await expect.element(status).toHaveTextContent("Read an artifact");
+  const failedNow = group.map(([id, each]) => [id, { ...each, status: "error" }] as const);
+  await screen.rerender(
+    <ul>
+      <RunSteps tools={failedNow} running={false} />
+    </ul>,
+  );
+  expect(status.element().textContent).toBe("Read an artifact");
+  const line = screen.getByRole("button", { name: /: 1 tool call$/ });
+  await line.click();
+  expect(line.element().getAttribute("aria-controls")).toBe(
+    screen.getByRole("list", { name: "Tool calls" }).element().id,
+  );
+  expect(line.element().hasAttribute("aria-haspopup")).toBe(false);
+});

@@ -2,6 +2,7 @@ import {
   AppShell,
   ButtonLink,
   glyphs,
+  IconButton,
   StatusBadge,
   Switcher,
   TrackLink,
@@ -44,6 +45,13 @@ function Workspace() {
   const { data: memberships } = useSuspenseQuery(queries.grantr.memberships(user));
   const { data: me } = useSuspenseQuery(queries.grantr.me(tenant));
   const tenants = [...new Set(memberships.map((membership) => membership.tenant))].sort();
+  // A thread is a task of its own: on a phone its foot is its composer, not the tab bar, and its
+  // way back to the threads is at the bar's start (portalr ADR-0087).
+  const onThread = useMatchRoute()({
+    to: "/t/$tenant/w/$workspace/threads/$thread",
+    params: { tenant, workspace },
+    fuzzy: true,
+  });
   return (
     <WorkspaceStreams
       key={`${tenant}/${workspace}`}
@@ -56,23 +64,41 @@ function Workspace() {
         <AppShell
           home={<Link to="/" />}
           switcher={
-            <Switcher
-              tenant={tenant}
-              workspace={workspace}
-              tenants={tenants.map((id) => ({ id }))}
-              workspaces={[...me.workspaces].sort().map((id) => ({ id }))}
-              onTenant={(id) => void navigate({ to: "/t/$tenant", params: { tenant: id } })}
-              onWorkspace={(id) =>
-                void navigate({
-                  to: "/t/$tenant/w/$workspace",
-                  params: { tenant, workspace: id },
-                })
-              }
-              every={<Link to="/t/$tenant" params={{ tenant }} />}
-            />
+            <>
+              {onThread && (
+                <IconButton
+                  label="All threads"
+                  icon={glyphs.chevronLeft}
+                  className="hidden phone:flex"
+                  render={<Link to="/t/$tenant/w/$workspace" params={{ tenant, workspace }} />}
+                />
+              )}
+              <Switcher
+                tenant={tenant}
+                workspace={workspace}
+                tenants={tenants.map((id) => ({ id }))}
+                workspaces={[...me.workspaces].sort().map((id) => ({ id }))}
+                onTenant={(id) => void navigate({ to: "/t/$tenant", params: { tenant: id } })}
+                onWorkspace={(id) =>
+                  void navigate({
+                    to: "/t/$tenant/w/$workspace",
+                    params: { tenant, workspace: id },
+                  })
+                }
+                every={<Link to="/t/$tenant" params={{ tenant }} />}
+              />
+            </>
           }
           nav={<Areas tenant={tenant} workspace={workspace} />}
-          search={<SearchButton />}
+          search={<SearchButton {...(!onThread && { className: "phone:hidden" })} />}
+          tabs={
+            onThread ? null : (
+              <>
+                <Areas tenant={tenant} workspace={workspace} bar />
+                <SearchButton docked />
+              </>
+            )
+          }
           waiting={<NeedYou tenant={tenant} workspace={workspace} />}
           account={<AppAccount />}
         >
@@ -89,7 +115,16 @@ function Workspace() {
  * The workspace's areas, the current one marked, with the open proposals beside Proposals. Threads
  * is current on a thread's page as well as its own.
  */
-function Areas({ tenant, workspace }: { tenant: string; workspace: string }) {
+function Areas({
+  tenant,
+  workspace,
+  bar = false,
+}: {
+  tenant: string;
+  workspace: string;
+  /** In a phone's tab bar, across its width. */
+  bar?: boolean;
+}) {
   const params = { tenant, workspace };
   const { state } = useWorkspace();
   const onThread = useMatchRoute()({
@@ -99,7 +134,7 @@ function Areas({ tenant, workspace }: { tenant: string; workspace: string }) {
   });
   const open = Object.values(state.proposals).filter((proposal) => proposal.status === "open");
   return (
-    <Tracks label="Workspace">
+    <Tracks label="Workspace" {...(bar && { className: "flex-1" })}>
       <TrackLink
         icon={glyphs.messageSquare}
         render={

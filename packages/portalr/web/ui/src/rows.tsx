@@ -146,9 +146,9 @@ export function TrackLink({
     defaultTagName: "a",
     render,
     props: {
-      "aria-label": count ? `${children}, ${count} waiting for you` : children,
+      "aria-label": count ? `${children} ${count} waiting for you` : children,
       className: cn(
-        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-(--segmented-item-radius) px-1 py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:text-fg aria-[current]:bg-surface aria-[current]:text-fg aria-[current]:shadow-(--card-shadow) max-sm:flex-auto max-sm:flex-col sm:px-(--segmented-item-pad-x)",
+        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-(--segmented-item-radius) px-1 py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:text-fg aria-[current]:bg-surface aria-[current]:text-fg aria-[current]:shadow-(--card-shadow) aria-[current]:font-semibold max-sm:flex-auto phone:min-w-11 max-sm:flex-col sm:px-(--segmented-item-pad-x)",
         RING,
         FEEDBACK,
       ),
@@ -157,7 +157,13 @@ export function TrackLink({
           <Icon icon={icon} />
           <span aria-hidden="true" className="max-w-full truncate text-xs">
             {children}
-            {count ? <span className="ms-1 text-accent tabular-nums">{count}</span> : null}
+            {/* A space, so the name said contains the words shown (Voice Control). */}
+            {count ? (
+              <>
+                {" "}
+                <span className="text-accent tabular-nums">{count}</span>
+              </>
+            ) : null}
           </span>
         </>
       ),

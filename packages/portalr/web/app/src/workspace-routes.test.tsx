@@ -345,3 +345,16 @@ test("from 1024 pixels the threads are a table whose links Tab reaches, and the 
   await userEvent.keyboard("{ArrowDown}");
   await expect.element(table.getByRole("link", { name: "Launch" })).toHaveFocus();
 });
+
+test("with a mouse, however narrow, there is no tab bar: the areas are the page's first row", async () => {
+  await page.viewport(390, 800);
+  const { screen } = await open(
+    "/t/acme/w/notes",
+    async (_request, path) => (path === FLAGS ? Response.json({}) : undefined),
+    () => null,
+  );
+  await expect
+    .element(screen.getByRole("main").getByRole("navigation", { name: "Workspace" }))
+    .toBeVisible();
+  expect((document.querySelector("[data-tab-bar]") as HTMLElement).checkVisibility()).toBe(false);
+});

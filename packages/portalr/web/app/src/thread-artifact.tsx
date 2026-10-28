@@ -42,7 +42,7 @@ export function kindName(kind: string, data: Readonly<Record<string, unknown>>):
  * Whether a revision is the blank file its app made for the agent, with no version after it: what
  * the agent writes into it is a proposal until accepted, so the file has nothing to show yet.
  */
-export function createdBlank(revision: {
+function createdBlank(revision: {
   version: number;
   data: Readonly<Record<string, unknown>>;
 }): boolean {

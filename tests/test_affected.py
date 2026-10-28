@@ -38,12 +38,14 @@ def test_a_task_runs_all_at_once_unless_it_starts_a_stack_or_runs_in_a_browser()
     targets = ["app:bdd", "admin:bdd"]
     assert batches("bdd", targets, {"app", "admin"}) == [["app:bdd"], ["admin:bdd"]]
     assert batches("test", ["lattice:test", "evalr:test"]) == [["lattice:test", "evalr:test"]]
-    # The browser projects' tests first, in a run of their own, and then the rest (#254).
+    # The browser projects' tests first, each in a run of its own (#254, #875), then the rest.
     tests = ["admin:test", "evalr:test", "lattice:test", "ui:test"]
     assert batches("test", tests, {"admin", "ui"}) == [
-        ["admin:test", "ui:test"],
+        ["admin:test"],
+        ["ui:test"],
         ["evalr:test", "lattice:test"],
     ]
+    assert batches("test", ["app:test"], {"app"}) == [["app:test"]]
 
 
 def test_every_task_that_starts_a_stack_runs_one_project_at_a_time() -> None:

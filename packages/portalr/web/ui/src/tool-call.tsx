@@ -4,22 +4,19 @@
  */
 
 import { Button as BaseButton } from "@base-ui/react/button";
-import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import type { Artifactr } from "@portalr/client";
 import type { ReactNode } from "react";
 import { type RefObject, useEffect, useId, useRef, useState } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
-import { backdrop, popup } from "./dialog";
+import { Dialog } from "./dialog";
 import { Disclosure } from "./disclosure";
-import { keepTabWithin } from "./full-view";
 import { Icon } from "./icon";
 import { IconButton } from "./icon-button";
 import { glyphs } from "./icons";
 import { useRetrying } from "./on-demand";
 import { ScrollRegion } from "./scroll-region";
-import { SheetHandle, sheet, useSheet } from "./sheet";
 import { RING } from "./states";
 import { StatusBadge, type Tone } from "./status-badge";
 import { callAbout, callLabel, foldSummary } from "./tool-fold";
@@ -217,7 +214,6 @@ function ToolSheet({
   tools: readonly (readonly [string, Artifactr.Tool])[];
   finalFocus: RefObject<HTMLElement | null>;
 }) {
-  const asSheet = useSheet(open, () => onOpenChange(false));
   const view = useRetrying(loadJsonView, open, open);
   const [chosen, setChosen] = useState<string | null>(null);
   // The call last opened, whose row takes the focus back from its detail.
@@ -227,9 +223,9 @@ function ToolSheet({
     setLeft(chosen);
     setChosen(null);
   };
-  const close = (next: boolean, details: { reason: string; cancel: () => void }) => {
+  const close = (next: boolean, details?: { reason: string; cancel: () => void }) => {
     // Escape from a call's detail goes back to the list; from the list, it closes.
-    if (!next && chosen !== null && details.reason === "escape-key") {
+    if (!next && chosen !== null && details?.reason === "escape-key") {
       details.cancel();
       back();
       return;
@@ -240,65 +236,46 @@ function ToolSheet({
     }
     onOpenChange(next);
   };
+  // The kit's dialog, a sheet on a phone (portalr ADR-0082), titled by the list or the call.
   return (
-    <BaseDialog.Root open={open} onOpenChange={close}>
-      <BaseDialog.Portal>
-        <BaseDialog.Backdrop className={backdrop} />
-        <BaseDialog.Popup
-          ref={asSheet}
-          onKeyDown={(event) => keepTabWithin(event.currentTarget, event.nativeEvent)}
-          className={`${popup} ${sheet}`}
-          finalFocus={finalFocus}
-        >
-          <SheetHandle />
-          <div className="flex items-center gap-2">
-            {tool ? (
-              <IconButton
-                label="Back to the calls"
-                icon={glyphs.chevronLeft}
-                className="rounded-full bg-wash"
-                // The focus moves with the reader: to Back, and from it to the call's row.
-                autoFocus
-                onClick={back}
-              />
-            ) : (
-              <BaseDialog.Close
-                render={
-                  <IconButton label="Close" icon={glyphs.x} className="rounded-full bg-wash" />
-                }
-              />
-            )}
-            <BaseDialog.Title className={`${TYPE.section} line-clamp-2 min-w-0 flex-1`}>
-              {tool ? callLabel(tool) : title}
-            </BaseDialog.Title>
-          </div>
-          {tool ? (
-            <div key={chosen} className="flex flex-col gap-3 text-sm">
-              <CallDetail tool={tool} view={view} />
-            </div>
-          ) : (
-            <ol aria-label="Tool calls" className="flex flex-col">
-              {tools.map(([call, each]) => (
-                <li key={call} className="border-line border-s ps-2">
-                  <BaseButton
-                    autoFocus={call === left}
-                    onClick={() => setChosen(call)}
-                    className={`flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-(--tool-call-radius) py-2 text-start text-sm ${RING}`}
-                  >
-                    <CallLine tool={each} />
-                    <CallStatus tool={each} />
-                    <Icon
-                      icon={glyphs.chevronRight}
-                      className="size-3.5 shrink-0 text-muted rtl:-scale-x-100"
-                    />
-                  </BaseButton>
-                </li>
-              ))}
-            </ol>
-          )}
-        </BaseDialog.Popup>
-      </BaseDialog.Portal>
-    </BaseDialog.Root>
+    <Dialog
+      open={open}
+      onOpenChange={close}
+      title={tool ? callLabel(tool) : title}
+      finalFocus={finalFocus}
+    >
+      {tool ? (
+        <div key={chosen} className="flex flex-col gap-3 text-sm">
+          <IconButton
+            label="Back to the calls"
+            icon={glyphs.chevronLeft}
+            // The focus moves with the reader: to Back, and from it to the call's row.
+            autoFocus
+            onClick={back}
+          />
+          <CallDetail tool={tool} view={view} />
+        </div>
+      ) : (
+        <ol aria-label="Tool calls" className="flex flex-col">
+          {tools.map(([call, each]) => (
+            <li key={call} className="border-line border-s ps-2">
+              <BaseButton
+                autoFocus={call === left}
+                onClick={() => setChosen(call)}
+                className={`flex min-h-11 w-full cursor-pointer items-center gap-2 rounded-(--tool-call-radius) py-2 text-start text-sm ${RING}`}
+              >
+                <CallLine tool={each} />
+                <CallStatus tool={each} />
+                <Icon
+                  icon={glyphs.chevronRight}
+                  className="size-3.5 shrink-0 text-muted rtl:-scale-x-100"
+                />
+              </BaseButton>
+            </li>
+          ))}
+        </ol>
+      )}
+    </Dialog>
   );
 }
 

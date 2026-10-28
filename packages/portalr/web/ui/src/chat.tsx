@@ -1056,9 +1056,12 @@ export function ProposalCard({
   proposal,
   onRespond,
   blocked = null,
+  id,
   children,
 }: {
   proposal: Artifactr.Proposal;
+  /** Its id in the page, to link to: focused when followed, and shown so. */
+  id?: string;
   onRespond?: (decision: "accept" | "reject") => Sent;
   /** Why it can't be accepted, or null where it can. */
   blocked?: string | null;
@@ -1069,7 +1072,12 @@ export function ProposalCard({
   const { pending, unsent, send } = useSending();
   const why = useId();
   return (
-    <section className={card} aria-label={`Proposal: ${what}`}>
+    <section
+      id={id}
+      tabIndex={id === undefined ? undefined : -1}
+      className={cn(card, "focus:outline-(length:--focus-width) focus:outline-focus")}
+      aria-label={`Proposal: ${what}`}
+    >
       <p className="font-semibold">{what}</p>
       {proposal.rationale && <p className="text-muted">{proposal.rationale}</p>}
       {children}

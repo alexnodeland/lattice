@@ -94,8 +94,9 @@ def native_file_tools(
     async def create_native_file(ctx: RunContext[Session[Any]], type: str, title: str) -> str:
         """Create an empty native file of a type, named by its title, to edit with `edit_native`.
 
-        It is made at once, by the type's app; find its commands with `find_commands`, then
-        write it with `edit_native` from version 1. You are told when others change it.
+        It is made at once, empty, by the type's app; find its commands with `find_commands`,
+        then write it with `edit_native` from version 1. An edit may be proposed, for a person
+        to review: until one is accepted the file is empty. You are told when others change it.
 
         Args:
             type: The type of file, one of those listed.
@@ -147,7 +148,9 @@ def native_file_tools(
         head = await ws.get(NativeFile, artifact_id)
         return (
             f"Created {artifact_id}: {_noun(file_type)} named {head.data.name}, at version "
-            f"{head.version}. Edit it with edit_native."
+            f"{head.version}. It is empty: edit it with edit_native. An edit that is proposed "
+            "waits for a person's review, and the file stays empty until it is accepted, so tell "
+            "the person it waits for review."
         )
 
     @toolset.tool

@@ -4,7 +4,9 @@
  * its own page and, but for an app, which has its own, a full view. A mini app runs there, as the
  * person viewing the thread, under the kill switch; a form is sent from there, as that person; and
  * a native file is read there a page at a time, and checked out, or edited, as on its page. An
- * app runs in its newest card in the thread alone; one before it says which version it was.
+ * app runs in its newest card in the thread alone; one before it says which version it was. A
+ * native file the agent made blank, and nothing since, says it was created, and that the agent's
+ * changes wait for review where they do, rather than show an empty file (portalr ADR-0055).
  */
 
 import type { Artifactr } from "@portalr/client";
@@ -17,6 +19,7 @@ import {
   factsOf,
   InlineArtifact,
   Reading,
+  TextLink,
 } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -26,7 +29,7 @@ import type { Context } from "./context";
 import { NativeInline } from "./files";
 import { useFormHost } from "./form-host";
 import { KillSwitch } from "./kill-switch";
-import { NATIVE } from "./native";
+import { fields, NATIVE } from "./native";
 import { RENDERERS } from "./renderers";
 import { titleOf } from "./titles";
 
@@ -34,6 +37,13 @@ import { titleOf } from "./titles";
 export function kindName(kind: string, data: Readonly<Record<string, unknown>>): string {
   return NATIVE.has(kind) && factsOf(data).type !== "File" ? factsOf(data).type : kindWords(kind);
 }
+
+/**
+ * Whether a revision is the blank file its app made for the agent, with no version after it: what
+ * the agent writes into it is a proposal until accepted, so the file has nothing to show yet.
+ */
+const createdBlank = (revision: { version: number; data: Readonly<Record<string, unknown>> }) =>
+  revision.version === 1 && fields(revision.data.provenance).source === "blank";
 
 /** Words written as capitals in a kind's name. */
 const CAPITALS: Readonly<Record<string, string>> = { pdf: "PDF", cad: "CAD", svg: "SVG" };
@@ -53,6 +63,7 @@ export function ThreadArtifact({
   me,
   superseded,
   fired = null,
+  waiting = null,
 }: {
   context: Context;
   tenant: string;
@@ -64,6 +75,8 @@ export function ThreadArtifact({
   superseded?: number;
   /** What a rule's preview found, from the proposal that made it, where one said. */
   fired?: string | null;
+  /** The thread's open proposals that would change it: the first's id, and how many. */
+  waiting?: { first: string; count: number } | null;
 }) {
   const { queries } = context;
   const apps = useAppHost(context, tenant, workspace);
@@ -107,6 +120,27 @@ export function ThreadArtifact({
         </div>
       ) : latest === undefined ? (
         <Reading>Loading the {artifact.kind}…</Reading>
+      ) : native && createdBlank(latest) ? (
+        // Its name and kind are the header's; the change that fills it is the proposal's. Nothing
+        // is checked out or edited until it has content: its page still offers both.
+        <div className="flex flex-col gap-1 text-muted text-sm">
+          <p>
+            Created empty.
+            {waiting !== null && (
+              <>
+                {" "}
+                <TextLink href={`#proposal-${waiting.first}`}>
+                  {waiting.count === 1
+                    ? "The agent's changes are waiting for your review."
+                    : `${waiting.count} changes by the agent are waiting for your review.`}
+                </TextLink>
+              </>
+            )}
+          </p>
+          <TextLink className="self-start" render={open}>
+            Open the file's page
+          </TextLink>
+        </div>
       ) : native ? (
         <NativeInline
           place={{ context, tenant, workspace, artifact: artifact.id }}

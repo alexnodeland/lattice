@@ -24,7 +24,7 @@ import {
 import { type UseQueryResult, useQueries, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { Place } from "./check-out";
-import type { Native } from "./native";
+import { fields, type Native } from "./native";
 import { holderOf, PAGES_AT_ONCE, userOf } from "./native-file";
 import { useWorkspace } from "./workspace";
 
@@ -40,8 +40,7 @@ export interface Proposed {
   readonly size: number | null;
 }
 
-const record = (value: unknown): Op =>
-  typeof value === "object" && value !== null ? (value as Op) : {};
+const record: (value: unknown) => Op = fields;
 
 /** A native file's proposal, as its patch says, or null for a change that isn't one's patch. */
 export function proposedOf(change: Artifactr.Proposal["change"]): Proposed | null {

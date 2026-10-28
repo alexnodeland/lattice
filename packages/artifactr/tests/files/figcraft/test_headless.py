@@ -6,17 +6,20 @@ calls against FigCraft itself.
 
 import hashlib
 import stat
+import struct
 import sys
+import zlib
 from pathlib import Path
 
 import pytest
 
 from artifactr.files.app import App, AppCommand, AppFailed
+from artifactr.files.app.png import SIGNATURE, solid
 from artifactr.files.figcraft import Subprocess
 from artifactr.files.manifest import FIGCRAFT
 
 FAKE = Path(__file__).with_name("fake_cli.py")
-PNG = b"\x89PNG\r\n\x1a\n"
+PNG = SIGNATURE
 
 
 @pytest.fixture
@@ -71,15 +74,44 @@ async def test_a_command_that_fails_refuses_the_batch_and_is_named(figcraft: Sub
     assert refused.value.failure == "refused"
 
 
-async def test_it_renders_each_canvas_page_and_refuses_an_empty_one(figcraft: Subprocess) -> None:
+async def test_it_renders_each_canvas_page_and_refuses_one_past_the_last(
+    figcraft: Subprocess,
+) -> None:
     design = (await figcraft.apply(None, [text("Hello")], deadline=20)).content
     assert (await figcraft.render(design, 1, scale=0.0001, deadline=20)).startswith(PNG)
     with pytest.raises(AppFailed, match="no such page") as refused:
         await figcraft.render(design, 2, scale=1, deadline=20)
     assert refused.value.failure == "refused"
+    unrenderable = (await figcraft.apply(None, [text("Unrenderable")], deadline=20)).content
+    with pytest.raises(AppFailed, match="renderer crashed") as crashed:
+        await figcraft.render(unrenderable, 1, scale=1, deadline=20)
+    assert crashed.value.failure == "refused"
+
+
+def pixels(png: bytes) -> tuple[int, int, bytes]:
+    """A solid PNG's width, height and first pixel, as `solid` writes one."""
+    width, height = struct.unpack(">II", png[16:24])
+    idat = png.index(b"IDAT")
+    (length,) = struct.unpack(">I", png[idat - 4 : idat])
+    return width, height, zlib.decompress(png[idat + 4 : idat + 4 + length])[1:4]
+
+
+async def test_a_blank_page_is_drawn_as_its_background_not_refused(figcraft: Subprocess) -> None:
     blank = (await figcraft.apply(None, [], deadline=20)).content
-    with pytest.raises(AppFailed, match="nothing to render"):
-        await figcraft.render(blank, 1, scale=1, deadline=20)
+    png = await figcraft.render(blank, 1, scale=0.25, deadline=20)
+    assert pixels(png) == (256, 256, bytes.fromhex("F5F5F5"))
+    odd = AppCommand(name="page.background", args={"color": "transparent"})
+    unknown = (await figcraft.apply(None, [odd], deadline=20)).content
+    assert pixels(await figcraft.render(unknown, 1, scale=0, deadline=20)) == (1, 1, b"\xff" * 3)
+    assert pixels(await figcraft.render(blank, 1, scale=8, deadline=20))[:2] == (1024, 1024)
+    gone = AppCommand(name="page.unlisted", args={})
+    unlisted = (await figcraft.apply(None, [gone], deadline=20)).content
+    assert pixels(await figcraft.render(unlisted, 1, scale=0, deadline=20)) == (1, 1, b"\xff" * 3)
+
+
+def test_a_colour_is_three_bytes() -> None:
+    with pytest.raises(ValueError, match="three bytes, not 4"):
+        solid(1, 1, b"\x00" * 4)
 
 
 async def test_it_finds_ten_commands_at_most_from_its_lines(figcraft: Subprocess) -> None:

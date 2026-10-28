@@ -22,7 +22,8 @@ from pydantic_ai import Agent, ModelMessage, ModelRequest, ModelResponse, ToolRe
 import artifactr.files
 from artifactr.agent import ArtifactWorkspace, Session
 from artifactr.core import UserActor
-from artifactr.files.app import AppCommand, AppFailed
+from artifactr.files.app import AppCommand
+from artifactr.files.app.png import SIGNATURE
 from artifactr.files.blobs import InMemoryBlobs
 from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.craft import CRAFTS
@@ -66,11 +67,6 @@ FIRST: Final[dict[str, AppCommand]] = {
 ALICE = UserActor(id="alice", name="Alice")
 
 NIGHTLY: Final = Path(__file__).parents[5] / ".github" / "workflows" / "nightly.yml"
-
-UNRENDERED: Final = {"figcraft": "the current page is empty: nothing to render"}
-"""Apps whose blank file has a page they refuse to render, and how (lattice#1087): seen on
-FigCraft 0.6.0's macOS CLI. Once a fix renders it, or Linux's CLI does, the test fails, and the
-app comes out of here."""
 
 # Each call to the app has NativeFiles' default deadline, 30 seconds: a create, an edit, a render.
 pytestmark = pytest.mark.timeout(180)
@@ -159,12 +155,7 @@ async def test_a_blank_file_is_created_opens_and_its_first_edit_is_proposed(app:
         assert (await ws.get(NativeFile, file.id)).version == 1, "the edit waits for review"
         # Its first page, as a person's preview asks for it, if the blank file has one.
         if CRAFTS[app].render and made.data.pages:
-            if app in UNRENDERED:
-                with pytest.raises(AppFailed, match=UNRENDERED[app]) as refused:
-                    await files.render(ws, file.id, 1)
-                assert refused.value.failure == "refused"
-            else:
-                png = await files.render(ws, file.id, 1)
-                assert png.startswith(b"\x89PNG\r\n\x1a\n")
+            png = await files.render(ws, file.id, 1)
+            assert png.startswith(SIGNATURE)
     finally:
         await worker.aclose()

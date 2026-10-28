@@ -138,7 +138,7 @@ check "with stackr's stack on postgres" grep -qE \
 check "its keys and choices in its .env, mode 0600" test \
   "$(key LITELLM_API_KEY) $(key PORTAL_LITELLM_KEY) $(key DIAGRAMS) $(uv run python -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$scratch/app/.env")" = \
   "sk-tenant-made-up sk-portal-made-up on 0o600"
-check "every crafting app but Blender" test "$(key FILES_CRAFTS | tr , '\n' | grep -c .) $(key FILES_CRAFTS | grep -c blender)" = "10 0"
+check "every crafting app but Blender" test "$(key FILES_CRAFTS | tr , '\n' | grep -c .) $(key FILES_CRAFTS | grep -c blender)" = "13 0"
 check "and db-roles before the start" grep -q "run --rm --no-deps -T app portal-admin db-roles" "$scratch/calls"
 check "never printing a key" refused grep -q made-up "$scratch/out"
 check "nor passing one as an argument" refused grep -q made-up "$scratch/calls"

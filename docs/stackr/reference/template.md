@@ -46,7 +46,7 @@ These are computed from the answers, apart from `libraries_path`, which `scripts
 | `use_files` | bool | `{{ libraries in ['artifactr', 'both'] and native_files }}` |
 | `use_diagrams` | bool | `{{ use_files and diagrams }}` |
 | `use_integrations` | bool | `{{ use_ui or use_files or use_tracker }}` |
-| `crafts` | yaml | `{'wordcraft': {'version': '0.11.0', 'type': 'WordDocument', 'editor': 5}, 'gridcraft': {'version': '0.8.0', 'type': 'Workbook', 'editor': 2}, 'deckcraft': {'version': '0.7.0', 'type': 'Presentation'}, 'pdfcraft': {'version': '0.8.0', 'type': 'PdfDocument', 'editor': 3}, 'cadcraft': {'version': '0.8.0', 'type': 'Drawing', 'editor': 4}, 'photocraft': {'version': '0.9.0', 'type': 'LayeredImage'}, 'vectorcraft': {'version': '0.12.0', 'type': 'VectorImage'}, 'designcraft': {'version': '0.9.0', 'type': 'PageLayout'}, 'figcraft': {'version': '0.6.0', 'type': 'Design'}, 'freecad': {'version': '1.1.4', 'type': 'CadModel'}, 'blender': {'version': '5.2.2', 'type': 'Scene', 'platform': 'linux/amd64', 'memory': 4, 'packages': ['libx11-6', 'libxi6', 'libxxf86vm1', 'libxfixes3', 'libxrender1', 'libxkbcommon0', 'libsm6', 'libice6', 'libgl1', 'libegl1', 'libegl-mesa0', 'libgl1-mesa-dri'], 'source': 'https://download.blender.org/source/blender-5.2.2.tar.xz', 'source_sha256': '56a3b1ec97479ff24dce65d2f09f8a1895005cece279b701fe4fcf74bce3f77e'}}` |
+| `crafts` | yaml | `{'wordcraft': {'version': '0.11.0', 'type': 'WordDocument', 'editor': 5}, 'gridcraft': {'version': '0.8.0', 'type': 'Workbook', 'editor': 2}, 'deckcraft': {'version': '0.7.0', 'type': 'Presentation'}, 'pdfcraft': {'version': '0.8.0', 'type': 'PdfDocument', 'editor': 3}, 'cadcraft': {'version': '0.8.0', 'type': 'Drawing', 'editor': 4}, 'photocraft': {'version': '0.9.0', 'type': 'LayeredImage'}, 'vectorcraft': {'version': '0.12.0', 'type': 'VectorImage'}, 'designcraft': {'version': '0.9.0', 'type': 'PageLayout'}, 'figcraft': {'version': '0.6.0', 'type': 'Design'}, 'filmcraft': {'version': '0.8.0', 'type': 'VideoProject'}, 'effectcraft': {'version': '0.11.1', 'type': 'MotionGraphics'}, 'soundcraft': {'version': '0.8.0', 'type': 'AudioSession'}, 'freecad': {'version': '1.1.4', 'type': 'CadModel'}, 'blender': {'version': '5.2.2', 'type': 'Scene', 'platform': 'linux/amd64', 'memory': 4, 'packages': ['libx11-6', 'libxi6', 'libxxf86vm1', 'libxfixes3', 'libxrender1', 'libxkbcommon0', 'libsm6', 'libice6', 'libgl1', 'libegl1', 'libegl-mesa0', 'libgl1-mesa-dri'], 'source': 'https://download.blender.org/source/blender-5.2.2.tar.xz', 'source_sha256': '56a3b1ec97479ff24dce65d2f09f8a1895005cece279b701fe4fcf74bce3f77e'}}` |
 | `use_portal` | bool | `{{ access == 'grantr' and portal }}` |
 
 | Copier setting | Value |
@@ -135,11 +135,14 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `scripts/crafts/cadcraft.sha256` | `use_files` | copied |
 | `scripts/crafts/deckcraft.sha256` | `use_files` | copied |
 | `scripts/crafts/designcraft.sha256` | `use_files` | copied |
+| `scripts/crafts/effectcraft.sha256` | `use_files` | copied |
 | `scripts/crafts/figcraft.sha256` | `use_files` | copied |
+| `scripts/crafts/filmcraft.sha256` | `use_files` | copied |
 | `scripts/crafts/freecad.sha256` | `use_files` | copied |
 | `scripts/crafts/gridcraft.sha256` | `use_files` | copied |
 | `scripts/crafts/pdfcraft.sha256` | `use_files` | copied |
 | `scripts/crafts/photocraft.sha256` | `use_files` | copied |
+| `scripts/crafts/soundcraft.sha256` | `use_files` | copied |
 | `scripts/crafts/vectorcraft.sha256` | `use_files` | copied |
 | `scripts/crafts/wordcraft.sha256` | `use_files` | copied |
 | `scripts/build-diagrams-worker.sh` | `use_diagrams` and `use_files` | copied |

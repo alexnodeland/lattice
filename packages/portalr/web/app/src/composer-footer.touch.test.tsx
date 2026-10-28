@@ -43,16 +43,18 @@ async function thread() {
 test("+ opens the Add sheet; its Mode chooses the agent's mode, and the focus comes back to +", async () => {
   const { screen, sent } = await thread();
   const plus = screen.getByRole("button", { name: "Add", exact: true });
-  await plus.click();
+  (plus.element() as HTMLElement).click();
   const sheet = screen.getByRole("dialog", { name: "Add" });
   await expect.element(sheet).toBeVisible();
   await expect.element(sheet.getByRole("button", { name: "Add files" })).toBeVisible();
-  await sheet.getByRole("button", { name: /^Mode/ }).click();
+  // Pressed in the page, not by the pointer: a sheet slides in, and the pointer waits for stillness.
+  (sheet.getByRole("button", { name: /^Mode/ }).element() as HTMLElement).click();
   const modes = screen.getByRole("dialog", { name: "Agent mode" });
   await expect
     .element(modes.getByRole("button", { name: /^Auto/ }))
     .toHaveAttribute("aria-pressed", "true");
-  await modes.getByRole("button", { name: /^Ask/ }).click();
+  await expect.element(modes.getByRole("button", { name: /^Ask/ })).toBeVisible();
+  (modes.getByRole("button", { name: /^Ask/ }).element() as HTMLElement).click();
   await expect.poll(() => sent.find((c) => c.type === "set_thread_mode")?.mode).toBe("suggest");
   await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
   await expect.element(plus).toHaveFocus();
@@ -66,8 +68,9 @@ test("+ opens the Add sheet; its Mode chooses the agent's mode, and the focus co
 test("the pill names the model and opens the Select model sheet; a choice renames it, and the focus comes back", async () => {
   const { screen } = await thread();
   const pill = screen.getByRole("button", { name: "Model: Default" });
-  await expect.element(pill).toBeVisible();
-  await pill.click();
+  // The models are read once the composer has had the focus.
+  await expect.element(pill, { timeout: 10_000 }).toBeVisible();
+  (pill.element() as HTMLElement).click();
   const sheet = screen.getByRole("dialog", { name: "Select model" });
   // A turn waits here: the model is fixed for it, and the sheet says so.
   await expect.element(sheet).toHaveAccessibleDescription("The running turn keeps its model");

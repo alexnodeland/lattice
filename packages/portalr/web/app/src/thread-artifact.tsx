@@ -3,7 +3,8 @@
  * over REST and again as the workspace's log moves on, through its kind's renderer, with a link to
  * its own page and, but for an app, which has its own, a full view. A mini app runs there, as the
  * person viewing the thread, under the kill switch; a form is sent from there, as that person; and
- * a native file is read there a page at a time, and checked out, or edited, as on its page.
+ * a native file is read there a page at a time, and checked out, or edited, as on its page. An
+ * app runs in its newest card in the thread alone; one before it says which version it was.
  */
 
 import type { Artifactr } from "@portalr/client";
@@ -49,6 +50,7 @@ export function ThreadArtifact({
   workspace,
   artifact,
   me,
+  superseded,
 }: {
   context: Context;
   tenant: string;
@@ -56,6 +58,8 @@ export function ThreadArtifact({
   artifact: Artifactr.Artifact;
   /** The reader's user id, as whom a form is sent and a file checked out. */
   me: string;
+  /** For an app shown again further down: the version this card was, shown without running. */
+  superseded?: number;
 }) {
   const { queries } = context;
   const apps = useAppHost(context, tenant, workspace);
@@ -90,6 +94,13 @@ export function ThreadArtifact({
         <Alert tone="error">
           This {artifact.kind} couldn't be read. Reload the page to try again.
         </Alert>
+      ) : superseded !== undefined ? (
+        <div className="flex flex-col gap-1">
+          <span className="font-semibold text-sm">{name}</span>
+          <p className="text-muted text-xs">
+            Made by the agent. Version {superseded}. A newer version runs below.
+          </p>
+        </div>
       ) : latest === undefined ? (
         <Reading>Loading the {artifact.kind}…</Reading>
       ) : native ? (

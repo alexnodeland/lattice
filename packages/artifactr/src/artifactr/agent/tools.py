@@ -74,7 +74,7 @@ def artifact_tools(
             artifact_id: The artifact to read.
         """
         artifact = await ctx.deps.workspace.artifact(artifact_id)
-        await _follow(ctx, artifact.id)
+        await follow(ctx, artifact.id)
         return artifact_text(artifact)
 
     @toolset.tool(
@@ -88,7 +88,7 @@ def artifact_tools(
         annotate({ARTIFACT_ID: command.artifact_id})  # the tool's span; it has no artifact_id
         outcome = await ctx.deps.workspace.commit(command)
         if isinstance(outcome, Applied):
-            await _follow(ctx, outcome.artifact_id)
+            await follow(ctx, outcome.artifact_id)
         return describe_outcome(outcome)
 
     @toolset.tool
@@ -119,7 +119,7 @@ def artifact_tools(
             old, new, field=field, summary=summary, thread_id=ctx.deps.thread_id
         )
         outcome = await submit(ctx.deps.workspace, edit, propose=propose, rationale=rationale)
-        await _follow(ctx, artifact.id)
+        await follow(ctx, artifact.id)
         return describe_outcome(outcome)
 
     @toolset.tool
@@ -157,8 +157,11 @@ def artifact_tools(
     return toolset
 
 
-async def _follow(ctx: RunContext[Session[Any]], artifact_id: ArtifactId) -> None:
-    """Add an artifact to the thread's focus, so the agent hears about changes to it."""
+async def follow(ctx: RunContext[Session[Any]], artifact_id: ArtifactId) -> None:
+    """Add an artifact to the thread's focus, so the agent hears about changes to it.
+
+    A tool of an application's, or of a package's, that makes an artifact calls it too.
+    """
     workspace = ctx.deps.workspace
     thread = await workspace.thread(ctx.deps.thread_id)
     if artifact_id not in thread.focus:

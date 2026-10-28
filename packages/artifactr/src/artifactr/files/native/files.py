@@ -1,4 +1,4 @@
-"""Native files in a workspace: uploads, check-outs, check-ins, agents' edits and collection.
+"""Native files in a workspace: uploads, blank files, check-outs, check-ins, edits, collection.
 
 One writer at a time, through a lease on the artifact (artifactr ADR-0071): a person's
 check-out holds it for hours, as `checkout:<id>:<participant>`, and an agent's edit for the
@@ -18,6 +18,7 @@ from collections.abc import (
     AsyncIterable,
     Awaitable,
     Callable,
+    Generator,
     Mapping,
     Sequence,
 )
@@ -27,6 +28,7 @@ from typing import Final, Literal, cast, override
 from pydantic import JsonValue
 
 from artifactr.core import (
+    AgentActor,
     AlreadyExists,
     Applied,
     Artifact,
@@ -51,11 +53,12 @@ from artifactr.core import (
 )
 from artifactr.files.app import App, AppCommand, AppFailed, Inspection
 from artifactr.files.blobs import Blobs, Clock, once
-from artifactr.files.blobs.port import spool, utc_now
+from artifactr.files.blobs.port import TooLarge, spool, utc_now
 from artifactr.files.checkouts import Checkout, Checkouts, holder_of
 from artifactr.files.manifest import Blob, NativeFile, Provenance, revise
 from artifactr.files.native.formats import FORMATS, Format, file_name, sniffed
-from artifactr.workspace import ArtifactBusy, Scope, Workspace
+from artifactr.files.native.pace import Gauge, Pace
+from artifactr.workspace import Access, ArtifactBusy, Scope, Workspace
 from lattice_core.integrations import Integrations
 
 TEXT: Final = "text/plain; charset=utf-8"
@@ -64,6 +67,9 @@ JSON: Final = "application/json"
 CREATE_NATIVE_FILE: Final = "artifactr:create_native_file"
 """The action a person's upload over HTTP asks `authorize` before any of its bytes are read:
 an editor's, as `artifactr:create_artifact` is, which its commit asks too."""
+
+CREATE_ARTIFACT: Final = "artifactr:create_artifact"
+"""The action `create` asks of an agent as well, before its commit asks it of the person."""
 
 Part = Literal["content", "text", "review"]
 """What of a revision to read: the file, its words, or its comments and tracked changes."""
@@ -128,6 +134,22 @@ class Busy(Exception):
         self.limit = limit
 
 
+class Paced(Exception):
+    """Too many files are being made: by the actor this minute, or by this process now.
+
+    Nothing was read or committed.
+
+    Attributes:
+        wait: The seconds until the actor's pace lets another through; None if every place is
+            held, which frees when some file is done.
+    """
+
+    def __init__(self, wait: int | None) -> None:
+        when = "shortly" if wait is None else f"in {wait} seconds"
+        super().__init__(f"too many files are being made: try again {when}")
+        self.wait = wait
+
+
 class NativeFiles:
     """Native files in workspaces: their bytes, their check-outs and the apps that read them.
 
@@ -171,6 +193,12 @@ class NativeFiles:
         naming: Other artifact types whose revisions name bytes in the same store, such as
             diagrams, whose images it keeps: collection keeps what their revisions and their
             pending proposals name too (artifactr ADR-0090).
+        pace: How many files each of a tenant's people may start in a minute, in this process,
+            past which `create` refuses another with `Paced`; None, the default, for no pace.
+            `files_router` paces uploads by it too, in place of its own.
+        gauge: How many files this process makes at once, a tenant's and a person's share,
+            past which `create` refuses another with `Paced`; None, the default, for no limit.
+            `files_router` holds uploads and check-ins to it too, in place of its own.
 
     Raises:
         ValueError: If an edit's lease would end before the apps' deadline, or no app is given.
@@ -193,6 +221,8 @@ class NativeFiles:
         pages: int = 64 << 20,
         waiting: int = 8,
         naming: Sequence[type[Artifact]] = (),
+        pace: Pace | None = None,
+        gauge: Gauge | None = None,
     ) -> None:
         if edit_ttl.total_seconds() <= deadline:
             raise ValueError("an edit's lease must outlast the app's deadline, and the commit")
@@ -218,6 +248,8 @@ class NativeFiles:
         self._pages: OrderedDict[PageKey, bytes] = OrderedDict()
         self._pages_held = 0
         self._naming: tuple[type[Artifact], ...] = (NativeFile, *naming)
+        self._pace = pace
+        self._gauge = gauge
 
     def waiting(self, tenant_id: str) -> int:
         """How many of the tenant's pages wait for one of its readings now."""
@@ -227,6 +259,16 @@ class NativeFiles:
     def readings(self) -> int | None:
         """How many files each tenant may have the app read at once, or None for no limit."""
         return self._readings
+
+    @property
+    def pace(self) -> Pace | None:
+        """How many files each person may start in a minute, if it is paced here."""
+        return self._pace
+
+    @property
+    def gauge(self) -> Gauge | None:
+        """How many files this process makes at once, if it is held to a number here."""
+        return self._gauge
 
     @property
     def limit(self) -> int:
@@ -366,6 +408,114 @@ class NativeFiles:
         return await ws.commit(
             create_artifact(manifest, artifact_id=artifact_id, thread_id=thread_id)
         )
+
+    async def create[F: NativeFile](
+        self,
+        ws: Workspace,
+        file_type: type[F],
+        name: str,
+        *,
+        artifact_id: ArtifactId | None = None,
+        thread_id: ThreadId | None = None,
+    ) -> Applied | Proposed | None:
+        """Create a blank native file of a type, as its app makes one, under an id or a new one.
+
+        It is how an agent starts a file to edit (native files ADR-0019). The handle's actor must
+        be allowed `artifactr:create_native_file` and `artifactr:create_artifact`, asked before
+        anything else. The app makes the file from nothing, `apply` of no commands, in one of
+        the tenant's readings, and its format is the one the app names, or the type's only one.
+        The name keeps no path or control character, and takes the format's extension. Given
+        the id of a file of this type that is there, it makes nothing, before the app is called
+        or the pace spent, so a call retried after it succeeded makes one file.
+
+        An agent's run commits it as the person it acts for, so it is applied, not proposed,
+        whatever the type's write policy, and is held to their pace and share of places, as
+        their uploads are: the provenance, `blank`, records that the app made it, and the agent
+        and its run that asked. The agent's edits of it then follow the policy. A run that acts
+        for no one commits it as itself, and one for a person's client as the client, each
+        under the policy.
+
+        Returns:
+            The new file's outcome, or None if a file of this type has this id already.
+
+        Raises:
+            Forbidden: If the actor may not create a native file, or an artifact.
+            NotEnabled: If the app's integration is off in the workspace.
+            AlreadyExists: If an artifact with this id exists, and isn't a file of this type.
+            Paced: If the actor is past their pace, or this process holds every place.
+            Busy: If the tenant has as many files being read as it may.
+            AppFailed: If the app can't make a blank file: `refused` if it makes none.
+            ValidationFailed: If the app makes a file of another format than the type's.
+            TooLarge: If the file is larger than its format's most.
+            OverQuota: If the file would take the workspace or the tenant past a quota.
+        """
+        await ws.check(Access(action=CREATE_NATIVE_FILE))
+        await ws.check(Access(action=CREATE_ARTIFACT))
+        app = await self._switched_on(ws, file_type)
+        if artifact_id is not None and artifact_id in (await ws.hidden()).artifacts:
+            raise AlreadyExists("artifact", artifact_id)
+        if artifact_id is not None and (made := await _existing(ws, artifact_id)):
+            if not isinstance(made.data, file_type):
+                raise AlreadyExists("artifact", artifact_id)
+            return None
+        committer = _creator(ws)
+        with self._admitted(committer):
+            async with self._turn(ws.tenant_id):
+                blank = await app.apply(None, [], deadline=self._deadline)
+            media_type = _blank_format(file_type, blank.inspection)
+            if len(blank.content) > (most := self._most(media_type)):
+                raise TooLarge(most)
+            known = self._formats.get(media_type)
+            name = file_name(name, "" if known is None else known.extension, self._formats)
+            artifact_id = artifact_id or new_artifact_id()
+            asked = ws.actor
+            via = asked if committer is not ws and isinstance(asked, AgentActor) else None
+            made = Provenance(
+                source="blank",
+                app=app.name,
+                app_version=app.version,
+                build=app.build,
+                agent=None if via is None else via.participant,
+                run_id=None if via is None else via.run_id,
+            )
+            manifest = await self._stored(
+                ws,
+                artifact_id,
+                file_type,
+                name,
+                (blank.content, media_type),
+                blank.inspection,
+                made,
+            )
+            command = create_artifact(manifest, artifact_id=artifact_id, thread_id=thread_id)
+            try:
+                return await committer.commit(command)
+            except AlreadyExists:
+                # The same id, made meanwhile by the same call run twice at once: made once.
+                made = await _existing(ws, artifact_id)
+                if made is None or not isinstance(made.data, file_type):
+                    raise
+                return None
+
+    @contextlib.contextmanager
+    def _admitted(self, ws: Workspace) -> Generator[None]:
+        """Hold a place for the actor's file while it is made, within their pace and share.
+
+        The actor is the one it is committed as, so an agent's run spends its person's pace and
+        share, as their uploads do. The place first, as the router takes it: a refusal for want
+        of one counts against no one's pace.
+
+        Raises:
+            Paced: If no place is free, or the actor is past their pace.
+        """
+        who = (ws.tenant_id, ws.actor.participant)
+        places = contextlib.nullcontext(True) if self._gauge is None else self._gauge.held(who)
+        with places as held:
+            if not held:
+                raise Paced(None)
+            if self._pace is not None and (wait := self._pace.admit(who)) is not None:
+                raise Paced(wait)
+            yield
 
     # ─── check-out and check-in ───────────────────────────────────────────────
 
@@ -970,6 +1120,34 @@ def _replaced(patch: Patch, part: Part) -> Blob | None:
             value = op.get("value")
             return None if value is None else Blob.model_validate(value)
     return None
+
+
+def _blank_format(file_type: type[NativeFile], inspection: Inspection) -> str:
+    """The format of a blank file its app made: the one it names, or else the type's only one.
+
+    Raises:
+        ValidationFailed: If the app names a format the type doesn't hold, or names none of a
+            type of several.
+    """
+    named = inspection.media_type
+    if named is None and len(file_type.formats) == 1:
+        (named,) = file_type.formats
+    if named is None or named not in file_type.formats:
+        # Never the format the app named: it is the worker's text.
+        raise ValidationFailed(f"the app made a file of another format than a {file_type.kind}", [])
+    return named
+
+
+def _creator(ws: Workspace) -> Workspace:
+    """The handle a created file is committed through: an agent's run's person's, or its own.
+
+    The run's actor was checked first, so the file is made only if the agent may make it, and
+    the commit asks as the person too.
+    """
+    actor = ws.actor
+    if isinstance(actor, AgentActor) and actor.on_behalf_of is not None:
+        return ws.as_actor(actor.on_behalf_of)
+    return ws
 
 
 async def _existing(ws: Workspace, artifact_id: ArtifactId) -> Versioned[NativeFile] | None:

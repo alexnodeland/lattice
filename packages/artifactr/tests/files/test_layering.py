@@ -110,15 +110,17 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {*LIBRARY, "pydantic", "lattice_core.integrations"},
     ),
-    # The agent's tools, on pydantic-ai and the agent's Session, the one layer that knows them.
+    # The agent's tools, on pydantic-ai and the agent's Session, the one layer that knows them;
+    # a file it creates is marked on its tool's span, as `create_artifact`'s artifact is.
     "tools": (
         {
             "artifactr.files.manifest",
             "artifactr.files.app",
+            "artifactr.files.blobs",
             "artifactr.files.native",
             "artifactr.files.tools",
         },
-        {*LIBRARY, "artifactr.agent", "pydantic", "pydantic_ai"},
+        {*LIBRARY, "artifactr.agent", "artifactr.telemetry", "pydantic", "pydantic_ai"},
     ),
     # People's check-out and check-in over HTTP, on artifactr's router's auth and statuses.
     "fastapi": (

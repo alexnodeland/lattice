@@ -55,6 +55,7 @@ from artifactr.agent.session import Session, last_seen
 from artifactr.agent.tools import artifact_tools
 from artifactr.core import (
     Artifact,
+    ArtifactCreated,
     ArtifactId,
     DeferredRequest,
     FocusChanged,
@@ -254,6 +255,8 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
                     focus = set(event.artifact_ids)
                 elif same_participant(envelope.actor, workspace.actor):
                     pass
+                elif isinstance(event, ArtifactCreated) and event.artifact_id in session.made:
+                    pass  # made by its own tool as its person: the tool told it already
                 elif isinstance(event, MessagePosted) and event.kind == "message":
                     if not same_principal(envelope.actor, workspace.actor):
                         return  # one author per turn: the next turn acts for this one's

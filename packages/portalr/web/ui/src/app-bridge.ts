@@ -36,13 +36,22 @@ const SIZE_CHANGED = "ui/notifications/size-changed";
 /** What the host sends the app when its theme, colours or modes change. */
 const CONTEXT_CHANGED = "ui/notifications/host-context-changed";
 
-/** The notifications an app may send; any other is dropped, and any other request refused. */
 /** portalr's own, said by the app's document before the app's HTML: it runs. */
 export const APP_STARTED = "portalr/app-started";
 
+/**
+ * portalr's own, said by the app's document of the app: an error, a refused promise or a refusal
+ * of its policy, the first five that differ; and once, after it loaded, what it drew.
+ */
+export const APP_ERROR = "portalr/app-error";
+export const APP_BOOT = "portalr/app-boot";
+
+/** The notifications an app may send; any other is dropped, and any other request refused. */
 const NOTIFICATIONS = new Set([
   PROXY_READY,
   APP_STARTED,
+  APP_ERROR,
+  APP_BOOT,
   "ui/notifications/initialized",
   SIZE_CHANGED,
 ]);
@@ -142,6 +151,74 @@ export class Limiter {
     this.#taken.push(at);
     return true;
   }
+}
+
+// ─── what the app's document reports ─────────────────────────────────────────
+
+/** The most reports a frame's bridge passes on: five errors and three of what it drew. */
+export const MOST_REPORTS = 8;
+
+/** Each report's fields: text kept to so many characters, or a number (`0`). Others are dropped. */
+const REPORTED: Readonly<Record<string, Readonly<Record<string, number>>>> = {
+  [APP_ERROR]: { kind: 20, message: 300, source: 120, line: 0, directive: 60, blocked: 200 },
+  [APP_BOOT]: {
+    drawn: 20,
+    readyState: 20,
+    children: 0,
+    canvases: 0,
+    canvasWidth: 0,
+    canvasHeight: 0,
+    canvasContext: 30,
+    canvasPixels: 20,
+    width: 0,
+    height: 0,
+    pixelRatio: 0,
+    userAgent: 120,
+    has: 120,
+  },
+};
+
+/** What an error is said to be; any other is an error. */
+const KINDS = new Set(["error", "load", "rejection", "policy"]);
+
+/** The most a number reported may be: none is ever more, or less than nothing. */
+const MOST_NUMBER = 100_000;
+
+/** What could hide or reorder the text around it, or break its line: controls, formats, breaks. */
+const UNSHOWN = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
+
+/** Text as one plain line of at most `most` characters, never half of one; the unshown, spaces. */
+const oneLine = (text: string, most: number) =>
+  Array.from(text).slice(0, most).join("").replace(UNSHOWN, " ");
+
+/** What an app's document reported: untrusted text and numbers, for plain text alone. */
+export type Report = {
+  readonly method: typeof APP_ERROR | typeof APP_BOOT;
+  readonly params: Readonly<Record<string, string | number>>;
+};
+
+/** A report's fields the bridge knows, text cut short and stripped; null if none is left. */
+export function readReport(method: string, params: JsonObject): Report | null {
+  const fields = REPORTED[method];
+  if (fields === undefined) {
+    return null;
+  }
+  const kept: Record<string, string | number> = {};
+  for (const [name, most] of Object.entries(fields)) {
+    const value = params[name];
+    if (most > 0 && isString(value)) {
+      kept[name] = oneLine(value, most);
+    } else if (most === 0 && isNumber(value) && Number.isFinite(value)) {
+      kept[name] = Math.min(MOST_NUMBER, Math.max(0, value));
+    }
+  }
+  if (Object.keys(kept).length === 0) {
+    return null;
+  }
+  if (method === APP_ERROR && !KINDS.has(String(kept.kind))) {
+    kept.kind = "error";
+  }
+  return { method: method as Report["method"], params: kept };
 }
 
 // ─── JSON Patch ───────────────────────────────────────────────────────────────
@@ -432,6 +509,8 @@ export interface BridgeHost {
   readonly ready: () => void;
   /** The app's document said something: it runs, whether or not it uses the bridge. */
   readonly started: () => void;
+  /** The app's document reported an error, or what it drew: untrusted, for plain text alone. */
+  readonly reported?: (report: Report) => void;
 }
 
 /**
@@ -451,6 +530,8 @@ export class Bridge {
   #measuredAt = Number.NEGATIVE_INFINITY;
   /** The latest measure heard too soon after the last, applied when its time comes. */
   #held: { height: number; timer: ReturnType<typeof setTimeout> } | null = null;
+  /** How many of the app's reports were passed on, up to `MOST_REPORTS`. */
+  #reports = 0;
   readonly #now: () => number;
 
   constructor(options: {
@@ -554,6 +635,11 @@ export class Bridge {
     if (message.kind === "notification") {
       if (method === SIZE_CHANGED && isNumber(params.height)) {
         this.#sizeChanged(params.height, params.measured === true);
+      }
+      const report = this.#reports < MOST_REPORTS ? readReport(method, params) : null;
+      if (report !== null) {
+        this.#reports += 1;
+        this.#host.reported?.(report);
       }
       return;
     }

@@ -339,8 +339,12 @@ type MakeRunner = Callable[..., Runner[Gate]]
 
 
 @pytest.fixture
-async def runners(gate: Gate) -> AsyncIterator[MakeRunner]:
-    """Make runners that are closed as the test ends, so one that is stuck fails the test."""
+async def runners(gate: Gate, _no_task_left: None) -> AsyncIterator[MakeRunner]:
+    """Make runners that are closed as the test ends, so one that is stuck fails the test.
+
+    They are closed before `_no_task_left` cancels what is left: a runner still open would
+    start a turn for each it cancels.
+    """
     made: list[Runner[Gate]] = []
 
     def make(agent: Agent[Session[Gate], Any], **options: Any) -> Runner[Gate]:

@@ -4,11 +4,8 @@
  */
 
 import { expect, type Page } from "@playwright/test";
+import { card } from "./diagrams";
 import { Then, When } from "./fixtures";
-
-/** A file's card, named for the file: in the thread, or beside it, where the newest goes. */
-const card = (page: Page, name: string) =>
-  page.getByRole("main").getByRole("listitem", { name, exact: true });
 
 Then(
   "{string} was created empty, its changes waiting for review",
@@ -21,7 +18,10 @@ Then(
   },
 );
 
-/** A proposal in the thread, by its summary alone: one summary may begin another. */
+/**
+ * A proposal in the thread, by its whole summary: "Write the travel plan" begins "Write the travel
+ * plan's slides", so threads.ts's steps, which match a summary's start, would find both.
+ */
 const proposal = (page: Page, what: string) =>
   page.getByRole("region", { name: `Proposal: ${what}`, exact: true });
 
@@ -31,10 +31,12 @@ Then("the proposal {string} waits for review", async ({ page }, what: string) =>
 
 When("they accept the proposal {string}", async ({ page }, what: string) => {
   await proposal(page, what).getByRole("button", { name: "Accept" }).click();
+  await expect(proposal(page, what)).toContainText("Accepted");
 });
 
 Then("{string} is a file to read", async ({ page }, name: string) => {
   const file = card(page, name);
   await expect(file).not.toContainText("Created empty.");
-  await expect(file.getByRole("radio").first()).toBeVisible();
+  // The normal card's facts, which the created card, with no size, pages or version, never shows.
+  await expect(file.getByText(/· version 2$/)).toBeVisible();
 });

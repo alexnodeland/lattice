@@ -192,7 +192,7 @@ async def answer(messages: list[ModelMessage], _info: AgentInfo) -> ModelRespons
             # The document's id, and none of the change notes that may follow it.
             document = (prompt.split()[1:] or [""])[0]
             return ModelResponse(parts=[ToolCallPart("read_artifact", {"artifact_id": document})])
-        case ["write"]:
+        case ["write"] if writes(prompt):
             return ModelResponse(parts=[create_next(messages)])
         case ["draw"]:
             drawn = {"mermaid": STACK, "summary": "the stack", "name": "Stack"}
@@ -238,9 +238,9 @@ def after(returned: ToolReturnPart, messages: list[ModelMessage]) -> ModelRespon
     if returned.tool_name == "edit_text":
         note = called(returned, messages)["artifact_id"]
         return ModelResponse(parts=[TextPart(f"Done: proposed an edit to {note}")])
-    if returned.tool_name in ("create_native_file", "edit_native") and first_prompt(
-        messages
-    ).startswith("write"):
+    if returned.tool_name in ("create_native_file", "edit_native") and writes(
+        first_prompt(messages)
+    ):
         return write_next(messages)
     if returned.tool_name == "draw_mermaid":
         return ModelResponse(parts=[TextPart("Drew the stack.")])
@@ -255,6 +255,11 @@ def after(returned: ToolReturnPart, messages: list[ModelMessage]) -> ModelRespon
         }
         return ModelResponse(parts=[ToolCallPart("edit_native", edit)])
     return ModelResponse(parts=[TextPart(f"Done: {told}")])
+
+
+def writes(prompt: str) -> bool:
+    """Whether a prompt is ``write``'s: "write up ...", which no other scenario posts."""
+    return prompt.startswith("write up ")
 
 
 def create_next(messages: list[ModelMessage]) -> ToolCallPart:
@@ -279,6 +284,8 @@ def write_next(messages: list[ModelMessage]) -> ModelResponse:
         summary, paragraphs = list(PLAN.values())[edited]
         edit = {
             "artifact_id": made[edited],
+            # Each file is as created, version 1: its only change is this proposal, not yet
+            # accepted, since the turn proposes and ends before anyone answers.
             "base_version": 1,
             "commands": [{"name": "add_paragraph", "args": {"text": each}} for each in paragraphs],
             "summary": summary,

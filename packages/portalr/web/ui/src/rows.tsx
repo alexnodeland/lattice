@@ -132,14 +132,14 @@ export function TrackLink({
     props: {
       "aria-label": children,
       className: cn(
-        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-(--segmented-item-radius) px-(--segmented-item-pad-x) py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:text-fg max-sm:flex-1 max-sm:flex-col",
+        "inline-flex min-w-0 items-center justify-center gap-1.5 rounded-(--segmented-item-radius) px-1 py-(--segmented-item-pad-y) font-medium text-muted text-sm hover:text-fg max-sm:flex-auto max-sm:flex-col",
         RING,
         FEEDBACK,
       ),
       children: (
         <>
           <Icon icon={icon} />
-          <span aria-hidden="true" className="max-w-full truncate text-xs">
+          <span aria-hidden="true" className="max-w-full truncate text-xs max-sm:text-[0.6875rem]">
             {children}
           </span>
         </>

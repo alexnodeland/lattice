@@ -44,7 +44,7 @@ from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.fastapi import files_router
 from artifactr.files.fastapi.router import Body, Meter, TooSlow
 from artifactr.files.manifest import DOCX, NativeFile, WordDocument
-from artifactr.files.native import CREATE_NATIVE_FILE, FORMATS, Format, NativeFiles
+from artifactr.files.native import CREATE_NATIVE_FILE, FORMATS, Format, Gauge, NativeFiles, Pace
 from artifactr.files.native.formats import PROJECT
 from artifactr.files.worker import Limits, Worker, worker_app
 from artifactr.workspace import Access, InMemoryStorage, Workspace, Workspaces, integration_gate
@@ -96,6 +96,7 @@ class World:
     switch: Switch
     app: Gated
     ws: Workspace
+    files: NativeFiles
 
     def upload(self, body: Any, *, user: str = "alice", tenant: str = "acme", **query: str) -> Any:
         params = {"kind": "word_document", "name": "terms.docx", **query}
@@ -115,11 +116,20 @@ def world_of(
     each: int = 1,
     body: Body | None = None,
     hidden: Hidden | None = None,
+    pace: Pace | None = None,
+    gauge: Gauge | None = None,
 ) -> World:
     switch, app = Switch(), Gated()
     blobs = InMemoryBlobs(limit=2 * LIMIT, workspace_quota=Quota(files=3))
     files = NativeFiles(
-        blobs, InMemoryCheckouts(), app, integrations=switch, formats=JSON_DOCX, readings=readings
+        blobs,
+        InMemoryCheckouts(),
+        app,
+        integrations=switch,
+        formats=JSON_DOCX,
+        readings=readings,
+        pace=pace,
+        gauge=gauge,
     )
     workspaces = Workspaces(
         InMemoryStorage(),
@@ -144,7 +154,7 @@ def world_of(
     ws = asyncio.run(workspaces.open("acme", "w1", actor=UserActor(id="alice")))
     # Every request on the client's one event loop, as a server runs them (tests/clients.py).
     client = entered(server)
-    return World(client, switch, app, ws)
+    return World(client, switch, app, ws, files)
 
 
 @pytest.fixture
@@ -405,6 +415,20 @@ def test_the_process_takes_only_so_many_uploads_at_once() -> None:
         world.app.through.set()
         assert first.result(timeout=10).status_code == 201
     assert (refused.status_code, refused.json()["detail"]["type"]) == (429, "busy")
+
+
+def test_the_pace_and_places_native_files_carry_are_the_routers_and_an_agents_files() -> None:
+    pace, gauge = Pace(2), Gauge(1, tenant=1, each=1)
+    world = world_of(per_minute=20, at_once=8, pace=pace, gauge=gauge)
+    assert world.upload(FakeApp.file("1")).status_code == 201
+    asyncio.run(world.files.create(world.ws, WordDocument, "Trip"))
+    refused = world.upload(FakeApp.file("2"))
+    assert (refused.status_code, refused.json()["detail"]["type"]) == (429, "rate_limited")
+    with gauge.held(("acme", "user:bob")) as held:
+        assert held
+        refused = world.upload(FakeApp.file("3"), user="bob")
+    assert (refused.status_code, refused.json()["detail"]["type"]) == (429, "busy")
+    assert world.upload(FakeApp.file("3"), user="bob").status_code == 201
 
 
 def test_the_routers_limit_is_never_past_the_stores() -> None:

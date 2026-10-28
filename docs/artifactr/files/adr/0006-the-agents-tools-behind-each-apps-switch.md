@@ -1,6 +1,6 @@
 # ADR-0006: The agent's tools, behind each app's switch
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0019](0019-the-agent-creates-native-files.md)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 

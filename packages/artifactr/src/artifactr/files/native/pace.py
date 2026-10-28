@@ -1,4 +1,7 @@
-"""How many uploads each person may start in a minute, and this process takes at once."""
+"""How many files each person may start in a minute, and this process takes at once.
+
+Uploads over HTTP and the files an agent creates share them, when `NativeFiles` is given them.
+"""
 
 import math
 import time

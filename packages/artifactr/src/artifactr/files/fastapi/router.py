@@ -36,9 +36,8 @@ from artifactr.fastapi import STATUS_CODES, ResolveActor, Unauthorized
 from artifactr.files.app import AppFailed, Failure, Talk
 from artifactr.files.blobs import OverQuota, TooLarge
 from artifactr.files.checkouts import Checkout
-from artifactr.files.fastapi.pace import Gauge, Pace
 from artifactr.files.manifest import NativeFile
-from artifactr.files.native import CREATE_NATIVE_FILE, Busy, NativeFiles
+from artifactr.files.native import CREATE_NATIVE_FILE, Busy, Gauge, NativeFiles, Pace
 from artifactr.telemetry import annotate, attribution
 from artifactr.workspace import Access, ArtifactLease, Workspace, Workspaces
 from lattice_core.refusals import refusals
@@ -230,10 +229,12 @@ def files_router(
             body that grows past the store's limit as it streams, whatever its
             `Content-Length` said, is refused there.
         uploads_per_minute: How many uploads each person of a tenant may start in a minute,
-            in this process, past which one is refused with 429 until the minute has passed.
+            in this process, past which one is refused with 429 until the minute has passed:
+            unless `files` has a pace, which its agents' files share and this is not read.
         uploads_at_once: How many uploads and check-ins this process takes at once, from every
             tenant, past which another is refused with 429 at once: each holds its file in
-            memory.
+            memory. Unless `files` has a gauge, which its agents' files share: then it, and
+            `uploads_per_tenant` and `uploads_each`, are not read.
         uploads_per_tenant: How many of them one tenant's people may have at once, so that
             one tenant never holds every place: half of `uploads_at_once` by default, and never
             fewer than `uploads_each`.
@@ -253,13 +254,13 @@ def files_router(
     if limit > files.limit:
         raise ValueError(f"the router's limit, {limit}, is past the blob store's, {files.limit}")
     router = APIRouter(responses=REFUSALS)
-    pace = Pace(uploads_per_minute)
+    pace = files.pace or Pace(uploads_per_minute)
     rendering = Pace(renders_per_minute)
     each = min(uploads_each, uploads_at_once)
     per_tenant = (
         max(uploads_at_once // 2, each) if uploads_per_tenant is None else uploads_per_tenant
     )
-    taking = Gauge(uploads_at_once, tenant=per_tenant, each=each)
+    taking = files.gauge or Gauge(uploads_at_once, tenant=per_tenant, each=each)
     pacing = body or Body()
 
     async def workspace_of(request: Request, workspace_id: PathId) -> Workspace:

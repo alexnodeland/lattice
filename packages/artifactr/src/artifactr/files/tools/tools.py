@@ -4,9 +4,12 @@ The toolset is offered only while an app's integration is on in the run's worksp
 a step, so a model in a workspace where every app is off never sees it; `NativeFiles` refuses a
 file whose app is off, whatever calls it. A rejection is raised as it is, for artifactr's
 capability to turn into a retry, except a person's check-out: the agent is told who has the
-file and plans again after the check-in, rather than retrying at once.
+file and plans again after the check-in, rather than retrying at once. `create_native_file`
+answers every refusal in a sentence instead, since none is fixed by calling it again at once.
 """
 
+import copy
+import dataclasses
 import json
 from collections.abc import Sequence
 from typing import Annotated, Any, Final
@@ -21,11 +24,14 @@ from pydantic_ai import (
     ToolDefinition,
 )
 
-from artifactr.agent import Session, describe_outcome
+from artifactr.agent import Session, describe_outcome, follow
+from artifactr.core import Applied, Forbidden, NotEnabled, ValidationFailed, artifact_types
 from artifactr.files.app import AppCommand, AppFailed
+from artifactr.files.blobs import OverQuota, TooLarge
 from artifactr.files.manifest import NativeFile
-from artifactr.files.native import NativeFiles
-from artifactr.workspace import ArtifactBusy
+from artifactr.files.native import Busy, NativeFiles, Paced
+from artifactr.telemetry import annotate, outcome_attributes
+from artifactr.workspace import ArtifactBusy, Workspace
 
 TEXT_CHARS: Final = 8_000
 """The most of a file's words one `read_native` returns."""
@@ -48,6 +54,60 @@ def native_file_tools(files: NativeFiles, *, view: bool = False) -> AbstractTool
             default, since a page is an image's worth of tokens.
     """
     toolset = FunctionToolset[Session[Any]]()
+
+    async def creatable(ws: Workspace) -> dict[str, type[NativeFile]]:
+        """The native types whose app is on in the workspace, by kind."""
+        return {kind: t for kind, t in _native_types().items() if await files.enabled(ws, t)}
+
+    async def listed(ctx: RunContext[Session[Any]], tool: ToolDefinition) -> ToolDefinition:
+        """`create_native_file`, offering the types the run's workspace may create."""
+        types = await creatable(ctx.deps.workspace)
+        lines = "\n".join(
+            f"- {kind} ({', '.join(files.extensions(t))}): {_noun(t)}" for kind, t in types.items()
+        )
+        schema = copy.deepcopy(tool.parameters_json_schema)
+        schema["properties"]["type"]["enum"] = list(types)
+        return dataclasses.replace(
+            tool,
+            description=f"{tool.description}\n\nThe types you may create here:\n{lines}",
+            parameters_json_schema=schema,
+        )
+
+    @toolset.tool(prepare=listed)
+    async def create_native_file(ctx: RunContext[Session[Any]], type: str, title: str) -> str:
+        """Create an empty native file of a type, named by its title, to edit with `edit_native`.
+
+        It is made at once, by the type's app; find its commands with `find_commands`, then
+        write it with `edit_native` from version 1. You are told when others change it.
+
+        Args:
+            type: The type of file, one of those listed.
+            title: The file's name, such as "Travel plan"; its extension is added.
+        """
+        ws = ctx.deps.workspace
+        file_type = (await creatable(ws)).get(type)
+        if file_type is None:
+            return f"{type!r} can't be created in this workspace: create one of the types listed."
+        try:
+            outcome = await files.create(ws, file_type, title, thread_id=ctx.deps.thread_id)
+        except (Forbidden, NotEnabled) as refused:
+            return f"You may not create {_noun(file_type)} here: {refused}."
+        except (Paced, Busy, OverQuota, TooLarge, ValidationFailed) as refused:
+            noun = _noun(file_type)
+            return f"{noun[0].upper()}{noun[1:]} wasn't created: {refused}."
+        except AppFailed as failed:
+            if failed.failure == "refused":
+                return f"The app can't make {_noun(file_type)} from nothing: {failed}."
+            return f"The app that makes {_noun(file_type)} is unavailable now: {failed}."
+        annotate(outcome_attributes(outcome))
+        if not isinstance(outcome, Applied):
+            return describe_outcome(outcome)
+        await follow(ctx, outcome.artifact_id)
+        name = (await ws.get(NativeFile, outcome.artifact_id)).data.name
+        return (
+            f"Created {outcome.artifact_id}: {_noun(file_type)} named {name}, at version "
+            f"{outcome.version}. Edit it with edit_native."
+        )
 
     @toolset.tool
     async def read_native(ctx: RunContext[Session[Any]], artifact_id: str, start: Start = 0) -> str:
@@ -165,6 +225,17 @@ def native_file_tools(files: NativeFiles, *, view: bool = False) -> AbstractTool
         return tools if await files.enabled(ctx.deps.workspace) else []
 
     return toolset.prepared(offered)
+
+
+def _native_types() -> dict[str, type[NativeFile]]:
+    """Every native type registered, by kind, in order."""
+    found = artifact_types()
+    return {kind: t for kind in sorted(found) if issubclass(t := found[kind], NativeFile)}
+
+
+def _noun(file_type: type[NativeFile]) -> str:
+    """What a native type's file is called, such as `a Word document`."""
+    return file_type.noun or f"a {file_type.kind.replace('_', ' ')}"
 
 
 def _items(review: dict[str, JsonValue]) -> Sequence[JsonValue]:

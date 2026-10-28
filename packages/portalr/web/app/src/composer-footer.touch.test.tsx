@@ -56,7 +56,9 @@ test("+ opens the Add sheet; its Mode chooses the agent's mode, and the focus co
   await expect.poll(() => sent.find((c) => c.type === "set_thread_mode")?.mode).toBe("suggest");
   await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
   await expect.element(plus).toHaveFocus();
-  await plus.click();
+  // From the keyboard, as the closing sheet's scrim may still be fading under a pointer.
+  await userEvent.keyboard("{Enter}");
+  await expect.element(screen.getByRole("dialog", { name: "Add" })).toBeVisible();
   await userEvent.keyboard("{Escape}");
   await expect.element(plus).toHaveFocus();
 });

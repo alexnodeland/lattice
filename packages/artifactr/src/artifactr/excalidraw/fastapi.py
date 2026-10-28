@@ -24,7 +24,7 @@ from artifactr.excalidraw.integrations import EXCALIDRAW
 from artifactr.excalidraw.types import Diagram, DiagramFile
 from artifactr.fastapi import STATUS_CODES, ResolveActor, Unauthorized
 from artifactr.files.blobs import Blobs, OverQuota, TooLarge
-from artifactr.files.native import Pace
+from artifactr.files.native.pace import Pace
 from artifactr.telemetry import annotate, attribution
 from artifactr.workspace import Access, Scope, Workspace, Workspaces
 from lattice_core.integrations import Defaults, Integrations

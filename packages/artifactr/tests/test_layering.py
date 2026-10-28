@@ -110,7 +110,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "excalidraw": (
         {
             *("artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.excalidraw"),
-            *("artifactr.files.blobs", "artifactr.files.native"),
+            *("artifactr.files.blobs", "artifactr.files.native.pace"),
             *("artifactr.fastapi", "artifactr.telemetry"),
         },
         {

@@ -421,7 +421,8 @@ def test_the_pace_and_places_native_files_carry_are_the_routers_and_an_agents_fi
     pace, gauge = Pace(2), Gauge(1, tenant=1, each=1)
     world = world_of(per_minute=20, at_once=8, pace=pace, gauge=gauge)
     assert world.upload(FakeApp.file("1")).status_code == 201
-    asyncio.run(world.files.create(world.ws, WordDocument, "Trip"))
+    agent = AgentActor(thread_id="t1", run_id="r1", on_behalf_of=UserActor(id="alice"))
+    asyncio.run(world.files.create(world.ws.as_actor(agent), WordDocument, "Trip"))
     refused = world.upload(FakeApp.file("2"))
     assert (refused.status_code, refused.json()["detail"]["type"]) == (429, "rate_limited")
     with gauge.held(("acme", "user:bob")) as held:

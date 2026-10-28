@@ -10,6 +10,8 @@ from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Final
 
+__all__ = ["KEPT", "MINUTE", "Gauge", "Pace"]
+
 MINUTE: Final = 60.0
 KEPT: Final = 4096
 """How many people's windows are kept before those that have emptied are let go."""

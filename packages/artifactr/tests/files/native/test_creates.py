@@ -178,7 +178,7 @@ async def test_a_file_waits_for_no_place_and_counts_against_no_pace() -> None:
     ws, app = await workspace(), Naming()
     gauge, pace = Gauge(1, tenant=1, each=1), Pace(1)
     files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), app, pace=pace, gauge=gauge)
-    with gauge.held(("acme", AGENT.participant)) as held:
+    with gauge.held(("acme", ALICE.participant)) as held:
         assert held
         with pytest.raises(Paced) as paced:
             await files.create(ws, WordDocument, "Notes")

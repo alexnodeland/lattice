@@ -93,9 +93,9 @@ async def test_every_type_is_created_blank_and_then_edited_by_proposal(kind: str
     await run(files, ws, thread, script)
     [file] = await ws.artifacts(NativeFile)
     name = (await ws.get(NativeFile, file.id)).data.name
+    noun = TYPES[kind].noun or f"a {kind.replace('_', ' ')}"
     assert script.tool_returns(1) == [
-        f"Created {file.id}: {TYPES[kind].noun or 'a ' + kind} named {name}, at version 1. "
-        "Edit it with edit_native."
+        f"Created {file.id}: {noun} named {name}, at version 1. Edit it with edit_native."
     ]
     assert script.tool_returns(2)[0].startswith("Proposed as ")
     assert (file.kind, file.version) == (kind, 1), "the edit waits for review"

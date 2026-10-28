@@ -426,8 +426,9 @@ class NativeFiles:
         The name keeps no path or control character, and takes the format's extension.
 
         An agent's run commits it as the person it acts for, so it is applied, not proposed,
-        whatever the type's write policy: the provenance, `blank`, records that the app made it.
-        The agent's edits of it then follow the policy. A run that acts for no one commits it as
+        whatever the type's write policy, and is held to their pace and share of places, as
+        their uploads are: the provenance, `blank`, records that the app made it. The agent's
+        edits of it then follow the policy. A run that acts for no one commits it as
         itself, and one for a person's client as the client, each under the policy.
 
         Raises:
@@ -443,7 +444,8 @@ class NativeFiles:
         await ws.check(Access(action=CREATE_NATIVE_FILE))
         await ws.check(Access(action=CREATE_ARTIFACT))
         app = await self._switched_on(ws, file_type)
-        with self._admitted(ws):
+        committer = _creator(ws)
+        with self._admitted(committer):
             async with self._turn(ws.tenant_id):
                 blank = await app.apply(None, [], deadline=self._deadline)
             media_type = _blank_format(file_type, blank.inspection)
@@ -465,14 +467,15 @@ class NativeFiles:
                 made,
             )
             command = create_artifact(manifest, artifact_id=artifact_id, thread_id=thread_id)
-            return await _creator(ws).commit(command)
+            return await committer.commit(command)
 
     @contextlib.contextmanager
     def _admitted(self, ws: Workspace) -> Generator[None]:
         """Hold a place for the actor's file while it is made, within their pace and share.
 
-        The place first, as the router takes it: a refusal for want of one counts against no
-        one's pace.
+        The actor is the one it is committed as, so an agent's run spends its person's pace and
+        share, as their uploads do. The place first, as the router takes it: a refusal for want
+        of one counts against no one's pace.
 
         Raises:
             Paced: If no place is free, or the actor is past their pace.

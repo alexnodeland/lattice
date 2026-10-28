@@ -52,6 +52,7 @@ from grantr.grants import Grants, InMemoryStorage
 from portalr.actions import ACTIONS
 from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay, Umami
 from portalr.fastapi import UI, Site, Surfaces, portalr_router
+from portalr.models import OfferedModel
 from portalr.readers import (
     Analytics,
     Grafana,
@@ -181,6 +182,11 @@ def library_actor[A](
 async def invite(email: str) -> str:
     """Invite without Supabase: the user's id is the email's local part."""
     return email.partition("@")[0]
+
+
+async def models(_tenant: str, _workspace: str) -> list[OfferedModel]:
+    """The models every workspace here allows: the two every deployment offers (ADR-0085)."""
+    return [OfferedModel(id="default", label="Default"), OfferedModel(id="fast", label="Fast")]
 
 
 async def people(ids: Collection[str]) -> dict[str, str]:
@@ -314,6 +320,7 @@ def create_app(ui: Path = UI) -> FastAPI:
             readers=readers(),
             invite=invite,
             people=people,
+            models=models,
             # The relay's routes, over a ClickHouse that isn't there: answers are kept in memory,
             # and every event is dropped, as a deployment without ClickHouse up would drop it.
             relay=Relay(

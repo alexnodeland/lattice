@@ -1,7 +1,7 @@
 import { expect, onTestFinished, test, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { APP_STARTED, PROXY_READY, RESOURCE_READY } from "./app-bridge";
+import { APP_BOOT, APP_ERROR, APP_STARTED, PROXY_READY, RESOURCE_READY } from "./app-bridge";
 import { AppFrame, type AppHost, AppHostContext, type ReadApp } from "./app-frame";
 import type { Shown } from "./artifacts";
 import { IntegrationsContext, type IsEnabled } from "./integrations";
@@ -378,4 +378,63 @@ test("a new version's HTML clears a stalled frame's card", async () => {
     </IntegrationsContext>,
   );
   await expect.element(said).not.toBeInTheDocument();
+});
+
+const DREW_NOTHING = "The app hasn't drawn anything yet.";
+
+test("what an app reports went wrong is shown as plain text under it, and said in the console", async () => {
+  const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  onTestFinished(() => warned.mockRestore());
+  const screen = await shown();
+  const frame = await frameIn(screen);
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "something", canvases: 1 } });
+  await vi.waitFor(() =>
+    expect(warned).toHaveBeenCalledWith("[app-frame] boot: drawn=something canvases=1"),
+  );
+  expect(screen.getByText("The app reported a problem").query()).toBeNull();
+  const looked = screen.getByText("What the app reported");
+  await looked.click();
+  await expect.element(screen.getByText("boot: drawn=something canvases=1")).toBeVisible();
+  expect(screen.getByText(DREW_NOTHING, { exact: false }).query()).toBeNull();
+  const message = "<b>boom</b> \u202eevil";
+  fromFrame(frame, {
+    method: APP_ERROR,
+    params: { kind: "error", message, source: "about:srcdoc", line: 9 },
+  });
+  fromFrame(frame, {
+    method: APP_ERROR,
+    params: { kind: "policy", message: "style-src refused", blocked: "inline" },
+  });
+  const summary = screen.getByText("The app reported a problem");
+  // Open already, from the look before: the same disclosure, now saying there is a problem.
+  await expect.element(summary).toBeInTheDocument();
+  const said = "error: <b>boom</b>  evil at about:srcdoc:9";
+  await expect.element(screen.getByText(said)).toBeVisible();
+  await expect.element(screen.getByText("policy: style-src refused (inline)")).toBeVisible();
+  expect(screen.container.querySelector("b")).toBeNull();
+  expect(warned).toHaveBeenCalledWith(`[app-frame] ${said}`);
+  fromFrame(frame, { method: APP_ERROR, params: { kind: "error", message: "Script error." } });
+  await expect
+    .element(screen.getByText("error: the app threw an error; this browser doesn't say which"))
+    .toBeVisible();
+});
+
+test("an app said to have drawn nothing is said to, until it draws; Try again makes it afresh", async () => {
+  const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  onTestFinished(() => warned.mockRestore());
+  const screen = await shown();
+  const frame = await frameIn(screen);
+  const said = screen.getByText(DREW_NOTHING, { exact: false });
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "not yet" } });
+  await vi.waitFor(() => expect(warned).toHaveBeenCalledOnce());
+  expect(said.query()).toBeNull();
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "nothing" } });
+  await expect.element(said).toBeVisible();
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "something" } });
+  await expect.element(said).not.toBeInTheDocument();
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "nothing" } });
+  await expect.element(said).toBeVisible();
+  await screen.getByRole("button", { name: "Try again" }).click();
+  await expect.element(said).not.toBeInTheDocument();
+  expect(await frameIn(screen)).not.toBe(frame);
 });

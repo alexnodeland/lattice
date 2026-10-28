@@ -11,7 +11,14 @@
  * what the portal sends is relayed to the app.
  */
 
-import { APP_STARTED, MOST_MESSAGE, PROXY_READY, RESOURCE_READY } from "./app-bridge";
+import {
+  APP_BOOT,
+  APP_ERROR,
+  APP_STARTED,
+  MOST_MESSAGE,
+  PROXY_READY,
+  RESOURCE_READY,
+} from "./app-bridge";
 import { isObject, isString } from "./json";
 
 /** An app's policy, which the server sends for the sandbox too: `web/ui/csp/app-policy.txt`. */
@@ -162,9 +169,113 @@ const HOST = [
 /** Said first, before the app's HTML: its document runs, whatever the app then does or draws. */
 const STARTED = `parent.postMessage({ jsonrpc: "2.0", method: "${APP_STARTED}" }, "*");`;
 
+/**
+ * What went wrong in the app's document, said to the host, which shows it as plain text: an error
+ * (a resource that didn't load among them), a refused promise, or a refusal of its policy, the
+ * first five that differ by their message or what was refused, one kept for a thrown error, each
+ * cut short (WebKit says the app's own errors only as "Script error."). And what it drew, 1.5 s
+ * after the document loaded and, if nothing yet, again at 5 s, then once more when it first
+ * does: its visible content, its largest visible canvas's size, the context the app asked of it,
+ * and, for a 2D one alone, whether nine pixels on a 3 by 3 grid across it are transparent; the window, and
+ * which of the APIs a game leans on it has. It said "nothing" only where both looks found no
+ * visible text or element, and no canvas, one the app never drew on, or a 2D one transparent at
+ * its centre. `getContext` is wrapped to remember which context each canvas was given, and the
+ * sampler never asks a canvas for one it wasn't, so an app's later WebGL is left to it. Nothing
+ * here is sent anywhere but the host's page, which keeps none of it.
+ */
+const DIAGNOSED = [
+  "(() => {",
+  "  const said = new Set(), kinds = new WeakMap(), getContext = HTMLCanvasElement.prototype.getContext;",
+  "  let errored = false;",
+  "  HTMLCanvasElement.prototype.getContext = function (type, ...rest) {",
+  "    const context = getContext.call(this, type, ...rest);",
+  "    if (context && !kinds.has(this)) kinds.set(this, String(type));",
+  "    return context;",
+  "  };",
+  "  const offscreen = HTMLCanvasElement.prototype.transferControlToOffscreen;",
+  "  if (offscreen) HTMLCanvasElement.prototype.transferControlToOffscreen = function (...rest) {",
+  "    const handed = offscreen.apply(this, rest);",
+  '    kinds.set(this, "offscreen");',
+  "    return handed;",
+  "  };",
+  '  const cut = (text, most) => { try { return String(text == null ? "" : text).slice(0, most); } catch { return ""; } };',
+  '  const post = (method, params) => parent.postMessage({ jsonrpc: "2.0", method, params }, "*");',
+  "  const report = (params) => {",
+  "    const key = params.blocked || params.message;",
+  '    if (said.size >= 5 || said.has(key) || (params.kind !== "error" && !errored && said.size >= 4)) return;',
+  '    if (params.kind === "error") errored = true;',
+  "    said.add(key);",
+  `    post("${APP_ERROR}", params);`,
+  "  };",
+  '  addEventListener("error", (event) => {',
+  "    const target = event.target;",
+  "    if (target && target !== window && target.tagName) {",
+  '      report({ kind: "load", message: cut("<" + target.tagName.toLowerCase() + "> didn\'t load", 300), blocked: cut(target.currentSrc || target.src || target.href, 200) });',
+  "      return;",
+  "    }",
+  '    report({ kind: "error", message: cut(event.message || "an error", 300), source: cut(event.filename, 120), line: event.lineno | 0 });',
+  "  }, true);",
+  '  addEventListener("unhandledrejection", (event) => {',
+  '    let message = "a refused promise";',
+  "    try { const reason = event.reason; message = cut(reason && reason.message ? reason.message : reason, 300); } catch {}",
+  '    report({ kind: "rejection", message });',
+  "  });",
+  '  document.addEventListener("securitypolicyviolation", (event) => {',
+  "    const directive = cut(event.effectiveDirective || event.violatedDirective, 60);",
+  '    report({ kind: "policy", message: directive + " refused", directive, blocked: cut(event.blockedURI || "inline", 200), source: cut(event.sourceFile, 120), line: event.lineNumber | 0 });',
+  "  });",
+  "  const looked = () => {",
+  "    const body = document.body;",
+  "    let largest = null, content = false;",
+  '    for (const each of body ? body.querySelectorAll("*") : []) {',
+  "      const area = each.clientWidth * each.clientHeight || each.getBoundingClientRect().width * each.getBoundingClientRect().height;",
+  '      if (each.tagName === "CANVAS") { if (area > 0 && (!largest || area > largest.clientWidth * largest.clientHeight)) largest = each; }',
+  "      else if (area > 0 && each.childElementCount === 0 && !/^(SCRIPT|STYLE)$/.test(each.tagName)) content = true;",
+  "    }",
+  "    if (body && body.innerText.trim()) content = true;",
+  '    const kind = largest ? kinds.get(largest) || "none" : "";',
+  '    let pixels = "";',
+  '    if (kind === "2d") {',
+  "      try {",
+  '        const context = largest.getContext("2d");',
+  '        pixels = "blank";',
+  "        for (const fx of [1, 2, 3]) for (const fy of [1, 2, 3]) {",
+  "          const at = context.getImageData((largest.width * fx) >> 2, (largest.height * fy) >> 2, 1, 1).data;",
+  '          if (at[3] !== 0) pixels = "drawn";',
+  "        }",
+  '      } catch { pixels = "unread"; }',
+  "    }",
+  '    const nothing = !content && (!largest || kind === "none" || pixels === "blank");',
+  "    return { nothing, params: {",
+  '      readyState: document.readyState, children: body ? body.childElementCount : 0, canvases: document.getElementsByTagName("canvas").length,',
+  "      canvasWidth: largest ? largest.clientWidth : 0, canvasHeight: largest ? largest.clientHeight : 0, canvasContext: kind, canvasPixels: pixels,",
+  "      width: innerWidth, height: innerHeight, pixelRatio: devicePixelRatio, userAgent: cut(navigator.userAgent, 120),",
+  '      has: ["AudioContext", "webkitAudioContext", "ResizeObserver", "requestAnimationFrame"].filter((name) => name in window).join(" "),',
+  "    } };",
+  "  };",
+  '  addEventListener("DOMContentLoaded", () => {',
+  "    let first = true;",
+  "    const sample = () => {",
+  "      const { nothing, params } = looked();",
+  `      post("${APP_BOOT}", { ...params, drawn: nothing ? (first ? "not yet" : "nothing") : "something" });`,
+  "      if (!nothing || !first) {",
+  "        if (nothing) {",
+  `          const watch = setInterval(() => { if (!looked().nothing) { clearInterval(watch); post("${APP_BOOT}", { ...looked().params, drawn: "something" }); } }, 1000);`,
+  "          setTimeout(() => clearInterval(watch), 120000);",
+  "        }",
+  "        return;",
+  "      }",
+  "      first = false;",
+  "      setTimeout(sample, 3500);",
+  "    };",
+  "    setTimeout(sample, 1500);",
+  "  });",
+  "})();",
+].join("\n");
+
 /** The app's document: its own policy, no DNS prefetching, no WebRTC, its size and `host` first. */
 export const appDocument = (html: string): string =>
-  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${STARTED}\n${NO_WEBRTC}\n${SIZED}\n${HOST}</script>${html}`;
+  `<!doctype html><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${APP_POLICY}"><meta http-equiv="x-dns-prefetch-control" content="off"><script>${STARTED}\n${DIAGNOSED}\n${NO_WEBRTC}\n${SIZED}\n${HOST}</script>${html}`;
 
 /** What the app's frame may do: run its scripts, and nothing else. */
 export const APP_SANDBOX = "allow-scripts";

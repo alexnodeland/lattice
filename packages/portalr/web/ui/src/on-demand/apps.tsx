@@ -116,17 +116,12 @@ function hostContext(within: Element, displayMode: DisplayMode): JsonObject {
   };
 }
 
-/**
- * Whether what the app's document said it drew is nothing: no element in its body, or canvases
- * the largest of which has no size or a blank copy, all of it transparent or white.
- */
-export const drewNothing = ({ params }: Report): boolean =>
-  params.children === 0 ||
-  (Number(params.canvases) > 0 &&
-    (params.canvasWidth === 0 || params.canvasHeight === 0 || params.canvasPixels === "blank"));
-
 /** A report as one line of plain text: what it says, where, and what its policy refused. */
-export function reportLine({ params }: Report): string {
+function reportLine({ method, params }: Report): string {
+  if (method === APP_BOOT) {
+    const said = Object.entries(params).map(([name, value]) => `${name}=${value}`);
+    return `boot: ${said.join(" ")}`;
+  }
   const where = params.source ? ` at ${params.source}:${params.line ?? 0}` : "";
   const refused = params.blocked ? ` (${params.blocked})` : "";
   return `${params.kind ?? "error"}: ${params.message ?? ""}${where}${refused}`;
@@ -296,15 +291,15 @@ export function Running({
         },
         reported: (report) => {
           // For the browser's own console, where a person debugging the app looks; nothing else.
+          const line = reportLine(report);
+          console.warn(`[app-frame] ${line}`);
           if (report.method === APP_BOOT) {
-            if (drewNothing(report)) {
-              console.warn("[app-frame]", "drew nothing", report.params);
-              setBlank(true);
+            const { drawn } = report.params;
+            if (drawn === "nothing" || drawn === "something") {
+              setBlank(drawn === "nothing");
             }
             return;
           }
-          console.warn("[app-frame]", reportLine(report));
-          const line = reportLine(report);
           setProblems((now) => (now.includes(line) ? now : [...now, line]));
         },
       },
@@ -428,7 +423,7 @@ export function Running({
         <Alert tone="warn">
           <span className="flex flex-col items-start gap-2">
             <span>
-              The app started but drew nothing. Try again, or ask the agent to rebuild it.
+              The app hasn't drawn anything yet. Try again, or ask the agent to rebuild it.
             </span>
             <Button variant="secondary" className="px-2 py-1 text-xs" onClick={again}>
               Try again

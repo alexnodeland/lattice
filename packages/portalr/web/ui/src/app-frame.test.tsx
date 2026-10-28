@@ -380,26 +380,19 @@ test("a new version's HTML clears a stalled frame's card", async () => {
   await expect.element(said).not.toBeInTheDocument();
 });
 
-const DREW_NOTHING = "The app started but drew nothing.";
+const DREW_NOTHING = "The app hasn't drawn anything yet.";
 
 test("what an app reports went wrong is shown as plain text under it, and said in the console", async () => {
   const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
   onTestFinished(() => warned.mockRestore());
   const screen = await shown();
   const frame = await frameIn(screen);
-  fromFrame(frame, {
-    method: APP_BOOT,
-    params: {
-      children: 2,
-      canvases: 1,
-      canvasWidth: 300,
-      canvasHeight: 200,
-      canvasPixels: "drawn",
-    },
-  });
-  await new Promise((settled) => setTimeout(settled, 100));
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "something", canvases: 1 } });
+  await vi.waitFor(() =>
+    expect(warned).toHaveBeenCalledWith("[app-frame] boot: drawn=something canvases=1"),
+  );
   expect(screen.getByText("The app reported a problem").query()).toBeNull();
-  expect(warned).not.toHaveBeenCalled();
+  expect(screen.getByText(DREW_NOTHING, { exact: false }).query()).toBeNull();
   const message = "<b>boom</b> \u202eevil";
   fromFrame(frame, {
     method: APP_ERROR,
@@ -407,38 +400,33 @@ test("what an app reports went wrong is shown as plain text under it, and said i
   });
   fromFrame(frame, {
     method: APP_ERROR,
-    params: { kind: "policy", message: "style-src refused inline", blocked: "inline" },
+    params: { kind: "policy", message: "style-src refused", blocked: "inline" },
   });
   const summary = screen.getByText("The app reported a problem");
   await expect.element(summary).toBeInTheDocument();
   await summary.click();
   const said = "error: <b>boom</b>  evil at about:srcdoc:9";
   await expect.element(screen.getByText(said)).toBeVisible();
-  await expect.element(screen.getByText("policy: style-src refused inline (inline)")).toBeVisible();
+  await expect.element(screen.getByText("policy: style-src refused (inline)")).toBeVisible();
   expect(screen.container.querySelector("b")).toBeNull();
-  expect(warned).toHaveBeenCalledWith("[app-frame]", said);
-  expect(screen.getByText(DREW_NOTHING, { exact: false }).query()).toBeNull();
+  expect(warned).toHaveBeenCalledWith(`[app-frame] ${said}`);
 });
 
-test.each([
-  ["no element", { children: 0, canvases: 0 }],
-  [
-    "a blank canvas",
-    { children: 1, canvases: 1, canvasWidth: 300, canvasHeight: 200, canvasPixels: "blank" },
-  ],
-  [
-    "a canvas of no size",
-    { children: 1, canvases: 1, canvasWidth: 0, canvasHeight: 0, canvasPixels: "drawn" },
-  ],
-])("an app that drew %s is said to, and Try again makes its frame afresh", async (_, params) => {
+test("an app said to have drawn nothing is said to, until it draws; Try again makes it afresh", async () => {
   const warned = vi.spyOn(console, "warn").mockImplementation(() => undefined);
   onTestFinished(() => warned.mockRestore());
   const screen = await shown();
   const frame = await frameIn(screen);
-  fromFrame(frame, { method: APP_BOOT, params });
   const said = screen.getByText(DREW_NOTHING, { exact: false });
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "not yet" } });
+  await vi.waitFor(() => expect(warned).toHaveBeenCalledOnce());
+  expect(said.query()).toBeNull();
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "nothing" } });
   await expect.element(said).toBeVisible();
-  expect(warned).toHaveBeenCalledWith("[app-frame]", "drew nothing", params);
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "something" } });
+  await expect.element(said).not.toBeInTheDocument();
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "nothing" } });
+  await expect.element(said).toBeVisible();
   await screen.getByRole("button", { name: "Try again" }).click();
   await expect.element(said).not.toBeInTheDocument();
   expect(await frameIn(screen)).not.toBe(frame);

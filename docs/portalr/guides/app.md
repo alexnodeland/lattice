@@ -38,7 +38,7 @@ Every kind the app draws shows in the thread it was made in, between the message
 
 A running mini app is shown whole, as tall as it draws, up to twice the window's height or 2,000 pixels, whichever is less, and the page scrolls past it. The app keeps running in its full view. A thread with several apps runs each at once, and the workspace's switch for mini apps stops them all ([ADR-0052](../adr/0052-artifacts-inline-in-their-thread.md)).
 
-An app that doesn't start says so, with **Try again**. One that starts but throws an error, refuses a promise, loads what its policy refuses, or draws nothing shows **The app reported a problem** under it, or **The app started but drew nothing.**, and writes each line to the browser's console as `[app-frame] …`. To debug an app on a phone, open the console of the portal's page (Safari's Web Inspector, from a Mac, for an iPhone) and look for those lines. They stay in the browser: nothing is sent or kept ([ADR-0051](../adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md)).
+An app that doesn't start says so, with **Try again**. One that starts but throws an error, refuses a promise, loads what its policy refuses, or draws nothing shows **The app reported a problem** under it, or **The app hasn't drawn anything yet.**, and writes each line, and what it drew, to the browser's console as `[app-frame] …`. To debug an app on a phone, open the console of the portal's page (Safari's Web Inspector, from a Mac, for an iPhone) and look for those lines. They stay in the browser: nothing is sent or kept ([ADR-0051](../adr/0051-mini-apps-the-sandboxed-frame-and-its-bridge.md)).
 
 ## Proposals
 

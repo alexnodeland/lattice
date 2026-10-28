@@ -155,18 +155,20 @@ export class Limiter {
 
 // ─── what the app's document reports ─────────────────────────────────────────
 
-/** The most reports a frame's bridge passes on: five errors and one boot, as the document says. */
-export const MOST_REPORTS = 6;
+/** The most reports a frame's bridge passes on: five errors and three of what it drew. */
+export const MOST_REPORTS = 8;
 
 /** Each report's fields: text kept to so many characters, or a number (`0`). Others are dropped. */
 const REPORTED: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   [APP_ERROR]: { kind: 20, message: 300, source: 120, line: 0, directive: 60, blocked: 200 },
   [APP_BOOT]: {
+    drawn: 20,
     readyState: 20,
     children: 0,
     canvases: 0,
     canvasWidth: 0,
     canvasHeight: 0,
+    canvasContext: 30,
     canvasPixels: 20,
     width: 0,
     height: 0,
@@ -176,15 +178,18 @@ const REPORTED: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   },
 };
 
-/** What could reorder the text around it, as `plainName` strips it. */
-const BIDI = /[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]/;
+/** What an error is said to be; any other is an error. */
+const KINDS = new Set(["error", "load", "rejection", "policy"]);
 
-/** Text as one plain line: a control character or a bidi mark is a space, never kept. */
-const oneLine = (text: string) =>
-  Array.from(text, (each) => {
-    const code = each.codePointAt(0) ?? 0;
-    return code < 0x20 || (code >= 0x7f && code <= 0x9f) || BIDI.test(each) ? " " : each;
-  }).join("");
+/** The most a number reported may be: none is ever more, or less than nothing. */
+const MOST_NUMBER = 100_000;
+
+/** What could hide or reorder the text around it, or break its line: controls, formats, breaks. */
+const UNSHOWN = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
+
+/** Text as one plain line of at most `most` characters, never half of one; the unshown, spaces. */
+const oneLine = (text: string, most: number) =>
+  Array.from(text).slice(0, most).join("").replace(UNSHOWN, " ");
 
 /** What an app's document reported: untrusted text and numbers, for plain text alone. */
 export type Report = {
@@ -202,14 +207,18 @@ export function readReport(method: string, params: JsonObject): Report | null {
   for (const [name, most] of Object.entries(fields)) {
     const value = params[name];
     if (most > 0 && isString(value)) {
-      kept[name] = oneLine(value.slice(0, most));
+      kept[name] = oneLine(value, most);
     } else if (most === 0 && isNumber(value) && Number.isFinite(value)) {
-      kept[name] = value;
+      kept[name] = Math.min(MOST_NUMBER, Math.max(0, value));
     }
   }
-  return Object.keys(kept).length === 0
-    ? null
-    : { method: method as Report["method"], params: kept };
+  if (Object.keys(kept).length === 0) {
+    return null;
+  }
+  if (method === APP_ERROR && !KINDS.has(String(kept.kind))) {
+    kept.kind = "error";
+  }
+  return { method: method as Report["method"], params: kept };
 }
 
 // ─── JSON Patch ───────────────────────────────────────────────────────────────

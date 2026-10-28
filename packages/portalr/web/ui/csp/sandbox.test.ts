@@ -449,36 +449,80 @@ test("an app that throws, or loads what its policy refuses, is said under it and
   await page.close();
 });
 
-test("an app that draws nothing on its canvas is said to, and one that draws is not", async () => {
-  const blank = await watched(`<body><canvas width="200" height="100"></canvas>`);
-  await expect
-    .poll(
-      () => blank.page.getByText("The app started but drew nothing.", { exact: false }).count(),
-      SETTLED,
-    )
-    .toBe(1);
-  expect(blank.said.join("\n")).toContain("drew nothing");
-  await blank.page.close();
-  const drawing = await watched(
-    `<body style="margin:0"><canvas width="200" height="100"></canvas><script>requestAnimationFrame(()=>{const c=document.querySelector("canvas").getContext("2d");c.fillStyle="#000";c.fillRect(0,0,200,100)})</script>`,
+const NOTHING_YET = "The app hasn't drawn anything yet.";
+
+/** Whether the page says its app hasn't drawn anything, now. */
+const saysNothing = (page: Page) => page.getByText(NOTHING_YET, { exact: false }).count();
+
+test("an app that never draws is said to after two looks, and its look said in the console", async () => {
+  const { page, said } = await watched(
+    `<body><div id="root"></div><canvas width="200" height="100"></canvas>`,
   );
-  await expect.poll(() => drawn(drawing.page), SETTLED).toBeGreaterThan(0);
-  // Past the document's report of what it drew, 1.5 s after it loaded.
-  await drawing.page.waitForTimeout(3000);
-  expect(drawing.said).toEqual([]);
-  expect(await drawing.page.getByText("The app reported a problem").count()).toBe(0);
-  expect(await drawing.page.getByText("drew nothing", { exact: false }).count()).toBe(0);
-  await drawing.page.close();
+  await expect.poll(() => said.some((line) => line.includes("drawn=not yet")), SETTLED).toBe(true);
+  expect(await saysNothing(page)).toBe(0);
+  await expect.poll(() => saysNothing(page), SETTLED).toBe(1);
+  expect(said.join("\n")).toContain("drawn=nothing");
+  await page.close();
+});
+
+test.each([
+  [
+    "a white background",
+    `<body style="margin:0"><canvas width="200" height="100"></canvas><script>const c=document.querySelector("canvas").getContext("2d");c.fillStyle="#fff";c.fillRect(0,0,200,100)</script>`,
+  ],
+  [
+    "a canvas drawn after 1.5 s",
+    `<body style="margin:0"><canvas width="200" height="100"></canvas><script>setTimeout(()=>{const c=document.querySelector("canvas").getContext("2d");c.fillRect(0,0,200,100)},2500)</script>`,
+  ],
+  [
+    "a DOM app with a hidden canvas",
+    `<body><p>Score 0</p><canvas width="0" height="0" style="display:none"></canvas>`,
+  ],
+  [
+    "a WebGL canvas",
+    `<body style="margin:0"><canvas width="200" height="100"></canvas><script>const g=document.querySelector("canvas").getContext("webgl");if(g){g.clearColor(0,0,1,1);g.clear(g.COLOR_BUFFER_BIT)}</script>`,
+  ],
+])("an app with %s is never said to have drawn nothing", async (_, html) => {
+  const { page, said } = await watched(html);
+  await expect
+    .poll(() => said.some((line) => line.includes("drawn=something")), SETTLED)
+    .toBe(true);
+  await page.waitForTimeout(5000);
+  expect(await saysNothing(page)).toBe(0);
+  expect(said.filter((line) => !line.startsWith("[app-frame] boot:"))).toEqual([]);
+  expect(await page.getByText("The app reported a problem").count()).toBe(0);
+  await page.close();
+});
+
+test("a canvas the app asks for WebGL after its look is still given WebGL", async () => {
+  const { page, said } = await watched(
+    `<body><p>Tap to start</p><canvas width="200" height="100"></canvas><script>setTimeout(()=>{document.body.dataset.gl=String(!!document.querySelector("canvas").getContext("webgl"))},2500)</script>`,
+  );
+  await expect.poll(() => said.length, SETTLED).toBeGreaterThan(0);
+  await expect
+    .poll(() => appFrame(page)?.evaluate(() => document.body.dataset.gl), SETTLED)
+    .toBe("true");
+  await page.close();
+});
+
+test("an app that draws after it was said to have drawn nothing clears what was said", async () => {
+  const { page } = await watched(
+    `<body style="margin:0"><canvas width="200" height="100"></canvas><script>setTimeout(()=>{const c=document.querySelector("canvas").getContext("2d");c.fillRect(0,0,200,100)},7000)</script>`,
+  );
+  await expect.poll(() => saysNothing(page), SETTLED).toBe(1);
+  await expect.poll(() => saysNothing(page), SETTLED).toBe(0);
+  await page.close();
 });
 
 test("an app's document says the first five errors that differ, and no more", async () => {
   const { page, said } = await watched(
     `<body><p>Board</p><script>for(let i=0;i<20;i++)setTimeout(()=>{throw new Error("again")});for(let i=0;i<7;i++)setTimeout(()=>{throw new Error("boom "+i)});</script>`,
   );
-  await expect.poll(() => said.length, SETTLED).toBe(5);
+  const errors = () => said.filter((line) => !line.startsWith("[app-frame] boot:"));
+  await expect.poll(() => errors().length, SETTLED).toBe(5);
   await page.waitForTimeout(2000);
-  expect(said).toHaveLength(5);
-  expect(said.filter((line) => line.includes("again"))).toHaveLength(1);
+  expect(errors()).toHaveLength(5);
+  expect(errors().filter((line) => line.includes("again"))).toHaveLength(1);
   await page.getByText("The app reported a problem").click();
   expect(await page.locator("details li").count()).toBe(5);
   await page.close();

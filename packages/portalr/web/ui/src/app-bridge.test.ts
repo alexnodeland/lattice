@@ -512,7 +512,33 @@ test("an app's report keeps the fields it knows, text cut short and on one line,
   expect(readMessage(reported("portalr/app-evil", { message: "x" }))).toBeNull();
 });
 
-test("an app's reports reach the page, at most six a frame, and count against its messages", async () => {
+test("a report's kind is one the bridge knows, its numbers within bounds, its text never split", () => {
+  expect(
+    readReport(APP_ERROR, {
+      kind: "<script>",
+      message: `\u{1F600}${"\u2028\u{E0041}\u00AD"}x`,
+      line: -4,
+      source: "x".repeat(119) + "\u{1F600}",
+    }),
+  ).toEqual({
+    method: APP_ERROR,
+    params: {
+      kind: "error",
+      message: "\u{1F600}   x",
+      line: 0,
+      source: `${"x".repeat(119)}\u{1F600}`,
+    },
+  });
+  expect(readReport(APP_BOOT, { width: 1e12, drawn: "nothing" })?.params).toEqual({
+    width: 100_000,
+    drawn: "nothing",
+  });
+  expect(readReport(APP_ERROR, { kind: "policy", message: "img-src refused" })?.params.kind).toBe(
+    "policy",
+  );
+});
+
+test("an app's reports reach the page, at most eight a frame, and count against its messages", async () => {
   const { hear, reports, posted, started } = bridged();
   for (let each = 0; each < 10; each += 1) {
     await hear(reported(APP_ERROR, { kind: "error", message: `boom ${each}` }));

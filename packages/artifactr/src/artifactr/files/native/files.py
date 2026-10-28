@@ -488,7 +488,14 @@ class NativeFiles:
                 made,
             )
             command = create_artifact(manifest, artifact_id=artifact_id, thread_id=thread_id)
-            return await committer.commit(command)
+            try:
+                return await committer.commit(command)
+            except AlreadyExists:
+                # The same id, made meanwhile by the same call run twice at once: made once.
+                made = await _existing(ws, artifact_id)
+                if made is None or not isinstance(made.data, file_type):
+                    raise
+                return None
 
     @contextlib.contextmanager
     def _admitted(self, ws: Workspace) -> Generator[None]:

@@ -18,7 +18,7 @@ from pydantic_ai.capabilities import AbstractCapability, Instrumentation
 from pydantic_ai.models.instrumented import InstrumentationSettings
 
 from artifactr.agent import ArtifactWorkspace, Runner, Session
-from artifactr.core import Actor, Thread, UserActor, artifact_types
+from artifactr.core import Actor, SetThreadMode, Thread, UserActor, artifact_types
 from artifactr.files.app import AppCommand, AppFailed, FakeApp
 from artifactr.files.app import Applied as Made
 from artifactr.files.blobs import InMemoryBlobs, Quota
@@ -26,7 +26,8 @@ from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.manifest import DXF, Drawing, NativeFile, WordDocument
 from artifactr.files.native import NativeFiles, Pace
 from artifactr.files.tools import native_file_tools
-from artifactr.telemetry.attributes import ARTIFACT_ID, RUN_ID, USER_ID
+from artifactr.files.tools.tools import _call_id
+from artifactr.telemetry.attributes import ACTOR_KIND, ARTIFACT_ID, RUN_ID, USER_ID
 from artifactr.workspace import Access, Authorize, InMemoryStorage, Workspace, Workspaces
 from tests.agent.conftest import Script, call, say
 from tests.files.conftest import Switch
@@ -34,6 +35,7 @@ from tests.files.naming import Naming
 from tests.telemetry.conftest import Recorder, attributes, recording
 
 ALICE = UserActor(id="alice", name="Alice")
+RUN = "run_1"
 TYPES = {k: t for k, t in sorted(artifact_types().items()) if issubclass(t, NativeFile)}
 """Every native type, by kind."""
 
@@ -69,7 +71,8 @@ async def run(
         toolsets=[native_file_tools(files)],
         capabilities=capabilities,
     )
-    await agent.run("Go.", deps=Session.start(ws, thread.id, app=None, on_behalf_of=person))
+    deps = Session.start(ws, thread.id, app=None, run_id=RUN, on_behalf_of=person)
+    await agent.run("Go.", deps=deps)
 
 
 def create(
@@ -148,7 +151,7 @@ async def test_the_file_is_marked_on_its_tools_span(recorder: Recorder) -> None:
     marked = attributes(span)
     assert marked[ARTIFACT_ID] == file.id
     assert marked[USER_ID] == "alice", "the person it is committed as"
-    assert marked[RUN_ID], "and the agent's run that asked"
+    assert (marked[ACTOR_KIND], marked[RUN_ID]) == ("agent", RUN), "and the agent's run that asked"
 
 
 @pytest.mark.parametrize(
@@ -322,4 +325,69 @@ async def test_the_run_isnt_told_of_its_own_file_as_its_persons() -> None:
         for part in message.parts
         if isinstance(part, UserPromptPart)
     ]
-    assert not any("created" in str(words) for words in told)
+    assert told == ["Make a document"], "the tool's answer is all it hears of its file"
+
+
+async def test_refused_attempts_spend_none_of_the_runs_files() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp(fails="crashed"))
+    ws, thread = await opened()
+    script = Script(*(create(call_id=f"c{i}") for i in range(3)), say("Done."))
+    agent = Agent(
+        script.model,
+        deps_type=Session[None],
+        toolsets=[native_file_tools(files, creates=1)],
+        capabilities=[ArtifactWorkspace(types=[WordDocument])],
+    )
+    await agent.run("Go.", deps=Session.start(ws, thread.id, app=None, on_behalf_of=ALICE))
+    for request in (1, 2, 3):
+        assert script.tool_returns(request)[0].startswith("The app that makes a Word document")
+
+
+def test_a_call_without_an_id_is_never_taken_for_a_retry() -> None:
+    assert _call_id("r1", None) != _call_id("r1", None)
+    assert _call_id("r1", "c1") == _call_id("r1", "c1")
+
+
+async def test_a_suggest_threads_blank_file_is_made_and_its_edit_held() -> None:
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp())
+    ws, thread = await opened()
+    await ws.commit(SetThreadMode(thread_id=thread.id, mode="suggest"))
+    script = Script(create(), edit_what_was_created, say("Done."))
+    await run(files, ws, thread, script)
+    assert script.tool_returns(1)[0].startswith("Created ")
+    assert script.tool_returns(2)[0].startswith("Proposed as ")
+
+
+async def test_a_run_for_no_one_retried_proposes_again() -> None:
+    """A limit: a proposal isn't a file, so a retried call for no one is proposed twice."""
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp())
+    ws, thread = await opened()
+    script = Script(create(), create(), say("Done."))
+    await run(files, ws, thread, script, person=None)
+    assert len(await ws.proposals(status="pending")) == 2
+
+
+async def test_a_retry_refused_still_counts_the_file_it_made() -> None:
+    refused: set[str] = set()
+
+    async def authorize(_t: str, _w: str | None, actor: Actor, access: Access) -> bool:
+        return not (actor.kind == "agent" and access.action in refused)
+
+    def then_refuse(messages: list[ModelMessage]) -> ModelResponse:
+        refused.add("artifactr:create_native_file")
+        return create()
+
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), FakeApp())
+    ws, thread = await opened(authorize)
+    script = Script(create(), then_refuse, create(call_id="c2"), say("Done."))
+    agent = Agent(
+        script.model,
+        deps_type=Session[None],
+        toolsets=[native_file_tools(files, creates=1)],
+        capabilities=[ArtifactWorkspace(types=[WordDocument])],
+    )
+    await agent.run("Go.", deps=Session.start(ws, thread.id, app=None, on_behalf_of=ALICE))
+    assert script.tool_returns(2)[0].startswith("You may not create")
+    assert script.tool_returns(3) == [
+        "You have created 1 files in this run: create no more until asked."
+    ]

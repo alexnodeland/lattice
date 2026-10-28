@@ -3,6 +3,9 @@ run acts for while its edits stay proposals, checked as the agent first, and pac
 places and to quotas as an upload is.
 """
 
+import asyncio
+from collections.abc import Sequence
+
 import pytest
 
 from artifactr.core import (
@@ -19,6 +22,7 @@ from artifactr.core import (
     Visibility,
 )
 from artifactr.files.app import AppCommand, AppFailed
+from artifactr.files.app import Applied as Made
 from artifactr.files.blobs import InMemoryBlobs, OverQuota, Quota, TooLarge
 from artifactr.files.checkouts import InMemoryCheckouts
 from artifactr.files.manifest import DOCX, DWG, DXF, Drawing, NativeFile, WordDocument
@@ -218,3 +222,43 @@ async def test_a_file_waits_for_no_place_and_counts_against_no_pace() -> None:
     assert app.made == 0
     assert isinstance(await files.create(ws, WordDocument, "Notes"), Applied)
     assert (files.pace, files.gauge) == (pace, gauge)
+
+
+class Held(Naming):
+    """A fake app whose blank files wait to be let through, so two calls overlap."""
+
+    def __init__(self, media_type: str | None, through: asyncio.Event) -> None:
+        super().__init__(media_type)
+        self.through = through
+
+    async def apply(
+        self, source: bytes | None, commands: Sequence[AppCommand], *, deadline: float
+    ) -> Made:
+        await self.through.wait()
+        return await super().apply(source, commands, deadline=deadline)
+
+
+async def overlapping(second: type[NativeFile]) -> list[object]:
+    """Two creates of one id at once, a Word document and a `second`."""
+    through = asyncio.Event()
+    apps = {WordDocument: Held(None, through), Drawing: Held(DXF, through)}
+    files = NativeFiles(InMemoryBlobs(), InMemoryCheckouts(), apps)
+    ws = await workspace()
+    both = asyncio.gather(
+        files.create(ws, WordDocument, "Trip", artifact_id="a1"),
+        files.create(ws, second, "Trip", artifact_id="a1"),
+        return_exceptions=True,
+    )
+    await asyncio.sleep(0)
+    through.set()
+    return list(await both)
+
+
+async def test_the_same_call_run_twice_at_once_makes_one_file() -> None:
+    made = await overlapping(WordDocument)
+    assert sorted(type(m).__name__ for m in made) == ["Applied", "NoneType"]
+
+
+async def test_another_type_made_at_once_under_the_id_is_refused() -> None:
+    made = await overlapping(Drawing)
+    assert sorted(type(m).__name__ for m in made) == ["AlreadyExists", "Applied"]

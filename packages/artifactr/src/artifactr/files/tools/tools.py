@@ -34,6 +34,7 @@ from artifactr.core import (
     Proposed,
     ValidationFailed,
     artifact_types,
+    new_artifact_id,
 )
 from artifactr.files.app import AppCommand, AppFailed
 from artifactr.files.blobs import OverQuota, TooLarge
@@ -107,7 +108,8 @@ def native_file_tools(
             return f"{type!r} can't be created in this workspace: create one of the types listed."
         # The call's own id, so a call retried after it succeeded makes one file.
         artifact_id = _call_id(session.run_id, ctx.tool_call_id)
-        if artifact_id not in session.made and len(session.made) >= creates:
+        fresh = artifact_id not in session.made
+        if fresh and len(session.made) >= creates:
             return f"You have created {creates} files in this run: create no more until asked."
         session.made.add(artifact_id)  # before the commit, which the run's watcher then skips
         annotate(
@@ -120,9 +122,14 @@ def native_file_tools(
             )
         )
         try:
-            outcome = await files.create(
-                ws, file_type, title, artifact_id=artifact_id, thread_id=session.thread_id
-            )
+            try:
+                outcome = await files.create(
+                    ws, file_type, title, artifact_id=artifact_id, thread_id=session.thread_id
+                )
+            except BaseException:
+                if fresh:  # nothing made: the run's count of files isn't spent
+                    session.made.discard(artifact_id)
+                raise
         except (Forbidden, NotEnabled) as refused:
             return f"You may not create {_noun(file_type)} here: {refused}."
         except (Paced, Busy, OverQuota, TooLarge, ValidationFailed, AlreadyExists) as refused:
@@ -262,7 +269,13 @@ def native_file_tools(
 
 
 def _call_id(run_id: str, tool_call_id: str | None) -> ArtifactId:
-    """The id of the file a tool call creates: the same for the same call, retried."""
+    """The id of the file a tool call creates: the same for the same call, retried.
+
+    A call without an id, which a model's provider may send, gets a new one: it can't be told
+    from another call, so it is never taken for a retry.
+    """
+    if tool_call_id is None:
+        return new_artifact_id()
     digest = hashlib.sha256(f"{run_id}:{tool_call_id}".encode()).hexdigest()
     return f"art_{digest[:16]}"
 

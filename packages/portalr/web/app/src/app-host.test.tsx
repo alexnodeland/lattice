@@ -345,3 +345,121 @@ test("at an address the deployment names no apps for, the app says where to open
     );
   expect(screen.container.querySelector("iframe")).toBeNull();
 });
+
+/** A call of run_1's, from `seq`: called, and, with a status, returned two seqs on. */
+const call = (seq: number, id: string, name: string, args: string, end?: [string, string]) => [
+  logged(seq, {
+    type: "tool_called",
+    run_id: "run_1",
+    thread_id: "thr_1",
+    tool_call_id: id,
+    tool_name: name,
+    args_summary: args,
+  }),
+  ...(end
+    ? [
+        logged(seq + 2, {
+          type: "tool_returned",
+          run_id: "run_1",
+          thread_id: "thr_1",
+          tool_call_id: id,
+          tool_name: name,
+          status: end[0],
+          summary: end[1],
+        }),
+      ]
+    : []),
+];
+
+const ALICE = { kind: "user", id: "alice" };
+
+const HTML = '{"id": "app_1", "html": "<button>Roll twice</button>"}';
+
+/** A thread in which the agent makes an app, then updates it with `update`'s status and result. */
+const updating = (update?: [string, string], ended = true) =>
+  [
+    logged(1, { type: "thread_created", thread_id: "thr_1", title: "Games" }, ALICE),
+    logged(2, { type: "run_started", run_id: "run_1", thread_id: "thr_1" }),
+    ...call(3, "c1", "create_app", '{"title": "Dice"}', ["ok", "Done: app_1 is now at version 1."]),
+    logged(4, {
+      type: "artifact_created",
+      artifact_id: "app_1",
+      kind: "app",
+      version: 1,
+      data: {},
+      thread_id: "thr_1",
+      run_id: "run_1",
+    }),
+    ...call(6, "c2", "update_app", HTML, update),
+    ...(update?.[0] === "ok"
+      ? [
+          logged(7, {
+            type: "artifact_changed",
+            artifact_id: "app_1",
+            kind: "app",
+            version: 2,
+            patch: { kind: "json_patch", ops: [] },
+            summary: "",
+            thread_id: "thr_1",
+            run_id: "run_1",
+          }),
+        ]
+      : []),
+    ...(ended
+      ? [logged(9, { type: "run_ended", run_id: "run_1", thread_id: "thr_1", status: "completed" })]
+      : []),
+  ].sort((a, b) => a.seq - b.seq);
+
+test("an app updated by a call is shown again beneath it, at its latest version, the call folded", async () => {
+  let versions = [revision("app_1", 1, "Dice"), revision("app_1", 2, "Dice")];
+  const { screen, queryClient } = await open(
+    "/t/acme/w/notes/threads/thr_1",
+    threaded(() => Response.json(versions)),
+    undefined,
+    { apps: APPS, artifactrLog: updating(["ok", "Done: app_1 is now at version 2."]) },
+  );
+  const updated = screen.getByRole("listitem", { name: "Dice" }).nth(1);
+  await expect.element(updated.getByTitle(TITLE)).toBeInTheDocument();
+  await expect.element(updated.getByText(/Version 2\./)).toBeVisible();
+  await expect
+    .element(updated.getByRole("link", { name: "Open its page" }))
+    .toHaveAttribute("href", expect.stringContaining("/artifacts/app_1"));
+  // Each call's row, folded, above what it made: create_app's, Dice, update_app's, Dice.
+  const rows = [...screen.container.querySelectorAll("[role=log] > ol > li")];
+  expect(
+    rows.map((row) => row.getAttribute("aria-label") ?? row.textContent?.slice(0, 10)),
+  ).toEqual([
+    expect.stringContaining("create_app"),
+    "Dice",
+    expect.stringContaining("update_app"),
+    "Dice",
+  ]);
+  const details = screen.getByRole("button", { name: /update_app/ });
+  await expect.element(details).toHaveAttribute("aria-expanded", "false");
+  await details.click();
+  await expect.element(screen.getByText("Done: app_1 is now at version 2.")).toBeVisible();
+  // Read again later, at a later version, both cards show it.
+  versions = [...versions, revision("app_1", 3, "Dice")];
+  await queryClient.invalidateQueries();
+  await expect.element(updated.getByText(/Version 3\./)).toBeVisible();
+});
+
+test.each([
+  ["running", undefined, false, "Running"],
+  ["failed", ["error", "No app app_1."], true, "Failed"],
+  ["proposed", ["ok", "Proposed as prop_1. A person will review it."], true, "Done"],
+] as const)(
+  "an update_app call %s is a call, as any other, with nothing beneath",
+  async (_, update, ended, word) => {
+    const { screen } = await open(
+      "/t/acme/w/notes/threads/thr_1",
+      threaded(() => Response.json([revision("app_1", 1, "Dice")])),
+      undefined,
+      { apps: APPS, artifactrLog: updating(update && [...update], ended) },
+    );
+    await expect.element(screen.getByRole("listitem", { name: "Dice" })).toBeInTheDocument();
+    const row = screen.getByRole("button", { name: /^update_app/ });
+    await vi.waitFor(() => expect(row.element().textContent).toContain(word));
+    expect(screen.getByRole("listitem", { name: "Dice" }).all()).toHaveLength(1);
+  },
+);

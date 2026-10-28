@@ -46,12 +46,19 @@ export const APP_STARTED = "portalr/app-started";
 export const APP_ERROR = "portalr/app-error";
 export const APP_BOOT = "portalr/app-boot";
 
+/**
+ * portalr's own, said by the app's document after an uncaught error, where the app was drawing
+ * frames: `stopped` "yes" where none came in the 2 s after it, "no" where they went on or came back.
+ */
+export const APP_STOPPED = "portalr/app-stopped";
+
 /** The notifications an app may send; any other is dropped, and any other request refused. */
 const NOTIFICATIONS = new Set([
   PROXY_READY,
   APP_STARTED,
   APP_ERROR,
   APP_BOOT,
+  APP_STOPPED,
   "ui/notifications/initialized",
   SIZE_CHANGED,
 ]);
@@ -155,12 +162,25 @@ export class Limiter {
 
 // ─── what the app's document reports ─────────────────────────────────────────
 
-/** The most reports a frame's bridge passes on: five errors and three of what it drew. */
+/**
+ * The most reports a frame's bridge passes on: five errors and three of what it drew; and,
+ * counted apart so no earlier report can crowd them out, four of whether it stopped.
+ */
 export const MOST_REPORTS = 8;
+const MOST_STOPPED = 4;
 
 /** Each report's fields: text kept to so many characters, or a number (`0`). Others are dropped. */
 const REPORTED: Readonly<Record<string, Readonly<Record<string, number>>>> = {
-  [APP_ERROR]: { kind: 20, message: 300, source: 120, line: 0, directive: 60, blocked: 200 },
+  [APP_ERROR]: {
+    kind: 20,
+    message: 300,
+    stack: 400,
+    source: 120,
+    line: 0,
+    directive: 60,
+    blocked: 200,
+  },
+  [APP_STOPPED]: { stopped: 3, message: 300, stack: 400 },
   [APP_BOOT]: {
     drawn: 20,
     readyState: 20,
@@ -197,7 +217,7 @@ const oneLine = (text: string, most: number) =>
 
 /** What an app's document reported: untrusted text and numbers, for plain text alone. */
 export type Report = {
-  readonly method: typeof APP_ERROR | typeof APP_BOOT;
+  readonly method: typeof APP_ERROR | typeof APP_BOOT | typeof APP_STOPPED;
   readonly params: Readonly<Record<string, string | number>>;
 };
 
@@ -534,8 +554,9 @@ export class Bridge {
   #measuredAt = Number.NEGATIVE_INFINITY;
   /** The latest measure heard too soon after the last, applied when its time comes. */
   #held: { height: number; timer: ReturnType<typeof setTimeout> } | null = null;
-  /** How many of the app's reports were passed on, up to `MOST_REPORTS`. */
+  /** How many of the app's reports were passed on, up to `MOST_REPORTS`, and of whether it stopped. */
   #reports = 0;
+  #stopped = 0;
   readonly #now: () => number;
 
   constructor(options: {
@@ -640,9 +661,15 @@ export class Bridge {
       if (method === SIZE_CHANGED && isNumber(params.height)) {
         this.#sizeChanged(params.height, params.measured === true);
       }
-      const report = this.#reports < MOST_REPORTS ? readReport(method, params) : null;
+      const stopped = method === APP_STOPPED;
+      const room = stopped ? this.#stopped < MOST_STOPPED : this.#reports < MOST_REPORTS;
+      const report = room ? readReport(method, params) : null;
       if (report !== null) {
-        this.#reports += 1;
+        if (stopped) {
+          this.#stopped += 1;
+        } else {
+          this.#reports += 1;
+        }
         this.#host.reported?.(report);
       }
       return;

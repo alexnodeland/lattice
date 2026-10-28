@@ -51,6 +51,7 @@ nav:
       - adr/0033-lattice-compiles-semantic-queries-itself-on-duckdb.md
       - adr/0034-one-decide-port-on-decision-models-calibrated-before-it-acts.md
       - adr/0035-every-number-an-agent-states-traces-to-a-computation.md
+      - adr/0036-lattice-supports-compliance-and-operators-are-certified.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr

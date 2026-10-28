@@ -41,5 +41,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0033](0033-lattice-compiles-semantic-queries-itself-on-duckdb.md) | lattice compiles semantic queries itself, on DuckDB | Proposed |
 | [0034](0034-one-decide-port-on-decision-models-calibrated-before-it-acts.md) | One `decide` port on decision models, calibrated before it acts | Proposed |
 | [0035](0035-every-number-an-agent-states-traces-to-a-computation.md) | Every number an agent states traces to a computation | Proposed |
+| [0036](0036-lattice-supports-compliance-and-operators-are-certified.md) | lattice supports compliance, and operators are the ones certified | Proposed |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

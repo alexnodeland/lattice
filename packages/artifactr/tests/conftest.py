@@ -52,32 +52,49 @@ async def _no_task_left() -> AsyncIterator[None]:
     await cancel_what_is_left()
 
 
-async def cancel_what_is_left() -> None:
+_CLOSES = frozenset(
+    {
+        "AsyncConnection.close",
+        "AsyncResult.close",
+        "AsyncSession.close",
+        "_AsyncSessionContextManager.__aexit__.<locals>.go",
+    }
+)
+"""The coroutines SQLAlchemy's asyncio extension runs in tasks of their own, shielded, to close
+a connection, a result or a session (lattice-core's ``to_the_end(session.close())`` too)."""
+
+
+async def cancel_what_is_left(*, within: float = 10) -> None:
     """Cancel every task but this one and SQLAlchemy's closes, and await them all.
 
-    SQLAlchemy closes a session or a connection in a task of its own, which it shields: the
-    close is left to end, and whoever awaits it, cancelled, raises once it has. Cancelled
-    itself, the close would stop partway, its connection never returned to the pool, to be
-    collected under a later test, and on PostgreSQL holding its transaction's locks meanwhile
-    (issue #836).
+    A close is left to end, and whoever awaits it, cancelled, raises once it has. Cancelled
+    itself, it would stop partway, its connection never returned to the pool, to be collected
+    under a later test, and on PostgreSQL holding its transaction's locks meanwhile (issue
+    #836). A task cancelled may start a close as it ends, so this looks again until none is
+    left; one that doesn't end `within` seconds is named, rather than waited on for ever.
     """
     current = asyncio.current_task()
-    left = [task for task in asyncio.all_tasks() if task is not current and not task.done()]
-    for task in left:
-        if not _shielded(task):
-            task.cancel()
-    await asyncio.gather(*left, return_exceptions=True)
+    try:
+        async with asyncio.timeout(within):
+            while left := [t for t in asyncio.all_tasks() if t is not current and not t.done()]:
+                for task in left:
+                    if not closing(task):
+                        task.cancel()
+                await asyncio.gather(*left, return_exceptions=True)
+    except TimeoutError:
+        left = [_named(t) for t in asyncio.all_tasks() if t is not current and not t.done()]
+        raise AssertionError(f"tasks still running after {within}s: {left}") from None
 
 
-def _shielded(task: asyncio.Task[object]) -> bool:
-    """Whether the task closes a SQLAlchemy session or connection.
+def _named(task: asyncio.Task[object]) -> str:
+    code = getattr(task.get_coro(), "cr_code", None)
+    return f"{task.get_name()} ({code.co_qualname if code is not None else '?'})"
 
-    SQLAlchemy's asyncio extension runs one, shielded, as `__aexit__` closes; lattice-core's
-    `to_the_end(session.close())` does too.
-    """
-    frame = getattr(task.get_coro(), "cr_frame", None)
-    module = frame.f_globals.get("__name__", "") if frame is not None else ""
-    return module.startswith("sqlalchemy.ext.asyncio.")
+
+def closing(task: asyncio.Task[object]) -> bool:
+    """Whether the task is one of SQLAlchemy's shielded closes."""
+    code = getattr(task.get_coro(), "cr_code", None)
+    return code is not None and code.co_qualname in _CLOSES
 
 
 @pytest.fixture(autouse=True)

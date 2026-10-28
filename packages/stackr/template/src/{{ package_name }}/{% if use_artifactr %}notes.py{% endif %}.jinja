@@ -70,6 +70,7 @@ def build_note_agent(
 {%- endif %}
 {%- if use_files %}
     toolsets: Sequence[AbstractToolset[Session[None]]] = (),
+    instructions: Sequence[str] = (),
 {%- endif %}
 ) -> Agent[Session[None], str | DeferredToolRequests]:
     """Build the notes agent.
@@ -79,6 +80,7 @@ def build_note_agent(
         capabilities: More capabilities: the gateway's and telemetry's.
 {%- if use_files %}
         toolsets: More tools: native files', while any app runs.
+        instructions: More instructions: native files', while any app runs.
 {%- endif %}
 {%- if use_ui %}
         integrations: Whether forms and dashboards are on in a run's workspace; each one's
@@ -88,7 +90,7 @@ def build_note_agent(
     return Agent[Session[None], str | DeferredToolRequests](
         model,
         deps_type=Session[None],
-        instructions=INSTRUCTIONS,
+        instructions={% if use_files %}[INSTRUCTIONS, *instructions]{% else %}INSTRUCTIONS{% endif %},
         output_type=[str, DeferredToolRequests],
         # A model that fills a tool's arguments wrongly is told why, and tries again this often.
         retries=3,

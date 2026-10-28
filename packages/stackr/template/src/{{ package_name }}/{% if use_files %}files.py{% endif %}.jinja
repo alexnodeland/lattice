@@ -9,7 +9,9 @@ native files are off: no route is mounted, and the agent has no tools for them.
 
 - ``/artifactr/v1/workspaces/{w}/files/...``: a file's head, check-out and check-in, and each
   version's bytes, words and pages, beside artifactr's routes
-- the agent's tools: ``read_native``, ``read_review``, ``find_commands`` and ``edit_native``
+- the agent's tools: ``create_native_file``, ``read_native``, ``read_review``, ``find_commands``
+  and ``edit_native``, and its instructions for them: which types it can create, and that a
+  file is made empty and written by its edits, which may wait for a person's review
 
 Each app is an integration of its own, ``files:<app>``, switched per workspace like any other.
 {%- if use_diagrams %}
@@ -87,6 +89,22 @@ TYPES: Final[Mapping[str, type[NativeFile]]] = {
 {%- endfor %}
 }
 """The native type each app keeps."""
+
+
+FILE_INSTRUCTIONS: Final = """\
+You can create files in an app's own format, kept as artifacts the team can open and download: \
+{kinds}. Where a workspace has an app switched off, `create_native_file` doesn't list \
+its type.
+
+- Never say you can't create a file of one of these types: create it with \
+`create_native_file`.
+- A file is created empty. In the same turn, put its content in with `edit_native`: find the \
+commands with `find_commands`, then edit it from version 1.
+- Your edits of these files are proposed, in Ask and Auto alike: each waits for a person's \
+review, and the file stays empty until one is accepted. Say so, as `edit_native` tells you \
+("Proposed as ..."): that the content waits for review, never that the file is written.
+"""
+"""What the agent is told of native files, with the running apps' types for ``{kinds}``."""
 
 
 def worker_url(craft: str) -> str:
@@ -221,6 +239,19 @@ class Files:
             )
 {%- endif %}
         return found
+
+    def instructions(self) -> list[str]:
+        """The agent's instructions for native files, naming the types of the apps that run.
+
+        The list is :data:`TYPES`', the same that makes the workers and ``create_native_file``'s
+        types, so it can't name a type the agent has no tool for.
+        """
+        if self.native is None:
+            return []
+        native = self.native
+        types = [TYPES[craft] for craft in self._workers]
+        kinds = "; ".join(f"{t.noun} ({', '.join(native.extensions(t))})" for t in types)
+        return [FILE_INSTRUCTIONS.format(kinds=kinds)]
 
     async def migrate(self, database: Database) -> None:
         """Upgrade the database to native files' tables, as its owner, even with no app running.

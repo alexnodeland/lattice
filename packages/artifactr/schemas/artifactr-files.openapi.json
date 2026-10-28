@@ -53,6 +53,33 @@
       "ArtifactId": {
         "type": "string"
       },
+      "Change": {
+        "description": "One command of a batch: what it does, in words, and the command, its long strings cut.",
+        "properties": {
+          "args": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Args",
+            "type": "object"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "name",
+          "args"
+        ],
+        "title": "Change",
+        "type": "object"
+      },
       "CheckedIn": {
         "description": "What a check-in made: a revision, a proposal if it was stale, or nothing.",
         "properties": {
@@ -165,6 +192,33 @@
           "expires_at"
         ],
         "title": "Checkout",
+        "type": "object"
+      },
+      "Described": {
+        "description": "What a batch of commands does: a line, its first `MOST_ITEMS` commands, and how many.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Change"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "summary",
+          "items",
+          "total"
+        ],
+        "title": "Described",
         "type": "object"
       },
       "EvaluatorActor": {
@@ -353,6 +407,7 @@
         "title": "FileStatus",
         "type": "object"
       },
+      "JsonValue": {},
       "Lease": {
         "description": "Who has a native file, until when.",
         "properties": {
@@ -1853,6 +1908,147 @@
           }
         },
         "summary": "Text"
+      }
+    },
+    "/workspaces/{workspace_id}/proposals/{proposal_id}/commands": {
+      "get": {
+        "description": "What an agent's proposal on a native file does, in words: a line, and each command.\n\nA proposal made by no commands, such as a person's check-in kept as one, has none (409).",
+        "operationId": "proposed_commands_workspaces__workspace_id__proposals__proposal_id__commands_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "proposal_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Proposal Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace_id",
+            "required": true,
+            "schema": {
+              "minLength": 1,
+              "title": "Workspace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Described"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "408": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Refused"
+                }
+              }
+            },
+            "description": "Refused"
+          }
+        },
+        "summary": "Proposed Commands"
       }
     },
     "/workspaces/{workspace_id}/proposals/{proposal_id}/pages/{page}": {

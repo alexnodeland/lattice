@@ -237,10 +237,10 @@ export async function refusal(answered: Response, detail: unknown): Promise<Refu
   return new Refused(answered.status, detail, Number.isNaN(wait) ? null : wait, said);
 }
 
-/** A text read's words, or null where the server has none to give (`409`, nothing to read). */
-async function words(
-  response: Promise<{ data?: string; error?: unknown; response: Response }>,
-): Promise<string | null> {
+/** A read's answer, or null where the server has none to give (`409`, nothing to read). */
+async function words<T>(
+  response: Promise<{ data?: T; error?: unknown; response: Response }>,
+): Promise<T | null> {
   try {
     return await body(response);
   } catch (error) {
@@ -515,6 +515,22 @@ export function createQueries(api: Api) {
                 ...named(tenant),
                 params: { path: { workspace_id: ws, proposal_id: proposal } },
                 parseAs: "text",
+              }),
+            ),
+          staleTime: Number.POSITIVE_INFINITY,
+        }),
+      /**
+       * What an agent's proposal on a native file does, in words: a line, and each command, or
+       * null for one made by no commands, as a person's check-in kept as a proposal.
+       */
+      proposedCommands: (tenant: string, ws: string, proposal: string) =>
+        queryOptions({
+          queryKey: [...keys.files.proposal(tenant, ws, proposal), "commands"],
+          queryFn: () =>
+            words(
+              api.files.GET("/workspaces/{workspace_id}/proposals/{proposal_id}/commands", {
+                ...named(tenant),
+                params: { path: { workspace_id: ws, proposal_id: proposal } },
               }),
             ),
           staleTime: Number.POSITIVE_INFINITY,

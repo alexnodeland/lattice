@@ -37,7 +37,7 @@ from artifactr.files.app import AppFailed, Failure, Talk
 from artifactr.files.blobs import OverQuota, TooLarge
 from artifactr.files.checkouts import Checkout
 from artifactr.files.manifest import NativeFile
-from artifactr.files.native import CREATE_NATIVE_FILE, Busy, Gauge, NativeFiles, Pace
+from artifactr.files.native import CREATE_NATIVE_FILE, Busy, Described, Gauge, NativeFiles, Pace
 from artifactr.telemetry import annotate, attribution
 from artifactr.workspace import Access, ArtifactLease, Workspace, Workspaces
 from lattice_core.refusals import refusals
@@ -511,6 +511,16 @@ def files_router(
         """The words a proposal would give a native file, as the app read them: its diff."""
         words = await _answered(files.proposed(ws, proposal_id, part="text"))
         return Response(words, media_type=TEXT, headers=DOWNLOAD)
+
+    @router.get("/workspaces/{workspace_id}/proposals/{proposal_id}/commands")
+    async def proposed_commands(
+        proposal_id: PathId, ws: Workspace = current_workspace
+    ) -> Described:
+        """What an agent's proposal on a native file does, in words: a line, and each command.
+
+        A proposal made by no commands, such as a person's check-in kept as one, has none (409).
+        """
+        return await _answered(files.proposed_commands(ws, proposal_id))
 
     @router.get(
         "/workspaces/{workspace_id}/proposals/{proposal_id}/pages/{page}",

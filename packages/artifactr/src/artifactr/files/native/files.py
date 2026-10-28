@@ -25,7 +25,7 @@ from collections.abc import (
 from datetime import timedelta
 from typing import Final, Literal, cast, override
 
-from pydantic import JsonValue
+from pydantic import JsonValue, TypeAdapter, ValidationError
 
 from artifactr.core import (
     AgentActor,
@@ -56,6 +56,7 @@ from artifactr.files.blobs import Blobs, Clock, once
 from artifactr.files.blobs.port import TooLarge, spool, utc_now
 from artifactr.files.checkouts import Checkout, Checkouts, holder_of
 from artifactr.files.manifest import Blob, NativeFile, Provenance, revise
+from artifactr.files.native.describe import Described, describe
 from artifactr.files.native.formats import FORMATS, Format, file_name, sniffed
 from artifactr.files.native.pace import Gauge, Pace
 from artifactr.workspace import Access, ArtifactBusy, Scope, Workspace
@@ -74,6 +75,8 @@ CREATE_ARTIFACT: Final = "artifactr:create_artifact"
 Part = Literal["content", "text", "review"]
 """What of a revision to read: the file, its words, or its comments and tracked changes."""
 
+_COMMANDS: Final = TypeAdapter(list[AppCommand])
+
 
 class ContentUnavailable(InvalidState):
     """A manifest names bytes the blob store doesn't have.
@@ -82,10 +85,10 @@ class ContentUnavailable(InvalidState):
     never put. Reads show the content as unavailable, and edits are refused until it is replaced.
     """
 
-    def __init__(self, artifact_id: ArtifactId, part: Part) -> None:
+    def __init__(self, artifact_id: ArtifactId, part: Part | Literal["commands"]) -> None:
         super().__init__(f"the {part} of artifact {artifact_id} is unavailable")
         self.artifact_id = artifact_id
-        self.part: Part = part
+        self.part: Part | Literal["commands"] = part
 
 
 class FormatChanged(InvalidState):
@@ -867,6 +870,31 @@ class NativeFiles:
 
         return await self._rendered(ws, app, key, proposed, admit)
 
+    async def proposed_commands(self, ws: Workspace, proposal_id: ProposalId) -> Described:
+        """Say what an agent's proposal on a native file does: a line, and each of its commands.
+
+        The batch is read from the blob its provenance names, as it was applied, and said in its
+        app's words (native files ADR-0020). It is read as `proposed` reads, so a hidden
+        proposal, or one to a hidden file, is answered as a missing one.
+
+        Raises:
+            NotFound: If there is no such proposal, it is to no native file, or either is hidden.
+            ContentUnavailable: If the proposal was made by no commands, as a person's check-in,
+                or names a batch the blob store doesn't have, or that holds no commands.
+        """
+        proposal = await ws.proposal(proposal_id)
+        await ws.get(NativeFile, proposal.artifact_id)
+        change = proposal.change
+        made = _provenance(change.patch) if isinstance(change, EditArtifact) else None
+        if made is None or made.commands is None:
+            raise ContentUnavailable(proposal.artifact_id, "commands")
+        batch = await self._bytes(_scope(ws), proposal.artifact_id, made.commands, "commands")
+        try:
+            commands = _COMMANDS.validate_json(batch)
+        except ValidationError:
+            raise ContentUnavailable(proposal.artifact_id, "commands") from None
+        return describe(made.app, commands)
+
     def _page(self, key: PageKey) -> bytes | None:
         """A page rendered before, if this process still keeps it."""
         png = self._pages.get(key)
@@ -1068,7 +1096,11 @@ class NativeFiles:
         return await self._blobs.put(scope, artifact_id, once(_canonical(value)), JSON)
 
     async def _bytes(
-        self, scope: Scope, artifact_id: ArtifactId, blob: Blob | None, part: Part
+        self,
+        scope: Scope,
+        artifact_id: ArtifactId,
+        blob: Blob | None,
+        part: Part | Literal["commands"],
     ) -> bytes:
         found = None if blob is None else await self._blobs.get(scope, artifact_id, blob.sha256)
         if found is None:
@@ -1119,6 +1151,20 @@ def _replaced(patch: Patch, part: Part) -> Blob | None:
         if op.get("op") == "replace" and op.get("path") == f"/{part}":
             value = op.get("value")
             return None if value is None else Blob.model_validate(value)
+    return None
+
+
+def _provenance(patch: Patch) -> Provenance | None:
+    """The provenance a native file's revision gives it, as `revise` builds it, if it reads as one.
+
+    As `_replaced` reads a part, the last operation that replaces it is what the revision makes;
+    the proposed manifest was validated as the proposal was made, so what it holds is one.
+    """
+    if not isinstance(patch, JsonPatch):
+        return None
+    for op in reversed(patch.ops):
+        if op.get("op") == "replace" and op.get("path") == "/provenance":
+            return Provenance.model_validate(op.get("value"))
     return None
 
 

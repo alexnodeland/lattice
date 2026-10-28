@@ -28,6 +28,12 @@ const UPLOADS = {
   kinds: [{ kind: "word_document", extensions: [".docx"], enabled: true }],
 };
 
+const SAID = {
+  summary: "Adds a slide: Trip.",
+  items: [{ text: "Adds a slide: “Trip”", name: "slide.new", args: { title: "Trip" } }],
+  total: 1,
+};
+
 const seen: URL[] = [];
 let server: Server<unknown>;
 let queries: ReturnType<typeof createQueries>;
@@ -62,6 +68,10 @@ beforeAll(() => {
         case `${AT}/proposals/p_1/pages/1`:
           // Typed as anything: the page is a PNG whatever the response says.
           return new Response(PNG, { headers: { "content-type": "application/octet-stream" } });
+        case `${AT}/proposals/p_1/commands`:
+          return Response.json(SAID);
+        case `${AT}/proposals/p_2/commands`:
+          return Response.json({ detail: { type: "invalid_state" } }, { status: 409 });
         case `${AT}/files/doc_1/versions/1/content`:
           return new Response("the file's bytes");
         case `${AT}/uploads`:
@@ -134,6 +144,14 @@ test("pages are data: URLs, and a proposal's are read by the proposal", async ()
   expect(await client.fetchQuery(queries.files.proposedText("acme", "ws_1", "p_1"))).toBe(
     "Brief\n\nStarts on Monday.",
   );
+});
+
+test("a proposal's commands are said in words, or null where it was made by none", async () => {
+  const client = new QueryClient();
+  expect(await client.fetchQuery(queries.files.proposedCommands("acme", "ws_1", "p_1"))).toEqual(
+    SAID,
+  );
+  expect(await client.fetchQuery(queries.files.proposedCommands("acme", "ws_1", "p_2"))).toBeNull();
 });
 
 test("a version's bytes are a Blob, kept no longer than it is read", async () => {

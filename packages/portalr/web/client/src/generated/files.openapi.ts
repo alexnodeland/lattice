@@ -171,6 +171,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/workspaces/{workspace_id}/proposals/{proposal_id}/commands": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Proposed Commands
+         * @description What an agent's proposal on a native file does, in words: a line, and each command.
+         *
+         *     A proposal made by no commands, such as a person's check-in kept as one, has none (409).
+         */
+        get: operations["proposed_commands_workspaces__workspace_id__proposals__proposal_id__commands_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/workspaces/{workspace_id}/proposals/{proposal_id}/pages/{page}": {
         parameters: {
             query?: never;
@@ -260,6 +282,20 @@ export interface components {
         };
         ArtifactId: string;
         /**
+         * Change
+         * @description One command of a batch: what it does, in words, and the command, its long strings cut.
+         */
+        Change: {
+            /** Args */
+            args: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /** Name */
+            name: string;
+            /** Text */
+            text: string;
+        };
+        /**
          * CheckedIn
          * @description What a check-in made: a revision, a proposal if it was stale, or nothing.
          */
@@ -298,6 +334,18 @@ export interface components {
             expires_at: string;
             /** Id */
             id: string;
+        };
+        /**
+         * Described
+         * @description What a batch of commands does: a line, its first `MOST_ITEMS` commands, and how many.
+         */
+        Described: {
+            /** Items */
+            items: components["schemas"]["Change"][];
+            /** Summary */
+            summary: string;
+            /** Total */
+            total: number;
         };
         /**
          * EvaluatorActor
@@ -379,6 +427,7 @@ export interface components {
             /** Version */
             version: number;
         };
+        JsonValue: unknown;
         /**
          * Lease
          * @description Who has a native file, until when.
@@ -1344,6 +1393,119 @@ export interface operations {
                 };
                 content: {
                     "text/plain; charset=utf-8": unknown;
+                };
+            };
+            /** @description Refused */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            408: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+            /** @description Refused */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Refused"];
+                };
+            };
+        };
+    };
+    proposed_commands_workspaces__workspace_id__proposals__proposal_id__commands_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                proposal_id: string;
+                workspace_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Described"];
                 };
             };
             /** @description Refused */

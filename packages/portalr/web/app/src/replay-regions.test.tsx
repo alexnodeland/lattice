@@ -1,8 +1,8 @@
 /**
  * What the recorder blocks, held to the app's own pages (portalr ADR-0077): `main` is blocked
  * unless a page marks itself `allow`, so a page that says nothing, a new one, or a not-found page
- * that echoes an address is not recorded; and the nav drawer is still recorded while the dialogs
- * that hold who has access are not.
+ * that echoes an address is not recorded; and no dialog is: neither the ones that hold who has
+ * access nor the palette.
  */
 
 import { afterEach, expect, test, vi } from "vitest";
@@ -69,7 +69,7 @@ test.each(Object.entries(PAGES))("%s: main is %s", async (_route, { at, allowed 
     .poll(() => document.querySelector("main")?.matches(BLOCKED), { timeout: 5_000 })
     .toBe(!allowed);
   if (allowed) {
-    expect(document.querySelector('main > div > [data-portalr-replay="allow"]')).not.toBeNull();
+    expect(document.querySelector('main > [data-portalr-replay="allow"]')).not.toBeNull();
   }
   // No chat, file, markdown or free-text surface is drawn where the recorder would see it.
   const surfaces =
@@ -79,15 +79,10 @@ test.each(Object.entries(PAGES))("%s: main is %s", async (_route, { at, allowed 
   }
 });
 
-test("the nav drawer is recorded, and a dialog that holds who has access is not", async () => {
+test("every dialog is blocked: the one that holds who has access, and the palette", async () => {
   const { screen } = await open("/t/acme/w/notes", serve);
-  await screen.getByRole("button", { name: "Menu" }).click();
-  const drawer = screen.getByRole("dialog").element();
-  expect(drawer.querySelector("[data-drawer]")).not.toBeNull();
-  expect(drawer.matches(BLOCKED)).toBe(false);
-  const sharing = document.createElement("div");
-  sharing.setAttribute("role", "dialog");
-  document.body.append(sharing);
-  expect(sharing.matches(BLOCKED)).toBe(true);
-  sharing.remove();
+  await screen.getByRole("button", { name: "Search", exact: true }).click();
+  const palette = screen.getByRole("dialog");
+  await expect.element(palette).toBeVisible();
+  expect(palette.element().matches(BLOCKED)).toBe(true);
 });

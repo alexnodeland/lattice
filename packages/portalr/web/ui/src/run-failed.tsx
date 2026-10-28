@@ -21,16 +21,22 @@ const REASONS: Readonly<Record<string, string>> = {
 };
 
 /**
- * What a provider's error says, in words a reader can act on (portalr ADR-0070, ADR-0085): the
- * error itself stays under Details, never in the sentence.
+ * What a provider's error says, in words a reader can act on (portalr ADR-0070, ADR-0085), each
+ * no firmer than the cause (ADR-0087): what the turn did before it failed stays done, so no
+ * sentence claims that nothing changed, or more of the cause than the error says. A timeout is the model's only
+ * where the error doesn't name a tool, whose own timeout is no fault of the model's. The error
+ * itself stays under Details, never in the sentence.
  */
 const SAID: readonly (readonly [RegExp, string])[] = [
-  [/overloaded|\b529\b/i, "The model was overloaded, so it couldn't answer. Nothing was lost."],
+  [
+    /overloaded|\b529\b/i,
+    "The model's provider was overloaded, so the model couldn't answer. Try again in a moment.",
+  ],
   [
     /rate.?limit|\b429\b/i,
-    "The model's provider is taking no more requests for a moment. Nothing was lost.",
+    "The model's provider is limiting requests for now. Try again in a moment.",
   ],
-  [/time(d)? ?out/i, "The model took too long to answer. Nothing was lost."],
+  [/^(?![\s\S]*\btool)[\s\S]*\btime(d)? ?out/i, "The model's provider didn't answer in time."],
 ];
 
 /** Why it failed, in words: its reason's, else its error's, else the kit's sentence. */

@@ -1,13 +1,23 @@
-import { AppShell, glyphs, NavLink, SideNav, Switcher } from "@portalr/ui";
+import {
+  AppShell,
+  ButtonLink,
+  glyphs,
+  StatusBadge,
+  Switcher,
+  TrackLink,
+  Tracks,
+} from "@portalr/ui";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useMatchRoute, useNavigate } from "@tanstack/react-router";
 import { AppAccount } from "../../../../../analytics";
+import { SearchButton, SearchPalette } from "../../../../../search";
 import { useWorkspace, WorkspaceAddons, WorkspaceStreams } from "../../../../../workspace";
 
 /**
  * A workspace: its streams, open while any of its areas is, its integrations, read as it opens,
- * and its frame, ui's AppShell, with the way between its areas, between workspaces and tenants,
- * and the account. Integrations that can't be read are their defaults, never a failed page.
+ * and its frame, ui's AppShell (portalr ADR-0087): a bar with the way between workspaces and
+ * tenants, its areas, its search, what waits for the reader, and the account. Integrations that
+ * can't be read are their defaults, never a failed page.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/w/$workspace")({
   head: ({ params, match }) => ({
@@ -42,38 +52,42 @@ function Workspace() {
       tenant={tenant}
       workspace={workspace}
     >
-      <AppShell
-        home={<Link to="/" />}
-        switcher={
-          <Switcher
-            tenant={tenant}
-            workspace={workspace}
-            tenants={tenants.map((id) => ({ id }))}
-            workspaces={[...me.workspaces].sort().map((id) => ({ id }))}
-            onTenant={(id) => void navigate({ to: "/t/$tenant", params: { tenant: id } })}
-            onWorkspace={(id) =>
-              void navigate({
-                to: "/t/$tenant/w/$workspace",
-                params: { tenant, workspace: id },
-              })
-            }
-            every={<Link to="/t/$tenant" params={{ tenant }} />}
-          />
-        }
-        nav={<Areas tenant={tenant} workspace={workspace} />}
-        account={<AppAccount />}
-      >
-        <WorkspaceAddons queries={queries} tenant={tenant} workspace={workspace}>
-          <Outlet />
-        </WorkspaceAddons>
-      </AppShell>
+      <SearchPalette tenant={tenant} workspace={workspace}>
+        <AppShell
+          home={<Link to="/" />}
+          switcher={
+            <Switcher
+              tenant={tenant}
+              workspace={workspace}
+              tenants={tenants.map((id) => ({ id }))}
+              workspaces={[...me.workspaces].sort().map((id) => ({ id }))}
+              onTenant={(id) => void navigate({ to: "/t/$tenant", params: { tenant: id } })}
+              onWorkspace={(id) =>
+                void navigate({
+                  to: "/t/$tenant/w/$workspace",
+                  params: { tenant, workspace: id },
+                })
+              }
+              every={<Link to="/t/$tenant" params={{ tenant }} />}
+            />
+          }
+          nav={<Areas tenant={tenant} workspace={workspace} />}
+          search={<SearchButton />}
+          waiting={<NeedYou tenant={tenant} workspace={workspace} />}
+          account={<AppAccount />}
+        >
+          <WorkspaceAddons queries={queries} tenant={tenant} workspace={workspace}>
+            <Outlet />
+          </WorkspaceAddons>
+        </AppShell>
+      </SearchPalette>
     </WorkspaceStreams>
   );
 }
 
 /**
- * The workspace's areas, the current one marked, with what waits for the reader: turns paused
- * for an answer, and open proposals. Threads is current on a thread's page as well as its own.
+ * The workspace's areas, the current one marked, with the open proposals beside Proposals. Threads
+ * is current on a thread's page as well as its own.
  */
 function Areas({ tenant, workspace }: { tenant: string; workspace: string }) {
   const params = { tenant, workspace };
@@ -83,49 +97,81 @@ function Areas({ tenant, workspace }: { tenant: string; workspace: string }) {
     params,
     fuzzy: true,
   });
-  const paused = Object.values(state.runs).filter((run) => run.status === "paused").length;
   const open = Object.values(state.proposals).filter((proposal) => proposal.status === "open");
   return (
-    <SideNav label="Workspace">
-      <NavLink
+    <Tracks label="Workspace">
+      <TrackLink
         icon={glyphs.messageSquare}
-        count={paused}
         render={
           <Link
             to="/t/$tenant/w/$workspace"
             params={params}
-            activeOptions={{ exact: true }}
+            activeOptions={{ exact: true, includeSearch: false }}
             {...(onThread && { "aria-current": "true" })}
           />
         }
       >
         Threads
-      </NavLink>
-      <NavLink
+      </TrackLink>
+      <TrackLink
         icon={glyphs.fileText}
         render={<Link to="/t/$tenant/w/$workspace/artifacts" params={params} />}
       >
         Artifacts
-      </NavLink>
-      <NavLink
+      </TrackLink>
+      <TrackLink
         icon={glyphs.workflow}
         count={open.length}
         render={<Link to="/t/$tenant/w/$workspace/proposals" params={params} />}
       >
         Proposals
-      </NavLink>
-      <NavLink
+      </TrackLink>
+      <TrackLink
         icon={glyphs.play}
         render={<Link to="/t/$tenant/w/$workspace/runs" params={params} />}
       >
         Runs
-      </NavLink>
-      <NavLink
+      </TrackLink>
+      <TrackLink
         icon={glyphs.zap}
         render={<Link to="/t/$tenant/w/$workspace/rules" params={params} />}
       >
         Rules
-      </NavLink>
-    </SideNav>
+      </TrackLink>
+    </Tracks>
+  );
+}
+
+/**
+ * What waits for the reader across the workspace, in the bar's corner (portalr ADR-0087): the
+ * requests its paused turns hold, a link to the threads that hold them; nothing where none wait.
+ */
+function NeedYou({ tenant, workspace }: { tenant: string; workspace: string }) {
+  const { state } = useWorkspace();
+  const waiting = Object.values(state.runs)
+    .filter((run) => run.status === "paused" && state.threads[run.threadId] !== undefined)
+    .reduce((count, run) => count + run.requests.length, 0);
+  const needs = waiting === 1 ? "needs" : "need";
+  return (
+    waiting > 0 && (
+      <ButtonLink
+        variant="ghost"
+        size="sm"
+        aria-label={`${waiting} ${needs} you`}
+        render={
+          <Link
+            to="/t/$tenant/w/$workspace"
+            params={{ tenant, workspace }}
+            search={{ show: "needs" }}
+          />
+        }
+      >
+        <StatusBadge tone="waiting">
+          {waiting}
+          {/* On a phone, the count alone, named in full (portalr ADR-0087). */}
+          <span className="max-sm:hidden"> {needs} you</span>
+        </StatusBadge>
+      </ButtonLink>
+    )
   );
 }

@@ -7,7 +7,6 @@ import {
   ArtifactContent,
   ButtonLink,
   Card,
-  CRUMB,
   FormHostContext,
   NotFound as NotFoundPage,
   PageHeader,
@@ -160,18 +159,6 @@ function Artifact() {
         id="artifact"
         title={title ?? id}
         mono={title === null}
-        breadcrumbs={[
-          {
-            label: "Artifacts",
-            render: (
-              <Link
-                to="/t/$tenant/w/$workspace/artifacts"
-                params={{ tenant, workspace }}
-                activeOptions={CRUMB}
-              />
-            ),
-          },
-        ]}
         meta={
           <>
             <span className="first-letter:uppercase inline-block">{latest.kind}</span>

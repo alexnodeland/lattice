@@ -1,4 +1,4 @@
-import "../styles.css";
+import "../rail.css";
 import { beforeEach } from "vitest";
 import { commands } from "vitest/browser";
 

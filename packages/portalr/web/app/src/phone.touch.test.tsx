@@ -104,9 +104,9 @@ test("a stepped question's bar says Next, then Answer, and gives way as it bring
   await away("Answer");
 });
 
-test("a plain approval's bar mirrors Approve", async () => {
-  // A short window, so the card's own Approve is out of sight: with no strip above the card
-  // (portalr ADR-0085), a tall one shows it, and the bar gives way to it.
+test("a plain approval holds the window's foot, so the bar has nothing to mirror", async () => {
+  // A short window: the card's own Approve stays in the thumb's reach, at the window's foot over
+  // the thread (portalr ADR-0087), and the bar gives way to it, as it does to any card in view.
   await page.viewport(390, 600);
   const { screen } = await open(
     "/t/acme/w/notes/threads/thr_1",
@@ -114,9 +114,16 @@ test("a plain approval's bar mirrors Approve", async () => {
     () => null,
     APPROVAL(undefined),
   );
-  await expect.element(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
+  const approve = screen.getByRole("button", { name: "Approve" });
+  await expect.element(approve).toBeInTheDocument();
   window.scrollTo(0, 0);
-  await expect.poll(() => bar()?.textContent).toContain("Approve");
+  await expect
+    .poll(() => {
+      const box = approve.element().getBoundingClientRect();
+      return box.top >= 0 && box.bottom <= window.innerHeight;
+    })
+    .toBe(true);
+  expect(bar()).toBeNull();
 });
 
 for (const [what, review] of [

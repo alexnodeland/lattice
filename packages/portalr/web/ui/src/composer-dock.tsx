@@ -7,9 +7,10 @@
  */
 
 import { type ReactNode, useEffect, useRef } from "react";
+import { cn } from "./cn";
 import { useCoarsePointer, useTouch } from "./touch";
 
-export function ComposerDock({ children }: { children: ReactNode }) {
+export function ComposerDock({ className, children }: { className?: string; children: ReactNode }) {
   const dock = useRef<HTMLDivElement>(null);
   // On a phone the on-screen keyboard's height is kept on the root, and the dock sits above it.
   const touch = useTouch(useCoarsePointer());
@@ -34,7 +35,10 @@ export function ComposerDock({ children }: { children: ReactNode }) {
     <div
       ref={dock}
       data-composer-dock=""
-      className="sticky bottom-(--keyboard-inset,0px) z-10 bg-paper pt-2 short:static"
+      className={cn(
+        "sticky bottom-(--keyboard-inset,0px) z-10 bg-paper pt-2 short:static",
+        className,
+      )}
     >
       {children}
     </div>

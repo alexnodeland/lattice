@@ -1,6 +1,6 @@
 /**
- * Every page with a breadcrumb names the places above it as links, never as the page shown: a
- * router's fuzzy match would mark the parent `aria-current="page"` (ADR-0059).
+ * A page inside an area, an artifact's, a rule's or a thread's, has no breadcrumb: the bar's
+ * areas mark the one it is in, the way back up (portalr ADR-0087).
  */
 
 import { afterEach, expect, test, vi } from "vitest";
@@ -40,32 +40,29 @@ const serve = async (request: Request, path: string) => {
   return path.startsWith("/grantr/v1/tenants/acme/") ? Response.json([]) : undefined;
 };
 
-async function crumbsOf(screen: RenderResult) {
-  const trail = screen.getByRole("navigation", { name: "Breadcrumb" });
-  await expect.element(trail.getByRole("link").first()).toBeVisible();
-  return trail
-    .getByRole("link")
-    .elements()
-    .map((crumb) => [crumb.textContent, crumb.getAttribute("aria-current")]);
+/** The area the bar marks as where the page is, and the page's breadcrumbs, if any. */
+async function marked(screen: RenderResult, area: string) {
+  const link = screen
+    .getByRole("navigation", { name: "Workspace" })
+    .first()
+    .getByRole("link", { name: area });
+  await expect.element(link).toHaveAttribute("aria-current");
+  expect(screen.getByRole("navigation", { name: "Breadcrumb" }).elements()).toHaveLength(0);
 }
 
-test("an artifact's crumbs are links, none the page shown", async () => {
+test("an artifact's page is marked in Artifacts, with no breadcrumb", async () => {
   const { screen } = await open("/t/acme/w/notes/artifacts/note_1", serve);
-  for (const [, current] of await crumbsOf(screen)) {
-    expect(current).toBeNull();
-  }
+  await marked(screen, "Artifacts");
 });
 
-test("a rule's crumbs are links, none the page shown", async () => {
+test("a rule's page is marked in Rules, with no breadcrumb", async () => {
   const { screen } = await open("/t/acme/w/notes/rules/tidy", serve);
-  for (const [, current] of await crumbsOf(screen)) {
-    expect(current).toBeNull();
-  }
+  await marked(screen, "Rules");
 });
 
 test("an artifact marks itself, with its files and mini apps, to be blocked whole from a session replay", async () => {
   const { screen } = await open("/t/acme/w/notes/artifacts/note_1", serve);
-  const trail = screen.getByRole("navigation", { name: "Breadcrumb" });
-  await expect.element(trail.getByRole("link").first()).toBeVisible();
-  expect(trail.element().closest('[data-portalr-replay="block"]')).not.toBeNull();
+  const heading = screen.getByRole("heading", { level: 1 });
+  await expect.element(heading).toBeVisible();
+  expect(heading.element().closest('[data-portalr-replay="block"]')).not.toBeNull();
 });

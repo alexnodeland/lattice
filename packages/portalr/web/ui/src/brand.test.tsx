@@ -2,11 +2,11 @@ import type { ReactNode } from "react";
 import { expect, onTestFinished, test } from "vitest";
 import { page } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { AppShell } from "./app-shell";
 import { type Brand, BrandContext, pageTitle } from "./brand";
 import { Lockup } from "./marks";
 import { NewVersion } from "./new-version";
 import { Plain } from "./plain";
+import { RailShell } from "./rail-shell";
 import { SignIn } from "./sign-in";
 
 const BRAND: Brand = {
@@ -52,9 +52,9 @@ test("the kit's mark for the page's scheme is the one shown, the system's or the
 
 test("the frame's way home is named for the product: on the rail, and in a phone's drawer", async () => {
   const frame = branded(
-    <AppShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>alice</span>}>
+    <RailShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>alice</span>}>
       Content
-    </AppShell>,
+    </RailShell>,
   );
   await page.viewport(1280, 800);
   onTestFinished(() => page.viewport(414, 896));
@@ -115,9 +115,9 @@ for (const scheme of ["light", "dark"] as const) {
     });
     const screen = await render(
       branded(
-        <AppShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>a</span>}>
+        <RailShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>a</span>}>
           Content
-        </AppShell>,
+        </RailShell>,
       ),
     );
     const marks = shown(screen.container);
@@ -157,9 +157,13 @@ for (const name of [LONG, EMOJI]) {
       onTestFinished(() => page.viewport(414, 896));
       const screen = await render(
         branded(
-          <AppShell home={<a href="#home" />} switcher={<span>acme</span>} account={<span>a</span>}>
+          <RailShell
+            home={<a href="#home" />}
+            switcher={<span>acme</span>}
+            account={<span>a</span>}
+          >
             Content
-          </AppShell>,
+          </RailShell>,
           long,
         ),
       );

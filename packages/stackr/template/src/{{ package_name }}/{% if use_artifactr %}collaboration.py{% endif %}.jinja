@@ -40,6 +40,7 @@ from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 {%- if use_ui or use_files %}
 from lattice_core.integrations import Integrations
 {%- endif %}
+from lattice_core.settings import Settings
 {%- if use_relayr %}
 from relayr.rules import RuleDraft
 {%- endif %}
@@ -52,7 +53,7 @@ from {{ package_name }}.database import Database
 {%- if use_files %}
 from {{ package_name }}.files import Files
 {%- endif %}
-from {{ package_name }}.gateway import Guardrails, TenantKeys
+from {{ package_name }}.gateway import Guardrails, Models, TenantKeys
 {%- if use_relayr %}
 from {{ package_name }}.incidents import Postmortem, Timeline
 {%- endif %}
@@ -108,7 +109,12 @@ class Collaboration:
 {%- if use_files %}
         files: Native files: their types, routes and the agent's tools, while any app runs.
 {%- endif %}
-        model: The agent's model.
+        model: The agent's model, which answers a turn whose message names none.
+        models: The models a message may name instead (artifactr ADR-0097); without it, those
+            ``gateway`` lists.
+        allowed: Which of them each workspace allows: its ``models:allowed``, which a turn's
+            ``artifactr:use_model`` is checked against before ``authorize`` is asked; without
+            it, the operator's, everywhere.
         gateway: The gateway's settings: tenant keys and guardrails.
         database: The database; without one, workspaces live in memory.
         telemetry: OpenTelemetry, and Langfuse when it has a client.
@@ -137,6 +143,8 @@ class Collaboration:
         files: Files,
 {%- endif %}
         model: Model,
+        models: Models | None = None,
+        allowed: Settings | None = None,
         gateway: GatewaySettings,
         database: Database | None = None,
         telemetry: TelemetryHandle | None = None,
@@ -147,6 +155,7 @@ class Collaboration:
 {%- endif %}
     ) -> None:
         self._authenticate = authenticate
+        models = models or Models(gateway)
         self._identify = identify
 {%- if use_files %}
         self._files = files
@@ -197,7 +206,7 @@ class Collaboration:
 {%- elif use_files %}
             gate=integration_gate(integrations, files.key_of),
 {%- endif %}
-            authorize=authorize,
+            authorize=models.narrowed(authorize, allowed or models.defaults()),
             hidden=hidden,
             on_open=opened(
                 self._recover,
@@ -238,6 +247,7 @@ class Collaboration:
             ),
             app=None,
             agent_name="assistant",
+            model_for=models,
             turn_context={% if use_relayr %}turn_context{% else %}langfuse_turn if langfuse else None{% endif %},
             tracer_provider=tracer_provider,
             meter_provider=meter_provider,
@@ -246,7 +256,7 @@ class Collaboration:
                 no_output=gateway.no_output_seconds,
                 local_first_output=gateway.local_first_output_seconds,
                 local_no_output=gateway.local_no_output_seconds,
-                local_models=frozenset(gateway.local_models),
+                local_models=frozenset((*gateway.local_models, *models.local)),
                 hosted_models=frozenset(gateway.hosted_models),
                 tool=gateway.tool_seconds,
             ),

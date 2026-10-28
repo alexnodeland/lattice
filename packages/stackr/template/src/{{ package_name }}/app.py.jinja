@@ -71,7 +71,11 @@ from {{ package_name }}.database import Database, create_schema, open_database
 {%- if use_files %}
 from {{ package_name }}.files import Files
 {%- endif %}
+{%- if use_artifactr and access == 'grantr' %}
+from {{ package_name }}.gateway import Models, gateway_model
+{%- else %}
 from {{ package_name }}.gateway import gateway_model
+{%- endif %}
 {%- if use_portal %}
 from {{ package_name }}.portal import Portal
 {%- endif %}
@@ -178,10 +182,17 @@ def create_app(
 {%- if use_files %}
         files=settings.files.crafts,
 {%- endif %}
+{%- if use_artifactr %}
+        gateway=settings.gateway,
+{%- endif %}
     )
 {%- if use_artifactr %}
     artifactr_hooks = access.grants.hooks(access.artifactr_subject)
 {%- endif %}
+{%- endif %}
+{%- if use_artifactr and access == 'grantr' %}
+    # The models a message may name, which the portal lists as grantr's settings allow them.
+    models = Models(settings.gateway)
 {%- endif %}
 {%- if use_integrations %}
     # Whether each integration is on in a workspace: {% if access == 'grantr' %}as grantr's switches say{% else %}each one's default, everywhere{% endif %}.
@@ -252,6 +263,10 @@ def create_app(
         files=files,
 {%- endif %}
         model=model,
+{%- if access == 'grantr' %}
+        models=models,
+        allowed=access.grants,
+{%- endif %}
         gateway=settings.gateway,
         database=database,
         telemetry=telemetry,
@@ -269,7 +284,7 @@ def create_app(
     tracking.connect(automation.workspaces, automation.resolve_actor)
 {%- endif %}
 {%- if use_portal %}
-    portal = Portal(access=access, settings=settings, database=database)
+    portal = Portal(access=access, settings=settings, database=database{% if use_artifactr %}, models=models{% endif %})
 {%- endif %}
 {%- if use_relayr %}
     # The bridge starts after the libraries' parts, and stops before them.

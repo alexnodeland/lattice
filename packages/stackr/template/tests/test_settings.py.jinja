@@ -1,8 +1,6 @@
 """Settings come from the environment: the stack's ports, with local defaults."""
-{%- if use_tracker %}
 
 import json
-{%- endif %}
 
 import pytest
 {%- if use_tracker %}
@@ -11,8 +9,10 @@ from relayr.ledger import WorkspaceKey
 from relayr.trackers import TrackerBinding, TrackerCredentials
 
 from {{ package_name }}.settings import (
+    ALWAYS,
     AuthSettings,
     GatewaySettings,
+    ModelInfo,
     Settings,
     TrackerSettings,
 )
@@ -29,7 +29,13 @@ CREDENTIALS = {
 }
 {%- else %}
 
-from {{ package_name }}.settings import AuthSettings, GatewaySettings, Settings
+from {{ package_name }}.settings import (
+    ALWAYS,
+    AuthSettings,
+    GatewaySettings,
+    ModelInfo,
+    Settings,
+)
 {%- endif %}
 
 
@@ -156,6 +162,53 @@ def test_a_tool_may_be_waited_for_as_long_as_it_needs() -> None:
 def test_tenant_keys_must_be_a_json_object(keys: str) -> None:
     with pytest.raises(ValueError, match="LITELLM_TENANT_KEYS"):
         Settings.from_environ({"LITELLM_TENANT_KEYS": keys})
+
+
+def test_the_models_a_message_may_name_are_default_fast_and_those_listed() -> None:
+    listed = json.dumps(
+        [
+            {"id": "deep", "label": "Deep", "family": "anthropic", "reasoning": True},
+            {"id": "fast", "label": "Quick"},
+            {"id": "here", "label": "Here", "local": True},
+        ]
+    )
+    gateway = Settings.from_environ(
+        {"LITELLM_MODELS": listed, "LITELLM_MODELS_ALLOWED": "default,deep"}
+    ).gateway
+    assert gateway.models == (
+        ModelInfo(id="default", label="Default"),
+        ModelInfo(id="deep", label="Deep", family="anthropic", reasoning=True),
+        ModelInfo(id="fast", label="Quick"),
+        ModelInfo(id="here", label="Here", local=True),
+    )
+    assert gateway.allowed_models == ("default", "deep")
+    assert Settings.from_environ({}).gateway.models == ALWAYS
+    assert Settings.from_environ({}).gateway.allowed_models == ("default", "fast")
+
+
+@pytest.mark.parametrize(
+    "listed",
+    [
+        "not json",
+        '{"id": "deep"}',
+        '["deep"]',
+        '[{"id": "deep"}]',
+        '[{"id": "", "label": "Deep"}]',
+        '[{"id": "deep", "label": "Deep", "local": "yes"}]',
+        '[{"id": "deep", "label": "Deep", "family": 3}]',
+        '[{"id": "deep", "label": "Deep"}, {"id": "deep", "label": "Again"}]',
+    ],
+)
+def test_a_model_list_that_isnt_one_is_refused(listed: str) -> None:
+    with pytest.raises(ValueError, match="LITELLM_MODELS"):
+        Settings.from_environ({"LITELLM_MODELS": listed})
+
+
+def test_only_listed_models_may_be_allowed_and_default_and_fast_are_always_listed() -> None:
+    with pytest.raises(ValueError, match="LITELLM_MODELS_ALLOWED names unlisted deep"):
+        Settings.from_environ({"LITELLM_MODELS_ALLOWED": "default,deep"})
+    with pytest.raises(ValueError, match="LITELLM_MODELS must list fast"):
+        GatewaySettings(models=(ModelInfo(id="default", label="Default"),))
 
 
 @pytest.mark.parametrize("schema", ["Public", "has space", 'quote"d', ""])

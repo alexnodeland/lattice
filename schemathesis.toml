@@ -35,7 +35,7 @@ checks.negative_data_rejection.enabled = false
 # portalr's reads name their tenant with X-Tenant, which a caller bound to no tenant must send
 # though the document can't require it; scripts/api calls as acme's owner.
 [[operations]]
-include-path-regex = "^/portalr/v1/(traces|logs|metrics|scores|spend|invites)"
+include-path-regex = "^/portalr/v1/(traces|logs|metrics|scores|spend|invites|models)"
 headers = { "X-Tenant" = "acme" }
 
 # The deployment's reads are an operator's, which acme's owner isn't.

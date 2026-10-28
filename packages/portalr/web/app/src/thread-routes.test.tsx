@@ -168,9 +168,11 @@ test("a thread shows its messages, the reader's on the wash, its calls and quest
   const words = (item: Element) => getComputedStyle(item.querySelector(":scope > div") as Element);
   expect(words(mine).backgroundColor).not.toBe("rgba(0, 0, 0, 0)");
   expect(words(theirs).backgroundColor).toBe("rgba(0, 0, 0, 0)");
-  const [created, drafted] = log.getByRole("list", { name: "Tools" }).elements();
-  expect(created?.textContent).toContain("create_artifact");
-  expect(drafted?.textContent).toContain("Refused");
+  // Each run's calls a quiet line, in plain words, a refusal marked.
+  const created = log.getByRole("button", { name: "Made an artifact: 1 tool call" }).element();
+  await expect
+    .element(log.getByRole("button", { name: "Drafted a rule · 1 failed: 1 tool call" }))
+    .toBeVisible();
   const asked = log.getByRole("region", { name: "The agent asked" });
   await expect.element(asked.getByText("The next")).toBeVisible();
   await expect.element(asked.getByText("Answered by You")).toBeVisible();

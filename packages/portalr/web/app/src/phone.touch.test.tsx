@@ -274,11 +274,12 @@ for (const width of [320, 390, 768]) {
     await page.viewport(width, 900);
     const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
     await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
-    await screen.getByRole("button", { name: "2 steps" }).click();
-    const step = screen.getByRole("button", { name: /list_artifacts/ }).first();
+    // On a phone the calls are a sheet, a call's detail a tap further.
+    await screen.getByRole("button", { name: /: 2 tool calls$/ }).click();
+    const step = screen.getByRole("dialog").getByRole("button", { name: /^Looked through/ });
     await expect.element(step).toBeVisible();
     await step.click();
-    await expect.element(screen.getByText("Arguments").first()).toBeVisible();
+    await expect.element(screen.getByText("What it was asked")).toBeVisible();
     noneWider();
   });
 }

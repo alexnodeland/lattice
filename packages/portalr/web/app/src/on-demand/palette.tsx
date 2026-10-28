@@ -177,8 +177,8 @@ export function Palette({
       <div id={list} role="listbox" aria-label="Results" className="overflow-y-auto p-1.5">
         {choices.length === 0 && <p className="px-2.5 py-2 text-muted text-sm">Nothing matches.</p>}
         {[...groups].map(([group, members]) => (
-          <div key={group}>
-            <div aria-hidden="true" className="px-2.5 pt-2 pb-1 text-muted text-xs">
+          <fieldset key={group} aria-labelledby={`${list}-${group}`} className="m-0 border-0 p-0">
+            <div id={`${list}-${group}`} className="px-2.5 pt-2 pb-1 text-muted text-xs">
               {group}
             </div>
             {members.map(({ choice, index }) => (
@@ -189,11 +189,11 @@ export function Palette({
                 aria-selected={index === at}
                 tabIndex={-1}
                 onPointerMove={() => setChosen(index)}
-                // The field keeps the focus; the arrows and Enter are its own.
-                onMouseDown={(event) => {
-                  event.preventDefault();
-                  follow(choice);
-                }}
+                // The field keeps the focus as a pointer presses; a click, a tap, or a screen
+                // reader's or Voice Control's activation follows the choice.
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => follow(choice)}
+                onKeyDown={(event) => event.key === "Enter" && follow(choice)}
                 className="flex cursor-default items-center gap-2.5 rounded-(--radius-3) px-2.5 py-2 text-sm aria-selected:bg-subtle"
               >
                 <Icon icon={choice.icon} className="text-muted" />
@@ -201,7 +201,7 @@ export function Palette({
                 {choice.end}
               </div>
             ))}
-          </div>
+          </fieldset>
         ))}
       </div>
     </PaletteFrame>

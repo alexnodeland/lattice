@@ -16,28 +16,33 @@ import { useWorkspace } from "./workspace";
 /** The palette, loaded the first time it is opened (portalr ADR-0087). */
 const loadPalette = () => import("./on-demand/palette");
 
+/** A Mac, where Ctrl+K in a field is the system's: kill to the line's end. */
+const MAC = /Mac|iP(hone|ad|od)/.test(navigator.platform);
+
 /**
- * Whether a key opens the palette: Ctrl+K or ⌘K anywhere, and "/" where it isn't typed into a
- * field; never with another modifier held, and never over a dialog already open (portalr ADR-0087).
+ * Whether a key opens the palette (portalr ADR-0087): ⌘K anywhere, a field too; Ctrl+K outside a
+ * field, and in one too but on a Mac, where it is the field's own; "/" outside a field. Never with
+ * another modifier held, and never over a dialog or a menu already open.
  */
-export function opensPalette(event: KeyboardEvent): boolean {
+export function opensPalette(event: KeyboardEvent, mac = MAC): boolean {
+  const field =
+    event.target instanceof Element &&
+    event.target.closest("input, textarea, select, [contenteditable]") !== null;
   const k =
     event.key.toLowerCase() === "k" &&
-    (event.metaKey || event.ctrlKey) &&
-    !(event.altKey || event.shiftKey);
-  const slash =
-    event.key === "/" &&
-    !(event.metaKey || event.ctrlKey || event.altKey) &&
-    !(
-      event.target instanceof Element &&
-      event.target.closest("input, textarea, select, [contenteditable]")
-    );
-  return (k || slash) && document.querySelector('[role="dialog"], [role="alertdialog"]') === null;
+    !(event.altKey || event.shiftKey) &&
+    (event.metaKey || (event.ctrlKey && !(mac && field)));
+  const slash = event.key === "/" && !(event.metaKey || event.ctrlKey || event.altKey || field);
+  return (
+    (k || slash) &&
+    document.querySelector('[role="dialog"], [role="alertdialog"], [role="menu"]') === null
+  );
 }
 
 const Opening = createContext<{
   readonly open: (from: RefObject<HTMLElement | null>) => void;
   readonly icon: RefObject<HTMLButtonElement | null>;
+  readonly shown: boolean;
 } | null>(null);
 
 /**
@@ -80,6 +85,7 @@ export function SearchPalette({
   }, []);
   const opening = {
     icon,
+    shown: open,
     open: (from: RefObject<HTMLElement | null>) => {
       setBack(from);
       setOpen(true);
@@ -117,6 +123,8 @@ export function SearchButton() {
         label="Search"
         icon={glyphs.search}
         aria-keyshortcuts="Control+K Meta+K /"
+        aria-haspopup="dialog"
+        aria-expanded={opening.shown}
         onClick={() => opening.open(opening.icon)}
       />
     )

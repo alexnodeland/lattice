@@ -17,6 +17,14 @@
  */
 @source not "./rail-shell.tsx";
 @source not "./side-nav.tsx";
+@source not "./breadcrumbs.tsx";
+@source not "./integration-list.tsx";
+@source not "./log-list.tsx";
+@source not "./tab-nav.tsx";
+@source not "./trace-view.tsx";
+@source not "./tracker.tsx";
+@source not "./error-state.tsx";
+@source not "./ansi.tsx";
 /* Streamdown renders with Tailwind classes of its own, which Tailwind finds here. */
 @source "../node_modules/streamdown/dist/*.js";
 /*
@@ -160,16 +168,11 @@
 
   /*
    * The frame's header is pinned to the top of the window: what a link or the keyboard scrolls to
-   * stops below it. The app's bar is pinned at every width; admin's, at lg, is the rail beside the
-   * page, and takes no room above; a page without the frame has nothing pinned, so keeps none.
+   * stops below it. The app's bar is pinned at every width (admin's rail, at lg, takes no room
+   * above: `rail.css`); a page without the frame has nothing pinned, so keeps none.
    */
   html:has([data-frame-header]) {
     scroll-padding-top: calc(var(--header-clearance) + env(safe-area-inset-top));
-  }
-  html:has([data-rail]) {
-    @variant lg {
-      scroll-padding-top: 0;
-    }
   }
 
   /*
@@ -198,8 +201,8 @@
    * A phone's safe areas (portalr ADR-0080): the viewport reaches the screen's edges, so the page
    * keeps the sides clear, the header pinned to the top keeps the notch clear itself (its own
    * padding, in `app-shell.tsx`, and the room it takes below), a composer pinned to the bottom
-   * keeps the home indicator clear, and the drawer, which stands over the page, keeps the top,
-   * the bottom and its own side clear itself.
+   * keeps the home indicator clear; admin's drawer, which stands over the page, keeps the top,
+   * the bottom and its own side clear itself (`rail.css`).
    */
   body {
     padding-right: env(safe-area-inset-right);
@@ -211,11 +214,6 @@
   /* The keyboard up (`keyboardInset`) covers the home indicator: nothing to keep clear. */
   :root[data-keyboard] [data-composer-dock] {
     padding-bottom: var(--space-4);
-  }
-  [data-frame-drawer] {
-    padding-top: calc(var(--space-3) + env(safe-area-inset-top));
-    padding-bottom: calc(var(--space-3) + env(safe-area-inset-bottom));
-    padding-left: calc(var(--space-3) + env(safe-area-inset-left));
   }
 }
 

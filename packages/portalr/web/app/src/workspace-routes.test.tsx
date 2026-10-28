@@ -5,7 +5,7 @@
  */
 
 import { afterEach, expect, test, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { open } from "./test/app";
 
 const FLAGS = "/grantr/v1/tenants/acme/workspaces/notes/enabled-integrations";
@@ -198,15 +198,28 @@ test("the threads are filtered by state, the view kept in the URL, found from th
   // Search is the bar's magnifier, the palette, opened by it or by "/" (portalr ADR-0087); its
   // field finds a thread by its title, Enter goes to it, and Escape gives the focus back.
   const magnifier = screen.getByRole("button", { name: "Search", exact: true });
+  await expect.element(magnifier).toHaveAttribute("aria-expanded", "false");
   await magnifier.click();
+  await expect.element(magnifier).toHaveAttribute("aria-expanded", "true");
   const field = screen.getByRole("combobox", { name: "Search or go to" });
   await expect.element(field).toHaveFocus();
   await field.fill("inv");
   await expect
     .element(screen.getByRole("option", { name: "Invoices" }))
     .toHaveAttribute("aria-selected", "true");
+  // Its groups are named, and a choice is followed by a click as by Enter.
+  await expect.element(screen.getByRole("group", { name: "Threads" })).toBeVisible();
   await userEvent.keyboard("{Escape}");
   await expect.element(magnifier).toHaveFocus();
+  await magnifier.click();
+  await screen.getByRole("combobox", { name: "Search or go to" }).fill("rules");
+  await screen.getByRole("option", { name: "Rules" }).click();
+  await expect.poll(() => router.state.location.pathname).toBe("/t/acme/w/notes/rules");
+  await router.navigate({
+    to: "/t/$tenant/w/$workspace",
+    params: { tenant: "acme", workspace: "notes" },
+  });
+  (document.activeElement as HTMLElement).blur();
   // "/" opens it from the page, never with Ctrl held.
   await userEvent.keyboard("{Control>}/{/Control}");
   expect(screen.getByRole("combobox").elements()).toHaveLength(0);
@@ -284,4 +297,36 @@ test("a first message refused after its thread was made keeps the words, and sen
   await expect
     .poll(() => router.state.location.pathname)
     .toBe(`/t/acme/w/notes/threads/${sent[0]?.thread_id}`);
+});
+
+test("from 1024 pixels the threads are a table whose links Tab reaches, and the arrows move between", async () => {
+  const at = (seq: number, event: unknown) => ({
+    type: "event",
+    seq,
+    id: `evt_${seq}`,
+    ts: "2026-10-20T00:00:00Z",
+    workspace_id: "notes",
+    actor: { kind: "user", id: "alice" },
+    event,
+  });
+  await page.viewport(1280, 800);
+  const { screen } = await open(
+    "/t/acme/w/notes",
+    async (_request, path) => (path === FLAGS ? Response.json({}) : undefined),
+    () => null,
+    {
+      artifactrLog: [
+        at(1, { type: "thread_created", thread_id: "thr_1", title: "Launch" }),
+        at(2, { type: "thread_created", thread_id: "thr_2", title: "Invoices" }),
+      ],
+    },
+  );
+  const table = screen.getByRole("table", { name: "Threads" });
+  const invoices = table.getByRole("link", { name: "Invoices" });
+  await expect.element(invoices).toBeVisible();
+  expect(invoices.element().tabIndex).toBe(0);
+  expect(table.element().querySelectorAll("[tabindex='-1']")).toHaveLength(0);
+  (invoices.element() as HTMLElement).focus();
+  await userEvent.keyboard("{ArrowDown}");
+  await expect.element(table.getByRole("link", { name: "Launch" })).toHaveFocus();
 });

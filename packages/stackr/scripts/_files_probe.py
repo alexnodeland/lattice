@@ -43,6 +43,8 @@ DRAWN = {
     "figcraft": [
         AppCommand(name="frame.create", args={"x": 0, "y": 0, "width": 200, "height": 100})
     ],
+    # A blank FilmCraft or EffectCraft project has no page by design: with no sequence or
+    # composition, the adapter refuses `no page 1`, a property of the format. So each is given one.
     "filmcraft": [
         AppCommand(name="file.newSequence", args={"name": "Main"}),
         AppCommand(name="graphics.newText", args={"text": "Hello", "seconds": 2}),

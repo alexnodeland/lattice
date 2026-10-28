@@ -12,6 +12,9 @@ const sources = import.meta.glob(
   { query: "?raw", import: "default", eager: true },
 ) as Record<string, string>;
 
+/** A class's name, as a regular expression matches it literally. */
+const escaped = (name: string) => name.replace(/[.*+?^${}()|[\]\\/]/g, "\\$&");
+
 test("no class the stylesheet leaves out is one portalr's own code writes", () => {
   const listed = /@source not inline\("([^"]+)"\)/.exec(styles)?.[1]?.split(/\s+/) ?? [];
   expect(listed.length).toBeGreaterThan(0);
@@ -19,9 +22,7 @@ test("no class the stylesheet leaves out is one portalr's own code writes", () =
     .filter(([path]) => !/\.test\.tsx?$/.test(path))
     .flatMap(([path, text]) =>
       listed
-        .filter((name) =>
-          new RegExp(`(^|[\\s"'\`])${name.replace(/[[\]()/.]/g, "\\$&")}($|[\\s"'\`])`).test(text),
-        )
+        .filter((name) => new RegExp(`(^|[\\s"'\`])${escaped(name)}($|[\\s"'\`])`).test(text))
         .map((name) => `${path}: ${name}`),
     );
   expect(used).toEqual([]);

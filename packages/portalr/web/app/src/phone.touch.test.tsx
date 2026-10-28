@@ -105,7 +105,9 @@ test("a stepped question's bar says Next, then Answer, and gives way as it bring
 });
 
 test("a plain approval's bar mirrors Approve", async () => {
-  await page.viewport(390, 844);
+  // A short window, so the card's own Approve is out of sight: with no strip above the card
+  // (portalr ADR-0085), a tall one shows it, and the bar gives way to it.
+  await page.viewport(390, 600);
   const { screen } = await open(
     "/t/acme/w/notes/threads/thr_1",
     serve,

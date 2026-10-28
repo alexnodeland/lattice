@@ -130,7 +130,7 @@ export function ActionsMenu({
   const { pending, thumb, why } = useThumbs(onThumbs ?? NO_THUMBS);
   return (
     <div className="flex min-w-0 flex-col items-end gap-1">
-      <span className={unseen ? "sr-only" : "contents"}>
+      <span className={unseen ? "sr-only start-0" : "contents"}>
         <Menu
           label={label}
           icon={glyphs.more}
@@ -351,16 +351,15 @@ export function Message({
           <>
             {/* No glyph under every message (portalr ADR-0085): a long press opens the sheet;
                 the trigger is there for a screen reader alone. */}
-            <span className="sr-only">
-              <ActionsMenu
-                label="Message actions"
-                given={thumbs}
-                {...(onThumbs && { onThumbs })}
-                items={[{ label: "Copy as Markdown", onSelect: copy }]}
-                open={opened}
-                onOpenChange={setOpened}
-              />
-            </span>
+            <ActionsMenu
+              label="Message actions"
+              unseen
+              given={thumbs}
+              {...(onThumbs && { onThumbs })}
+              items={[{ label: "Copy as Markdown", onSelect: copy }]}
+              open={opened}
+              onOpenChange={setOpened}
+            />
             <span role="status" className="sr-only">
               {said}
             </span>

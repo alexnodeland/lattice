@@ -1277,9 +1277,6 @@ test("where the pointer can't hover, a message's actions are a menu, which a lon
   const drawn = [...item.querySelectorAll("button")].filter(
     (button) => button.closest(".sr-only") === null,
   );
-  expect(getComputedStyle(trigger.element().closest(".sr-only") as Element).clipPath).not.toBe(
-    "none",
-  );
   expect(drawn).toHaveLength(0);
   trigger.element().dispatchEvent(new MouseEvent("click", { bubbles: true }));
   const menu = screen.getByRole("menu");

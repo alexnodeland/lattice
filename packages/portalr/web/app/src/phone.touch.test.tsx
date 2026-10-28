@@ -181,13 +181,15 @@ for (const [width, height] of [
   [320, 568],
   [360, 640],
   [375, 667],
-  [390, 844],
-  [430, 932],
+  [390, 667],
+  [430, 667],
 ] as const) {
   test(`at ${width}px the composer's footer is one line of + and the primary action, and the dock at most a quarter of the window`, async () => {
     await page.viewport(width, height);
     const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
     await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
+    // The bar mirrors the card's Answer only while the card's own is out of view: from the top.
+    window.scrollTo(0, 0);
     await expect.poll(() => bar()?.textContent).toContain("Answer");
     const tall = await settled();
     // One footer (portalr ADR-0087): "+" at its start, and, while nothing is written, the thumb

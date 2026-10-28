@@ -108,7 +108,7 @@ test("a notice is set apart from messages", async () => {
   expect(getComputedStyle(notice).color).toBe(token("muted"));
 });
 
-test("the reader's words sit on the quiet wash and the agent's are unboxed, both at the start of the line", async () => {
+test("the reader's words sit on the quiet wash at the end of the line, the agent's unboxed at its start", async () => {
   const screen = await render(
     <Messages>
       <Message message={message()} author="You" mine />
@@ -117,7 +117,8 @@ test("the reader's words sit on the quiet wash and the agent's are unboxed, both
   );
   const mine = screen.getByRole("listitem", { name: "You" }).element();
   const theirs = screen.getByRole("listitem", { name: "Assistant" }).element();
-  expect(getComputedStyle(mine).alignSelf).toBe("flex-start");
+  expect(getComputedStyle(mine).alignSelf).toBe("flex-end");
+  expect(getComputedStyle(mine).alignItems).toBe("flex-end");
   expect(getComputedStyle(theirs).alignSelf).toBe("flex-start");
   const body = (item: Element) => getComputedStyle(item.querySelector(":scope > div") as Element);
   expect(body(mine).backgroundColor).toBe(token("subtle"));
@@ -126,6 +127,46 @@ test("the reader's words sit on the quiet wash and the agent's are unboxed, both
   // The name above each: the reader's in the ink, the agent's quieter.
   expect(getComputedStyle(screen.getByText("You").element()).color).toBe(token("fg"));
   expect(getComputedStyle(screen.getByText("Assistant").element()).color).toBe(token("muted"));
+});
+
+for (const dir of ["ltr", "rtl"] as const) {
+  test(`in ${dir}, the reader's message meets the line's end and the agent's its start`, async () => {
+    const screen = await render(
+      <div dir={dir} style={{ width: "400px" }}>
+        <Messages>
+          <Message message={message({ content: "Hi" })} author="You" mine />
+          <Message message={message({ id: "msg_2", content: "Hello" })} author="Assistant" />
+          <Message message={message({ id: "msg_3", content: "Later" })} author="You" mine sending />
+        </Messages>
+      </div>,
+    );
+    const log = screen.getByRole("list").element().getBoundingClientRect();
+    const [mine, theirs, queued] = screen
+      .getByRole("listitem")
+      .elements()
+      .map((item) => item.getBoundingClientRect());
+    const end = (box: DOMRect) => (dir === "ltr" ? log.right - box.right : box.left - log.left);
+    const start = (box: DOMRect) => (dir === "ltr" ? box.left - log.left : log.right - box.right);
+    expect(Math.abs(end(mine as DOMRect))).toBeLessThan(1);
+    expect(Math.abs(end(queued as DOMRect))).toBeLessThan(1);
+    expect(Math.abs(start(theirs as DOMRect))).toBeLessThan(1);
+    expect(start(mine as DOMRect)).toBeGreaterThan(100);
+  });
+}
+
+test("a long word in the reader's message wraps inside its bubble", async () => {
+  const word = "x".repeat(300);
+  const screen = await render(
+    <div style={{ width: "320px" }}>
+      <Messages>
+        <Message message={message({ content: `https://example.test/${word}` })} author="You" mine />
+      </Messages>
+    </div>,
+  );
+  const item = screen.getByRole("listitem", { name: "You" }).element();
+  const bubble = item.querySelector(":scope > div") as HTMLElement;
+  expect(bubble.scrollWidth).toBeLessThanOrEqual(bubble.clientWidth);
+  expect(item.getBoundingClientRect().width).toBeLessThanOrEqual(320 * 0.85 + 1);
 });
 
 test("a message on its way says so, and can't be copied or judged yet", async () => {

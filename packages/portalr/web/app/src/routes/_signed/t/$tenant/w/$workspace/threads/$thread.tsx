@@ -331,7 +331,7 @@ function Chat() {
     }
     return sent;
   };
-  const log = threadLog(thread, runs, inline);
+  const log = threadLog(thread, runs, inline, artifacts);
   // The thread's latest turn, if it failed, can be tried again by whoever may post.
   const retry = allowed.has("artifactr:post_message") ? retryOf(thread, runs, me) : null;
   const latestRequest = active.flatMap((run) => run.requests).at(-1);
@@ -419,12 +419,13 @@ function Chat() {
             case "artifact":
               return (
                 <ThreadArtifact
-                  key={entry.artifact.id}
+                  key={entry.updatedBy ? `call:${entry.updatedBy}` : `art:${entry.artifact.id}`}
                   context={context}
                   me={me}
                   tenant={tenant}
                   workspace={workspace}
                   artifact={entry.artifact}
+                  {...(entry.superseded && { superseded: entry.superseded })}
                 />
               );
             case "partial":

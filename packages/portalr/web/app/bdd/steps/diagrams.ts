@@ -10,7 +10,8 @@ import { signIn } from "./people";
 import { posted } from "./threads";
 
 /** A diagram's card in the thread: in its log, or, from 1100 pixels, beside it (portalr ADR-0087). */
-const card = (page: Page, name: string) => page.getByRole("main").getByRole("listitem", { name });
+export const card = (page: Page, name: string) =>
+  page.getByRole("main").getByRole("listitem", { name });
 
 /** What the page asks for, and what its policy refuses, from before the canvas opens. */
 const seen = new WeakMap<Page, { requests: string[]; violations: string[] }>();

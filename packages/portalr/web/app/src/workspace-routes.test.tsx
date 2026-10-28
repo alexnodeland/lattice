@@ -199,9 +199,13 @@ test("the threads are filtered by state, the view kept in the URL, found from th
   // field finds a thread by its title, Enter goes to it, and Escape gives the focus back.
   const magnifier = screen.getByRole("button", { name: "Search", exact: true });
   await expect.element(magnifier).toHaveAttribute("aria-expanded", "false");
+  // Held as the element: while the palette is open the page behind it is out of the
+  // accessibility tree, the magnifier with it.
+  const trigger = magnifier.element();
   await magnifier.click();
-  await expect.element(magnifier).toHaveAttribute("aria-expanded", "true");
   const field = screen.getByRole("combobox", { name: "Search or go to" });
+  await expect.element(field).toBeVisible();
+  expect(trigger.getAttribute("aria-expanded")).toBe("true");
   await expect.element(field).toHaveFocus();
   await field.fill("inv");
   await expect

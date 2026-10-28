@@ -61,10 +61,20 @@ async def thread(ws: Workspace) -> Thread:
 
 
 @pytest.fixture
-async def runners() -> AsyncIterator[list[Runner[None]]]:
+async def runners(_no_task_left: None) -> AsyncIterator[list[Runner[None]]]:
+    """The runners a test makes, each let finish handing its threads over, then closed.
+
+    A run that ends hands its thread over in the background, querying the storage as it does.
+    Cancelled mid-query, as `_no_task_left` would cancel it, a PostgreSQL connection is left
+    checked out in its transaction: the engine's disposal can't close it, its socket is
+    collected unclosed, and dropping the test's schema waits on its locks. So the hand-overs
+    end first, and these are closed before `_no_task_left` (which they request) and before the
+    storage they use.
+    """
     made: list[Runner[None]] = []
     yield made
     for runner in made:
+        await runner.drain()
         await runner.aclose()
 
 

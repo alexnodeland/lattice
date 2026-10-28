@@ -237,6 +237,27 @@ setTimeout(() => { document.getElementById("more").style.height = "300px"; }, 15
   await page.close();
 });
 
+test("the app's frame fills the sandbox's window even where its body has no height to share", async () => {
+  // iOS laid the app's frame out at 0 by 0 when it was sized by percentages of the sandbox's
+  // body. Here the body is left at its own height, as auto: a frame at 100% of it is 150 tall.
+  const page = await running(`<body style="margin:0">Board</body>`);
+  await expect.poll(() => appFrame(page) !== undefined, SETTLED).toBe(true);
+  const sandbox = appFrame(page)?.parentFrame();
+  const sizes = () =>
+    sandbox?.evaluate(() => {
+      document.documentElement.style.height = "auto";
+      document.body.style.height = "auto";
+      const { width, height } = (
+        document.querySelector("iframe") as Element
+      ).getBoundingClientRect();
+      return { frame: [width, height], window: [innerWidth, innerHeight] };
+    });
+  await expect.poll(async () => (await sizes())?.window[1], SETTLED).toBeGreaterThan(0);
+  const { frame, window } = (await sizes()) ?? { frame: [], window: [] };
+  expect(frame).toEqual(window);
+  await page.close();
+});
+
 test("a tall app is shown whole up to twice the window, and scrolls inside its frame past it", async () => {
   const page = await running(`<body style="margin:0"><div style="height:3000px">Board</div>`);
   const twice = await page.evaluate(() => innerHeight * 2);

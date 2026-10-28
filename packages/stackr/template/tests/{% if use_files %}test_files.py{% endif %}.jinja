@@ -255,23 +255,17 @@ def test_every_native_type_lattice_registers_has_a_pinned_app() -> None:
     assert registered == set(TYPES.values()), "a type the agent could be offered, with no app"
 
 
-def test_native_files_edits_are_proposed_in_ask_and_auto_alike() -> None:
-    # What the agent is told: a person reviews each of its edits of a file, whatever the mode.
+def test_every_native_type_has_the_propose_write_policy() -> None:
+    # Which the agent is told: a person reviews each of its edits of a file, whatever the mode.
     assert {t.write_policy for t in TYPES.values()} == {"propose"}
 
 
 @pytest.mark.parametrize("craft", list(CRAFTS))
 def test_the_agent_can_create_each_running_apps_files_and_is_told_so(craft: str) -> None:
-    running = FilesSettings(crafts=(craft,), tokens={craft: TOKEN})
-    files = Files(running, integrations=Defaults())
+    files = Files(FilesSettings(crafts=(craft,), tokens={craft: TOKEN}), integrations=Defaults())
     assert files.native is not None
-    file_type: type[NativeFile] = TYPES[craft]
-    extensions = files.native.extensions(file_type)
-    assert extensions, f"{craft}'s type has a format to create"
-    [told] = files.instructions()
-    assert f"{file_type.noun} ({', '.join(extensions)})" in told
-    for other in set(TYPES.values()) - {file_type}:
-        assert f"{other.noun} (" not in told, "only the running apps' types"
+    assert files.native.extensions(TYPES[craft]), f"{craft}'s type has a format to create"
+    assert files.instructions() == [FILE_INSTRUCTIONS]
     assert files.toolsets(), "native files' tools, create_native_file among them"
 
 
@@ -297,9 +291,7 @@ def test_the_agent_is_offered_create_native_file_and_told_how_to_write_it(script
     [offered] = script.tools
     assert {"create_native_file", "find_commands", "edit_native"} <= set(offered)
     told = script.requests[0][0].instructions or ""  # type: ignore[union-attr]
-    assert FILE_INSTRUCTIONS.format(kinds="a Word document (.docx)") in told
-    for promise in ("Never say you can't create", "same turn", "in Ask and Auto alike"):
-        assert promise in told
+    assert FILE_INSTRUCTIONS in told
 
 
 @pytest.mark.parametrize(

@@ -154,28 +154,16 @@ async def _seed(grants: Grants) -> None:
     await grants.provision_tenant(TENANT, owner="alice", admins=["bob"])
     await grants.provision_tenant(OTHER, owner="carol")
     await grants.provision_tenant("globex", owner="carol")
-{%- if use_files %}
 
 
-def seeded(gateway: GatewaySettings | None = None, files: Sequence[str] = ()) -> Grants:
-    """grantr in memory, with acme, initech and globex; seeded in a thread, from any test.
-
-    It knows the models ``gateway`` lists, if given, and installs the native files' apps
-    ``files`` names, as the application would.
-    """
-    grants = build_grants(
-        InMemoryStorage(), name=Settings().service_name, gateway=gateway, files=files
-    )
-{%- else %}
-
-
-def seeded({% if use_artifactr %}gateway: GatewaySettings | None = None{% endif %}) -> Grants:
+def seeded({% if use_artifactr %}gateway: GatewaySettings | None = None{% endif %}{% if use_files %}, files: Sequence[str] = (){% endif %}) -> Grants:
     """grantr in memory, with acme, initech and globex; seeded in a thread, from any test.{% if use_artifactr %}
 
-    It knows the models ``gateway`` lists, if given, as the application would.
+    It knows the models ``gateway`` lists, if given, as the application would{% if use_files %}, and
+    installs the native files' apps ``files`` names{% endif %}.
     """{% else %}"""{% endif %}
-    grants = build_grants(InMemoryStorage(), name=Settings().service_name{% if use_artifactr %}, gateway=gateway{% endif %})
-{%- endif %}
+    name = Settings().service_name
+    grants = build_grants(InMemoryStorage(), name=name{% if use_artifactr %}, gateway=gateway{% endif %}{% if use_files %}, files=files{% endif %})
     in_thread(_seed(grants))
     return grants
 

@@ -293,19 +293,15 @@ function useShimmer(running: boolean) {
     if (!running || element === null || !matchMedia(SHIMMERS).matches) {
       return;
     }
-    Object.assign(element.style, {
-      backgroundImage: "linear-gradient(90deg, var(--muted) 40%, var(--fg), var(--muted) 60%)",
-      backgroundSize: "300%",
-      backgroundClip: "text",
-      color: "transparent",
-    });
-    const moving = element.animate([{ backgroundPosition: "100%" }, { backgroundPosition: "0%" }], {
-      duration: 2000,
-      iterations: Number.POSITIVE_INFINITY,
-    });
+    element.style.cssText =
+      "background:linear-gradient(90deg,var(--muted) 40%,var(--fg),var(--muted) 60%) 0/300%;background-clip:text;color:transparent";
+    const moving = element.animate(
+      { backgroundPosition: ["100%", "0%"] },
+      { duration: 2e3, iterations: 1 / 0 },
+    );
     return () => {
       moving.cancel();
-      element.removeAttribute("style");
+      element.style.cssText = "";
     };
   }, [running]);
   return words;

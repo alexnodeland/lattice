@@ -114,7 +114,7 @@ export function foldSummary(tools: readonly Artifactr.Tool[], runRunning = false
 }
 
 /** Where a value holds what a call was about, the first of these keys a string has. */
-const ABOUT = ["title", "name", "description", "query", "url", "path", "kind"];
+const ABOUT = ["title", "name", "query", "url", "path"];
 
 /**
  * A line of what a call was about, in plain words where its arguments give one (a title, a

@@ -153,7 +153,7 @@ export { TextField } from "./text-field";
 export { type LinkVariant, TextLink } from "./text-link";
 export { ThumbBar } from "./thumb-bar";
 export { RunSteps, ToolCall, ToolCalls } from "./tool-call";
-export { useCoarsePointer, usePhone } from "./touch";
+export { useCoarsePointer, usePhone, useTouch } from "./touch";
 export { duration, type Reveal, type Standing, TraceView } from "./trace-view";
 export { type Block, type Level, Tracker } from "./tracker";
 export { type TrackerItem, TrackerItems, trackerName } from "./tracker-items";

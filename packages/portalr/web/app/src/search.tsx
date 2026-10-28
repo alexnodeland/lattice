@@ -1,4 +1,4 @@
-import { glyphs, IconButton, useLoaded } from "@portalr/ui";
+import { glyphs, IconButton, useCoarsePointer, useLoaded, useTouch } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
 import {
@@ -50,14 +50,14 @@ export function opensPalette(event: KeyboardEvent, mac = MAC): boolean {
 }
 
 const Opening = createContext<{
-  readonly open: (from: RefObject<HTMLElement | null>) => void;
+  readonly open: (from: RefObject<HTMLElement | null>, docked?: boolean) => void;
   readonly icon: RefObject<HTMLButtonElement | null>;
   readonly shown: boolean;
 } | null>(null);
 
 /**
- * A workspace's search: the palette, opened by its magnifier on the bar, by another way in such
- * as a phone's bottom band, or by Ctrl+K, ⌘K or "/". Closed by Escape, the focus goes back to
+ * A workspace's search: the palette, opened by its magnifier on the bar, by a phone's tab bar,
+ * whose whole bar it becomes (portalr ADR-0087), or by Ctrl+K, ⌘K or "/". Closed by Escape, the focus goes back to
  * what opened it, the magnifier for a key; following what it found goes to that page's heading
  * (portalr ADR-0068).
  */
@@ -71,6 +71,7 @@ export function SearchPalette({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [docked, setDocked] = useState(false);
   const icon = useRef<HTMLButtonElement>(null);
   const [back, setBack] = useState<RefObject<HTMLElement | null>>(icon);
   const palette = useLoaded(loadPalette, open).module;
@@ -87,17 +88,33 @@ export function SearchPalette({
       if (opensPalette(event)) {
         event.preventDefault();
         setBack(icon);
+        setDocked(false);
         setOpen(true);
       }
     };
     addEventListener("keydown", key);
     return () => removeEventListener("keydown", key);
   }, []);
+  // Docked, it sits on the on-screen keyboard, as the composer's dock does: what the keyboard covers
+  // is kept on the root while it is open, as iOS Safari resizes nothing of itself.
+  const touch = useTouch(useCoarsePointer() && open && docked);
+  useEffect(() => touch?.keyboardInset(), [touch]);
+  // Docked in a phone's tab bar, it closes if the window stops being a phone's (turned, or widened).
+  useEffect(() => {
+    if (!(open && docked)) {
+      return;
+    }
+    const phone = matchMedia("(max-width: 48rem) and (any-pointer: coarse)");
+    const left = () => !phone.matches && setOpen(false);
+    phone.addEventListener("change", left);
+    return () => phone.removeEventListener("change", left);
+  }, [open, docked]);
   const opening = {
     icon,
     shown: open,
-    open: (from: RefObject<HTMLElement | null>) => {
+    open: (from: RefObject<HTMLElement | null>, inBar = false) => {
       setBack(from);
+      setDocked(inBar);
       setOpen(true);
     },
   };
@@ -109,6 +126,7 @@ export function SearchPalette({
           open={open}
           onOpenChange={setOpen}
           finalFocus={back}
+          docked={docked}
           workspace={workspace}
           state={state}
           titles={titlesOf(read)}
@@ -120,23 +138,33 @@ export function SearchPalette({
   );
 }
 
-/** Opens the palette, the focus to come back to `from`; outside a workspace, nothing. */
-export const useOpenSearch = () => useContext(Opening)?.open;
-
-/** The magnifier on the bar, which opens the palette. */
-export function SearchButton() {
+/**
+ * The magnifier, which opens the palette: on the top bar, or, `docked`, at the end of a phone's
+ * tab bar, which the palette's field then takes the place of.
+ */
+export function SearchButton({
+  docked = false,
+  className,
+}: {
+  docked?: boolean;
+  className?: string;
+}) {
   const opening = useContext(Opening);
+  const own = useRef<HTMLButtonElement>(null);
+  if (!opening) {
+    return null;
+  }
+  const ref = docked ? own : opening.icon;
   return (
-    opening && (
-      <IconButton
-        ref={opening.icon}
-        label="Search"
-        icon={glyphs.search}
-        aria-keyshortcuts="Control+K Meta+K /"
-        aria-haspopup="dialog"
-        aria-expanded={opening.shown}
-        onClick={() => opening.open(opening.icon)}
-      />
-    )
+    <IconButton
+      ref={ref}
+      label="Search"
+      icon={glyphs.search}
+      aria-keyshortcuts="Control+K Meta+K /"
+      aria-haspopup="dialog"
+      aria-expanded={opening.shown}
+      {...(className && { className })}
+      onClick={() => opening.open(ref, docked)}
+    />
   );
 }

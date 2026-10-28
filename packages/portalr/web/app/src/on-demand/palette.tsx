@@ -7,7 +7,7 @@
  */
 
 import type { Artifactr } from "@portalr/client";
-import { type Glyph, glyphs, Icon, PaletteFrame, RunStatus } from "@portalr/ui";
+import { Button, type Glyph, glyphs, Icon, PaletteFrame, RunStatus } from "@portalr/ui";
 import { type ReactNode, type RefObject, useId, useState } from "react";
 
 /** One way on: what it says, its glyph, where it goes, and what is said at its end. */
@@ -28,6 +28,7 @@ export function Palette({
   open,
   onOpenChange,
   finalFocus,
+  docked = false,
   workspace,
   state,
   titles,
@@ -37,6 +38,8 @@ export function Palette({
   open: boolean;
   onOpenChange: (open: boolean) => void;
   finalFocus: RefObject<HTMLElement | null>;
+  /** Opened from a phone's tab bar: the bar becomes the field, what it finds above it. */
+  docked?: boolean;
   workspace: string;
   /** The workspace as its stream holds it. */
   state: Artifactr.Workspace;
@@ -132,50 +135,55 @@ export function Palette({
   choices.forEach((choice, index) => {
     groups.set(choice.group, [...(groups.get(choice.group) ?? []), { choice, index }]);
   });
-  return (
-    <PaletteFrame
-      open={open}
-      title={`Search ${workspace}`}
-      finalFocus={finalFocus}
-      onOpenChange={(next) => {
-        onOpenChange(next);
-        if (!next) {
-          setQuery("");
+  const close = (next: boolean) => {
+    onOpenChange(next);
+    if (!next) {
+      setQuery("");
+      setChosen(0);
+    }
+  };
+  const field = (
+    <div className="flex items-center gap-2 border-line border-b px-4">
+      <Icon icon={glyphs.search} className="text-muted" />
+      <input
+        role="combobox"
+        aria-label="Search or go to"
+        aria-expanded="true"
+        aria-controls={list}
+        aria-autocomplete="list"
+        {...(choices.length > 0 && { "aria-activedescendant": option(at) })}
+        placeholder="Search or go to…"
+        value={query}
+        onChange={(event) => {
+          setQuery(event.currentTarget.value);
           setChosen(0);
-        }
-      }}
-    >
-      <div className="flex items-center gap-2 border-line border-b px-4">
-        <Icon icon={glyphs.search} className="text-muted" />
-        <input
-          role="combobox"
-          aria-label="Search or go to"
-          aria-expanded="true"
-          aria-controls={list}
-          aria-autocomplete="list"
-          {...(choices.length > 0 && { "aria-activedescendant": option(at) })}
-          placeholder="Search or go to…"
-          value={query}
-          onChange={(event) => {
-            setQuery(event.currentTarget.value);
-            setChosen(0);
-          }}
-          onKeyDown={(event) => {
-            const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
-            if (step !== undefined && choices.length > 0) {
-              event.preventDefault();
-              setChosen((at + step + choices.length) % choices.length);
-            } else if (event.key === "Enter") {
-              event.preventDefault();
-              follow(choices[at]);
-            }
-          }}
-          className="h-12 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted"
-        />
+        }}
+        onKeyDown={(event) => {
+          const step = { ArrowDown: 1, ArrowUp: -1 }[event.key];
+          if (step !== undefined && choices.length > 0) {
+            event.preventDefault();
+            setChosen((at + step + choices.length) % choices.length);
+          } else if (event.key === "Enter") {
+            event.preventDefault();
+            follow(choices[at]);
+          }
+        }}
+        className="h-12 min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-muted"
+      />
+      {docked ? (
+        // In a tab bar's place, a finger's way out, as Escape is a keyboard's.
+        <Button variant="ghost" size="sm" onClick={() => close(false)}>
+          Close
+        </Button>
+      ) : (
         <kbd className="rounded-(--radius-2) border border-line px-1.5 text-muted text-xs">Esc</kbd>
-      </div>
+      )}
+    </div>
+  );
+  const results = (
+    <>
+      {choices.length === 0 && <p className="px-2.5 py-2 text-muted text-sm">Nothing matches.</p>}
       <div id={list} role="listbox" aria-label="Results" className="overflow-y-auto p-1.5">
-        {choices.length === 0 && <p className="px-2.5 py-2 text-muted text-sm">Nothing matches.</p>}
         {[...groups].map(([group, members], place) => (
           // A fieldset is a group to assistive technology, which a listbox may hold; the lint takes
           // no `role="group"` on another element, and the repository takes no suppression.
@@ -210,6 +218,19 @@ export function Palette({
           </fieldset>
         ))}
       </div>
+    </>
+  );
+  return (
+    <PaletteFrame
+      open={open}
+      title={`Search ${workspace}`}
+      finalFocus={finalFocus}
+      docked={docked}
+      onOpenChange={close}
+    >
+      {/* Docked, what it finds stands above the field, which holds the bar's place. */}
+      {docked ? results : field}
+      {docked ? field : results}
     </PaletteFrame>
   );
 }

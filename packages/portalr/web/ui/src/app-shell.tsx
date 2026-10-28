@@ -10,7 +10,8 @@ import { RING } from "./states";
  * page scrolls, and the page beneath it at the window's full width. The bar's start holds the
  * mark (from 1024 pixels: a phone's bar has none, ADR-0085) and the switcher, then the areas;
  * its end, the corner, holds the way to search, what waits for the reader and the account.
- * Narrower than 1024 pixels the areas are the first row of the page, in its flow, not pinned.
+ * Narrower than 1024 pixels the areas are the first row of the page, in its flow, not pinned; on
+ * a phone (`tabs`) they are a tab bar along the window's foot instead.
  * There is no drawer: everything the bar holds is on it at every width. A page with no areas,
  * or nothing to search, leaves `nav` or `search` out.
  */
@@ -20,6 +21,7 @@ export function AppShell({
   nav,
   search,
   waiting,
+  tabs,
   account,
   children,
 }: {
@@ -32,6 +34,12 @@ export function AppShell({
   search?: ReactNode;
   /** What waits for the reader, a link; none, where nothing does. */
   waiting?: ReactNode;
+  /**
+   * A phone's tab bar along the foot (portalr ADR-0087), such as the areas and the magnifier, in
+   * place of the areas' row at the page's top; null on a page that is a task of its own, such as
+   * a thread, whose foot is its composer and which has neither the bar nor the row on a phone.
+   */
+  tabs?: ReactNode;
   account: ReactNode;
   children: ReactNode;
 }) {
@@ -67,9 +75,19 @@ export function AppShell({
         // One rhythm (portalr ADR-0085): 24px between a page's parts on a phone, 32px from 1024.
         className="flex min-w-0 flex-1 flex-col gap-6 px-4 py-6 outline-none sm:px-6 lg:gap-8 lg:px-8"
       >
-        {nav && <div className="lg:hidden">{nav}</div>}
+        {nav && (
+          <div className={tabs === undefined ? "lg:hidden" : "lg:hidden phone:hidden"}>{nav}</div>
+        )}
         {children}
       </main>
+      {tabs && (
+        <div
+          data-tab-bar=""
+          className="sticky bottom-0 z-20 hidden items-center gap-1 border-line border-t bg-paper px-2 pt-1 phone:flex"
+        >
+          {tabs}
+        </div>
+      )}
     </div>
   );
 }

@@ -56,6 +56,16 @@ export type Answer = (command: {
   | ({ readonly type: string; readonly message: string } & Readonly<Record<string, unknown>>)
   | null;
 
+/** The artifactr streams open now, to which `deliver` sends what the log says next. */
+const streams = new Set<{ emit(frame: unknown): void }>();
+
+/** An event the workspace's log says after the replay, as if it had just happened. */
+export function deliver(frame: unknown) {
+  for (const stream of streams) {
+    stream.emit(frame);
+  }
+}
+
 /** A WebSocket that replays its library's log, or none, then answers each command as `answer` says. */
 function socketAnswering(
   answer: Answer,
@@ -74,6 +84,9 @@ function socketAnswering(
       const library = url.includes("/reflexr/") ? "reflexr" : "artifactr";
       this.#log = logs[library];
       this.#replaying = replaying === library;
+      if (library === "artifactr") {
+        streams.add({ emit: (frame) => this.#emit(frame) });
+      }
       queueMicrotask(() => this.onopen?.());
     }
 
@@ -164,6 +177,7 @@ export async function open(
   answer: Answer = () => null,
   world: World = {},
 ) {
+  streams.clear();
   const fetched = vi.fn(server(serve));
   vi.stubGlobal("fetch", fetched);
   vi.stubGlobal(

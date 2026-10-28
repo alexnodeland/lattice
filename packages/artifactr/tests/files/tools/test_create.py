@@ -110,8 +110,8 @@ async def test_every_type_is_created_blank_and_then_edited_by_proposal(kind: str
     assert script.tool_returns(1) == [
         f"Created {file.id}: {noun} named {name}, at version 1. "
         "It is empty: edit it with edit_native. An edit that is proposed waits for a "
-        "person's review, and the file stays empty until it is accepted, so say so rather "
-        "than that the file is written."
+        "person's review, and the file stays empty until it is accepted, so tell the person "
+        "it waits for review."
     ]
     assert script.tool_returns(2)[0].startswith("Proposed as ")
     assert (file.kind, file.version) == (kind, 1), "the edit waits for review"

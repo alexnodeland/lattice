@@ -149,8 +149,8 @@ def native_file_tools(
         return (
             f"Created {artifact_id}: {_noun(file_type)} named {head.data.name}, at version "
             f"{head.version}. It is empty: edit it with edit_native. An edit that is proposed "
-            "waits for a person's review, and the file stays empty until it is accepted, so say "
-            "so rather than that the file is written."
+            "waits for a person's review, and the file stays empty until it is accepted, so tell "
+            "the person it waits for review."
         )
 
     @toolset.tool

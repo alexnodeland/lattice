@@ -139,7 +139,7 @@ export function TrackLink({
       children: (
         <>
           <Icon icon={icon} />
-          <span aria-hidden="true" className="max-w-full truncate text-xs max-sm:text-[0.6875rem]">
+          <span aria-hidden="true" className="max-w-full truncate text-xs">
             {children}
           </span>
         </>

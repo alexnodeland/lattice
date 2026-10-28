@@ -42,7 +42,7 @@ async function send(page: Page, rule: string, button: string) {
     await install.click();
   }
   await field(page).fill(rule);
-  await page.getByRole("button", { name: button }).click();
+  await page.getByRole("button", { name: button, exact: true }).click();
 }
 
 When("they install a rule of their own", async ({ page, scenario }) => {

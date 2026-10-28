@@ -4,7 +4,7 @@
  * where that comes from, and who set it at that level.
  */
 
-import type { GrantrApi, Names } from "@portalr/client";
+import { type GrantrApi, type Names, namedOf } from "@portalr/client";
 import type { IntegrationRow, IntegrationSource } from "@portalr/ui";
 import { actor } from "./audit";
 import { nameOf } from "./runs";
@@ -39,27 +39,14 @@ export function sourceOf(state: IntegrationState, workspace: boolean): Integrati
 }
 
 /**
- * An integration's name and what it is, from its sentence: the registry's start with the name,
- * as in "Mermaid: diagrams written as text in messages, drawn."; one that doesn't is named by
- * its key.
+ * Each integration at a level as the list shows it, with who set it there named as `names` does,
+ * and, where it is on and brings an app at an address of `links`, the way to open it.
  */
-export function namedOf(state: IntegrationState): { name: string; description: string } {
-  const at = state.description.indexOf(": ");
-  if (at < 1) {
-    return { name: state.key, description: state.description };
-  }
-  const rest = state.description.slice(at + 2);
-  return {
-    name: state.description.slice(0, at),
-    description: rest.charAt(0).toUpperCase() + rest.slice(1),
-  };
-}
-
-/** Each integration at a level as the list shows it, with who set it there named as `names` does. */
 export function rowsOf(
   states: readonly IntegrationState[],
   workspace: boolean,
   names: Names,
+  links: Readonly<Record<string, string>> = {},
 ): IntegrationRow[] {
   return states.map((state) => {
     const here = workspace ? state.workspace : state.tenant;
@@ -69,6 +56,7 @@ export function rowsOf(
       on: state.enabled,
       source: sourceOf(state, workspace),
       changed: here ? { by: actor(here.by, names), at: here.at } : null,
+      open: state.enabled ? links[state.key] : undefined,
     };
   });
 }

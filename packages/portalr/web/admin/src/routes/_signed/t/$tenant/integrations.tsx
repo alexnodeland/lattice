@@ -1,4 +1,4 @@
-import { changedIntegrations, refusal } from "@portalr/client";
+import { changedIntegrations, deploymentAt, refusal } from "@portalr/client";
 import {
   Alert,
   EmptyState,
@@ -103,12 +103,13 @@ function IntegrationsPage() {
 
 /** A level's integrations, each switched there, and what the last change said. */
 function Settings({ tenant, workspace }: { tenant: string; workspace: string | undefined }) {
-  const { queries, commands, queryClient } = Route.useRouteContext();
+  const { queries, commands, queryClient, config } = Route.useRouteContext();
   const { allowed } = useAccess(tenant);
   const { data: states } = useSuspenseQuery(queries.grantr.integrations(tenant, workspace));
   const inWorkspace = workspace !== undefined;
   const names = useNames(tenant, settersOf(states, inWorkspace));
-  const rows = rowsOf(states, inWorkspace, names);
+  // Each app an integration brings, at its address beside the portal's this page is at.
+  const rows = rowsOf(states, inWorkspace, names, deploymentAt(config, location.origin).links);
   const [saving, setSaving] = useState<ReadonlySet<string>>(new Set());
   const [said, setSaid] = useState<Said>(null);
   const place = inWorkspace ? `in ${workspace}` : "on the tenant";

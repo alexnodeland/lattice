@@ -6,7 +6,7 @@ import { axeViolations } from "./test/axe";
 import { ROWS, SAVING, TENANT_ROWS } from "./test/integrations";
 
 /** The list, wide, so it is a table, with spies for what it hands its caller. */
-async function shown(saving: ReadonlySet<string> = new Set(), width = 1024) {
+async function shown(saving: ReadonlySet<string> = new Set(), width = 1024, rows = ROWS) {
   await page.viewport(width, 900);
   onTestFinished(() => page.viewport(414, 896));
   const onSwitch = vi.fn();
@@ -15,7 +15,7 @@ async function shown(saving: ReadonlySet<string> = new Set(), width = 1024) {
     <IntegrationList
       caption="Integrations in notes"
       level="workspace"
-      rows={ROWS}
+      rows={rows}
       saving={saving}
       onSwitch={onSwitch}
       onInherit={onInherit}
@@ -157,3 +157,22 @@ test("on the tenant, its own off says it is the ceiling every workspace is under
     .element(screen.getByRole("switch", { name: "Forms" }))
     .toHaveAccessibleDescription("On Default");
 });
+
+test.each([
+  ["wide", 1024],
+  ["narrow", 390],
+])(
+  "an integration with an app has a way to open it, %s, named and apart, with nothing axe finds wrong (portalr ADR-0088)",
+  async (_name, width) => {
+    const rows = ROWS.map((row) =>
+      row.key === "ui:forms" ? { ...row, open: "http://127.0.0.1:8090/" } : row,
+    );
+    const { screen } = await shown(new Set(), width, rows);
+    const open = screen.getByRole("link", { name: "Open Forms (opens in a new tab)" });
+    await expect.element(open).toBeVisible();
+    await expect.element(open).toHaveAttribute("href", "http://127.0.0.1:8090/");
+    await expect.element(open).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.getByRole("link", { name: /^Open/ }).elements()).toHaveLength(1);
+    expect(await axeViolations(screen.container)).toEqual([]);
+  },
+);

@@ -7,11 +7,13 @@
  * and nothing is framed, since the sandbox and the shim answer only the portals they were told.
  */
 
-import type { Config } from "@portalr/client";
+import type { Config } from "./rest";
 
 export interface Deployment {
   readonly apps: string | null;
   readonly editors: Readonly<Record<string, string>>;
+  /** Each connected app's address, by its integration. */
+  readonly links: Readonly<Record<string, string>>;
   /** Whether the deployment serves apps and editors at this address: false where it names none. */
   readonly known: boolean;
 }
@@ -20,12 +22,12 @@ export interface Deployment {
 export function deploymentAt(config: Config, at: string): Deployment {
   const alias = config.aliases[at];
   if (alias !== undefined) {
-    return { apps: alias.apps ?? null, editors: alias.editors, known: true };
+    return { apps: alias.apps ?? null, editors: alias.editors, links: alias.links, known: true };
   }
   if (!config.origin || config.origin === at) {
-    return { apps: config.apps, editors: config.editors, known: true };
+    return { apps: config.apps, editors: config.editors, links: config.links, known: true };
   }
-  return { apps: null, editors: {}, known: false };
+  return { apps: null, editors: {}, links: {}, known: false };
 }
 
 /** The portal's addresses the deployment serves apps and editors at, canonical first. */

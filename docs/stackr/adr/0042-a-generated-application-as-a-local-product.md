@@ -58,3 +58,5 @@ ADR-0038 put portalr in the template, and the smoke test runs it, but a person f
 - Easier: the portal's scenarios could run on the PostgreSQL adapter too, which `scripts/smoke` still skips; that is left for later.
 - Harder: the application now proxies three calls, which its tests pin, and which must follow supabase-js if portalr's UIs ever make another.
 - Not done: invitations still go to Supabase's gateway (`PORTAL_AUTH_URL`), so they don't work with GoTrue alone, and an invited person has no page to set a password; WordCraft's editor isn't in the template yet, and when it is, its own origin needs a second tailnet port (portalr ADR-0049).
+
+> **Amended (2026-10-28) by [portalr ADR-0088](../../portalr/adr/0088-connected-apps-opened-from-the-admin-and-the-palette.md):** connected apps' links (`Site.links`, `PORTAL_LINKS`) are beside each other origin by the same port-sibling rule as the editors, and `make tailnet` serves each loopback link's port beside the portal, tailnet only, never 8443; `deploymentAt` moved to `@portalr/client`, and returns `links` too.

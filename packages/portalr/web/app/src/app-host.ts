@@ -5,10 +5,10 @@
  * submission to it, with its derived id. Nothing else of the workspace is an app's to reach.
  */
 
+import { deploymentAt, portalsOf } from "@portalr/client";
 import type { AppHost } from "@portalr/ui";
 import { useMemo } from "react";
 import type { Context } from "./context";
-import { deploymentAt, portalsOf } from "./deployment";
 import { useStream } from "./workspace";
 
 /** The app host of a page in a workspace, for the deployment and the person `context` holds. */

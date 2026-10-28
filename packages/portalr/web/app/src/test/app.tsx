@@ -27,6 +27,7 @@ const CONFIG: Config = {
   people: false,
   editors: { "files:wordcraft": "https://wordcraft.example.test/" },
   apps: null,
+  links: {},
   aliases: {},
   replay: false,
 };
@@ -146,6 +147,8 @@ export interface World {
   /** The portal's own origin, and its other origins' places, which it doesn't name unless told. */
   readonly origin?: Config["origin"];
   readonly aliases?: Config["aliases"];
+  /** Each connected app's address, by its integration. */
+  readonly links?: Config["links"];
   /** The tools the deployment reads, past the defaults. */
   readonly readers?: Config["readers"];
   /** Whether the deployment records session replays, which it doesn't unless told. */
@@ -179,6 +182,7 @@ export async function open(
     apps: world.apps ?? CONFIG.apps,
     ...(world.origin !== undefined && { origin: world.origin }),
     aliases: world.aliases ?? CONFIG.aliases,
+    links: world.links ?? CONFIG.links,
     readers: { ...CONFIG.readers, ...world.readers },
     replay: world.replay ?? CONFIG.replay,
   };

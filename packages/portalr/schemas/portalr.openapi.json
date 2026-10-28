@@ -356,6 +356,13 @@
             "title": "Editors",
             "type": "object"
           },
+          "links": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Links",
+            "type": "object"
+          },
           "origin": {
             "anyOf": [
               {
@@ -396,7 +403,8 @@
           "readers",
           "people",
           "editors",
-          "apps"
+          "apps",
+          "links"
         ],
         "title": "Config",
         "type": "object"
@@ -1316,6 +1324,14 @@
             },
             "default": {},
             "title": "Editors",
+            "type": "object"
+          },
+          "links": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "default": {},
+            "title": "Links",
             "type": "object"
           }
         },

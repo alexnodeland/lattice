@@ -190,3 +190,27 @@ test("on a phone what waits is in the top bar, and its link opens the threads th
   await expect.poll(() => router.state.location.search).toEqual({ show: "needs" });
   await expect.element(screen.getByRole("radio", { name: /^Needs you/ })).toBeChecked();
 });
+
+test("docked, the search's empty field shows the connected apps that are on, under the areas, each a finger's size (portalr ADR-0088)", async () => {
+  await page.viewport(375, 667);
+  const { screen } = await open(
+    "/t/acme/w/notes",
+    async (request, path) =>
+      path === "/grantr/v1/tenants/acme/workspaces/notes/enabled-integrations"
+        ? Response.json({ "tracker:plane": true })
+        : serve(request, path),
+    () => null,
+    { artifactrLog: LOG, links: { "tracker:plane": "http://127.0.0.1:8090/" } },
+  );
+  await expect.poll(() => visible(tabBar())).toBe(true);
+  (tabBar().querySelector('button[aria-label="Search"]') as HTMLElement).click();
+  const apps = screen.getByRole("group", { name: "Connected apps" });
+  await expect.element(apps).toBeVisible();
+  const groups = [...document.querySelectorAll('[role="listbox"] fieldset')];
+  expect(groups.indexOf(apps.element() as HTMLFieldSetElement)).toBeGreaterThan(
+    groups.indexOf(screen.getByRole("group", { name: "Go to" }).element() as HTMLFieldSetElement),
+  );
+  const plane = apps.getByRole("option", { name: /^Open Plane.*opens in a new tab$/ });
+  await expect.element(plane).toBeVisible();
+  expect(plane.element().getBoundingClientRect().height).toBeGreaterThanOrEqual(36);
+});

@@ -1,3 +1,4 @@
+import { deploymentAt } from "@portalr/client";
 import { glyphs, IconButton, useCoarsePointer, useLoaded, useTouch } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate, useRouteContext } from "@tanstack/react-router";
@@ -75,9 +76,12 @@ export function SearchPalette({
   const icon = useRef<HTMLButtonElement>(null);
   const [back, setBack] = useState<RefObject<HTMLElement | null>>(icon);
   const palette = useLoaded(loadPalette, open).module;
-  const { queries } = useRouteContext({ from: "/_signed/t/$tenant/w/$workspace" });
+  const { queries, config } = useRouteContext({ from: "/_signed/t/$tenant/w/$workspace" });
   const navigate = useNavigate();
   const { state } = useWorkspace();
+  // Read raw, not through `useEnabled`, whose registry defaults would link an app that is off
+  // before grantr answers or where it can't (portalr ADR-0088).
+  const { data: on } = useQuery(queries.grantr.enabledIntegrations(tenant, workspace));
   // The artifacts' titles, as the Artifacts page reads them, read once the palette is opened.
   const { data: read } = useQuery({
     ...queries.artifactr.artifacts(tenant, workspace),
@@ -132,6 +136,11 @@ export function SearchPalette({
           titles={titlesOf(read)}
           base={`/t/${encodeURIComponent(tenant)}/w/${encodeURIComponent(workspace)}`}
           go={(to, hash) => void navigate({ to, ...(hash && { hash }) })}
+          links={Object.fromEntries(
+            Object.entries(deploymentAt(config, location.origin).links).filter(
+              ([key]) => on?.[key],
+            ),
+          )}
         />
       )}
     </Opening>

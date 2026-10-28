@@ -228,3 +228,32 @@ test("a workspace the tenant doesn't have is said, and the tenant can be chosen"
     .toBeVisible();
   expect(router.state.location.search).toEqual({});
 });
+
+test("an integration that is on and brings an app has a way to open it, in a new tab; one off has none (portalr ADR-0088)", async () => {
+  const links = {
+    "ui:forms": "http://127.0.0.1:8090/",
+    "markdown:mermaid": "http://127.0.0.1:8091/",
+  };
+  const { screen } = await opened(
+    "/t/acme/integrations",
+    ["grantr:manage_integrations"],
+    grantr,
+    ["acme"],
+    { links },
+  );
+  const table = screen.getByRole("table", { name: "Integrations on the tenant" });
+  const forms = table.getByRole("link", { name: "Open Forms (opens in a new tab)" });
+  await expect.element(forms).toHaveAttribute("href", links["ui:forms"]);
+  await expect.element(forms).toHaveAttribute("target", "_blank");
+  await expect.element(forms).toHaveAttribute("rel", "noopener noreferrer");
+  // Mermaid is off by default: no way to its app.
+  expect(table.getByRole("link", { name: /Open Mermaid/ }).elements()).toHaveLength(0);
+  // Turned on, it has one; turned off again, none.
+  await table.getByRole("switch", { name: "Mermaid" }).click();
+  await expect.element(table.getByRole("link", { name: /Open Mermaid/ })).toBeVisible();
+  await table.getByRole("switch", { name: "Mermaid" }).click();
+  await expect.element(table.getByRole("link", { name: /Open Mermaid/ })).not.toBeInTheDocument();
+  // The keyboard reaches it after the switch.
+  forms.element().focus();
+  await expect.element(forms).toHaveFocus();
+});

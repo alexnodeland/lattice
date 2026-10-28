@@ -166,6 +166,8 @@ class Config(BaseModel):
     """Each native file's hosted editor, by its app's integration."""
     apps: str | None
     """The origin mini apps run on, or None where the deployment runs none."""
+    links: dict[str, str]
+    """Each connected app's address, by the integration that brings it (portalr ADR-0088)."""
     origin: str | None = None
     """The portal's own origin, where the application names it; None leaves the UIs trusting the
     address they are at."""
@@ -355,6 +357,7 @@ def portalr_router(
             people=people is not None,
             editors=site.editors,
             apps=site.apps,
+            links=site.links,
             origin=site.origin,
             aliases=site.aliases,
             brand=Brand.model_validate(site.kit.config()) if site.kit else None,

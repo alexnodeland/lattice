@@ -416,7 +416,6 @@ export function Thread() {
           <Questions request={ASKED} onAnswer={sent} focus={false} />
         </li>
         <RunSteps
-          running={false}
           tools={[
             ["c1", tool("create_artifact", "ok", "Done: note_1 is now at version 1.")],
             ["c2", tool("draft_rule", "retry", "rule\n  Input should be an object")],

@@ -11,6 +11,7 @@ import { open } from "./test/app";
 import { AT } from "./test/files";
 import { APPROVAL, serve as notes, STEPPED, WORLD } from "./test/notes";
 import { wider } from "./test/overflow";
+import * as rules from "./test/rules";
 
 /** Files may be attached: a kind offered, so the composer has its Attach. */
 const OFFERED = {
@@ -240,4 +241,22 @@ test("a window at 400% zoom (320×256) scrolls down, never sideways, with the do
   // The bar gives way in a short window: nothing pinned covers most of the page.
   const shown = bar();
   expect(shown === null || getComputedStyle(shown).display === "none").toBe(true);
+});
+
+test("a rule's proposal, to a finger at 393px: its JSON's fold, Copy, Accept and Reject are 44px or taller", async () => {
+  await page.viewport(393, 900);
+  const { screen } = await open(
+    "/t/acme/w/notes/artifacts/rule_1",
+    rules.serve,
+    () => null,
+    rules.WORLD,
+  );
+  await expect.element(screen.getByRole("region", { name: "throttle" })).toBeVisible();
+  const fold = screen.getByRole("button", { name: "The rule, as JSON" });
+  await fold.click();
+  for (const name of ["The rule, as JSON", /Copy/, "Accept", "Reject"]) {
+    const target = screen.getByRole("button", { name }).first().element();
+    expect(target.getBoundingClientRect().height, String(name)).toBeGreaterThanOrEqual(44);
+  }
+  noneWider();
 });

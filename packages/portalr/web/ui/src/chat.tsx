@@ -227,12 +227,12 @@ type MessageProps = {
 const FOLDED_AFTER = 40;
 
 /**
- * The message grammar (portalr ADR-0081): the reader's words sit on the quiet wash, the agent's
- * are unboxed on the page; that one difference tells them apart, with the name above each.
+ * The message grammar (portalr ADR-0081): the reader's words sit on the quiet wash at the end of
+ * the line, the agent's unboxed on the page at its start, with the name above each.
  */
 const bubble = (mine: boolean) =>
   mine
-    ? "min-w-0 max-w-full break-words rounded-(--bubble-radius) bg-subtle px-(--bubble-pad-x) py-(--bubble-pad-y)"
+    ? "min-w-0 max-w-full break-words text-start rounded-(--bubble-radius) bg-subtle px-(--bubble-pad-x) py-(--bubble-pad-y)"
     : "min-w-0 max-w-full break-words";
 
 /**
@@ -281,7 +281,12 @@ export function Message({
       aria-labelledby={name}
       aria-busy={sending || undefined}
       className={cn(
-        "group flex max-w-[min(100%,var(--bubble-max-width))] flex-col items-start gap-1 self-start",
+        "group flex flex-col gap-1",
+        // The reader's own sit at the end of the line, in at most 85% of it; the rest at its start
+        // (portalr ADR-0081, as amended), in either direction of writing.
+        mine
+          ? "max-w-[min(85%,var(--bubble-max-width))] items-end self-end"
+          : "max-w-[min(100%,var(--bubble-max-width))] items-start self-start",
         notice && "text-muted italic",
       )}
     >

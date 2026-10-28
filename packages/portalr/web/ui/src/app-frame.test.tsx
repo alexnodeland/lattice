@@ -1,7 +1,14 @@
 import { expect, onTestFinished, test, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
-import { APP_BOOT, APP_ERROR, APP_STARTED, PROXY_READY, RESOURCE_READY } from "./app-bridge";
+import {
+  APP_BOOT,
+  APP_ERROR,
+  APP_STARTED,
+  APP_STOPPED,
+  PROXY_READY,
+  RESOURCE_READY,
+} from "./app-bridge";
 import { AppFrame, type AppHost, AppHostContext, type ReadApp } from "./app-frame";
 import type { Shown } from "./artifacts";
 import { IntegrationsContext, type IsEnabled } from "./integrations";
@@ -413,14 +420,14 @@ test("what an app reports went wrong is shown as plain text under it, and said i
   // Open already, from the look before: the same disclosure, now saying there is a problem.
   await expect.element(summary).toBeInTheDocument();
   const said = "error: <b>boom</b>  evil at about:srcdoc:9";
-  await expect.element(screen.getByText(said)).toBeVisible();
+  // The latest error is the card's, above; the report lists the rest.
+  await expect.element(screen.getByText("<b>boom</b>  evil", { exact: true })).toBeVisible();
   await expect.element(screen.getByText("policy: style-src refused (inline)")).toBeVisible();
   expect(screen.container.querySelector("b")).toBeNull();
   expect(warned).toHaveBeenCalledWith(`[app-frame] ${said}`);
   fromFrame(frame, { method: APP_ERROR, params: { kind: "error", message: "Script error." } });
-  await expect
-    .element(screen.getByText("error: the app threw an error; this browser doesn't say which"))
-    .toBeVisible();
+  await expect.element(screen.getByText("This browser doesn't say which error.")).toBeVisible();
+  await expect.element(screen.getByText(said)).toBeVisible();
 });
 
 test("an app said to have drawn nothing is said to, until it draws; Try again makes it afresh", async () => {
@@ -440,5 +447,142 @@ test("an app said to have drawn nothing is said to, until it draws; Try again ma
   await expect.element(said).toBeVisible();
   await screen.getByRole("button", { name: "Try again" }).click();
   await expect.element(said).not.toBeInTheDocument();
+  expect(await frameIn(screen)).not.toBe(frame);
+});
+
+const STOPPED = "The app stopped after an error";
+const REPORTED = "The app reported an error";
+const PACMAN = "TypeError: null is not an object (evaluating 'p.dir.x')";
+
+/** An app's frame that said `PACMAN` was thrown, with its stack, and the latest look. */
+async function threw() {
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  onTestFinished(() => {
+    vi.restoreAllMocks();
+  });
+  const screen = await shown();
+  const frame = await frameIn(screen);
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "something" } });
+  fromFrame(frame, {
+    method: APP_ERROR,
+    params: {
+      kind: "error",
+      message: PACMAN,
+      stack: "step@about:srcdoc:88:20 / loop@about:srcdoc:120:5",
+    },
+  });
+  return { screen, frame };
+}
+
+test("an error with no word that a loop stopped is said plainly, never as stopped, and once", async () => {
+  const { screen } = await threw();
+  await expect
+    .element(screen.getByRole("status").getByText(REPORTED, { exact: true }))
+    .toBeVisible();
+  expect(screen.getByText(STOPPED).query()).toBeNull();
+  // The card holds the error and the look: the report under it doesn't say them again.
+  expect(screen.getByText("The app reported a problem").query()).toBeNull();
+  expect(screen.getByText("What the app reported").query()).toBeNull();
+  expect(screen.getByText(`error: ${PACMAN}`).query()).toBeNull();
+});
+
+test("the error a loop stopped after comes with the word it stopped, though no report came before", async () => {
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  onTestFinished(() => {
+    vi.restoreAllMocks();
+  });
+  const screen = await shown();
+  const frame = await frameIn(screen);
+  fromFrame(frame, {
+    method: APP_STOPPED,
+    params: { stopped: "yes", message: PACMAN, stack: "loop@x" },
+  });
+  await expect.element(screen.getByRole("alert").getByText(PACMAN, { exact: true })).toBeVisible();
+  await expect.element(screen.getByText(STOPPED)).toBeVisible();
+});
+
+test("an app whose frames stopped after its error says so, with the error and its details", async () => {
+  const { screen, frame } = await threw();
+  fromFrame(frame, { method: APP_STOPPED, params: { stopped: "yes" } });
+  const card = screen.getByRole("alert");
+  await expect.element(card.getByText(STOPPED)).toBeVisible();
+  await expect.element(card.getByText(PACMAN, { exact: true })).toBeVisible();
+  await card.getByText("Details").click();
+  await expect
+    .element(card.getByText("step@about:srcdoc:88:20 / loop@about:srcdoc:120:5"))
+    .toBeVisible();
+  await expect.element(card.getByText(/^boot: drawn=something/)).toBeVisible();
+  expect(await axeViolations(screen.container)).toEqual([]);
+  // A later error, as a tap on the broken game throws, isn't the one it stopped after.
+  fromFrame(frame, { method: APP_ERROR, params: { kind: "error", message: "TypeError: tapped" } });
+  await expect.element(screen.getByText("error: TypeError: tapped")).toBeInTheDocument();
+  await expect.element(card.getByText(PACMAN, { exact: true })).toBeVisible();
+  await expect.element(screen.getByText("The app reported a problem")).toBeInTheDocument();
+  // Frames came back, as after a tap that starts the game again: no longer said to be stopped.
+  fromFrame(frame, { method: APP_STOPPED, params: { stopped: "no" } });
+  await expect.element(screen.getByText(REPORTED, { exact: true })).toBeVisible();
+  expect(screen.getByText(STOPPED).query()).toBeNull();
+});
+
+test("Copy says an error that stopped nothing was thrown, never that the app froze", async () => {
+  const { screen } = await threw();
+  const written = vi.fn(async (_: string) => undefined);
+  vi.spyOn(navigator, "clipboard", "get").mockReturnValue({
+    writeText: written,
+  } as unknown as Clipboard);
+  await screen.getByRole("button", { name: "Copy the error for the assistant" }).click();
+  expect(written).toHaveBeenCalledWith(
+    `The app threw an error: ${PACMAN}. Please find the cause and fix it.`,
+  );
+});
+
+test("an error the browser doesn't name is said as such, never as its 'Script error.'", async () => {
+  vi.spyOn(console, "warn").mockImplementation(() => undefined);
+  onTestFinished(() => {
+    vi.restoreAllMocks();
+  });
+  const screen = await shown();
+  const frame = await frameIn(screen);
+  fromFrame(frame, { method: APP_ERROR, params: { kind: "error", message: "Script error." } });
+  fromFrame(frame, { method: APP_STOPPED, params: { stopped: "yes" } });
+  await expect.element(screen.getByText("This browser doesn't say which error.")).toBeVisible();
+});
+
+test("Copy puts a sentence for the assistant on the clipboard, and nothing is sent", async () => {
+  const { screen, frame } = await threw();
+  const written = vi.fn(async (_: string) => undefined);
+  vi.spyOn(navigator, "clipboard", "get").mockReturnValue({
+    writeText: written,
+  } as unknown as Clipboard);
+  fromFrame(frame, { method: APP_STOPPED, params: { stopped: "yes" } });
+  await screen.getByRole("button", { name: "Copy the error for the assistant" }).click();
+  expect(written).toHaveBeenCalledWith(
+    `The app froze after an error: ${PACMAN}. Please find the cause and fix it.`,
+  );
+  await expect.element(screen.getByText("Copied.", { exact: false })).toBeVisible();
+});
+
+test("where the page can't copy, the sentence is shown and selected to copy by hand", async () => {
+  const { screen, frame } = await threw();
+  vi.spyOn(navigator, "clipboard", "get").mockReturnValue(undefined as unknown as Clipboard);
+  fromFrame(frame, { method: APP_STOPPED, params: { stopped: "yes" } });
+  await screen.getByRole("button", { name: "Copy the error for the assistant" }).click();
+  const sentence = `The app froze after an error: ${PACMAN}. Please find the cause and fix it.`;
+  await expect.element(screen.getByText(sentence)).toBeVisible();
+  expect(getSelection()?.toString()).toBe(sentence);
+  // Selected once: a later render leaves what the person selected since alone.
+  getSelection()?.removeAllRanges();
+  fromFrame(frame, { method: APP_BOOT, params: { drawn: "something", canvases: 2 } });
+  await new Promise((settle) => setTimeout(settle, 100));
+  expect(getSelection()?.toString()).toBe("");
+});
+
+test("Reload app makes the frame afresh, and the card goes with the old one", async () => {
+  const { screen, frame } = await threw();
+  fromFrame(frame, { method: APP_STOPPED, params: { stopped: "yes" } });
+  const reload = screen.getByRole("button", { name: "Reload app" });
+  await expect.element(reload).toBeVisible();
+  await reload.click();
+  await expect.element(screen.getByText(STOPPED)).not.toBeInTheDocument();
   expect(await frameIn(screen)).not.toBe(frame);
 });

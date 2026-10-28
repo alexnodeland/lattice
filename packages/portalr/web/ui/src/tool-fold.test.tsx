@@ -29,9 +29,17 @@ test("the calls are said in plain words, counted, in the order first called", ()
   expect(doneLabel([tool("create_app"), tool("read_artifact"), tool("read_artifact")])).toBe(
     "Made an app, read 2 artifacts",
   );
-  expect(doneLabel([tool("search_web"), tool("mcp_thing"), tool("fetch")])).toBe(
-    "Used 2 tools, fetched a page",
+  expect(doneLabel([tool("search_web"), tool("mcp_thing"), tool("view_page")])).toBe(
+    "Used 2 tools, looked at a page",
   );
+});
+
+test("tools that say the same are counted together, and a name on Object's prototype is a tool", () => {
+  expect(doneLabel([tool("draw"), tool("draw_mermaid")])).toBe("Drew 2 diagrams");
+  expect(doneLabel([tool("edit_text"), tool("edit_artifact")])).toBe("Edited 2 artifacts");
+  for (const name of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+    expect(doneLabel([tool(name)])).toBe("Used a tool");
+  }
 });
 
 test("while a call runs the line says it is doing it; a failure is counted", () => {
@@ -137,7 +145,7 @@ test("running, it shimmers unless motion is reduced; new calls keep it as the re
   const first = calls(tool("read_artifact"), tool("create_app", "called"));
   const screen = await render(
     <ul>
-      <RunSteps tools={first} />
+      <RunSteps tools={first} running />
     </ul>,
   );
   const words = () => shown(screen.container);
@@ -148,16 +156,25 @@ test("running, it shimmers unless motion is reduced; new calls keep it as the re
   const more = [...first, ["more", tool("draw", "called")] as const];
   await screen.rerender(
     <ul>
-      <RunSteps tools={more} />
+      <RunSteps tools={more} running />
     </ul>,
   );
   await expect
     .element(screen.getByRole("button", { name: "Drawing a diagram…: 3 tool calls" }))
     .toHaveAttribute("aria-expanded", "true");
+  // Between one call's answer and the next, its run still runs: nothing is said, nothing flickers.
   const done = more.map(([id, each]) => [id, { ...each, status: "ok" }] as const);
   await screen.rerender(
     <ul>
-      <RunSteps tools={done} />
+      <RunSteps tools={done} running />
+    </ul>,
+  );
+  expect(words().textContent).toBe("Drawing a diagram…");
+  expect(words().getAnimations()).toHaveLength(1);
+  expect(screen.getByRole("status").element().textContent).toBe("");
+  await screen.rerender(
+    <ul>
+      <RunSteps tools={done} running={false} />
     </ul>,
   );
   expect(words().getAnimations()).toHaveLength(0);
@@ -168,13 +185,13 @@ test("running, it shimmers unless motion is reduced; new calls keep it as the re
 });
 
 test("which groups were opened is kept as the thread is shown again", async () => {
-  const same = calls(tool("fetch"));
+  const same = calls(tool("view_page"));
   const first = await render(
     <ul>
       <RunSteps tools={same} />
     </ul>,
   );
-  await first.getByRole("button", { name: "Fetched a page: 1 tool call" }).click();
+  await first.getByRole("button", { name: "Looked at a page: 1 tool call" }).click();
   await first.unmount();
   const again = await render(
     <ul>
@@ -182,6 +199,6 @@ test("which groups were opened is kept as the thread is shown again", async () =
     </ul>,
   );
   await expect
-    .element(again.getByRole("button", { name: "Fetched a page: 1 tool call" }))
+    .element(again.getByRole("button", { name: "Looked at a page: 1 tool call" }))
     .toHaveAttribute("aria-expanded", "true");
 });

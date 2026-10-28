@@ -462,7 +462,13 @@ function Chat() {
                 />
               );
             case "tools":
-              return <RunSteps key={entry.tools[0]?.[0]} tools={entry.tools} />;
+              return (
+                <RunSteps
+                  key={entry.tools[0]?.[0]}
+                  tools={entry.tools}
+                  running={entry.run.status === "running"}
+                />
+              );
             case "question": {
               const { request, answer: given } = entry.question;
               return (

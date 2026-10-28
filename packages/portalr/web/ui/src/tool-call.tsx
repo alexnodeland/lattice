@@ -27,13 +27,16 @@ import { phoneNow, usePhone } from "./touch";
 import { TYPE } from "./type";
 
 /** How a call is going, as a shape and a word, by the status its run recorded. */
-const STATUS: Record<string, readonly [Tone, string, string, string]> = {
-  // tone, the badge's word, what the second part holds, and its name in plain words
-  called: ["working", "Running", "Result", "What it returned"],
-  ok: ["done", "Done", "Result", "What it returned"],
-  error: ["failed", "Failed", "Error", "Why it failed"],
-  retry: ["retrying", "Refused", "Why it was refused", "Why it was refused"],
+const STATUS: Record<string, readonly [Tone, string, string]> = {
+  // tone, the badge's word, and what the second part holds
+  called: ["working", "Running", "Result"],
+  ok: ["done", "Done", "Result"],
+  error: ["failed", "Failed", "Error"],
+  retry: ["retrying", "Refused", "Why it was refused"],
 };
+
+/** What the second part holds, in plain words. */
+const PLAIN: Record<string, string> = { Result: "What it returned", Error: "Why it failed" };
 
 /** The formatted view of a call's parts (portalr ADR-0083), loaded as a call is first opened. */
 const loadJsonView = () => import("./on-demand/json-view");
@@ -105,12 +108,7 @@ function Part({
 
 /** A call's detail, the third level: what it was asked and what it returned, by its tool's id. */
 function CallDetail({ tool, view }: { tool: Artifactr.Tool; view: JsonView | null }) {
-  const [, , returned, plain] = STATUS[tool.status] ?? [
-    "done",
-    tool.status,
-    "Result",
-    "What it returned",
-  ];
+  const returned = STATUS[tool.status]?.[2] ?? "Result";
   return (
     <>
       <code className="font-mono text-muted text-xs">{tool.name}</code>
@@ -125,7 +123,7 @@ function CallDetail({ tool, view }: { tool: Artifactr.Tool; view: JsonView | nul
       {tool.status !== "called" && (
         <Part
           name={returned}
-          label={plain}
+          label={PLAIN[returned] ?? returned}
           tool={tool.name}
           text={tool.result}
           cut={tool.resultCut}
@@ -225,7 +223,17 @@ function ToolSheet({
   // The call last opened, whose row takes the focus back from its detail.
   const [left, setLeft] = useState<string | null>(null);
   const tool = tools.find(([call]) => call === chosen)?.[1];
-  const close = (next: boolean) => {
+  const back = () => {
+    setLeft(chosen);
+    setChosen(null);
+  };
+  const close = (next: boolean, details: { reason: string; cancel: () => void }) => {
+    // Escape from a call's detail goes back to the list; from the list, it closes.
+    if (!next && chosen !== null && details.reason === "escape-key") {
+      details.cancel();
+      back();
+      return;
+    }
     if (!next) {
       setChosen(null);
       setLeft(null);
@@ -238,7 +246,6 @@ function ToolSheet({
         <BaseDialog.Backdrop className={backdrop} />
         <BaseDialog.Popup
           ref={asSheet}
-          aria-modal="true"
           onKeyDown={(event) => keepTabWithin(event.currentTarget, event.nativeEvent)}
           className={`${popup} ${sheet}`}
           finalFocus={finalFocus}
@@ -252,10 +259,7 @@ function ToolSheet({
                 className="rounded-full bg-wash"
                 // The focus moves with the reader: to Back, and from it to the call's row.
                 autoFocus
-                onClick={() => {
-                  setLeft(chosen);
-                  setChosen(null);
-                }}
+                onClick={back}
               />
             ) : (
               <BaseDialog.Close
@@ -334,12 +338,19 @@ function useShimmer(running: boolean) {
 const opened = new Map<string, boolean>();
 
 /**
- * A run's calls in a row as one quiet line (portalr ADR-0055): what they did, in plain words,
+ * A run's calls in a row as one quiet line (portalr ADR-0053): what they did, in plain words,
  * the first level, shimmering while a call runs, with how many failed, and a caret. It opens,
  * when tapped, to the calls (the second level): beneath it on a desktop, in a sheet on a phone,
  * where the list goes on to a call's detail. Closed until the reader opens it, as calls arrive.
  */
-export function RunSteps({ tools }: { tools: readonly (readonly [string, Artifactr.Tool])[] }) {
+export function RunSteps({
+  tools,
+  running: runRunning = false,
+}: {
+  tools: readonly (readonly [string, Artifactr.Tool])[];
+  /** Whether its run runs: between one call's answer and the next, the group still does. */
+  running?: boolean;
+}) {
   const key = tools[0]?.[0] ?? "";
   const phone = usePhone();
   // How it is open, chosen at the tap from what the window is then: beneath, or a sheet. Only an
@@ -355,7 +366,7 @@ export function RunSteps({ tools }: { tools: readonly (readonly [string, Artifac
   const button = useRef<HTMLButtonElement>(null);
   const panel = useId();
   const calls = tools.map(([, tool]) => tool);
-  const { label, failed, running } = foldSummary(calls);
+  const { label, failed, running } = foldSummary(calls, runRunning);
   const words = useShimmer(running);
   // Said once, as a group that was running ends: never as each call does.
   const [ran, setRan] = useState(running);

@@ -57,7 +57,8 @@ test("the line opens a sheet of the calls, which goes on to a call and back, and
   await sheet.getByRole("button", { name: "Copy the result of update_app" }).click();
   expect(written).toHaveBeenLastCalledWith("Done: app_1 is now at version 2.");
   expect(await axeViolations(sheet.element())).toEqual([]);
-  await sheet.getByRole("button", { name: "Back to the calls" }).click();
+  // Escape from a call's detail goes back to the list, not out of the sheet.
+  await userEvent.keyboard("{Escape}");
   await expect.element(list.getByRole("button", { name: /^Updated an app/ })).toHaveFocus();
   await userEvent.keyboard("{Escape}");
   await expect.element(sheet).not.toBeInTheDocument();
@@ -69,11 +70,11 @@ test("on a phone a tap opens the sheet, never the unfurl, even just after the wi
   await page.viewport(900, 800);
   const screen = await render(
     <ul>
-      <RunSteps tools={[["resized_1", tool("fetch", "ok", '{"url": "a"}', "ok")]]} />
+      <RunSteps tools={[["resized_1", tool("view_page", "ok", '{"url": "a"}', "ok")]]} />
     </ul>,
   );
   await page.viewport(393, 852);
-  await screen.getByRole("button", { name: "Fetched a page: 1 tool call" }).click();
-  await expect.element(screen.getByRole("dialog", { name: "Fetched a page" })).toBeVisible();
+  await screen.getByRole("button", { name: "Looked at a page: 1 tool call" }).click();
+  await expect.element(screen.getByRole("dialog", { name: "Looked at a page" })).toBeVisible();
   expect(document.querySelectorAll("li > ol[aria-label='Tool calls']")).toHaveLength(0);
 });

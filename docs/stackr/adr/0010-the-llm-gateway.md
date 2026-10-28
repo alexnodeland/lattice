@@ -1,6 +1,6 @@
 # ADR-0010: The LLM gateway
 
-**Status:** Accepted, amended by [ADR-0047](0047-an-upstream-gateway-for-the-model-groups.md)
+**Status:** Accepted, amended by [ADR-0047](0047-an-upstream-gateway-for-the-model-groups.md) and on 2026-10-27 (below)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 
@@ -65,3 +65,15 @@ Checking LiteLLM 1.103.0, the current release, against its source settled what t
 
 1. [x] The `gateway` profile, `scripts/create-tenant`, the guardrails and telemetry (RFC-0001 phase 4).
 2. [ ] Dashboards for the gateway's usage and cost, beside the libraries' own.
+
+## Amendment (2026-10-27): `prompt-injection` reads tool results
+
+`prompt-injection` read every message of a request: the system prompt, the person's prompt, the model's replies and the arguments of its tool calls, and tool results. Its categories are word lists; `prompt_injection_jailbreak` blocks at high severity when a word such as "enter" and one such as "unlimited" fall in one sentence, and sentences end only at `.`, `!` or `?`, so a page of markup is a few very long sentences. An agent asked for a landing page wrote one into a mini-app tool's arguments; the tool succeeded, and the next request of the turn, which carried those arguments, was blocked (`conditional match 'enter + unlimited' detected (severity: high)`). Every later request of that thread would have been blocked too, since each carries the thread's history.
+
+The guardrail now has `scan_only_tool_results: true` (LiteLLM v1.103.0, applied to any guardrail from the configuration file): it reads tool-role messages only, and skips the system prompt, the person's prompt, and the model's replies, tool arguments and tool definitions. A request without a tool result isn't scanned. The proxy applies this to every client that asks for `prompt-injection`, not only the libraries.
+
+- **Kept:** injection through what tools bring back: fetched web pages, the contents of files a connector or tool read, another service's answers.
+- **Lost:** the word-list check of everything in user and system messages: the person's own prompt, and outside text that arrives there instead of through a tool, such as an email, a document or a web page the person pasted or attached, or that a client puts in a system prompt. That text is as untrusted as a tool result and is no longer scanned. The person is an authenticated user of the tenant, in their own workspace, and the provider's own safety still applies to direct prompts; a word list was a weak defence against a determined person, or a crafted document, anyway.
+- **Still possible:** a false positive on a tool result that repeats generated content. artifactr's `read_artifact` returns a mini app's whole HTML, so an agent that reads a generated app back can block its thread one step later, as before ([#830](https://github.com/alexnodeland/lattice/issues/830)).
+- **Not chosen:** a higher severity threshold (the match was already `high`); sending the guardrail only on a turn's first request, or when the newest message is the person's (the thread's history still carries the model's tool arguments, so its next turn is blocked too); `skip_tool_message_in_guardrail` (it keeps the model's tool arguments, where the page was); `experimental_use_latest_role_message_only` (read only by the Bedrock and Prisma AIRS guardrails at this version, not by the content filter).
+- **Revisit:** choosing the guardrail per tool, so a result from a tool that only echoes what the model made (artifactr's mini-app and artifact tools) isn't scanned while one from an outside source is. The proxy can't tell tools apart in a tool message, so that would be the libraries' `GuardrailPolicy` choosing per request from the newest tool result.

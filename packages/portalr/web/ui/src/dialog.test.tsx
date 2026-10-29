@@ -3,7 +3,7 @@ import { expect, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { Button } from "./button";
-import { Dialog } from "./dialog";
+import { Dialog, WholeDialog } from "./dialog";
 
 function Opened({ aimed = false }: { aimed?: boolean }) {
   const [open, setOpen] = useState(false);
@@ -78,4 +78,30 @@ test("a dialog is modal: named so, and Tab goes round its own controls", async (
   }
   document.removeEventListener("focusin", onGuard);
   expect(guarded).toEqual([]);
+});
+
+test("a whole-window dialog closes by its Close, or by what its bar holds in Close's place", async () => {
+  function Whole({ bar }: { bar?: boolean }) {
+    const [open, setOpen] = useState(true);
+    return (
+      <WholeDialog
+        open={open}
+        onOpenChange={setOpen}
+        title="Canvas"
+        {...(bar && { bar: <Button onClick={() => setOpen(false)}>Back</Button> })}
+      >
+        <p>Drawn</p>
+      </WholeDialog>
+    );
+  }
+  const plain = await render(<Whole />);
+  const dialog = plain.getByRole("dialog", { name: "Canvas" });
+  await dialog.getByRole("button", { name: "Close" }).click();
+  await expect.element(dialog).not.toBeInTheDocument();
+  await plain.unmount();
+  const barred = await render(<Whole bar />);
+  const other = barred.getByRole("dialog", { name: "Canvas" });
+  expect(other.getByRole("button", { name: "Close" }).elements()).toHaveLength(0);
+  await other.getByRole("button", { name: "Back" }).click();
+  await expect.element(other).not.toBeInTheDocument();
 });

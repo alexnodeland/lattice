@@ -103,6 +103,7 @@ nav:
   - adr/0089-a-native-files-proposal-says-what-it-does-in-its-thread.md
   - adr/0090-a-native-files-editor-takes-a-phones-whole-window.md
   - adr/0091-a-native-files-proposal-opens-on-its-first-changed-page.md
+  - adr/0092-a-phones-thread-uses-its-height-one-tray-for-what-waits-one-strip-for-a-turn.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

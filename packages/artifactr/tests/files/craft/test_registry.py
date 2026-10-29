@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import pytest
+import yaml
 
 from artifactr.files.craft import CRAFTS, Craft
 from artifactr.files.manifest import (
@@ -26,6 +27,7 @@ from artifactr.files.wordcraft import Subprocess
 from lattice_core.integrations import KNOWN
 
 PINS = Path(__file__).parents[5] / "scripts" / "crafts"
+COPIER = Path(__file__).parents[4] / "stackr" / "copier.yml"
 BRAND = "artcraft"
 """The apps' brand, whose licence lets its name appear only in the official builds."""
 
@@ -57,6 +59,16 @@ def test_a_cli_that_confines_nothing_is_never_on_by_default() -> None:
 
 def test_each_app_is_pinned() -> None:
     assert sorted(path.stem for path in PINS.glob("*.sha256")) == sorted(CRAFTS)
+
+
+def test_the_template_hosts_an_editor_for_exactly_the_apps_whose_build_has_a_bridge() -> None:
+    """An app the template wires has an editor port if its build hands a file over, and says
+    why not otherwise: no browser build, or no bridge (scripts/check-template holds which)."""
+    crafts = yaml.safe_load(COPIER.read_text())["crafts"]["default"]
+    editors = {name for name, craft in crafts.items() if craft.get("editor")}
+    bridged = {name for name in crafts if CRAFTS[name].bridge == "parent"}
+    assert editors == bridged == {"wordcraft", "gridcraft", "pdfcraft", "cadcraft"}
+    assert all(crafts[name].get("no_editor") for name in crafts.keys() - editors)
 
 
 THIRD_PARTIES = {"freecad", "blender"}

@@ -208,29 +208,33 @@ use_integrations:
 
 # The apps a worker runs (lattice RFC-0003): each one's release, as lattice's scripts/crafts pins
 # it, which scripts/check-template holds this to; its native type; and, for an app whose browser
-# build hands a file over, its editor's port: app_port and this. An app whose release is built
-# for one platform names it; one whose CLI needs more address space than a worker's default 2 GiB
-# names the GiB; one whose release links system libraries names their packages; and one whose
-# licence asks for its source to be offered names where it is.
+# build hands a file over, its editor's port: app_port and this; or else, no_editor, why it has
+# none: "no browser build", or "no host bridge", a build with no `?host=parent` bridge to open a
+# file in and hand its saves back (native files ADR-0010), which EffectCraft's and FilmCraft's
+# JavaScript APIs don't either; scripts/check-template holds both to artifactr's registry. An app
+# whose release is built for one platform names it; one whose CLI needs more address space than a
+# worker's default 2 GiB names the GiB; one whose release links system libraries names their
+# packages; and one whose licence asks for its source to be offered names where it is.
 crafts:
   type: yaml
   default:
     wordcraft: {version: "0.11.0", type: WordDocument, editor: 5}
     gridcraft: {version: "0.8.0", type: Workbook, editor: 2}
-    deckcraft: {version: "0.7.0", type: Presentation}
+    deckcraft: {version: "0.7.0", type: Presentation, no_editor: "no host bridge"}
     pdfcraft: {version: "0.8.0", type: PdfDocument, editor: 3}
     cadcraft: {version: "0.8.0", type: Drawing, editor: 4}
-    photocraft: {version: "0.9.0", type: LayeredImage}
-    vectorcraft: {version: "0.12.0", type: VectorImage}
-    designcraft: {version: "0.9.0", type: PageLayout}
-    figcraft: {version: "0.6.0", type: Design}
-    filmcraft: {version: "0.8.0", type: VideoProject}
-    effectcraft: {version: "0.11.1", type: MotionGraphics}
-    soundcraft: {version: "0.8.0", type: AudioSession}
-    freecad: {version: "1.1.4", type: CadModel}
+    photocraft: {version: "0.9.0", type: LayeredImage, no_editor: "no host bridge"}
+    vectorcraft: {version: "0.12.0", type: VectorImage, no_editor: "no host bridge"}
+    designcraft: {version: "0.9.0", type: PageLayout, no_editor: "no host bridge"}
+    figcraft: {version: "0.6.0", type: Design, no_editor: "no host bridge"}
+    filmcraft: {version: "0.8.0", type: VideoProject, no_editor: "no host bridge"}
+    effectcraft: {version: "0.11.1", type: MotionGraphics, no_editor: "no host bridge"}
+    soundcraft: {version: "0.8.0", type: AudioSession, no_editor: "no host bridge"}
+    freecad: {version: "1.1.4", type: CadModel, no_editor: "no browser build"}
     blender:
       version: "5.2.2"
       type: Scene
+      no_editor: "no browser build"
       platform: linux/amd64
       memory: 4
       # The X11 and GL libraries its tarball links, and Mesa, which draws its pages with no GPU.

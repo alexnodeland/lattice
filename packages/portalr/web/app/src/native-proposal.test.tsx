@@ -167,8 +167,12 @@ test("a check-in kept as a proposal opens on its first changed page, then compar
   });
   const checkedIn = card(screen, "Checked in brief.docx");
   await expect.element(checkedIn.getByText(/^A check-in kept as a proposal/)).toBeVisible();
-  // On a desktop, the comparison is open at first: its words, and the first page that changed,
-  // found by reading each page in turn, as no command names one.
+  // On a desktop, one comparison a page is open at first, the first proposal's; this one opens
+  // on its words and the first page that changed, found by reading each page in turn.
+  await expect
+    .element(checkedIn.getByRole("button", { name: /^Compare with/ }))
+    .toHaveAttribute("aria-expanded", "false");
+  await checkedIn.getByRole("button", { name: /^Compare with/ }).click();
   await expect
     .poll(() => checkedIn.element().querySelector("ins")?.textContent)
     .toContain("Signed");

@@ -239,9 +239,26 @@ const NO_PICTURE = new Set(["GridCraft", "SoundCraft"]);
  * The proposal's words and pages beside the head's: open at first on a desktop, on the first
  * changed page, and read only once open.
  */
+/** The proposal whose comparison opened at first: one a page, so a thread of them reads one. */
+let opened: string | null = null;
+
 function Comparison(props: Compare & { size: number | null }) {
   const phone = usePhone();
-  const [open, setOpen] = useState(!phone);
+  const [open, setOpen] = useState(() => {
+    const first = !phone && opened === null;
+    if (first) {
+      opened = props.proposal;
+    }
+    return first;
+  });
+  useEffect(
+    () => () => {
+      if (opened === props.proposal) {
+        opened = null;
+      }
+    },
+    [props.proposal],
+  );
   return (
     <Disclosure
       look="link"
@@ -315,7 +332,9 @@ function failed(page: number, read: UseQueryResult<string>, proposed: boolean): 
     return { page, state: "failed", onRetry: retry };
   }
   if (error.status === 429 || error.status === 503) {
-    const said = `Still preparing the picture. Try again in ${error.retryAfter ?? 10} seconds.`;
+    // The server's wait, at most five minutes, or ten seconds where it gave none.
+    const wait = Math.min(Math.max(error.retryAfter ?? 10, 0), 300);
+    const said = `Still preparing the picture. Try again ${wait > 1 ? `in ${wait} seconds` : wait ? "in a second" : "now"}.`;
     return { page, state: "failed", said, onRetry: retry };
   }
   return proposed && record(record(error.detail).detail).reason === "content_unavailable"
@@ -373,7 +392,7 @@ export function BeforeAfter({
     if (same && heads[0]?.data !== undefined && at < Math.min(most, PAGES_AT_ONCE)) {
       setAt(at + 1);
     }
-  });
+  }, [same, heads[0]?.data, at, most]);
   if (!drawn) {
     return (
       <p className="text-muted">

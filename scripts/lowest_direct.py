@@ -10,7 +10,8 @@ gets. Then every module of the package is imported. A floor below what the code 
 
 EXPECTED lists the packages known to fail until their floors are raised, as each package's release
 does (the owner's step): each must still fail, so a package that starts passing is flagged, and
-must come off the list. The others must pass. It exits 1 if any package does other than expected.
+must come off the list. The others must pass, as every package does now. It exits 1 if any package
+does other than expected.
 """
 
 import subprocess
@@ -31,14 +32,10 @@ PACKAGES = {
 }
 """Each package that ships a wheel, by its directory, and the module it installs, in release order.
 stackr ships none."""
-EXPECTED: dict[str, tuple[str, str]] = {
-    "relayr": (
-        "artifactr-ai 0.2.0, at its floor, has no artifactr.excalidraw, which relayr imports",
-        "No module named 'artifactr.excalidraw'",
-    ),
-}
+EXPECTED: dict[str, tuple[str, str]] = {}
 """The packages whose floors are known to be too low: why, and what the import says when it fails
-so. Each comes off as its floor is raised (lattice ADR-0029)."""
+so. Empty: every floor passes. A package goes on it, and comes off as its floor is raised
+(lattice ADR-0029)."""
 CHECK = """
 import importlib, pkgutil, sys
 

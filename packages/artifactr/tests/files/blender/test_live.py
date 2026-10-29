@@ -14,9 +14,11 @@ from pathlib import Path
 import pytest
 
 from artifactr.files.app import AppCommand, AppFailed
+from artifactr.files.app.png import SIGNATURE
 from artifactr.files.blender import COMMANDS, Subprocess, scan
-from artifactr.files.blender.headless import ARGUMENTS, SCRIPT
+from artifactr.files.blender.headless import ARGUMENTS, CLEAR, SCRIPT
 from artifactr.files.manifest import BLEND
+from tests.files.app.png import pixels
 from tests.files.corpus.blender.corpus import CORPUS
 from tests.files.corpus.harness import pinned
 
@@ -111,13 +113,32 @@ async def test_what_the_commands_dont_allow_is_refused(
 async def test_a_scene_with_no_camera_has_nothing_to_draw_and_no_page_two(
     blender: Subprocess,
 ) -> None:
-    for call in (
-        blender.render(CORPUS.source("primitives"), 1, scale=1, deadline=DEADLINE),
-        blender.render(CORPUS.source("camera_light"), 2, scale=1, deadline=DEADLINE),
+    for call, why in (
+        (blender.render(CORPUS.source("primitives"), 1, scale=1, deadline=DEADLINE), "no camera"),
+        (blender.render(CORPUS.source("camera_light"), 2, scale=1, deadline=DEADLINE), "page 2"),
     ):
-        with pytest.raises(AppFailed) as refused:
+        with pytest.raises(AppFailed, match=why) as refused:
             await call
         assert refused.value.failure == "refused"
+
+
+async def test_a_blank_file_is_drawn_transparent(blender: Subprocess) -> None:
+    blank = await blender.apply(None, [], deadline=DEADLINE)
+    png = await blender.render(blank.content, 1, scale=0.25, deadline=DEADLINE)
+    assert pixels(png) == (256, 256, CLEAR)
+
+
+async def test_an_empty_scene_through_a_camera_is_drawn_transparent_as_its_blank_is(
+    blender: Subprocess,
+) -> None:
+    """The blank page's colour is what Blender itself draws an empty scene as."""
+    seen = await blender.apply(
+        None, [AppCommand(name="camera", args={"at": [0, -10, 0]})], deadline=DEADLINE
+    )
+    png = await blender.render(seen.content, 1, scale=0.25, deadline=DEADLINE)
+    assert png.startswith(SIGNATURE)
+    assert png[24:26] == b"\x08\x06", "Workbench writes 8-bit RGBA"
+    assert pixels(png)[2][3] == CLEAR[3], "transparent: its colour, near black, is not seen"
 
 
 @pytest.mark.parametrize("name", ["text_block", "python_driver"])

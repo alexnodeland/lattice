@@ -19,6 +19,7 @@ import anyio.to_thread
 from pydantic import BaseModel, JsonValue
 
 from artifactr.files.app import AppCommand, AppFailed, Applied, CommandSpec, Inspection, Talk
+from artifactr.files.app.png import solid
 from artifactr.files.blender.document import LIMIT, Scanned, fingerprint, scan
 from artifactr.files.craft import CRAFTS, FOUND, PREVIEW, Craft, Script
 from artifactr.files.manifest import BLEND, OUTLINE_LIMIT
@@ -32,6 +33,12 @@ SAVED: Final = "document.blend"
 
 BATCH: Final = 200
 """The most commands a batch may hold."""
+
+EMPTY: Final = "nothing to draw: the scene is empty"
+"""How the script refuses to draw a scene with no object, such as a blank file: its words."""
+
+CLEAR: Final = b"\x00\x00\x00\x00"
+"""What Workbench draws where a scene with no world has nothing: transparent, as seen on 5.2.2."""
 
 WIDEST: Final = 4096
 """The widest a page may be drawn, in pixels."""
@@ -256,23 +263,31 @@ class Subprocess:
     async def render(self, source: bytes, page: int, *, scale: float, deadline: float) -> bytes:
         """Draw the scene through its camera, by Workbench, `PREVIEW` times `scale` wide, as page 1.
 
+        An empty scene, such as a blank file, has no camera, so the script refuses it. It is
+        drawn as what Blender draws an empty scene as through a camera, transparent: a square as
+        wide as the page, at most `PREVIEW`, since it has no render size of its own. A blank file
+        is new, not damaged.
+
         Raises:
             AppFailed: `refused` too for any page but the first, a scale that isn't a positive
-                number, or a scene with no camera.
+                number, or a scene with objects and no camera.
         """
         if page != 1:
             raise AppFailed("refused", f"no page {page}: a scene is drawn as page 1")
         if not math.isfinite(scale) or scale <= 0:
             raise AppFailed("refused", f"a scale must be a positive number, not {scale}")
         scanned, deadline = await self._scan(source, deadline)
-        call: dict[str, JsonValue] = {
-            "step": "render",
-            "page": page,
-            "width": min(WIDEST, max(16, round(PREVIEW * scale))),
-        }
-        ran = await self._script.run(
-            deadline, call, scanned.content, self.extension, wanted={"page.png"}
-        )
+        width = min(WIDEST, max(16, round(PREVIEW * scale)))
+        call: dict[str, JsonValue] = {"step": "render", "page": page, "width": width}
+        try:
+            ran = await self._script.run(
+                deadline, call, scanned.content, self.extension, wanted={"page.png"}
+            )
+        except AppFailed as failed:
+            if failed.failure != "refused" or str(failed) != f"refused: {EMPTY}":
+                raise
+            blank = min(width, PREVIEW)
+            return solid(blank, blank, CLEAR)
         if (png := ran.files.get("page.png")) is None:
             raise AppFailed("crashed", "Blender drew no page")
         return png

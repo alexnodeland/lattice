@@ -511,6 +511,8 @@ def reading():
 def draw(width, path):
     """Draw the scene through its camera, by Workbench, `width` pixels wide."""
     scene = bpy.context.scene
+    if scene.camera is None and not scene.objects:
+        raise Refused("nothing to draw: the scene is empty")
     if scene.camera is None:
         raise Refused("nothing to draw: the scene has no camera")
     settings = scene.render

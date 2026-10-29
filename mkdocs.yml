@@ -107,6 +107,10 @@ plugins:
   - search
   # Zensical implements awesome-nav itself: each folder's .nav.yml orders its section.
   - awesome-nav
+  # Instructions for coding agents, beside the pages they describe, aren't pages of the site.
+  # Zensical implements the exclude plugin itself and ignores mkdocs' exclude_docs.
+  - exclude:
+      regex: ['(^|/)AGENTS\.md$']
   - mkdocstrings:
       handlers:
         python:

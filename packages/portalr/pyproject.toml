@@ -35,7 +35,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "grantr[fastapi]>=0.1.0",
+    "grantr[fastapi]>=0.2.0",
     "lattice-core-ai>=0.2.0",
     "fastapi>=0.141",
     "httpx>=0.28",

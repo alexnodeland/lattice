@@ -1,6 +1,6 @@
 # ADR-0029: Each wheel checked at its floors
 
-**Status:** Accepted
+**Status:** Accepted (2026-10-29: every floor now passes, and `EXPECTED` is empty)
 **Date:** 2026-10-22
 **Deciders:** Alex Nodeland
 
@@ -30,5 +30,5 @@ Nothing caught these. CI installs the workspace from its lock, at the newest ver
 ## Consequences
 
 - Easier: a floor that is too low fails a pull request, not a user's install.
-- Known: artifactr failed on a lattice-core module 0.1.0 lacks before it reached `repair_messages`, so its `pydantic-ai-slim` floor showed only once its `lattice-core-ai` floor was raised. Both were raised together (2026-10-29: `lattice-core-ai>=0.2.0`, `pydantic-ai-slim>=2.53`, for artifactr and relayr), and artifactr, grantr and portalr came off `EXPECTED`. relayr stays on it until its `artifactr-ai` floor names a release with `artifactr.excalidraw`.
+- Known: artifactr failed on a lattice-core module 0.1.0 lacks before it reached `repair_messages`, so its `pydantic-ai-slim` floor showed only once its `lattice-core-ai` floor was raised. Both were raised together (2026-10-29: `lattice-core-ai>=0.2.0`, `pydantic-ai-slim>=2.53`, for artifactr and relayr), and artifactr, grantr and portalr came off `EXPECTED`. relayr stayed on it until its `artifactr-ai` floor named a release with `artifactr.excalidraw`: `>=0.3.0`, which took it off.
 - Harder: CI installs each wheel once more, about a minute in all; and a release must edit `EXPECTED` when it raises a floor.

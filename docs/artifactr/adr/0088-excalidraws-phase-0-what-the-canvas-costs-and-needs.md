@@ -90,7 +90,7 @@ Headless Chromium, as U6 has it. The SVGs jsdom wrote were byte-identical to Chr
 | 1,334 elements, warm | about 150 ms | 0.6 to 1.25 s |
 | 26,667 elements, SVG / PNG | 406 / 2,717 ms | 1,794 / 11,385 ms |
 
-- One warm browser, one job at a time, 1 GB, a 10 s deadline. Within the 2,000-element limit, a job fits well inside it. One job at a time is for every tenant together: no tenant has a bound of its own on the worker's time yet ([ADR-0090](0090-diagrams-drawn-by-the-agent-through-a-converter.md)).
+- One warm browser, one job at a time, 1 GB, a 10 s deadline. Within the 2,000-element limit, a job fits well inside it. One job at a time is for every tenant together: no tenant has a bound of its own on the worker's time yet ([ADR-0091](0090-diagrams-drawn-by-the-agent-through-a-converter.md)).
 - Its isolated page alone allows `'unsafe-eval'`, for subset export.
 - It has a CJK face, without which it draws tofu.
 

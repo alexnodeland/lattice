@@ -63,3 +63,5 @@ Option A keeps every level read-only and cheap, and puts the wording where every
 - `ContentUnavailable.part` widens to `Part | Literal["commands"]`.
 - The tables have to follow each craft's pinned release. When a command is renamed, it falls back to its own name.
 - The other crafts' tables, the open-by-default before and after, affected pages, and the can't-preview wording are later changes (issue 1090).
+
+> **Amended (2026-10-28) by [portalr ADR-0091](../../../portalr/adr/0091-a-native-files-proposal-opens-on-its-first-changed-page.md):** each item names the `pages` of the proposed file it changes, from 1, where its craft can say: DeckCraft's added slides, WordCraft's header and footer commands' `page`; `describe` takes the head's page count as `before`. `ContentUnavailable` says `reason: content_unavailable` and its `part`. Every craft that `stackr`'s template wires now has a table, read from its pinned catalogue (FreeCAD's and Blender's from the adapter's steps), or is in `GENERIC`, said by names on purpose. The can't-preview line reads "<App> can't show a picture of this change. Its words and commands are listed above."

@@ -102,6 +102,7 @@ nav:
   - adr/0088-connected-apps-opened-from-the-admin-and-the-palette.md
   - adr/0089-a-native-files-proposal-says-what-it-does-in-its-thread.md
   - adr/0090-a-native-files-editor-takes-a-phones-whole-window.md
+  - adr/0091-a-native-files-proposal-opens-on-its-first-changed-page.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

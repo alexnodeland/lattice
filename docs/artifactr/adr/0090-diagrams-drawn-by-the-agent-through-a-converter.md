@@ -1,4 +1,4 @@
-# ADR-0090: Diagrams drawn by the agent, through a converter
+# ADR-0091: Diagrams drawn by the agent, through a converter
 
 **Status:** Accepted
 **Date:** 2026-10-23

@@ -93,7 +93,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0087](0087-a-connected-apps-hourly-limit-read-from-settings.md) | A connected app's hourly limit, read from settings | Accepted |
 | [0088](0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md) | Excalidraw's phase 0: what the canvas costs and needs | Accepted |
 | [0089](0089-a-connected-apps-tools-narrowed-per-workspace.md) | A connected app's tools, narrowed per workspace | Accepted |
-| [0090](0090-diagrams-drawn-by-the-agent-through-a-converter.md) | Diagrams drawn by the agent, through a converter | Accepted |
+| [0091](0090-diagrams-drawn-by-the-agent-through-a-converter.md) | Diagrams drawn by the agent, through a converter | Accepted |
 | [0091](0091-diagrams-tombstones-swept-and-their-revisions-thinned.md) | Diagrams' tombstones swept, and their revisions thinned | Accepted, amended by [0094](0094-diagrams-revisions-thinned-to-one-an-actor-every-ten-minutes.md) |
 | [0092](0092-a-diagrams-images-uploaded-by-a-person-and-read-where-it-names-them.md) | A diagram's images, uploaded by a person and read where it names them | Accepted |
 | [0093](0093-presence-who-has-an-artifact-open-passed-on-and-never-stored.md) | Presence: who has an artifact open, passed on and never stored | Accepted |

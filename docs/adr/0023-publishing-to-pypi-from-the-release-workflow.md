@@ -131,3 +131,13 @@ As with lattice-core, uv can't lock `>=0.1.0` against a workspace member still a
 #### The package was folded into artifactr
 
 *2026-10-17.* Before its first release, `artifactr-files-ai` became artifactr's `files` extra, `artifactr-ai[files]` ([ADR-0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md)). It leaves `release-please-config.json`, the manifest and `STAGES`, and the amendment above no longer applies to anything: its release pull request, [#354](https://github.com/alexnodeland/lattice/pull/354), was never queued and is to be closed unmerged, since release-please no longer tends it, and no `pypi-artifactr-files-ai` environment or pending publisher was added, so there is nothing to remove from GitHub or PyPI. The order is again the first release's with artifactr-files left out: `lattice-core-ai` and `evalr`; then `artifactr-ai`, `reflexr` and `grantr`; then `relayr-ai`; then `portalr`.
+
+### Amendment (2026-10-29): merging release pull requests in turn
+
+Found in the 0.2 release; a lesson for the next, not a change of decision.
+
+- **A batch of release pull requests builds nothing.** When two merge close together, the run for the first sees release-please's tag for the second at another commit and the plan refuses (#206), as it should: the releases exist without wheels, and the dispatch the plan prints for each tag attaches, attests and, after the environment's approval, publishes. That is the path, not a failure to repair.
+- **A merged release pull request can conflict the others on `.release-please-manifest.json`.** Their manifest lines are neighbours, so after one merges, another's branch conflicts with `main` and Mergify dequeues it (`CONFLICT_WITH_BASE_BRANCH`). release-please refreshes its branches only on a push to `main`, so one has to follow: the next merge of any pull request does it, for every release pull request at once, bot-authored and with no hand edit.
+- **So merge one release pull request per stage at a time, or follow the batch with a push to `main`,** and read the next one's merge state before queueing it.
+
+Merging the pull requests, dispatching the publishes and releasing in dependency order by hand is the [release train's](https://github.com/alexnodeland/lattice/issues/1133) subject.

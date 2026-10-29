@@ -69,10 +69,19 @@ export function FileHolder({ holder, now = new Date() }: { holder: Holder; now?:
   }
 }
 
-/** One page as the strip shows it: its image, while it is read, or that it couldn't be. */
+/**
+ * One page as the strip shows it: its image, while it is read, or that it couldn't be, saying why
+ * where `said` does, with a button to try again where `onRetry` is given.
+ */
 export type PageShown =
   | { readonly page: number; readonly src: string }
-  | { readonly page: number; readonly state: "reading" | "failed" };
+  | { readonly page: number; readonly state: "reading" }
+  | {
+      readonly page: number;
+      readonly state: "failed";
+      readonly said?: string;
+      readonly onRetry?: () => void;
+    };
 
 /** One page in a box of a page's proportions, named beneath, as it is read, drawn or failed. */
 function Page({ shown, name }: { shown: PageShown; name: string }) {
@@ -84,7 +93,14 @@ function Page({ shown, name }: { shown: PageShown; name: string }) {
         ) : shown.state === "reading" ? (
           <Skeleton className="size-full rounded-none" />
         ) : (
-          <p className="p-2 text-center text-muted text-xs">This page couldn't be shown.</p>
+          <div className="flex flex-col items-center gap-1 p-2 text-center text-muted text-xs">
+            <p>{shown.said ?? "This page couldn't be shown."}</p>
+            {shown.onRetry && (
+              <Button variant="secondary" size="sm" onClick={shown.onRetry}>
+                Try again
+              </Button>
+            )}
+          </div>
         )}
       </div>
       {/* An image is named by its page, which its caption says again for the eye. */}

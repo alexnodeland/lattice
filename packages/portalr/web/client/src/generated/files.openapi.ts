@@ -332,6 +332,11 @@ export interface components {
             };
             /** Name */
             name: string;
+            /**
+             * Pages
+             * @default []
+             */
+            pages: number[];
             /** Text */
             text: string;
         };

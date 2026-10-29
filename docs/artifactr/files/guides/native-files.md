@@ -13,6 +13,8 @@ WordDocument.formats  # frozenset({DOCX})
 WordDocument.write_policy  # "propose": an agent's edit is a proposal
 ```
 
+`write_policy` is a native type's default ([ADR-0009](../../adr/0009-write-policies-and-non-blocking-proposals.md)). An agent's edit is a proposal in a thread in Ask. It is also a proposal in Auto unless the application's `agent-writes:direct` setting names the kind. That setting's default leaves native kinds out, the operator's configuration may add them, and a tenant's and a workspace's admins may only take kinds out again.
+
 A type for another format subclasses `NativeFile` and names its media types in `formats`; a manifest whose content isn't one of them doesn't validate. What the agent sees by default is the file's name, its pages if known and its outline: `render_for_agent` does no IO, so it shows what the app read from the file when the revision was made. The fingerprint is the digest of the content with what each save stamps, such as the time, left out, so a save that changes nothing else makes no revision.
 
 ## Wiring it in

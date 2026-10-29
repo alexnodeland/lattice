@@ -6,7 +6,7 @@
 
 ## Context
 
-For a native file, every agent edit is a proposal: the types' write policy is `propose`, in Ask and Auto alike ([ADR-0019](0019-the-agent-creates-native-files.md)). So Accept is the only way an agent's content gets into a file, and the reviewer has to know what accepting does. A proposal's card said only its one-line summary ("Write the travel plan"). Issue 1090's owner: "I can't knowledgeably accept with no info. It should show diff etc."
+For a native file, every agent edit is a proposal: the types' write policy is `propose`, in Ask and Auto alike ([ADR-0019](0019-the-agent-creates-native-files.md)). (Since 2026-10-29 that is the default, not a rule: an operator may let a native kind's edits apply in Auto through `agent-writes:direct`, [artifactr ADR-0009](../../adr/0009-write-policies-and-non-blocking-proposals.md). Ask still proposes every edit.) So Accept is the only way an agent's content gets into a file, and the reviewer has to know what accepting does. A proposal's card said only its one-line summary ("Write the travel plan"). Issue 1090's owner: "I can't knowledgeably accept with no info. It should show diff etc."
 
 A reviewer needs four things, each deeper than the last, the way a run's tool calls fold ([portalr ADR-0053](../../../portalr/adr/0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md)):
 

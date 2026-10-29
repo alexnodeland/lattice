@@ -10,7 +10,8 @@ through that task's own dependencies: a change to evalr alone would run evalr's 
 one else's. So this asks moon which projects the change touches, both by their files and by
 their tasks' inputs, which cover the root's files (uv.lock, pyproject.toml, .moon/), then adds
 every project that depends on one, all the way down, from moon's project graph, and runs the
-task in each that has it.
+task in each that has it. Files that no task reads (INERT, the instructions for coding agents)
+are left out of the change first, so a change to them alone affects no project.
 
 A task in ONE_AT_A_TIME runs in one project after another, rather than all at once. Otherwise
 the projects tagged BROWSER run theirs first, each in a `moon run` of its own, one after
@@ -19,6 +20,7 @@ another, and then the rest together.
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from collections.abc import Collection
@@ -36,12 +38,17 @@ ONE_AT_A_TIME = frozenset({"bdd"})
 # times slower, and a phone test past its 15 s (#875).
 BROWSER = "browser"
 
+# Files no task reads: the AGENTS.md beside the code, for coding agents. moon counts a project
+# affected by any file in it, so a change to these alone would run every check of each package.
+INERT = re.compile(r"(^|/)AGENTS\.md$")
 
-def query(*arguments: str) -> dict[str, Any]:
-    """What `moon query` answers, as JSON."""
+
+def query(*arguments: str, given: str | None = None) -> dict[str, Any]:
+    """What `moon query` answers, as JSON, given `given` on its standard input if there is one."""
     done = subprocess.run(
         ["moon", "query", *arguments],
-        stdin=subprocess.DEVNULL,
+        input=given,
+        stdin=None if given is not None else subprocess.DEVNULL,
         capture_output=True,
         text=True,
         check=True,
@@ -74,6 +81,11 @@ def targets_of(
     ]
 
 
+def without_inert(changed: dict[str, Any]) -> dict[str, Any]:
+    """`moon query changed-files`'s answer, without the files no task reads (INERT)."""
+    return {**changed, "files": [file for file in changed["files"] if not INERT.search(file)]}
+
+
 def main() -> int:
     """Run the task in the affected projects and their dependents; nothing if there are none."""
     arguments = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
@@ -87,8 +99,10 @@ def main() -> int:
         for dependency in project.get("dependencies", []):
             dependents[dependency["id"]].add(name)
 
-    changed = {project["id"] for project in query("projects", "--affected")["projects"]}
-    changed |= set(query("tasks", "--affected")["tasks"])
+    files = json.dumps(without_inert(query("changed-files")))
+    touched = query("projects", "--affected", given=files)["projects"]
+    changed = {project["id"] for project in touched}
+    changed |= set(query("tasks", "--affected", given=files)["tasks"])
     affected, pending = set(changed), list(changed)
     while pending:
         for dependent in dependents[pending.pop()] - affected:

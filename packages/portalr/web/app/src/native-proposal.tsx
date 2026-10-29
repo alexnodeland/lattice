@@ -6,7 +6,7 @@
  * the head when asked. A reviewer compares its pages and words with the head's, on demand.
  */
 
-import { type Artifactr, keys, usePeople } from "@portalr/client";
+import { type Artifactr, keys, Refused, usePeople } from "@portalr/client";
 import { changes } from "@portalr/client/diff";
 import {
   Alert,
@@ -20,6 +20,7 @@ import {
   ProposalCard,
   type Sent,
   StatusBadge,
+  usePhone,
 } from "@portalr/ui";
 import { type UseQueryResult, useQueries, useQuery } from "@tanstack/react-query";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
@@ -126,6 +127,7 @@ export function NativeProposal({
       me={me}
       proposal={proposal}
       proposed={proposed}
+      app={native.app}
       onRespond={onRespond}
     >
       {children}
@@ -140,6 +142,7 @@ function OpenProposal({
   me,
   proposal,
   proposed,
+  app,
   onRespond,
   children,
 }: {
@@ -148,6 +151,7 @@ function OpenProposal({
   me: string;
   proposal: Artifactr.Proposal;
   proposed: Proposed;
+  app: string;
   onRespond: (decision: "accept" | "reject") => Sent;
   children: ReactNode;
 }) {
@@ -175,7 +179,15 @@ function OpenProposal({
     proposed.tested !== null &&
     proposed.tested !== record(head.data.content).sha256;
   const held = status ? holderOf(status.lease, me, names) : null;
-  const pages = head === undefined ? undefined : head.data.pages;
+  const pages = head?.data.pages;
+  const compare: Compare | undefined = head && {
+    place,
+    proposal: proposal.id,
+    version: head.version,
+    pages: { head: typeof pages === "number" ? pages : null, proposed: proposed.pages },
+    app,
+    commands: proposed.source !== "check_in",
+  };
   return (
     <ProposalCard
       id={id}
@@ -188,7 +200,13 @@ function OpenProposal({
           Outdated
         </StatusBadge>
       )}
-      {proposed.source !== "check_in" && <NativeChanges place={place} proposal={proposal.id} />}
+      {proposed.source !== "check_in" && (
+        <NativeChanges
+          place={place}
+          proposal={proposal.id}
+          preview={compare && <BeforeAfter {...compare} />}
+        />
+      )}
       {children}
       {(held?.kind === "person" || held?.kind === "you") && (
         <Alert tone="warn" live={false}>
@@ -197,31 +215,50 @@ function OpenProposal({
             : `${held.who} has the file checked out: accepting this now makes their check-in a proposal in turn.`}
         </Alert>
       )}
-      {head !== undefined && (
-        <Comparison
-          place={place}
-          proposal={proposal.id}
-          version={head.version}
-          pages={{
-            head: typeof pages === "number" ? pages : null,
-            proposed: proposed.pages,
-          }}
-          size={proposed.size}
-        />
-      )}
+      {compare && <Comparison {...compare} size={proposed.size} />}
     </ProposalCard>
   );
 }
 
-/** The proposal's pages and words beside the head's, read only once asked for. */
-function Comparison(props: {
-  place: Place;
-  proposal: string;
-  version: number;
-  pages: { readonly head: number | null; readonly proposed: number | null };
-  size: number | null;
-}) {
-  const [open, setOpen] = useState(false);
+/** Where a proposal's pages are compared: its file, and how many pages each side has. */
+interface Compare {
+  readonly place: Place;
+  readonly proposal: string;
+  readonly version: number;
+  readonly pages: { readonly head: number | null; readonly proposed: number | null };
+  /** The file's app, as people call it. */
+  readonly app: string;
+  /** Whether it was made by commands, which may name the pages they change. */
+  readonly commands: boolean;
+}
+
+/** The apps whose CLI draws no page (native files ADR-0020): their changes are said in words. */
+const NO_PICTURE = new Set(["GridCraft", "SoundCraft"]);
+
+/**
+ * The proposal's words and pages beside the head's: open at first on a desktop, on the first
+ * changed page, and read only once open.
+ */
+/** The proposal whose comparison opened at first: one a page, so a thread of them reads one. */
+let opened: string | null = null;
+
+function Comparison(props: Compare & { size: number | null }) {
+  const phone = usePhone();
+  const [open, setOpen] = useState(() => {
+    const first = !phone && opened === null;
+    if (first) {
+      opened = props.proposal;
+    }
+    return first;
+  });
+  useEffect(
+    () => () => {
+      if (opened === props.proposal) {
+        opened = null;
+      }
+    },
+    [props.proposal],
+  );
   return (
     <Disclosure
       look="link"
@@ -235,35 +272,12 @@ function Comparison(props: {
   );
 }
 
-function Compared({
-  place,
-  proposal,
-  version,
-  pages,
-}: {
-  place: Place;
-  proposal: string;
-  version: number;
-  pages: { readonly head: number | null; readonly proposed: number | null };
-}) {
+function Compared(props: Compare) {
+  const { place, proposal, version } = props;
   const { context, tenant, workspace, artifact } = place;
   const { queries } = context;
-  const [shown, setShown] = useState(PAGES_AT_ONCE);
-  const most = Math.max(pages.head ?? 0, pages.proposed ?? 0);
-  const numbers = Array.from({ length: Math.min(shown, most) }, (_, index) => index + 1);
-  const has = (total: number | null, page: number) => total !== null && page <= total;
-  const heads = useQueries({
-    queries: numbers.map((page) => ({
-      ...queries.files.page(tenant, workspace, artifact, version, page),
-      enabled: has(pages.head, page),
-    })),
-  });
-  const theirs = useQueries({
-    queries: numbers.map((page) => ({
-      ...queries.files.proposedPage(tenant, workspace, proposal, page),
-      enabled: has(pages.proposed, page),
-    })),
-  });
+  // None: the first changed page alone; then as many from the first as were asked for.
+  const [shown, setShown] = useState(0);
   const [was, is] = useQueries({
     queries: [
       queries.files.text(tenant, workspace, artifact, version),
@@ -277,20 +291,7 @@ function Compared({
         : undefined,
     [was?.data, is?.data],
   );
-  const shownOf = (
-    read: Pick<UseQueryResult<string>, "data" | "isError"> | undefined,
-    page: number,
-  ): PageShown =>
-    read?.data !== undefined
-      ? { page, src: read.data }
-      : { page, state: read?.isError ? "failed" : "reading" };
-  const pairs = numbers.map(
-    (page, index): PagePair => ({
-      page,
-      before: has(pages.head, page) ? shownOf(heads[index], page) : null,
-      after: has(pages.proposed, page) ? shownOf(theirs[index], page) : null,
-    }),
-  );
+  const most = Math.max(props.pages.head ?? 0, props.pages.proposed ?? 0);
   return (
     <div className="flex flex-col gap-3 pt-2">
       <p className="font-semibold">Its words</p>
@@ -305,15 +306,8 @@ function Compared({
       ) : (
         <Diff changes={words} />
       )}
-      {pairs.length > 0 && (
-        <PageCompare
-          label="Its pages beside the head's"
-          before={`Version ${version}`}
-          after="Proposed"
-          pages={pairs}
-        />
-      )}
-      {numbers.length < most && (
+      <BeforeAfter {...props} shown={shown} />
+      {(shown || 1) < (NO_PICTURE.has(props.app) ? 0 : most) && (
         <Button
           variant="secondary"
           size="sm"
@@ -324,5 +318,120 @@ function Compared({
         </Button>
       )}
     </div>
+  );
+}
+
+/**
+ * How a page that couldn't be drawn is shown: why, in words, never the server's, and where asking
+ * again may draw it, a retry.
+ */
+function failed(page: number, read: UseQueryResult<string>, proposed: boolean): PageShown {
+  const { error } = read;
+  const refused = error instanceof Refused;
+  if (proposed && refused && record(record(error.detail).detail).reason === "content_unavailable") {
+    return { page, state: "failed", said: "The proposed file isn't stored." };
+  }
+  // The server's wait, from one second to five minutes, or ten where it gave none.
+  const wait = refused && Math.min(Math.max(error.retryAfter ?? 10, 1), 300);
+  return {
+    page,
+    state: "failed",
+    onRetry: () => void read.refetch(),
+    ...(wait &&
+      (error.status === 429 || error.status === 503) && {
+        said: `Still preparing the picture. Try again in ${wait} second${wait > 1 ? "s" : ""}.`,
+      }),
+  };
+}
+
+/**
+ * The proposal's pages beside the head's: the first that changed alone, as its commands name it
+ * or as the pages read say, or `shown` pages from the first; where its app draws none, that said.
+ */
+function BeforeAfter({
+  place,
+  proposal,
+  version,
+  pages,
+  app,
+  commands,
+  shown = 0,
+}: Compare & { shown?: number }) {
+  const { context, tenant, workspace, artifact } = place;
+  const { queries } = context;
+  const { data: said } = useQuery({
+    ...queries.files.proposedCommands(tenant, workspace, proposal),
+    enabled: commands,
+  });
+  const drawn = !NO_PICTURE.has(app);
+  const most = drawn ? Math.max(pages.head ?? 0, pages.proposed ?? 0) : 0;
+  const named = said?.items.flatMap((item) => item.pages) ?? [];
+  // Where no command names a page, the first is looked at, then each after it that reads the same.
+  const [at, setAt] = useState(1);
+  const numbers = shown
+    ? Array.from({ length: Math.min(shown, most) }, (_, index) => index + 1)
+    : most > 0
+      ? [Math.min(named.length > 0 ? Math.min(...named) : at, most)]
+      : [];
+  const has = (total: number | null, page: number) => total !== null && page <= total;
+  // A page the app is too busy or slow to draw is said at once, with a retry, not waited on.
+  const heads = useQueries({
+    queries: numbers.map((page) => ({
+      ...queries.files.page(tenant, workspace, artifact, version, page),
+      enabled: has(pages.head, page),
+      retry: false,
+    })),
+  });
+  const theirs = useQueries({
+    queries: numbers.map((page) => ({
+      ...queries.files.proposedPage(tenant, workspace, proposal, page),
+      enabled: has(pages.proposed, page),
+      retry: false,
+    })),
+  });
+  const same = !shown && named.length === 0 && heads[0]?.data === theirs[0]?.data;
+  useEffect(() => {
+    if (same && heads[0]?.data !== undefined && at < Math.min(most, PAGES_AT_ONCE)) {
+      setAt(at + 1);
+    }
+  }, [same, heads[0]?.data, at, most]);
+  if (!drawn) {
+    return (
+      <p className="text-muted">
+        {app} can't show a picture of this change. Its words and commands are listed above.
+      </p>
+    );
+  }
+  const side = (read: UseQueryResult<string> | undefined, page: number, proposed: boolean) =>
+    read === undefined
+      ? null
+      : read.data !== undefined
+        ? { page, src: read.data }
+        : read.isError
+          ? failed(page, read, proposed)
+          : { page, state: "reading" as const };
+  const pairs = numbers.map(
+    (page, index): PagePair => ({
+      page,
+      before: has(pages.head, page) ? side(heads[index], page, false) : null,
+      after: has(pages.proposed, page) ? side(theirs[index], page, true) : null,
+    }),
+  );
+  return (
+    <>
+      <p role="status" className="text-muted">
+        {[...heads, ...theirs].some((read) => read.isFetching)
+          ? "Preparing the pictures of its pages…"
+          : ""}
+      </p>
+      {pairs.length > 0 && (
+        <PageCompare
+          label="Its pages beside the head's"
+          before={`Version ${version}`}
+          after="Proposed"
+          pages={pairs}
+        />
+      )}
+    </>
   );
 }

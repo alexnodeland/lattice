@@ -1,8 +1,9 @@
 /**
- * A native file's proposals, pinned by screenshots (portalr ADR-0050): one outdated, whose Accept
- * is disabled with the reason beside it, and a check-in's pages beside the head's, the same,
- * changed and new, wide and narrow, in each scheme, in colour-blind mode, and under forced
- * colours. Like the gallery's, the baselines are Linux's, made in CI.
+ * A native file's proposals, pinned by screenshots (portalr ADR-0050, ADR-0091): one outdated,
+ * whose Accept is disabled with the reason beside it, and a check-in's pages beside the head's:
+ * the same, changed, new but still being drawn, with a retry, and one whose proposed bytes aren't
+ * stored; wide and narrow, in each scheme, in colour-blind mode, and under forced colours. Like
+ * the gallery's, the baselines are Linux's, made in CI.
  */
 
 import type { Artifactr } from "@portalr/client";
@@ -58,7 +59,21 @@ function Proposals() {
           pages={[
             { page: 1, before: ONE, after: ONE },
             { page: 2, before: ONE, after: TWO },
-            { page: 3, before: null, after: { page: 3, state: "failed" } },
+            {
+              page: 3,
+              before: null,
+              after: {
+                page: 3,
+                state: "failed",
+                said: "Still preparing the picture. Try again in 10 seconds.",
+                onRetry: () => undefined,
+              },
+            },
+            {
+              page: 4,
+              before: ONE,
+              after: { page: 4, state: "failed", said: "The proposed file isn't stored." },
+            },
           ]}
         />
       </ProposalCard>

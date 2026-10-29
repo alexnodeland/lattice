@@ -10,7 +10,7 @@
       "dashboards": { "total": 150000, "largest": 130000 },
       "apps": { "total": 9000, "largest": 9000 },
       "analytics": { "total": 600, "largest": 600 },
-      "files": { "total": 14000, "largest": 14000 },
+      "files": { "total": 14700, "largest": 14700 },
       "canvas": { "total": 350000, "largest": 165000 },
       "replay-account": { "total": 1400, "largest": 1400 },
       "replay": { "total": 61000, "largest": 61000 },

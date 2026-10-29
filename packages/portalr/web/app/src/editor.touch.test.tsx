@@ -5,10 +5,10 @@
  */
 
 import { afterEach, expect, test, vi } from "vitest";
-import { userEvent } from "vitest/browser";
+import { page, userEvent } from "vitest/browser";
 import { axeViolations } from "../../ui/src/test/axe";
 import { open } from "./test/app";
-import { AT, FLAGS } from "./test/files";
+import { AT, FLAGS, Upload } from "./test/files";
 
 const ALICE = { kind: "user", id: "alice" };
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -106,6 +106,8 @@ const held: { lease: unknown } = { lease: null };
 
 afterEach(() => {
   held.lease = null;
+  Upload.sent = [];
+  vi.unstubAllGlobals();
 });
 
 function fromShim(frame: HTMLIFrameElement, data: unknown) {
@@ -168,5 +170,34 @@ test("on a phone, a file's editor takes the whole window, with its name, its sta
   await expect
     .poll(() => document.activeElement?.getAttribute("aria-label"))
     .toBe("Preview of figures.xlsx");
-  vi.restoreAllMocks();
+});
+
+test("turned wider, it keeps its frame; a save checked in closes it and is said on the page", async () => {
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, undefined, {
+    artifactrLog: LOG,
+    editors: { "files:gridcraft": GRID },
+  });
+  const book = screen.getByRole("listitem", { name: "figures.xlsx" });
+  await book.getByRole("button", { name: "Edit in GridCraft" }).click();
+  const window_ = screen.getByRole("dialog", { name: "figures.xlsx" });
+  await expect.element(window_).toBeVisible();
+  const frame = window_.getByTitle("GridCraft, editing figures.xlsx").element();
+  // Past 48rem, as a phone on its side: the same frame, not loaded again, in the same window.
+  const [width, height] = [innerWidth, innerHeight];
+  await page.viewport(900, 430);
+  await expect.poll(() => innerWidth).toBe(900);
+  expect(window_.getByTitle("GridCraft, editing figures.xlsx").element()).toBe(frame);
+  await page.viewport(width, height);
+  const shim = frame as HTMLIFrameElement;
+  fromShim(shim, { type: "lattice:ready", version: "0.8.0" });
+  await expect
+    .element(window_.getByText("Open in GridCraft: saving there checks it in"))
+    .toBeVisible();
+  fromShim(shim, { type: "lattice:save", name: "figures.xlsx", bytes: new ArrayBuffer(8) });
+  await expect.poll(() => Upload.sent.length).toBe(1);
+  held.lease = null;
+  (Upload.sent[0] as Upload).answer(200, { outcome: "applied", version: 2 });
+  await expect.element(window_).not.toBeInTheDocument();
+  await expect.element(book.getByText("Checked in figures.xlsx as version 2.")).toBeVisible();
 });

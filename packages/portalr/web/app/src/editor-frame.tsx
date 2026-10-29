@@ -303,11 +303,11 @@ export function EditorFrame({
       </Alert>
     );
   }
-  // On a phone, "Back"; and "Close" or "Back to preview" where it is in the page.
-  const back = whole ? "Back" : flipped ? "Back to preview" : `Close ${app}`;
+  // On a phone, "Back"; in the page, "Back to preview" where it took the preview's box, or "Close".
+  const back = whole ? "Back" : flipped ? "Back to preview" : null;
   const closer = dirty ? (
     <ConfirmDialog
-      label={whole || flipped ? back : "Close without saving"}
+      label={back ?? "Close without saving"}
       size="sm"
       className="ms-auto"
       title={flipped ? `Back to the preview without saving?` : `Close ${app} without saving?`}
@@ -324,7 +324,7 @@ export function EditorFrame({
     </ConfirmDialog>
   ) : (
     <Button variant="secondary" size="sm" className="ms-auto" disabled={saving} onClick={onClose}>
-      {back}
+      {back ?? `Close ${app}`}
     </Button>
   );
   const pad = whole ? "px-4" : "";
@@ -408,8 +408,13 @@ export function EditorFrame({
   return whole ? (
     <WholeDialog
       open
-      // Escape goes back as "Back" does, but never past unsaved changes without asking.
-      onOpenChange={(open) => !(open || dirty || saving) && onClose()}
+      // Escape goes back as "Back" does; with unsaved changes it does nothing, since a key meant
+      // for the editor shouldn't lose them: "Back" asks first.
+      onOpenChange={(open) => {
+        if (!(open || dirty || saving)) {
+          onClose();
+        }
+      }}
       title={status.name}
       bar={closer}
     >

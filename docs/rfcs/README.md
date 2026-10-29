@@ -14,5 +14,6 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 | [0006](0006-excalidraw-diagrams-drawn-live.md) | Excalidraw diagrams, drawn live by people and agents | Implemented, amended by lattice ADR-0026 |
 | [0007](0007-portalr-brand-kits.md) | portalr brand kits | Accepted |
 | [0008](0008-portalr-product-analytics.md) | portalr product analytics | Draft |
+| [0010](0010-people-outside-the-tenant.md) | People outside the tenant: guests, share links, public forms and client portals | Draft |
 
 To propose one, copy [`template.md`](template.md) to the next number. Each package's series uses the same template.

@@ -181,6 +181,14 @@
             "title": "Name",
             "type": "string"
           },
+          "pages": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Pages",
+            "type": "array"
+          },
           "text": {
             "title": "Text",
             "type": "string"

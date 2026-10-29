@@ -93,6 +93,10 @@ class ContentUnavailable(InvalidState):
         self.artifact_id = artifact_id
         self.part: Part | Literal["commands"] = part
 
+    def details(self) -> dict[str, JsonValue]:
+        """Say why, so a client tells bytes not stored from any other state by its fields."""
+        return {"reason": "content_unavailable", "part": self.part}
+
 
 class FormatChanged(InvalidState):
     """A check-in is in another format than the file checked out, which is never converted.
@@ -900,7 +904,9 @@ class NativeFiles:
             commands = _COMMANDS.validate_json(batch)
         except ValidationError:
             raise ContentUnavailable(proposal.artifact_id, "commands") from None
-        return describe(made.app, commands)
+        patch = change.patch if isinstance(change, EditArtifact) else None
+        pages = _pages(patch) if isinstance(patch, JsonPatch) else None
+        return describe(made.app, commands, after=pages)
 
     def _page(self, key: PageKey) -> bytes | None:
         """A page rendered before, if this process still keeps it."""
@@ -1159,6 +1165,16 @@ def _replaced(patch: Patch, part: Part) -> Blob | None:
             value = op.get("value")
             return None if value is None else Blob.model_validate(value)
     return None
+
+
+def _pages(patch: JsonPatch) -> int | None:
+    """How many pages a native file's revision gives it, as `revise` builds it, if it says."""
+    said = [
+        op.get("value")
+        for op in patch.ops
+        if op.get("op") == "replace" and op.get("path") == "/pages"
+    ]
+    return next((value for value in reversed(said) if isinstance(value, int)), None)
 
 
 def _provenance(patch: Patch) -> Provenance | None:

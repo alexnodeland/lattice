@@ -2,7 +2,7 @@
  * A native file's proposals on the workspace's proposals, over a stubbed server and a stream that
  * replays them (portalr ADR-0050, ADR-0089): what each does in words, how each was made, one
  * outdated that can't be accepted, who has the file, and a proposal's words and pages beside the
- * head's, read once asked for.
+ * head's, open at first on a desktop on the first changed page, and why a page isn't shown.
  */
 
 import axe from "axe-core";
@@ -73,11 +73,12 @@ const LOG = [
 const SAID = {
   summary: "Types 22 characters and starts a new paragraph.",
   items: [
-    { text: "Starts a new paragraph", name: "text.newParagraph", args: {} },
+    { text: "Starts a new paragraph", name: "text.newParagraph", args: {}, pages: [] },
     {
       text: "Types “Signed off by the agent.”",
       name: "text.insert",
       args: { text: "Signed off by the agent." },
+      pages: [],
     },
   ],
   total: 3,
@@ -160,26 +161,86 @@ test("an agent's edit says what it does, then each change, its arguments and its
   expect(checkedIn.getByRole("button", { name: /^Types/ }).elements()).toHaveLength(0);
 });
 
-test("a check-in kept as a proposal is compared with the head, words and pages", async () => {
+test("a check-in kept as a proposal opens on its first changed page, then compares more", async () => {
   const { screen, fetched } = await open(`/t/acme/w/notes/proposals`, serving(), undefined, {
     artifactrLog: LOG,
   });
   const checkedIn = card(screen, "Checked in brief.docx");
   await expect.element(checkedIn.getByText(/^A check-in kept as a proposal/)).toBeVisible();
-  const read = () =>
-    fetched.mock.calls.filter(([input]) =>
-      new URL((input as Request).url).pathname.startsWith(`${AT}/proposals/p_in/`),
-    ).length;
-  // A check-in has no commands to read; its words and pages are read only once asked for.
-  expect(read()).toBe(0);
-  await checkedIn.getByText("Compare with version 2 (proposed: 48 kB)").click();
+  // On a desktop, one comparison a page is open at first, the first proposal's; this one opens
+  // on its words and the first page that changed, found by reading each page in turn.
+  await expect
+    .element(checkedIn.getByRole("button", { name: /^Compare with/ }))
+    .toHaveAttribute("aria-expanded", "false");
+  await checkedIn.getByRole("button", { name: /^Compare with/ }).click();
   await expect
     .poll(() => checkedIn.element().querySelector("ins")?.textContent)
     .toContain("Signed");
   const pages = checkedIn.getByRole("region", { name: "Its pages beside the head's" });
   const rows = () => [...pages.element().querySelectorAll("li > p")].map((row) => row.textContent);
+  await expect.poll(rows).toEqual(["Page 2Changed"]);
+  // A check-in has no commands to read.
+  const commands = fetched.mock.calls.filter(([input]) =>
+    new URL((input as Request).url).pathname.endsWith("/proposals/p_in/commands"),
+  );
+  expect(commands).toHaveLength(0);
+  await checkedIn.getByRole("button", { name: "Compare more pages" }).click();
   await expect.poll(rows).toEqual(["Page 1Unchanged", "Page 2Changed", "Page 3New"]);
   await expect.element(pages.getByText("No page 3 here")).toBeVisible();
+});
+
+test("an agent's edit opens on the page its commands name, and says why a page isn't shown", async () => {
+  const named = {
+    ...SAID,
+    items: SAID.items.map((item, at) => ({ ...item, pages: at === 1 ? [2] : [] })),
+  };
+  const busy = { detail: { type: "busy", message: "try again in 7 seconds", retry_after: 7 } };
+  const gone = {
+    detail: { type: "invalid_state", reason: "content_unavailable", part: "content" },
+  };
+  const base = serving();
+  const { screen } = await open(
+    `/t/acme/w/notes/proposals`,
+    async (request: Request, path: string) => {
+      switch (path) {
+        case `${AT}/proposals/p_now/commands`:
+          return Response.json(named);
+        case `${FILE}/versions/2/pages/2`:
+          return Response.json(busy, { status: 429, headers: { "Retry-After": "7" } });
+        case `${AT}/proposals/p_now/pages/2`:
+          return Response.json(gone, { status: 409 });
+        default:
+          return base(request, path);
+      }
+    },
+    undefined,
+    { artifactrLog: LOG },
+  );
+  const now = card(screen, "Add a sign-off");
+  const pages = now.getByRole("region", { name: "Its pages beside the head's" });
+  await expect.element(pages.getByText("Page 2", { exact: true })).toBeVisible();
+  await expect
+    .element(pages.getByText("Still preparing the picture. Try again in 7 seconds."), {
+      timeout: 15_000,
+    })
+    .toBeVisible();
+  await expect.element(pages.getByRole("button", { name: "Try again" })).toBeVisible();
+  await expect.element(pages.getByText("The proposed file isn't stored.")).toBeVisible();
+  expect(now.element().textContent).not.toMatch(/damaged/i);
+});
+
+test("a workbook's proposal says its app draws no picture of it", async () => {
+  const workbook = { ...CREATED, event: { ...CREATED.event, kind: "workbook" } };
+  const { screen } = await open(`/t/acme/w/notes/proposals`, serving(), undefined, {
+    artifactrLog: [workbook, proposal(2, "p_now", "b", "commands", "Add a sign-off")],
+  });
+  await expect
+    .element(
+      card(screen, "Add a sign-off").getByText(
+        "GridCraft can't show a picture of this change. Its words and commands are listed above.",
+      ),
+    )
+    .toBeVisible();
 });
 
 test("while someone has the file checked out, accepting is said to make theirs a proposal", async () => {

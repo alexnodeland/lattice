@@ -8,7 +8,7 @@
  */
 
 import type { FilesApi } from "@portalr/client";
-import { Button, Dialog, Disclosure, glyphs, Icon, JsonView, usePhone } from "@portalr/ui";
+import { Button, Dialog, Disclosure, glyphs, Heading, Icon, JsonView, usePhone } from "@portalr/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useId, useRef, useState } from "react";
 import type { Place } from "./check-out";
@@ -18,7 +18,16 @@ type Said = FilesApi.components["schemas"]["ProposalDescription"];
 /** A button laid out as a line of words: as wide as they are, wrapping, from the start. */
 const ROW = "justify-start whitespace-normal px-0 text-start";
 
-export function NativeChanges({ place, proposal }: { place: Place; proposal: string }) {
+export function NativeChanges({
+  place,
+  proposal,
+  preview,
+}: {
+  place: Place;
+  proposal: string;
+  /** The first changed page beside the head's, which the sheet shows under the changes. */
+  preview?: React.ReactNode;
+}) {
   const { context, tenant, workspace } = place;
   const { data: said, isError } = useQuery(
     context.queries.files.proposedCommands(tenant, workspace, proposal),
@@ -72,6 +81,7 @@ export function NativeChanges({ place, proposal }: { place: Place; proposal: str
         open={shown === "sheet"}
         onOpenChange={(open) => setShown(open ? "sheet" : null)}
         line={line}
+        preview={preview}
       />
     </>
   );
@@ -101,11 +111,13 @@ function ChangesSheet({
   open,
   onOpenChange,
   line,
+  preview,
 }: {
   said: Said;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   line: React.RefObject<HTMLButtonElement | null>;
+  preview: React.ReactNode;
 }) {
   const [chosen, setChosen] = useState<number | null>(null);
   // The change last opened, whose row takes the focus back from it.
@@ -169,6 +181,14 @@ function ChangesSheet({
             ))}
           </ol>
           <Rest said={said} />
+          {preview && (
+            <section aria-label="Before and after" className="flex flex-col gap-2">
+              <Heading level={3} look="label">
+                Before and after
+              </Heading>
+              {preview}
+            </section>
+          )}
         </div>
       )}
     </Dialog>

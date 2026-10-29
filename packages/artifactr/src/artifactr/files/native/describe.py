@@ -8,7 +8,7 @@ table names, is said by its name, with how many times the batch runs it ("Runs 3
 """
 
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Final
 
@@ -47,6 +47,8 @@ class CommandChange(BaseModel):
     text: str
     name: str
     args: dict[str, JsonValue]
+    pages: list[int] = []
+    """The pages of the proposed file it changes, from 1, where its craft can name them."""
 
 
 class ProposalDescription(BaseModel):
@@ -100,7 +102,7 @@ CRAFTS: Final[Mapping[str, Mapping[str, Says]]] = {
         "insert.picture|Inserts|a picture|pictures|alt",
         "insert.textBox|Inserts|a text box|text boxes|text",
         "insert.shape|Inserts|a shape|shapes|kind",
-        "insert.link|Inserts|a link|links|url",
+        "insert.link|Inserts|a link|links",
         "insert.coverPage|Adds|a cover page|cover pages|title",
         "insert.header|Adds|a header|headers|text",
         "insert.footer|Adds|a footer|footers|text",
@@ -129,20 +131,307 @@ CRAFTS: Final[Mapping[str, Mapping[str, Says]]] = {
         "transition.set|Sets|a transition|transitions|kind",
         "comment.add|Adds|a comment|comments|text",
     ),
+    # GridCraft 0.8's, as its `commands --json` lists them.
+    "gridcraft": _says(
+        "cell.set|Enters|a cell|cells|input",
+        "range.setValues|Sets the values of|a range|ranges|range",
+        "home.insertRows|Inserts|a set of rows|sets of rows",
+        "home.insertColumns|Inserts|a set of columns|sets of columns",
+        "home.deleteRows|Deletes|a set of rows|sets of rows",
+        "home.deleteColumns|Deletes|a set of columns|sets of columns",
+        "home.insertSheet|Adds|a sheet|sheets|name",
+        "home.deleteSheet|Deletes|a sheet|sheets|sheet",
+        "sheet.rename|Renames|a sheet|sheets|name",
+        "chart.set|Changes|a chart|charts|title",
+        "chart.delete|Deletes|a chart|charts",
+        "insert.textBox|Inserts|a text box|text boxes|text",
+        "shape.setText|Sets the text of|a text box|text boxes|text",
+        "data.removeDuplicates|Removes duplicates from|a range|ranges|range",
+    ),
+    # PdfCraft 0.8's, as its `tools` names the commands they run.
+    "pdfcraft": _says(
+        "page.rotate|Rotates|a set of pages|sets of pages",
+        "page.delete|Deletes|a set of pages|sets of pages",
+        "page.insert|Inserts pages from|a file|files",
+        "page.insert_blank|Inserts|a blank page|blank pages",
+        "page.duplicate|Duplicates|a set of pages|sets of pages",
+        "page.replace|Replaces|a set of pages|sets of pages",
+        "edit.text|Adds|a text|texts|text",
+        "edit.image|Adds|an image|images",
+        "edit.link|Adds|a link|links",
+        "comment.stamp|Adds|a stamp|stamps|name",
+        "protect.password|Protects|the file|files",
+        "protect.remove|Removes the protection of|the file|files",
+    ),
+    # CADCraft 0.8's, as its `commands --json` lists them.
+    "cadcraft": _says(
+        "line|Draws|a line|lines",
+        "circle|Draws|a circle|circles",
+        "arc|Draws|an arc|arcs",
+        "rectang|Draws|a rectangle|rectangles",
+        "polygon|Draws|a polygon|polygons",
+        "text|Writes|a text|texts|text",
+        "mtext|Writes|a text|texts|text",
+        "dimlinear|Adds|a dimension|dimensions|text",
+        "dimaligned|Adds|a dimension|dimensions|text",
+        "dim|Adds|a dimension|dimensions",
+        "layer.new|Adds|a layer|layers|name",
+        "layer.delete|Deletes|a layer|layers|name",
+        "layout.new|Adds|a layout|layouts|name",
+        "table.set|Sets|a table cell|table cells|text",
+        "erase.selection|Erases|a selection|selections",
+    ),
+    # PhotoCraft 0.9's, as its `commands --json` lists them.
+    "photocraft": _says(
+        "type.create|Adds|a type layer|type layers|text",
+        "type.insertText|Types into|a type layer|type layers|text",
+        "shape.create|Adds|a shape layer|shape layers|kind",
+        "layer.duplicate|Duplicates|a layer|layers|name",
+        "layer.delete|Deletes|a layer|layers",
+        "layer.renameLayer|Renames|a layer|layers|name",
+        "layer.setProps|Changes|a layer|layers|name",
+        "layer.removeBackground|Removes the background of|a layer|layers",
+        "file.placeEmbedded|Places|an image|images",
+        "file.placeLinked|Places|a linked image|linked images",
+    ),
+    # VectorCraft 0.12's, as its `commands --json` lists them.
+    "vectorcraft": _says(
+        "path.create|Draws|a path|paths",
+        "text.create|Adds|a text|texts|text",
+        "text.setText|Sets|a text|texts|text",
+        "dimension.create|Adds|a dimension|dimensions",
+        "layer.new|Adds|a layer|layers|name",
+        "layer.delete|Deletes|a selection of layers|selections of layers",
+        "artboard.new|Adds|an artboard|artboards|name",
+        "artboard.delete|Deletes|an artboard|artboards",
+        "paint.setFill|Sets|a fill|fills|color",
+        "paint.setStroke|Sets|a stroke|strokes|color",
+        "swatch.new|Adds|a set of swatches|sets of swatches|name",
+    ),
+    # DesignCraft 0.9's, as its `commands` lists them.
+    "designcraft": _says(
+        "text.insert|Types|a character|characters|text|text",
+        "story.setText|Sets the text of|a story|stories|text",
+        "frame.create|Adds|a frame|frames",
+        "line.create|Draws|a line|lines",
+        "path.create|Draws|a path|paths",
+        "file.place|Places|a file|files|name",
+        "table.insert|Inserts|a table|tables",
+        "note.new|Adds|a note|notes|text",
+        "endnote.insert|Inserts|an endnote|endnotes|text",
+        "math.insert|Inserts|a math expression|math expressions|latex",
+        "object.rename|Renames|an object|objects|name",
+    ),
+    # FigCraft 0.6's, as its `commands --json` lists them.
+    "figcraft": _says(
+        "frame.create|Adds|a frame|frames|name",
+        "text.create|Adds|a text|texts|text",
+        "node.create|Adds|a layer|layers|type",
+        "vector.create|Draws|a vector|vectors",
+        "image.place|Places|an image|images",
+        "edit.delete|Deletes|a selection|selections",
+        "edit.duplicate|Duplicates|a selection|selections",
+        "object.rename|Renames|a layer|layers|name",
+        "page.add|Adds|a page|pages|name",
+        "page.delete|Deletes|a page|pages",
+        "page.rename|Renames|a page|pages|name",
+        "fill.set|Sets|a fill|fills",
+        "effect.add|Adds|an effect|effects|type",
+    ),
+    # FilmCraft 0.8's, as its `commands --json` lists them.
+    "filmcraft": _says(
+        "file.newSequence|Adds|a sequence|sequences|name",
+        "file.newBin|Adds|a bin|bins|name",
+        "timeline.place|Places|a clip|clips",
+        "sequence.addEdit|Cuts|a clip|clips",
+        "sequence.addTracks|Adds|a set of tracks|sets of tracks",
+        "sequence.deleteTrack|Deletes|a track|tracks|track",
+        "clip.rename|Renames|a clip|clips|name",
+        "markers.add|Adds|a marker|markers|name",
+        "effects.setParam|Sets|an effect parameter|effect parameters|param",
+        "sequence.setTransition|Changes|a transition|transitions",
+        "sequence.removeTransition|Removes|a transition|transitions",
+    ),
+    # EffectCraft 0.11's, as its `commands --json` lists them.
+    "effectcraft": _says(
+        "comp.new|Adds|a composition|compositions|name",
+        "layer.newText|Adds|a text layer|text layers|text",
+        "layer.newSolid|Adds|a solid|solids|name",
+        "layer.newShape|Adds|a shape layer|shape layers|kind",
+        "layer.newNull|Adds|a null|nulls|name",
+        "layer.newCamera|Adds|a camera|cameras|name",
+        "layer.newLight|Adds|a light|lights|kind",
+        "layer.setText|Edits the text of|a layer|layers|text",
+        "layer.rename|Renames|a layer|layers|name",
+        "layer.addMask|Adds|a mask|masks|shape",
+        "prop.addKey|Adds|a keyframe|keyframes|prop",
+        "comp.addMarker|Adds|a marker|markers|comment",
+    ),
+    # SoundCraft 0.8's, as its `commands` lists them.
+    "soundcraft": _says(
+        "track.new|Adds|a set of tracks|sets of tracks|name",
+        "track.delete|Deletes|a track|tracks",
+        "track.duplicate|Duplicates|a track|tracks",
+        "track.rename|Renames|a track|tracks|name",
+        "clip.rename|Renames|a clip|clips|name",
+        "midi.new_clip|Adds|a MIDI clip|MIDI clips",
+        "event.midi_note|Adds|a MIDI note|MIDI notes",
+        "mix.insert|Inserts|a plugin|plugins",
+    ),
+    # FreeCAD's steps, as the adapter's console script names them (native files ADR-0014).
+    "freecad": _says(
+        "box|Adds|a box|boxes|name",
+        "cylinder|Adds|a cylinder|cylinders|name",
+        "sphere|Adds|a sphere|spheres|name",
+        "cone|Adds|a cone|cones|name",
+        "boolean|Combines|a pair of solids|pairs of solids|name",
+        "sketch|Adds|a sketch|sketches|name",
+        "sketch.line|Draws|a line|lines",
+        "sketch.circle|Draws|a circle|circles",
+        "sketch.constraint|Constrains|a sketch|sketches",
+        "extrude|Extrudes|a sketch|sketches|name",
+        "move|Moves|an object|objects|object",
+        "set|Sets|a property|properties|property",
+        "remove|Removes|an object|objects|object",
+        "sheet|Adds|a spreadsheet|spreadsheets|name",
+        "sheet.set|Sets|a spreadsheet cell|spreadsheet cells",
+    ),
+    # Blender's steps, as the adapter's console script names them (native files ADR-0015).
+    "blender": _says(
+        "cube|Adds|a cube|cubes|name",
+        "sphere|Adds|a sphere|spheres|name",
+        "cylinder|Adds|a cylinder|cylinders|name",
+        "cone|Adds|a cone|cones|name",
+        "plane|Adds|a plane|planes|name",
+        "move|Moves|an object|objects|object",
+        "material|Adds|a material|materials|name",
+        "assign|Assigns|a material|materials|material",
+        "modifier|Adds|a modifier|modifiers|type",
+        "camera|Adds|a camera|cameras|name",
+        "light|Adds|a light|lights|name",
+        "collection|Adds|a collection|collections|name",
+        "set|Sets|a property|properties|property",
+        "remove|Removes|an object|objects|object",
+    ),
 }
 """Each craft's commands worth saying in its own words, by the craft's name."""
 
+GENERIC: Final = frozenset({"lightcraft"})
+"""The crafts said by their commands' names alone, on purpose: LightCraft keeps no native file
+(native files ADR-0016), so no proposal is made by its commands."""
 
-def describe(app: str | None, commands: Sequence[AppCommand]) -> ProposalDescription:
+
+def describe(
+    app: str | None, commands: Sequence[AppCommand], *, after: int | None = None
+) -> ProposalDescription:
     """What a batch of `app`'s commands does: a line, and each command, in words.
 
     Args:
         app: The app the batch is for, as provenance records it, such as `wordcraft`.
         commands: The batch, as it was applied.
+        after: How many pages the file has after the batch, as the proposal says, if it does.
     """
     table = CRAFTS.get(app or "", {})
-    items = [_item(table.get(command.name), command) for command in commands[:MOST_ITEMS]]
+    listed = commands[:MOST_ITEMS]
+    pages = PAGES.get(app or "", _none)(commands, after)[:MOST_ITEMS]
+    items = [
+        _item(table.get(command.name), command).model_copy(update={"pages": named})
+        for command, named in zip(listed, pages, strict=True)
+    ]
     return ProposalDescription(summary=_summary(table, commands), items=items, total=len(commands))
+
+
+type Pages = Callable[[Sequence[AppCommand], int | None], list[list[int]]]
+"""The pages each of a batch's commands changes, from 1, by its craft: none where it can't say."""
+
+
+def _none(commands: Sequence[AppCommand], _after: int | None) -> list[list[int]]:
+    return [[] for _ in commands]
+
+
+DECK_REORDERS: Final = frozenset(
+    {
+        "file.new",
+        "file.open",
+        "file.openBytes",
+        "file.revert",
+        "file.recovery.open",
+        "window.next",
+        "edit.undo",
+        "edit.redo",
+        "edit.cut",
+        "edit.paste",
+        "edit.pasteText",
+        "edit.duplicate",
+        "edit.delete",
+        "slide.duplicate",
+        "slide.delete",
+        "slide.move",
+        "slide.go",
+        "slide.next",
+        "slide.previous",
+        "slide.first",
+        "slide.last",
+        "slide.selectSlides",
+        "slide.fromOutline",
+        "section.remove",
+        "section.removeAll",
+        "section.move",
+    }
+)
+"""DeckCraft's commands that add, remove, move or choose a slide other than by `slide.new`: past
+one, the batch's slides can't be numbered from its commands alone."""
+
+
+def _deck(commands: Sequence[AppCommand], after: int | None) -> list[list[int]]:
+    """The slides a deck's batch adds, numbered as they end.
+
+    DeckCraft 0.7 adds one after the current slide, or at `at`, no further than the end, and makes
+    it current; a file opens at its first. The deck's slides before the batch are those after it
+    less those it adds, so a slide is numbered only where the proposal says how many it makes. A
+    command in `DECK_REORDERS` leaves every slide unnumbered.
+    """
+    if after is None or any(command.name in DECK_REORDERS for command in commands):
+        return _none(commands, after)
+    added: dict[int, int] = {}  # the command's place in the batch: its slide's index, from 0
+    count = max(after - sum(command.name == "slide.new" for command in commands), 0)
+    current = 0
+    for at, command in enumerate(commands):
+        if command.name != "slide.new":
+            continue
+        asked = command.args.get("at")
+        index = min(asked if isinstance(asked, int) and asked >= 0 else current + 1, count)
+        count += 1
+        added = {each: slide + (slide >= index) for each, slide in added.items()}
+        added[at] = current = index
+    return [[added[at] + 1] if at in added else [] for at in range(len(commands))]
+
+
+WORD_PAGED: Final = frozenset(
+    {
+        "insert.editHeader",
+        "insert.editFooter",
+        "insert.createHeader",
+        "insert.createFooter",
+    }
+)
+"""WordCraft's commands that name the page they act on, as `page`, from 0. Its words flow, so no
+other command's page is known before the file is laid out."""
+
+
+def _word(commands: Sequence[AppCommand], _after: int | None) -> list[list[int]]:
+    return [
+        [page + 1]
+        if command.name in WORD_PAGED
+        and isinstance(page := command.args.get("page"), int)
+        and page >= 0
+        else []
+        for command in commands
+    ]
+
+
+PAGES: Final[Mapping[str, Pages]] = {"deckcraft": _deck, "wordcraft": _word}
+"""How each craft that can names the pages a command changes."""
 
 
 def _item(says: Says | None, command: AppCommand) -> CommandChange:

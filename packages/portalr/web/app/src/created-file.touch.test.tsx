@@ -1,7 +1,7 @@
 /**
  * A native file the agent created blank, on a phone (portalr ADR-0055): the created card, its link
  * to the change waiting for review, which focuses that proposal, and that proposal's changes, in
- * a sheet (portalr ADR-0089).
+ * a sheet, with the first changed page before and after (portalr ADR-0089).
  */
 
 import axe from "axe-core";
@@ -72,8 +72,13 @@ const BLANK = {
 const SAID = {
   summary: "Adds 2 slides: Trip and Day 1.",
   items: [
-    { text: "Adds a slide: “Trip”", name: "slide.new", args: { title: "Trip" } },
-    { text: "Adds a slide: “Day 1”", name: "slide.new", args: { title: "Day 1", body: "Lisbon" } },
+    { text: "Adds a slide: “Trip”", name: "slide.new", args: { title: "Trip" }, pages: [1] },
+    {
+      text: "Adds a slide: “Day 1”",
+      name: "slide.new",
+      args: { title: "Day 1", body: "Lisbon" },
+      pages: [2],
+    },
   ],
   total: 2,
 };
@@ -123,6 +128,9 @@ test("on a phone, a proposal's changes open in a sheet, each to its arguments an
   const sheet = screen.getByRole("dialog", { name: SAID.summary });
   const day = sheet.getByRole("button", { name: "Adds a slide: “Day 1”" });
   await expect.element(day).toBeVisible();
+  // Under the changes, the first changed page beside the head's.
+  const shown = sheet.getByRole("region", { name: "Before and after" });
+  await expect.element(shown.getByText(/^Page 1/).first()).toBeVisible();
   const { violations } = await axe.run(sheet.element(), { resultTypes: ["violations"] });
   expect(violations.map((violation) => violation.id)).toEqual([]);
   await day.click();

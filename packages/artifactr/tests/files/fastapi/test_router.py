@@ -240,7 +240,12 @@ async def test_a_proposal_is_read_and_rendered_beside_the_head(world: World) -> 
     assert said == {
         "summary": "Runs a command: add_paragraph.",
         "items": [
-            {"text": "add_paragraph: “Fees”", "name": "add_paragraph", "args": {"text": "Fees"}}
+            {
+                "text": "add_paragraph: “Fees”",
+                "name": "add_paragraph",
+                "args": {"text": "Fees"},
+                "pages": [],
+            }
         ],
         "total": 1,
     }

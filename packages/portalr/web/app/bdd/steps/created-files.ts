@@ -25,24 +25,37 @@ Then(
 const proposal = (page: Page, what: string) =>
   page.getByRole("region", { name: `Proposal: ${what}`, exact: true });
 
+/**
+ * What waits for a person is one tray over the composer, one line where several wait, which opens
+ * to them (portalr ADR-0092): opened, if it is closed, before a proposal in it is reached.
+ */
+async function reviewing(page: Page, what: string) {
+  const line = page.getByRole("button", { name: /waiting for you/ });
+  if ((await line.count()) > 0 && (await line.getAttribute("aria-expanded")) === "false") {
+    await line.click();
+  }
+  return proposal(page, what);
+}
+
 Then("the proposal {string} waits for review", async ({ page }, what: string) => {
-  await expect(proposal(page, what).getByRole("button", { name: "Accept" })).toBeVisible();
+  await expect((await reviewing(page, what)).getByRole("button", { name: "Accept" })).toBeVisible();
 });
 
 /** What a native file's proposal does, in words, which opens to each of its changes (ADR-0089). */
 Then(
   "the proposal {string} says {string}, change by change",
   async ({ page }, what: string, said: string) => {
-    const line = proposal(page, what).getByRole("button", { name: said });
+    const reviewed = await reviewing(page, what);
+    const line = reviewed.getByRole("button", { name: said });
     await line.click();
     await expect(line).toHaveAttribute("aria-expanded", "true");
-    const changes = proposal(page, what).getByRole("list", { name: "Its changes" });
+    const changes = reviewed.getByRole("list", { name: "Its changes" });
     await expect(changes.getByRole("listitem")).toHaveCount(3);
   },
 );
 
 When("they accept the proposal {string}", async ({ page }, what: string) => {
-  await proposal(page, what).getByRole("button", { name: "Accept" }).click();
+  await (await reviewing(page, what)).getByRole("button", { name: "Accept" }).click();
   await expect(proposal(page, what)).toContainText("Accepted");
 });
 

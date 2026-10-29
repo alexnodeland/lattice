@@ -28,7 +28,7 @@ export function ProposalLine({ proposal }: { proposal: Artifactr.Proposal }) {
   const what = proposalTitle(proposal);
   const accepted = proposal.status === "accept";
   return (
-    <li className="flex min-h-7 items-center gap-2 text-xs">
+    <li className="flex items-center gap-2 text-xs">
       <StatusBadge tone={accepted ? "done" : "stopped"} className="shrink-0">
         {accepted ? "Accepted" : "Rejected"}
       </StatusBadge>
@@ -45,7 +45,7 @@ export interface Waiting {
 }
 
 /** The page's tray, which opens as asked: there is one, and it says how while it is there. */
-let openTray: (() => void) | undefined;
+let openTray: ((id: string) => void) | undefined;
 
 /** The focus to the element `id`, or to the first named part of a request's card, "The agent asks". */
 function focusAt(id: string) {
@@ -64,8 +64,7 @@ function focusAt(id: string) {
 function reach(id: string): boolean {
   const held = document.getElementById(id)?.closest("[data-tray]") != null;
   if (held) {
-    openTray?.();
-    requestAnimationFrame(() => focusAt(id));
+    openTray?.(id);
   }
   return held;
 }
@@ -93,8 +92,18 @@ export function Tray({
   }, [waiting.length]);
   const several = waiting.length > 1;
   const present = waiting.length > 0;
+  // The focus goes where it was asked once the tray has been opened, not before.
+  const [reached, setReached] = useState<{ id: string }>();
   useEffect(() => {
-    openTray = () => setOpened(true);
+    if (reached) {
+      focusAt(reached.id);
+    }
+  }, [reached]);
+  useEffect(() => {
+    openTray = (id) => {
+      setOpened(true);
+      setReached({ id });
+    };
     // A link to what is already the hash fires no change: its click does.
     const click = (event: MouseEvent) => {
       const link = (event.target as Element).closest<HTMLAnchorElement>("a[href^='#']");

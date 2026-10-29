@@ -395,7 +395,7 @@ export function RunSteps({
     const resized = new ResizeObserver(fit);
     resized.observe(line);
     return () => resized.disconnect();
-  }, [ways, failed, words]);
+  }, [ways, failed]);
   // Said once, as a group that was running ends: never as each call does.
   const [ran, setRan] = useState(running);
   const marker = failed > 0 ? ` · ${failed} failed` : "";

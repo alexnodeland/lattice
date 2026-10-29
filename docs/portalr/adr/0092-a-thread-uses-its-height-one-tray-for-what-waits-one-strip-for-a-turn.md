@@ -51,5 +51,5 @@ The owner read the thread on an iPhone, over Tailscale, in the dark theme, and f
 
 - `Tray`, `ProposalLine`, `askedOf` and `reachWaiting` are in `ui`; `threadLog` takes the decided proposals and places them; the thread's page builds the tray's list.
 - A question's card is no longer in the log while it waits, but in the tray; its id and the thumb bar's target are the same, and the focus goes to it by `reachWaiting`.
-- The streaming add-on loses its chips. The app's initial and total budgets are met by 37 and 18 bytes ([ADR-0040](0040-scenarios-against-a-generated-application-and-size-budgets.md)); no ceiling is raised. The line of calls is measured in the browser, not counted in characters.
+- The streaming add-on loses its chips. The app's initial and total budgets are met by 39 and 2 bytes ([ADR-0040](0040-scenarios-against-a-generated-application-and-size-budgets.md)); no ceiling is raised. The line of calls is measured in the browser, not counted in characters.
 - The screenshot baselines of `ui` change for the strip, the handle and the message list; they are taken from CI's `ui-screenshots` artifact ([ADR-0019](0019-the-kits-look.md)).

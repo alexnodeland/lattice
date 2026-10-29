@@ -81,6 +81,7 @@ The application reads the stack's ports from its environment ([`settings.py`](ht
 | Database | `DATABASE_URL`, `DATABASE_SCHEMA`, `DATABASE_ADMIN_URL` for row-level security |
 | Identity | `AUTH_JWKS_URL`, `AUTH_ISSUER`, `AUTH_AUDIENCE`, `AUTH_JWT_SECRET`; `AUTH_SERVICE_ROLE_KEY` with grantr, for its commands to find users by email, at `AUTH_ADMIN_URL` when the admin API isn't at the issuer; `AUTH_TENANT_CLAIM` without |
 | LLM gateway | `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `LITELLM_TENANT_KEYS`, `LITELLM_MODEL`, `LITELLM_GUARDRAILS`; with artifactr, `LITELLM_MODELS` and `LITELLM_MODELS_ALLOWED`, the models a message may name (below) |
+| Agents' edits | with artifactr, `AGENT_WRITES_DIRECT`, the kinds whose agents' edits apply directly in Auto (below) |
 | Evaluation data | `LANGFUSE_BASE_URL`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_SECRET_KEY` |
 
 The stack's two other ports, profiles and object storage, aren't read: nothing in a generated application profiles or stores objects yet. An application that adds them reads `PYROSCOPE_SERVER_ADDRESS` with a Pyroscope SDK, and the `S3_*` settings with an S3 client, with a bucket of its own ([ADR-0005](../adr/0005-ports-and-adapters-for-the-stack.md)).
@@ -92,6 +93,10 @@ Fill in two things after `make env`: `LITELLM_API_KEY`, a tenant's key from `mak
 With artifactr, a message may name the model of the turn it starts, and the portal's composer offers the choice ([artifactr ADR-0097](../../artifactr/adr/0097-a-message-chooses-the-model-of-the-turn-it-starts.md), [portalr ADR-0086](../../portalr/adr/0086-the-composer-chooses-the-model-of-the-next-turn.md)). `gateway.py`'s `Models` is a closed list: `default` and `fast`, and whatever `LITELLM_MODELS` adds, a JSON list such as `[{"id": "deep", "label": "Deep", "family": "anthropic", "reasoning": true}, {"id": "local", "label": "On this machine", "local": true}]`, each `id` a model group the gateway serves. A name it doesn't list is never built: the turn answers with `LITELLM_MODEL` and a notice says why.
 
 Which of them people may choose is the `models:allowed` setting: `default` and `fast` unless `LITELLM_MODELS_ALLOWED`, comma-separated, offers more to every tenant; a tenant's and a workspace's admins narrow it in grantr's settings, and never widen it. The runner's check and `GET /portalr/v1/models` read the same setting, so the composer lists only what a turn will use.
+
+### What an agent's edits do in Auto
+
+In a thread in Ask, an agent's every create, edit and archive waits for a person's review. In Auto, an edit applies directly when the workspace's `agent-writes:direct` setting names its kind, and waits for review otherwise ([artifactr ADR-0009](../../artifactr/adr/0009-write-policies-and-non-blocking-proposals.md)). `kinds.py` declares the setting over the kinds the application keeps. Unset, it is each kind's own policy: notes, forms and dashboards apply, and native files, diagrams and rules' drafts wait for review. `AGENT_WRITES_DIRECT`, comma-separated or `none`, replaces that for every tenant: an operator who names `word_document` lets the agent's edits of Word documents apply in Auto. A tenant's and a workspace's admins only take kinds out, on the admin UI's Settings page, and a workspace can't put back a kind its tenant took out ([lattice ADR-0030](../../adr/0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md)). A name the application doesn't keep stops it at startup.
 
 ## Running it
 

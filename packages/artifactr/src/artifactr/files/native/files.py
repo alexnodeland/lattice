@@ -708,7 +708,8 @@ class NativeFiles:
     ) -> Applied | Proposed | None:
         """Edit a native file by a batch of its app's commands, holding its lease meanwhile.
 
-        For an agent, under the type's `propose` write policy, the revision is a proposal.
+        For an agent, the revision may be a proposal: always in a thread in Ask, and in Auto
+        unless the workspace's `agent-writes:direct` names the kind (ADR-0009).
 
         Returns:
             The revision's outcome, or None if the batch changed nothing.

@@ -1,0 +1,135 @@
+"""What an agent's edits do in Auto: ``agent-writes:direct``, over the kinds the app keeps."""
+
+{% if access == 'grantr' -%}
+import asyncio
+{% else -%}
+from dataclasses import replace
+{% endif -%}
+from pathlib import Path
+from typing import Any
+
+import pytest
+from fastapi.testclient import TestClient
+
+from artifactr import new_id
+from artifactr.workspace import DIRECT_WRITES, direct_writes_from
+{%- if access == 'grantr' %}
+from grantr import InMemoryStorage, Invalid, User
+{%- endif %}
+
+{% if access == 'grantr' -%}
+from {{ package_name }}.access import build_grants
+{% endif -%}
+{% if use_files -%}
+from {{ package_name }}.files import TYPES, native_types
+{% endif -%}
+from {{ package_name }}.kinds import artifact_types, operator_writes, writes_defaults
+from {{ package_name }}.settings import Settings
+
+from conftest import {% if access == 'grantr' %}TENANT, {% endif %}Script, app, bearer, call, {% if access == 'grantr' %}in_thread, {% endif %}say, {% if access == 'grantr' %}seeded, {% else %}settings, {% endif %}wait_for
+
+BASE = "/artifactr/v1/workspaces/main"
+{%- if access == 'grantr' %}
+ALICE = User(id="alice")
+{%- endif %}
+
+
+def command(client: TestClient, **body: Any) -> None:
+    frame = {"type": "command", "command_id": new_id("cmd"), "command": body}
+    client.post(f"{BASE}/commands", json=frame)
+
+
+def agents_note(client: TestClient, script: Script, *, mode: str = "edit") -> tuple[int, int]:
+    """The agent writes a note in a thread in ``mode``: how many notes, and proposals, follow."""
+    command(client, type="create_thread", thread_id="t1")
+    command(client, type="set_thread_mode", thread_id="t1", mode=mode)
+    script.steps += [
+        call("create_artifact", kind="note", data={"title": "Launch", "text": "Friday."}),
+        say("Done."),
+    ]
+    command(client, type="post_message", thread_id="t1", content="Start a note")
+
+    def ended() -> bool:
+        read = client.get(f"{BASE}/events").json()
+        return any(e["event"]["type"] == "run_ended" for e in read)
+
+    wait_for(ended)
+    notes = client.get(f"{BASE}/artifacts").json()
+    return len(notes), len(client.get(f"{BASE}/proposals").json())
+
+
+async def test_by_default_each_kind_keeps_its_own_policy() -> None:
+    types = artifact_types({% if use_files %}native_types(TYPES){% endif %})
+    applied = await direct_writes_from(writes_defaults(types, None))("acme", "main")
+    assert "note" in applied
+{%- if use_files %}
+    assert not {native.kind for native in native_types(TYPES)} & applied
+{%- endif %}
+{%- if use_relayr %}
+    assert "rule" not in applied
+{%- endif %}
+
+
+def test_the_operator_names_only_kinds_the_application_keeps() -> None:
+    assert operator_writes(None) == {}
+    assert operator_writes(["note"]) == {DIRECT_WRITES: ("note",)}
+    with pytest.raises(ValueError, match="agent-writes:direct is names it knows, not nope"):
+        writes_defaults(artifact_types(), ["nope"])
+
+
+def test_agent_writes_direct_is_read_from_the_environment() -> None:
+    assert Settings.from_environ({}).agent_writes_direct is None
+    named = Settings.from_environ({"AGENT_WRITES_DIRECT": "note, form"})
+    assert named.agent_writes_direct == ("note", "form")
+    assert Settings.from_environ({"AGENT_WRITES_DIRECT": "none"}).agent_writes_direct == ()
+    for unset in ("", "  "):
+        assert Settings.from_environ({"AGENT_WRITES_DIRECT": unset}).agent_writes_direct is None
+
+
+def test_an_env_copied_from_the_example_keeps_each_kinds_policy() -> None:
+    example = Path(__file__).parent.parent / ".env.example"
+    lines = example.read_text().splitlines()
+    env = dict(line.split("=", 1) for line in lines if "=" in line and not line.startswith("#"))
+    assert "AGENT_WRITES_DIRECT" in env
+    copied = Settings.from_environ({"AGENT_WRITES_DIRECT": env["AGENT_WRITES_DIRECT"]})
+    assert copied.agent_writes_direct is None
+
+
+def test_an_agents_note_applies_in_auto(script: Script) -> None:
+    with TestClient(app(script), headers=bearer()) as client:
+        assert agents_note(client, script) == (1, 0)
+
+
+def test_an_agents_note_waits_for_review_in_ask(script: Script) -> None:
+    with TestClient(app(script), headers=bearer()) as client:
+        assert agents_note(client, script, mode="suggest") == (0, 1)
+{%- if access == 'grantr' %}
+
+
+def test_a_tenant_that_takes_notes_out_reviews_them_in_auto(script: Script) -> None:
+    grants = seeded()
+    in_thread(grants.set_setting(TENANT, DIRECT_WRITES, [], by=ALICE))
+    with TestClient(app(script, grants=grants), headers=bearer()) as client:
+        assert agents_note(client, script) == (0, 1)
+
+
+def test_a_workspace_cant_put_back_what_its_tenant_took_out() -> None:
+    grants = seeded()
+    in_thread(grants.set_setting(TENANT, DIRECT_WRITES, [], by=ALICE))
+    put_back = grants.set_setting(TENANT, DIRECT_WRITES, ["note"], workspace="main", by=ALICE)
+    refusal = "agent-writes:direct may be at most none here: the tenant's value"
+    with pytest.raises(Invalid, match=refusal):
+        in_thread(put_back)
+
+
+def test_the_operators_kinds_are_every_tenants_ceiling() -> None:
+    grants = build_grants(InMemoryStorage(), name="app", direct=["note"])
+    assert asyncio.run(grants.value(TENANT, "main", DIRECT_WRITES)) == ("note",)
+{%- else %}
+
+
+def test_an_operator_who_names_no_kinds_reviews_every_agents_write(script: Script) -> None:
+    config = replace(settings(), agent_writes_direct=())
+    with TestClient(app(script, config), headers=bearer()) as client:
+        assert agents_note(client, script) == (0, 1)
+{%- endif %}

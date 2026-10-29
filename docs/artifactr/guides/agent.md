@@ -257,7 +257,7 @@ A run that pauses ends its segment with `run_paused` instead, listing the reques
 
 An agent proposes instead of applying a change when:
 
-- the artifact type's `write_policy` is `"propose"`
+- the artifact type's `write_policy` is `"propose"`, or, with `Workspaces(direct_writes=...)`, the workspace's `agent-writes:direct` setting doesn't name its kind
 - the thread is in suggest mode (`SetThreadMode(thread_id=..., mode="suggest")`)
 - it asks to, with `edit_text(..., propose=True, rationale=...)` or, in your tools, `submit(workspace, change, propose=True)`
 

@@ -36,6 +36,14 @@ Tenant-scoped handles. See [Workspaces, commits and the log](../guides/workspace
 
 ::: artifactr.workspace.KeyOf
 
+::: artifactr.workspace.DIRECT_WRITES
+
+::: artifactr.workspace.direct_writes
+
+::: artifactr.workspace.direct_writes_from
+
+::: artifactr.workspace.DirectWrites
+
 ## Storage
 
 The storage protocol, and the in-memory implementation. See [Storage](../guides/storage.md).

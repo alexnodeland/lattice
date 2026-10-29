@@ -14,6 +14,7 @@ import artifactr.agent
 import artifactr.core as a
 import reflexr
 import reflexr.workspace as r
+from artifactr.workspace import direct_writes
 from relayr.events import BRIDGED
 from relayr.rules import RuleDraft, RuleDrafting
 from tests.app_types import Deployed
@@ -219,3 +220,7 @@ async def test_a_rule_sent_as_a_string_of_json_is_read_as_its_object() -> None:
 def test_drafting_needs_stored_rules() -> None:
     with pytest.raises(ValueError, match="no stored rules"):
         RuleDrafting(r.Workspaces(r.InMemoryStorage()), {})
+
+
+def test_a_rule_draft_waits_for_review_in_auto_by_default() -> None:
+    assert direct_writes((RuleDraft,)).default == ()

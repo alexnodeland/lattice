@@ -29,6 +29,9 @@ const state = (over: Partial<Parameters<typeof nameOf>[0]> = {}) => ({
 test("a setting is named by what it limits, by its key, never the key itself", () => {
   expect(nameOf(state())).toBe("FreeCAD's tries an hour");
   expect(nameOf(state({ key: "connect-per-hour:blender" }))).toBe("Blender's tries an hour");
+  expect(nameOf(state({ key: "agent-writes:direct" }))).toBe(
+    "Kinds the agent edits directly in Auto",
+  );
   expect(nameOf(state({ key: "new:one", description: "Days logs are kept." }))).toBe(
     "Days logs are kept.",
   );

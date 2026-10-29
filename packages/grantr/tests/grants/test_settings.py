@@ -208,6 +208,21 @@ async def test_one_tenants_settings_are_its_own(storage: Storage) -> None:
     assert await grants.value("acme", "w1", KEY) == 30, "a deleted tenant's settings go with it"
 
 
+async def test_a_name_put_back_below_an_empty_subset_is_refused(storage: Storage) -> None:
+    kinds = Setting(
+        "agent-writes:direct",
+        Subset(frozenset({"note", "word_document"})),
+        default=("note",),
+        lowest="workspace",
+        description="The kinds whose agents' writes apply directly.",
+    )
+    grants = await _grants(storage, settings=registry(kinds))
+    await grants.set_setting("acme", kinds.key, [], by=ALICE)
+    with pytest.raises(Invalid, match="may be at most none here: the tenant's value"):
+        await grants.set_setting("acme", kinds.key, ["note"], workspace="w1", by=BOB)
+    assert await grants.value("acme", "w1", kinds.key) == ()
+
+
 async def test_a_changed_registry_never_widens_a_stored_value(storage: Storage) -> None:
     tools = Setting(
         "connect-tools:fake",

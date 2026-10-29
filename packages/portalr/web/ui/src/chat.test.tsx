@@ -10,7 +10,6 @@ import {
   Messages,
   ModeSwitch,
   ProposalCard,
-  ProposalLine,
   proposalTitle,
   proposedOn,
   Request,
@@ -22,6 +21,7 @@ import {
 } from "./chat";
 import { IntegrationsContext } from "./integrations";
 import { contrast, token } from "./test/colours";
+import { ProposalLine } from "./tray";
 
 /** A command handler whose commands end as `outcome`. */
 const sent = (outcome: "done" | "refused" | "closed" = "done") => vi.fn(async () => ({ outcome }));
@@ -1168,10 +1168,9 @@ test("the strip counts the turn's tokens in one line, each estimated and named i
   await expect
     .element(group.getByText("Input tokens, estimated: 1,000. Output tokens, estimated: 101"))
     .toBeInTheDocument();
-  // Never broken across lines, set in digits of one width, and never announced.
+  // Never broken across lines, and never announced.
   const line = group.getByText("in ~1,000 · out ~101").element().parentElement as HTMLElement;
   expect(getComputedStyle(line).whiteSpace).toBe("nowrap");
-  expect(getComputedStyle(line).fontVariantNumeric).toBe("tabular-nums");
   expect(line.closest("[role=status], [aria-live]")).toBeNull();
   await screen.rerender(strip({ outputChars: 401 }, now, { history: null }));
   await expect.element(group.getByText("out ~101")).toBeVisible();
@@ -1691,22 +1690,21 @@ test("a stopped turn's kept words render as Markdown, its list cut mid-item and 
   expect(item.element().textContent).not.toContain("\\n");
 });
 
-test("a proposal that was decided is one line: whether it was accepted or rejected, and what it was", async () => {
+test("a proposal that was decided is one line of the thread: whether it was accepted or rejected, and what it was", async () => {
   const screen = await render(
     <Messages>
       <ProposalLine proposal={proposal({ status: "accept" })} />
       <ProposalLine proposal={proposal({ id: "prop_2", status: "reject" })} />
     </Messages>,
   );
-  const lines = screen.getByRole("region");
-  expect(lines.elements()).toHaveLength(2);
-  const [accepted, rejected] = lines.elements();
-  await expect.element(screen.getByText("Accepted")).toBeVisible();
-  await expect.element(screen.getByText("Rejected")).toBeVisible();
-  // Slim: one line of words, no buttons, nothing of its card.
+  const what = proposalTitle(proposal());
+  const [accepted, rejected] = screen.getByRole("listitem").elements();
+  expect(accepted?.textContent).toBe(`Accepted${what}`);
+  expect(rejected?.textContent).toBe(`Rejected${what}`);
+  // Slim: one line of words, no buttons and no landmark of its own: nothing of its card.
   for (const line of [accepted, rejected]) {
     expect(line?.getBoundingClientRect().height).toBeLessThan(36);
-    expect(line?.querySelector("button")).toBeNull();
+    expect(line?.querySelector("button, section")).toBeNull();
   }
-  expect(accepted?.getAttribute("aria-label")).toBe(`Proposal: ${proposalTitle(proposal())}`);
+  expect(screen.getByRole("region").elements()).toHaveLength(0);
 });

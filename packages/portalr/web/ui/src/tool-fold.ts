@@ -80,15 +80,12 @@ export function callLabel(tool: Artifactr.Tool): string {
 }
 
 /**
- * The calls together, done: each tool's verb and its count, in the order first called, so
- * "Made an app, read 2 artifacts"; tools no table names are one "used 3 tools". Past `room`
- * characters it keeps whole kinds only, the first two if they fit, else the first, and counts the
- * calls of the rest: "Made an app, read 2 artifacts and 3 more". A phrase is never cut.
+ * The calls together, done, as the line may say them, longest first: each tool's verb and its
+ * count, in the order first called, so "Made an app, read 2 artifacts"; tools no table names are
+ * one "used 3 tools". Then, for a line short of room, the first two kinds, then the first, each
+ * whole, with the calls of the rest counted: "Made an app, read 2 artifacts and 3 more".
  */
-export function doneLabel(
-  tools: readonly Artifactr.Tool[],
-  room = Number.POSITIVE_INFINITY,
-): string {
+export function doneLabels(tools: readonly Artifactr.Tool[]): string[] {
   // By their words, so two tools that say the same, as draw and draw_mermaid do, are one.
   const counts = new Map<string, [Phrase, number]>();
   for (const tool of tools) {
@@ -106,38 +103,26 @@ export function doneLabel(
         .slice(0, kept)
         .map(([text]) => text)
         .join(", ") + (more > 0 ? ` and ${more} more` : "");
-    return joined.charAt(0) + joined.slice(1).toLowerCase();
+    return joined.charAt(0) + joined.slice(1).toLocaleLowerCase();
   };
-  const kept = [kinds.length, 2, 1].find(
-    (each) => each <= kinds.length && say(each).length <= room,
-  );
-  return say(kept ?? 1);
+  return [...new Set([kinds.length, 2, 1].map(say))];
 }
 
-/** The characters of a line that its count of what failed ("1 failed", and its mark) takes. */
-const FAILED_ROOM = 12;
+/** The calls together, done, all of them: the longest of `doneLabels`. */
+export const doneLabel = (tools: readonly Artifactr.Tool[]): string => doneLabels(tools)[0] ?? "";
 
 /**
- * The plain parts of a group's line: what it says (in `room` characters, if it is short of room),
- * all it would say, how many failed, and whether it runs: while a call does, or its run does,
- * between one call's answer and the next, it says what it is doing.
+ * The plain parts of a group's line: what it may say, longest first, how many failed, and whether
+ * it runs: while a call does, or its run does, between one call's answer and the next, it says
+ * what it is doing.
  */
-export function foldSummary(
-  tools: readonly Artifactr.Tool[],
-  runRunning = false,
-  room = Number.POSITIVE_INFINITY,
-) {
+export function foldSummary(tools: readonly Artifactr.Tool[], runRunning = false) {
   const latest = tools.findLast((tool) => tool.status === "called") ?? tools.at(-1);
   const running = runRunning || tools.some((tool) => tool.status === "called");
   const doingNow =
     running && latest ? `${doing(phrase(latest.name)[0])} ${phrase(latest.name)[1]}…` : null;
-  const failures = tools.filter(failed).length;
-  return {
-    label: doingNow ?? doneLabel(tools, failures > 0 ? room - FAILED_ROOM : room),
-    full: doingNow ?? doneLabel(tools),
-    failed: failures,
-    running,
-  };
+  const labels = doingNow === null ? doneLabels(tools) : [doingNow];
+  return { labels, failed: tools.filter(failed).length, running };
 }
 
 /** Where a value holds what a call was about, the first of these keys a string has. */

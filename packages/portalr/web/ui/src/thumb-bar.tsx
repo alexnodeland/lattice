@@ -5,8 +5,8 @@
  * the request's own, marked `data-thumb-action` by its card, so the handlers are the card's; it
  * is hidden from assistive technology, which reaches the one in the card, so there is one tab
  * stop. Its words and its disabled state follow that button's. It gives way while the card's own
- * button is in view, in the window and in the tray it may sit in, while the on-screen keyboard is
- * up, and in a short window.
+ * button is in view, not off the window, scrolled out of the tray it sits in or under the dock,
+ * while the on-screen keyboard is up, and in a short window.
  */
 
 import { useEffect, useState } from "react";
@@ -17,19 +17,6 @@ import { usePhone } from "./touch";
 
 /** The card's button the bar mirrors, if it is one to mirror. */
 const ACTION = "[data-thumb-action]";
-
-/** Whether a box the button sits in, that scrolls on its own, such as the tray, has it out of view. */
-function clipped(action: Element, box: DOMRect): boolean {
-  for (let at = action.parentElement; at && at !== document.body; at = at.parentElement) {
-    if (/auto|scroll/.test(getComputedStyle(at).overflowY)) {
-      const view = at.getBoundingClientRect();
-      if (box.bottom <= view.top || box.top >= view.bottom) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
 
 /** What the bar shows: the words and whether the action can be taken, or nothing. */
 type Mirror = { word: string; disabled: boolean } | null;
@@ -56,8 +43,11 @@ export function ThumbBar({ target }: { target: string }) {
         return;
       }
       const box = action.getBoundingClientRect();
-      const seen =
-        box.width > 0 && box.bottom > 0 && box.top < window.innerHeight && !clipped(action, box);
+      // Seen where what is at its centre is the button: not off the window, nor scrolled out of the
+      // tray it may sit in, nor under the dock.
+      const seen = action.contains(
+        document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2),
+      );
       // The keyboard's inset is kept on the root (`keyboardInset`): up, the bar would crowd it.
       const keyboard = Number.parseFloat(root.style.getPropertyValue("--keyboard-inset")) > 0;
       setMirror(

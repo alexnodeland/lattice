@@ -23,7 +23,7 @@ export const sheetPopup = "phone:!as-sheet-popup";
 
 /**
  * The handle at a sheet's top, which the finger drags: a small pill to see (36 by 4px) in a band a
- * finger can hit, 20px tall and the sheet's width, shown once the drag listens. Under forced
+ * finger can hit, 24px tall and the sheet's width, shown once the drag listens. Under forced
  * colours its edge is drawn, as its fill is not.
  */
 export function SheetHandle() {
@@ -31,7 +31,7 @@ export function SheetHandle() {
     <span
       data-sheet-handle=""
       aria-hidden="true"
-      className="hidden shrink-0 cursor-grab touch-none py-2 in-data-sheet-drag:phone:block"
+      className="hidden shrink-0 cursor-grab touch-none py-2.5 in-data-sheet-drag:phone:block"
     >
       <span className="mx-auto block h-1 w-9 rounded-full border border-transparent bg-edge" />
     </span>

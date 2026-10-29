@@ -223,6 +223,9 @@ type MessageProps = {
   onThumbs?: GiveThumbs;
 };
 
+/** The room of a message's row of actions, where the pointer hovers and the row is always there. */
+const ACTIONS_ROW = "min-h-7";
+
 /** The lines of a message past which it is folded, with a way to the whole. */
 const FOLDED_AFTER = 40;
 
@@ -337,7 +340,7 @@ export function Message({
       <div
         className={cn(
           "flex flex-wrap items-start gap-1",
-          !menu && "min-h-7",
+          !menu && ACTIONS_ROW,
           // Where the pointer hovers, the actions show as it rests on the message, or the keyboard
           // reaches them; the row keeps its height, so nothing moves. What was said stays shown.
           !sending &&
@@ -458,8 +461,8 @@ export function Streaming({
           <Markdown streaming={!ended}>{words}</Markdown>
         </div>
       )}
-      {/* Where a message has a row of actions, its room, so nothing moves when it replaces this. */}
-      {!fingers && <div aria-hidden="true" className="min-h-7" />}
+      {/* Where a message has that row, its room, so nothing moves when it replaces this. */}
+      {!fingers && <div aria-hidden="true" className={ACTIONS_ROW} />}
     </li>
   );
 }
@@ -1083,25 +1086,6 @@ export function proposalTitle(proposal: Artifactr.Proposal): string {
 }
 
 /**
- * A proposal that was decided, as one line of the thread (portalr ADR-0092): what it was, and
- * whether it was accepted or rejected. Its card is for the one that waits.
- */
-export function ProposalLine({ proposal }: { proposal: Artifactr.Proposal }) {
-  const what = proposalTitle(proposal);
-  const accepted = proposal.status === "accept";
-  return (
-    <li>
-      <section aria-label={`Proposal: ${what}`} className="flex min-h-7 items-center gap-2 text-xs">
-        <StatusBadge tone={accepted ? "done" : "stopped"} className="shrink-0">
-          {accepted ? "Accepted" : "Rejected"}
-        </StatusBadge>
-        <span className="min-w-0 truncate text-muted">{what}</span>
-      </section>
-    </li>
-  );
-}
-
-/**
  * A proposed change, with accept and reject while it is open, and what its caller adds. Where its
  * caller knows it can't be accepted, such as one made against a version of a file since replaced,
  * Accept is disabled and the reason is said beside it; it can still be rejected.
@@ -1265,22 +1249,23 @@ export function RunStrip({
     <fieldset
       aria-label="This turn"
       // While it waits, the request under it is the surface; the strip is a quiet line above it.
-      // It comes in with a short rise, and the words that say what it does change with a fade.
+      // It fades in, and so do the words that say what it does, as they change.
       className={cn(
-        "m-0 flex min-w-0 flex-col gap-0.5 rounded-(--card-radius) border border-line bg-surface px-3 py-1 transition-[opacity,translate] duration-(--dialog-duration) starting:translate-y-1 starting:opacity-0 motion-reduce:transition-none",
+        "m-0 flex min-w-0 flex-col gap-0.5 rounded-(--card-radius) border border-line bg-surface px-3 py-1 transition-opacity duration-(--dialog-duration) starting:opacity-0 motion-reduce:transition-none",
         run.status === "paused" && "border-transparent bg-transparent",
       )}
     >
-      <span className="flex min-h-9 flex-wrap items-center gap-x-2 phone:min-h-11">
+      <span className="flex min-h-9 flex-wrap items-center gap-2 phone:min-h-11">
         {working ? <Working>{status}</Working> : <StatusBadge tone={tone}>{status}</StatusBadge>}
         {/* One status, kept through the add-on's loading, so what it says changes in place. */}
         <span role="status" className="sr-only">
           {working && addon ? <addon.Said run={run} status={status} now={at} /> : status}
         </span>
-        {/* What it does, however long, gives way to the clock and the buttons. */}
+        {/* What it does, however long, gives way to the clock and the buttons; new words, as the phase
+            changes, are a new box, which fades in. */}
         {working && addon && (
           <span
-            key={`${run.live.phase} ${run.live.tool}`}
+            key={run.live.phase}
             className={`${TYPE.note} min-w-0 flex-1 truncate transition-opacity duration-(--dialog-duration) starting:opacity-0 motion-reduce:transition-none`}
           >
             <addon.Phase run={run} now={at} />
@@ -1288,7 +1273,7 @@ export function RunStrip({
         )}
         {active && since !== null && (
           // Its width kept as the digits tick, and a minute's carry, from 9:59 to 10:00.
-          <span className={`${TYPE.note} ms-auto min-w-[4ch] shrink-0 text-end tabular-nums`}>
+          <span className={`${TYPE.note} ms-auto min-w-9 shrink-0 text-end tabular-nums`}>
             {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
             {since}
           </span>

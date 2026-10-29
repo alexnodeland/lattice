@@ -74,7 +74,7 @@ test("a dialog is a sheet along the bottom: a dialog still, the focus in it, Esc
   // A small pill in a band a finger can hit, no taller than it needs to be.
   const pill = handle.firstElementChild?.getBoundingClientRect();
   expect([pill?.width, pill?.height]).toEqual([36, 4]);
-  expect(handle.getBoundingClientRect().height).toBe(20);
+  expect(handle.getBoundingClientRect().height).toBe(24);
   await expect.element(screen.getByRole("textbox", { name: "Email" })).toHaveFocus();
   await userEvent.keyboard("{Escape}");
   await expect.poll(() => onChange.mock.calls.at(-1)?.[0]).toBe(false);

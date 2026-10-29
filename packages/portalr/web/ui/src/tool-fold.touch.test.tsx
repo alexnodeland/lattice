@@ -9,6 +9,7 @@ import { page, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { axeViolations } from "./test/axe";
 import { RunSteps } from "./tool-call";
+import { doneLabels } from "./tool-fold";
 
 const tool = (name: string, status: string, args: string, result: string): Artifactr.Tool => ({
   name,
@@ -156,75 +157,68 @@ test("turned wide with its sheet open, the sheet stays the one way in, and turne
 const times = (prefix: string, name: string, n: number) =>
   Array.from({ length: n }, (_, at) => [`${prefix}_${at}`, tool(name, "ok", "{}", "ok")] as const);
 
-test("a run's calls are one line of whole kinds, counted, that fits a phone", async () => {
-  await page.viewport(390, 844);
+/** A group in a page's gutters, at `width`, and the box its words are in. */
+async function lineAt(width: number, tools: ReturnType<typeof times>) {
+  await page.viewport(width, 844);
   onTestFinished(() => page.viewport(414, 896));
-  const rollup = [
-    ...times("a", "create_artifact", 2),
-    ...times("b", "mystery_tool", 3),
-    ...times("c", "create_app", 1),
-  ];
   const screen = await render(
     <div className="px-4">
       <ul>
-        <RunSteps tools={rollup} />
+        <RunSteps tools={tools} />
       </ul>
     </div>,
   );
-  // The owner's reading of a run: every kind counted, all on the line, none cut.
-  const words = screen.getByText("Made 2 artifacts, used 3 tools, made an app");
-  await expect.element(words).toBeVisible();
-  expect(words.element().scrollWidth).toBeLessThanOrEqual(words.element().clientWidth);
-});
+  const line = screen.getByRole("button", { name: /tool calls?$/ });
+  await expect.element(line).toBeVisible();
+  // Settled: the longest line that fits is measured, a step at a time.
+  await new Promise((settled) => setTimeout(settled, 200));
+  const words = line.element().querySelector("span.truncate") as HTMLElement;
+  return { screen, line, words };
+}
 
-test("past what a phone's line holds, it keeps the first kinds whole and counts the rest, and the sheet keeps them all", async () => {
-  await page.viewport(390, 844);
-  onTestFinished(() => page.viewport(414, 896));
-  const long = [
-    ...times("a", "find_commands", 1),
-    ...times("b", "edit_native", 1),
-    ...times("c", "archive_artifact", 1),
-    ...times("d", "mystery_tool", 2),
-  ];
-  const screen = await render(
-    <div className="px-4">
-      <ul>
-        <RunSteps tools={long} />
-      </ul>
-    </div>,
-  );
-  const words = screen.getByText("Looked up commands, edited a file and 3 more");
-  await expect.element(words).toBeVisible();
-  expect(words.element().scrollWidth).toBeLessThanOrEqual(words.element().clientWidth);
-  const line = screen.getByRole("button", {
-    name: "Looked up commands, edited a file, archived an artifact, used 2 tools: 5 tool calls",
+for (const width of [390, 360, 320]) {
+  test(`at ${width}px a run's calls are one line of whole kinds that is never cut, and the sheet keeps them all`, async () => {
+    const rollup = [
+      ...times("a", "create_artifact", 2),
+      ...times("b", "mystery_tool", 3),
+      ...times("c", "create_app", 1),
+    ];
+    const { words, line, screen } = await lineAt(width, rollup);
+    // What the line says is one of the ways to say it, whole, with nothing cut.
+    expect(words.scrollWidth).toBeLessThanOrEqual(words.clientWidth);
+    expect(doneLabels(rollup.map(([, each]) => each))).toContain(words.textContent);
+    if (width === 390) {
+      // The owner's reading of a run, every kind counted, fits where there is room for it.
+      expect(words.textContent).toBe("Made 2 artifacts, used 3 tools, made an app");
+    }
+    await line.click();
+    const sheet = screen.getByRole("dialog", {
+      name: "Made 2 artifacts, used 3 tools, made an app",
+    });
+    await expect.element(sheet).toBeVisible();
+    expect(sheet.getByRole("listitem").elements()).toHaveLength(6);
   });
-  await line.click();
-  // The sheet is named by all of it, and lists every call.
-  const sheet = screen.getByRole("dialog", {
-    name: "Looked up commands, edited a file, archived an artifact, used 2 tools",
-  });
-  await expect.element(sheet).toBeVisible();
-  expect(sheet.getByRole("listitem").elements()).toHaveLength(5);
-});
 
-test("a failure takes its share of the line: fewer kinds are kept, and none is cut", async () => {
-  await page.viewport(390, 844);
-  onTestFinished(() => page.viewport(414, 896));
-  const failing = [
-    ...times("a", "create_artifact", 2),
-    ...times("b", "mystery_tool", 3),
-    ["c_0", tool("create_app", "error", "{}", "Not found")] as const,
-  ];
-  const screen = await render(
-    <div className="px-4">
-      <ul>
-        <RunSteps tools={failing} />
-      </ul>
-    </div>,
-  );
-  const words = screen.getByText("Made 2 artifacts and 4 more");
-  await expect.element(words).toBeVisible();
-  expect(words.element().scrollWidth).toBeLessThanOrEqual(words.element().clientWidth);
-  await expect.element(screen.getByText("1 failed")).toBeVisible();
-});
+  test(`at ${width}px a long run keeps the first kinds whole and counts the rest`, async () => {
+    const long = [
+      ...times("a", "find_commands", 1),
+      ...times("b", "edit_native", 1),
+      ...times("c", "archive_artifact", 1),
+      ...times("d", "mystery_tool", 2),
+    ];
+    const { words } = await lineAt(width, long);
+    expect(words.scrollWidth).toBeLessThanOrEqual(words.clientWidth);
+    expect(doneLabels(long.map(([, each]) => each)).slice(1)).toContain(words.textContent);
+  });
+
+  test(`at ${width}px a failure takes its share of the line, and nothing is cut`, async () => {
+    const failing = [
+      ...times("a", "create_artifact", 2),
+      ...times("b", "mystery_tool", 3),
+      ["c_0", tool("create_app", "error", "{}", "Not found")] as const,
+    ];
+    const { words, screen } = await lineAt(width, failing);
+    expect(words.scrollWidth).toBeLessThanOrEqual(words.clientWidth);
+    await expect.element(screen.getByText("1 failed")).toBeVisible();
+  });
+}

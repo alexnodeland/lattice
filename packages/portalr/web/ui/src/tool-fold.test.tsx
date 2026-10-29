@@ -4,7 +4,7 @@ import { commands, userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { axeViolations } from "./test/axe";
 import { RunSteps } from "./tool-call";
-import { doneLabel, foldSummary } from "./tool-fold";
+import { doneLabel, doneLabels, foldSummary } from "./tool-fold";
 
 const tool = (name: string, status = "ok", args = "{}", result = "Done."): Artifactr.Tool => ({
   name,
@@ -56,53 +56,47 @@ test("a run's calls are counted by kind, as the owner reads them, with the plura
   );
 });
 
-test("short of room, a line keeps whole kinds, the first two if they fit and else the first, and counts the rest", () => {
+test("a line short of room may say the first two kinds, then the first, each whole, with the rest counted", () => {
   const four = run(
     ["find_commands", 1],
     ["edit_native", 1],
     ["archive_artifact", 1],
     ["mystery", 2],
   );
-  // All of it fits: all of it is said.
-  expect(doneLabel(four, 80)).toBe(
+  expect(doneLabels(four)).toEqual([
     "Looked up commands, edited a file, archived an artifact, used 2 tools",
-  );
-  // Two kinds fit; the calls of the others are counted.
-  expect(doneLabel(four, 45)).toBe("Looked up commands, edited a file and 3 more");
-  // Only the first fits.
-  expect(doneLabel(four, 30)).toBe("Looked up commands and 4 more");
-  // Not even that: the first is kept whole all the same, never cut.
-  expect(doneLabel(four, 5)).toBe("Looked up commands and 4 more");
-  // Two kinds, both fit, or the one that does.
-  const two = run(["create_artifact", 2], ["mystery", 3]);
-  expect(doneLabel(two, 40)).toBe("Made 2 artifacts, used 3 tools");
-  expect(doneLabel(two, 20)).toBe("Made 2 artifacts and 3 more");
-  // One kind has nothing to count after it.
-  expect(doneLabel(run(["draw", 30]), 3)).toBe("Drew 30 diagrams");
-  // Two kinds, the first too long for the line, and a third behind them.
-  expect(doneLabel(run(["comment_on_item", 1], ["mystery", 1], ["draw", 1]), 10)).toBe(
+    "Looked up commands, edited a file and 3 more",
+    "Looked up commands and 4 more",
+  ]);
+  // Two kinds: both, or the first and the calls of the other.
+  expect(doneLabels(run(["create_artifact", 2], ["mystery", 3]))).toEqual([
+    "Made 2 artifacts, used 3 tools",
+    "Made 2 artifacts and 3 more",
+  ]);
+  // One kind has nothing to count after it, and no shorter way to say it.
+  expect(doneLabels(run(["draw", 30]))).toEqual(["Drew 30 diagrams"]);
+  expect(doneLabels(run(["read_artifact", 1]))).toEqual(["Read an artifact"]);
+  // Three kinds, the first long.
+  expect(doneLabels(run(["comment_on_item", 1], ["mystery", 1], ["draw", 1]))).toEqual([
+    "Commented on an item, used a tool, drew a diagram",
+    "Commented on an item, used a tool and 1 more",
     "Commented on an item and 2 more",
-  );
+  ]);
+  expect(doneLabel(four)).toBe(doneLabels(four)[0]);
 });
 
-test("the line's words never end mid-phrase, however little room there is", () => {
+test("a line's shorter ways count the calls of the kinds left out, not the kinds", () => {
   const many = run(["find_commands", 2], ["edit_native", 1], ["archive_artifact", 3], ["x", 4]);
-  const kinds = doneLabel(many).split(", ");
-  for (let room = 0; room < 90; room += 1) {
-    // The first kinds of it, whole, then perhaps "and N more", and nothing else.
-    const [kept = "", more] = doneLabel(many, room).split(/ and (\d+) more$/);
-    const at = kept.split(", ").length;
-    expect(kinds.slice(0, at).join(", ")).toBe(kept);
-    expect(at === kinds.length || at <= 2).toBe(true);
-    expect(more === undefined).toBe(at === kinds.length);
-    expect(foldSummary(many, false, room).full).toBe(doneLabel(many));
-  }
+  expect(doneLabels(many)).toEqual([
+    "Looked up commands, edited a file, archived 3 artifacts, used 4 tools",
+    "Looked up commands, edited a file and 7 more",
+    "Looked up commands and 8 more",
+  ]);
 });
 
 test("while a call runs the line says it is doing it; a failure is counted", () => {
   expect(foldSummary([tool("read_artifact"), tool("create_app", "called")])).toEqual({
-    label: "Making an app…",
-    full: "Making an app…",
+    labels: ["Making an app…"],
     failed: 0,
     running: true,
   });
@@ -122,7 +116,7 @@ test("a group is one quiet line, closed, named by what it did and its count", as
   expect(await axeViolations(screen.container)).toEqual([]);
 });
 
-test("a long line is cut to one, with the whole in its name", async () => {
+test("a long line says the longest way it has that fits, whole, with the whole in its name", async () => {
   const many = ["create_app", "read_artifact", "draw", "fetch", "send_message", "post_notice"];
   const screen = await render(
     <div className="w-60">
@@ -132,10 +126,44 @@ test("a long line is cut to one, with the whole in its name", async () => {
     </div>,
   );
   const words = screen.container.querySelector("button span.truncate") as HTMLElement;
-  expect(words.scrollWidth).toBeGreaterThan(words.clientWidth);
+  await expect.poll(() => words.textContent).toBe("Made an app and 5 more");
+  expect(words.scrollWidth).toBeLessThanOrEqual(words.clientWidth);
   await expect
     .element(screen.getByRole("button", { name: /posted a notice: 6 tool calls$/ }))
     .toBeVisible();
+});
+
+test("where not even its shortest way fits, a line is cut by an ellipsis, with the whole in its name", async () => {
+  const screen = await render(
+    <div className="w-24">
+      <ul>
+        <RunSteps tools={calls(tool("comment_on_item"), tool("draw"))} />
+      </ul>
+    </div>,
+  );
+  const words = screen.container.querySelector("button span.truncate") as HTMLElement;
+  await expect.poll(() => words.textContent).toBe("Commented on an item and 1 more");
+  expect(words.scrollWidth).toBeGreaterThan(words.clientWidth);
+  expect(getComputedStyle(words).textOverflow).toBe("ellipsis");
+  await expect
+    .element(
+      screen.getByRole("button", { name: "Commented on an item, drew a diagram: 2 tool calls" }),
+    )
+    .toBeVisible();
+});
+
+test("the line says its longest way again as its box grows", async () => {
+  const screen = await render(
+    <div id="box" className="w-40">
+      <ul>
+        <RunSteps tools={calls(tool("create_app"), tool("read_artifact"))} />
+      </ul>
+    </div>,
+  );
+  const words = screen.container.querySelector("button span.truncate") as HTMLElement;
+  await expect.poll(() => words.textContent).toBe("Made an app and 1 more");
+  (screen.container.querySelector("#box") as HTMLElement).style.width = "30rem";
+  await expect.poll(() => words.textContent).toBe("Made an app, read an artifact");
 });
 
 test("Enter and Space unfurl the calls beneath, the focus staying on the line", async () => {

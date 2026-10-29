@@ -7,7 +7,7 @@ import { Button as BaseButton } from "@base-ui/react/button";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import type { Artifactr } from "@portalr/client";
 import type { ReactNode } from "react";
-import { type RefObject, useEffect, useId, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
@@ -333,12 +333,6 @@ function useShimmer(running: boolean) {
   return words;
 }
 
-/**
- * How many characters of a group's line fit a phone's width at its small size, beside the wrench,
- * the caret and a count of failures, at the narrowest window (390px).
- */
-const PHONE_ROOM = 48;
-
 /** Which groups the reader unfurled, by their first call, for the page's life: never stored. */
 const opened = new Map<string, boolean>();
 
@@ -376,14 +370,32 @@ export function RunSteps({
   const button = useRef<HTMLButtonElement>(null);
   const panel = useId();
   const calls = tools.map(([, tool]) => tool);
-  // On a phone the line says what fits of it, whole kinds and a count of the rest; its name and
-  // the sheet's title keep it all.
-  const { label, full, failed, running } = foldSummary(
-    calls,
-    runRunning,
-    phone ? PHONE_ROOM : undefined,
-  );
+  const { labels, failed, running } = foldSummary(calls, runRunning);
+  const full = labels[0] ?? "";
   const words = useShimmer(running);
+  // The line says the longest of its ways that fits, measured, where it is set, and again as the
+  // line's own box, whose width its words don't change, as the button's they do, changes (the
+  // sheet's title and the button's name keep all of it).
+  const ways = labels.join("\n");
+  useLayoutEffect(() => {
+    const box = words.current;
+    const line = button.current?.parentElement;
+    if (!(box && line)) {
+      return;
+    }
+    const fit = () => {
+      for (const said of ways.split("\n")) {
+        box.textContent = said;
+        if (box.scrollWidth <= box.clientWidth) {
+          break;
+        }
+      }
+    };
+    fit();
+    const resized = new ResizeObserver(fit);
+    resized.observe(line);
+    return () => resized.disconnect();
+  }, [ways, failed, words]);
   // Said once, as a group that was running ends: never as each call does.
   const [ran, setRan] = useState(running);
   const marker = failed > 0 ? ` · ${failed} failed` : "";
@@ -395,7 +407,8 @@ export function RunSteps({
   }
   const count = `${tools.length} tool call${tools.length === 1 ? "" : "s"}`;
   return (
-    <li className="flex flex-col">
+    // On a phone its target, 44px, overlaps what is above and below it, as its words are not that tall.
+    <li className="flex flex-col phone:-my-1.5">
       <BaseButton
         ref={button}
         aria-expanded={open}
@@ -411,9 +424,7 @@ export function RunSteps({
         )}
       >
         <Icon icon={glyphs.wrench} className="size-3.5 shrink-0" />
-        <span ref={words} className="min-w-0 truncate">
-          {label}
-        </span>
+        <span ref={words} className="min-w-0 truncate" />
         {failed > 0 && (
           <span className="flex shrink-0 items-center gap-1 text-danger">
             <Icon icon={glyphs.circleAlert} className="size-3.5" />

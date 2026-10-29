@@ -1,6 +1,6 @@
 # ADR-0089: A native file's proposal says what it does, in its thread too
 
-**Status:** Accepted, amended by [ADR-0091](0091-a-native-files-proposal-opens-on-its-first-changed-page.md) (open on the first changed page), and by [ADR-0092](0092-a-phones-thread-uses-its-height-one-tray-for-what-waits-one-strip-for-a-turn.md) (where a proposal sits, open and decided)
+**Status:** Accepted, amended by [ADR-0091](0091-a-native-files-proposal-opens-on-its-first-changed-page.md) (open on the first changed page), and by [ADR-0092](0092-a-thread-uses-its-height-one-tray-for-what-waits-one-strip-for-a-turn.md) (where a proposal sits, open and decided)
 **Date:** 2026-10-28
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0050](0050-a-native-files-proposals-and-the-pilots-scenarios.md) (what a native file's proposal shows, and where)

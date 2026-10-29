@@ -56,7 +56,13 @@ Then(
 
 When("they accept the proposal {string}", async ({ page }, what: string) => {
   await (await reviewing(page, what)).getByRole("button", { name: "Accept" }).click();
-  await expect(proposal(page, what)).toContainText("Accepted");
+  await expect(
+    page
+      .getByRole("log")
+      .getByRole("listitem")
+      .filter({ hasText: "Accepted" })
+      .filter({ hasText: what }),
+  ).toBeVisible();
 });
 
 Then("{string} is a file to read", async ({ page }, name: string) => {

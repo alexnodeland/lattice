@@ -8,6 +8,9 @@
 
 import type { Artifactr } from "@portalr/client";
 
+/** A question a run asked: the entry of the log that holds it, answered or not. */
+export type Asking = Extract<Entry, { kind: "question" }>;
+
 export type Entry =
   | { readonly kind: "message"; readonly seq: number; readonly message: Artifactr.Message }
   | {
@@ -139,17 +142,17 @@ export function threadLog(
     }),
   ];
   entries.sort((a, b) => a.seq - b.seq);
-  // The last place of each run, which a proposal it made follows, half a place on.
-  const last = new Map<string, number>();
-  for (const entry of entries) {
-    const run =
-      entry.kind === "message" ? entry.message.runId : "run" in entry ? entry.run.id : null;
-    if (run !== null) {
-      last.set(run, entry.seq);
-    }
-  }
+  // The last place of each run (the entries are in order), which a proposal it made follows, half
+  // a place on; the thread's last for one no run made.
+  const last = new Map(
+    entries.map((entry) => [
+      entry.kind === "message" ? entry.message.runId : "run" in entry ? entry.run.id : null,
+      entry.seq,
+    ]),
+  );
+  const end = entries.at(-1)?.seq ?? 0;
   for (const proposal of decided) {
-    const after = last.get(proposal.runId ?? "") ?? Number.MAX_SAFE_INTEGER;
+    const after = last.get(proposal.runId ?? "") ?? end;
     entries.push({ kind: "proposal", seq: after + 0.5, proposal });
   }
   entries.sort((a, b) => a.seq - b.seq);

@@ -164,31 +164,29 @@ export function stream() {
   live({ type: "usage", step: 0, usage: used, total: { requests: 1, ...used }, exact: true });
 }
 
-/** A run waiting on a question, after the tour. */
-export const ASKING = [
+/** The tour, its run paused on `requests`. */
+export const pausedOn = (requests: unknown[]) => [
   ...TOUR,
-  logged(19, {
-    type: "run_paused",
-    run_id: "run_1",
-    thread_id: "thr_1",
-    requests: [
-      {
-        kind: "question",
-        tool_call_id: "q1",
-        tool_name: "ask_user",
-        args: {
-          questions: [
-            {
-              header: "Week",
-              question: "Which week should the note cover?",
-              options: [
-                { label: "This week", description: "The current week", recommended: true },
-                { label: "Next week", description: "The following week" },
-              ],
-            },
+  logged(19, { type: "run_paused", run_id: "run_1", thread_id: "thr_1", requests }),
+];
+
+/** A run waiting on a question, after the tour. */
+export const ASKING = pausedOn([
+  {
+    kind: "question",
+    tool_call_id: "q1",
+    tool_name: "ask_user",
+    args: {
+      questions: [
+        {
+          header: "Week",
+          question: "Which week should the note cover?",
+          options: [
+            { label: "This week", description: "The current week", recommended: true },
+            { label: "Next week", description: "The following week" },
           ],
         },
-      },
-    ],
-  }),
-];
+      ],
+    },
+  },
+]);

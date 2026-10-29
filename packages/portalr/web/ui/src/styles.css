@@ -110,13 +110,18 @@
 
 /*
  * The body of the tray over the composer (portalr ADR-0092): at most two fifths of what the window
- * has left of its height, the on-screen keyboard's room (`--keyboard-inset`) taken away, so the
- * composer and the tray both fit above the keyboard; it scrolls up and down inside itself alone.
+ * has left of its height, the on-screen keyboard's room (`--keyboard-inset`) taken away, but never
+ * less than nine rem, so a question stays answerable above a keyboard or in a short window; it
+ * scrolls up and down inside itself alone. Its padding, which its margin takes back, keeps a
+ * focus ring from being cut at its edge; and the content that scrolls into it fades there, so an
+ * edge there is more past shows (at rest the padding is clear).
  */
 @utility as-tray-body {
-  max-height: calc((100dvh - var(--keyboard-inset, 0px)) * 0.4);
+  max-height: max(9rem, calc((100dvh - var(--keyboard-inset, 0px)) * 0.4));
   overflow: hidden auto;
-  overscroll-behavior: contain;
+  margin: -0.5rem -0.25rem;
+  padding: 0.5rem 0.25rem;
+  mask-image: linear-gradient(transparent, black 0.5rem, black calc(100% - 0.5rem), transparent);
 }
 
 /*

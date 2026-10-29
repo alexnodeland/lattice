@@ -99,24 +99,26 @@ export function Tokens({
   history: number | null;
 }) {
   const usage = run.live.usage;
-  const named = (short: string, name: string, n: number): Count => [short, name, n];
-  const counts = usage
+  const counts: readonly Count[] = usage
     ? [
-        named("in", "Input tokens", usage.input_tokens ?? 0),
-        named("out", "Output tokens", usage.output_tokens ?? 0),
-        ...[
-          named("cached", "Cached input tokens", usage.cache_read_tokens ?? 0),
-          named("cache write", "Input tokens written to the cache", usage.cache_write_tokens ?? 0),
-          named("reasoning", "Reasoning tokens", usage.reasoning_tokens ?? 0),
-        ].filter(([, , n]) => n !== 0),
+        ["in", "Input tokens", usage.input_tokens ?? 0],
+        ["out", "Output tokens", usage.output_tokens ?? 0],
+        // What the cache and reasoning took, where any was.
+        ...(
+          [
+            ["cached", "Cached input tokens", usage.cache_read_tokens ?? 0],
+            ["cache write", "Input tokens written to the cache", usage.cache_write_tokens ?? 0],
+            ["reasoning", "Reasoning tokens", usage.reasoning_tokens ?? 0],
+          ] as const
+        ).filter(([, , n]) => n),
       ]
     : [
-        ...(history === null ? [] : [named("in", "Input tokens", Math.ceil(history / 4))]),
-        named("out", "Output tokens", Math.ceil(run.live.outputChars / 4)),
+        ...(history === null ? [] : ([["in", "Input tokens", Math.ceil(history / 4)]] as const)),
+        ["out", "Output tokens", Math.ceil(run.live.outputChars / 4)],
       ];
   const model = usage?.model;
   return (
-    <span className="block truncate tabular-nums">
+    <span className="block truncate">
       <span aria-hidden="true">
         {counts.map(([short, , n]) => `${short} ${usage ? "" : "~"}${count(n)}`).join(" · ")}
         {model && ` · ${model}`}

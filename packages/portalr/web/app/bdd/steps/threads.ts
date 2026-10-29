@@ -98,8 +98,11 @@ When("they reject it", async ({ page }) => {
   await page.getByRole("button", { name: "Reject" }).click();
 });
 
+// Once decided, a proposal is a line of the thread, not a card (portalr ADR-0092).
 Then("the proposal is {string}", async ({ page }, status: string) => {
-  await expect(page.getByRole("region", { name: /^Proposal:/ })).toContainText(status);
+  await expect(
+    page.getByRole("log").getByRole("listitem").filter({ hasText: status }),
+  ).toBeVisible();
 });
 
 Then("the note says {string}", async ({ page }, text: string) => {

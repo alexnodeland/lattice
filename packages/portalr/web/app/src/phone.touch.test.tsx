@@ -42,7 +42,7 @@ const press = () => {
 const dock = () => document.querySelector("[data-composer-dock]") as HTMLElement;
 /** What waits for the reader, docked above the composer: its box, and the part of it that scrolls. */
 const tray = () => document.querySelector("[aria-label='Waiting for you']") as HTMLElement | null;
-const trayBody = () => tray()?.lastElementChild as HTMLElement;
+const trayBody = () => tray()?.querySelector("[data-tray]") as HTMLElement;
 const noneWider = () => {
   const found = wider();
   expect(found, found.join("\n")).toEqual([]);
@@ -366,15 +366,23 @@ test("the thread on a phone: one compact strip with its tokens on one line, one 
   );
   expect(dock().contains(waiting)).toBe(true);
   const log = screen.getByRole("log").element();
-  const decided = log.querySelector(
-    "[aria-label='Proposal: Add a demo heading and two paragraphs']",
+  const decided = [...log.querySelectorAll("ol > li")].find((each) =>
+    each.textContent?.startsWith("AcceptedAdd a demo heading and two paragraphs"),
   );
-  expect(decided?.textContent).toContain("Accepted");
+  expect(decided).toBeDefined();
   expect(decided?.getBoundingClientRect().height).toBeLessThan(36);
   expect(log.querySelector("[aria-label='Proposal: Add a closing line']")).toBeNull();
+  expect(waiting?.textContent).not.toContain("Add a demo heading and two paragraphs");
+  // The composer starts one line tall, and a message followed by a fold leaves no dead space.
+  expect(dock().querySelector("textarea")?.getBoundingClientRect().height).toBeLessThanOrEqual(44);
+  const said = [...log.querySelectorAll("ol > li")].find((each) =>
+    each.textContent?.startsWith("AssistantHappy to"),
+  );
+  const fold = said?.nextElementSibling;
+  expect(fold?.querySelector("button")).not.toBeNull();
   expect(
-    waiting?.querySelector("[aria-label='Proposal: Add a demo heading and two paragraphs']"),
-  ).toBeNull();
+    (fold?.getBoundingClientRect().top ?? 99) - (said?.getBoundingClientRect().bottom ?? 0),
+  ).toBeLessThanOrEqual(4);
   // Words written before a tool call are not faded, and are the page's ink; no dots say it thinks.
   const words = screen
     .getByRole("listitem", { name: "Assistant is writing" })
@@ -500,4 +508,25 @@ test("the palette, the calls' sheet and its detail, the Add sheet and the tray n
   await screen.getByRole("button", { name: "Add", exact: true }).click();
   await expect.element(screen.getByRole("dialog", { name: "Add" })).toBeVisible();
   stillSideways(screen.getByRole("dialog", { name: "Add" }).element());
+});
+
+test("with the keyboard up in a short window, the tray keeps its few lines, and its last control is reachable", async () => {
+  await page.viewport(390, 560);
+  const viewport = keyboard(0);
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
+  await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
+  viewport.height = window.innerHeight - 300;
+  viewport.dispatchEvent(new Event("resize"));
+  await expect.poll(() => getComputedStyle(dock()).bottom).toBe("300px");
+  const body = trayBody();
+  // What is left of the window is little, but the tray is never less than nine rem...
+  expect(body.getBoundingClientRect().height).toBeGreaterThanOrEqual(143);
+  // ...and it scrolls to the last control, which is then in its view and above the keyboard.
+  body.scrollTo(0, body.scrollHeight);
+  await new Promise((settled) => setTimeout(settled, 100));
+  const answer = screen.getByRole("button", { name: "Answer" }).element().getBoundingClientRect();
+  const box = body.getBoundingClientRect();
+  expect(answer.top).toBeGreaterThanOrEqual(box.top);
+  expect(answer.bottom).toBeLessThanOrEqual(box.bottom);
+  expect(answer.bottom).toBeLessThanOrEqual(window.innerHeight - 300);
 });

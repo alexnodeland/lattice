@@ -13,6 +13,7 @@ import {
   Alert,
   ASK_FORM,
   ASK_USER,
+  askedOf,
   ButtonLink,
   Composer,
   ComposerDock,
@@ -32,6 +33,7 @@ import {
   RunFailed,
   RunSteps,
   RunStrip,
+  reachWaiting,
   rendererFor,
   SelectField,
   StatusBadge,
@@ -66,7 +68,7 @@ import { RuleProposal } from "../../../../../../../rule-proposal";
 import { markSeen } from "../../../../../../../seen";
 import { ShareDialog } from "../../../../../../../share-dialog";
 import { ThreadArtifact } from "../../../../../../../thread-artifact";
-import { type Entry, RETRY_TAKEN, retryOf, threadLog } from "../../../../../../../thread-log";
+import { type Asking, RETRY_TAKEN, retryOf, threadLog } from "../../../../../../../thread-log";
 import { ThreadMenu } from "../../../../../../../thread-menu";
 import { Uploader } from "../../../../../../../upload";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
@@ -441,9 +443,9 @@ function Chat() {
     </div>
   );
   /** Whether a question's run waits on it. */
-  const waitsFor = ({ run, question }: Extract<Entry, { kind: "question" }>) =>
+  const waitsFor = ({ run, question }: Asking) =>
     run.status === "paused" && question.answer === null;
-  const questions = (entry: Extract<Entry, { kind: "question" }>) => {
+  const questions = (entry: Asking) => {
     const { request, answer: given } = entry.question;
     return (
       <Questions
@@ -462,10 +464,10 @@ function Chat() {
       entry.kind === "question" && waitsFor(entry)
         ? [
             {
-              key: entry.question.request.tool_call_id,
-              label: "A question",
+              label: askedOf(entry.question.request),
               children: (
                 <div
+                  key={entry.question.request.tool_call_id}
                   id={`request-${entry.question.request.tool_call_id}`}
                   tabIndex={-1}
                   className="outline-none"
@@ -480,17 +482,14 @@ function Chat() {
     ...active.flatMap((run) =>
       run.requests
         .filter((request) => request.kind !== "approval" && request.tool_name !== ASK_USER)
-        .map((request) => ({
-          key: request.tool_call_id,
-          label: "A form",
-          children: asked(run, request, undefined),
-        })),
+        .map((request) => ({ label: askedOf(request), children: asked(run, request, undefined) })),
     ),
     ...open.map((proposal) => {
       const artifact = proposedOn(proposal);
       const kind = artifact === null ? undefined : artifacts[artifact]?.kind;
       const native = NATIVE.get(kind ?? "");
       const card = {
+        key: proposal.id,
         // Where a file created blank links to the change that fills it.
         id: `proposal-${proposal.id}`,
         proposal,
@@ -498,7 +497,6 @@ function Chat() {
           stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision }),
       };
       return {
-        key: proposal.id,
         label: proposalTitle(proposal),
         // A native file's says what it does and compares it with the head (portalr ADR-0050).
         children:
@@ -526,7 +524,7 @@ function Chat() {
       aria-labelledby="thread"
       data-portalr-replay="block"
       // The composer at the window's foot, under however few messages (portalr ADR-0087).
-      className={`flex min-w-0 flex-1 flex-col gap-6 phone:gap-3 ${split ? "" : "mx-auto w-full max-w-190"}`}
+      className={`flex min-w-0 flex-1 flex-col gap-6 ${split ? "" : "mx-auto w-full max-w-190"}`}
     >
       <PageHeader
         title={thread.title || "Untitled"}
@@ -682,7 +680,7 @@ function Chat() {
         <ComposerDock
           className={`mt-auto flex flex-col gap-2 ${approvals.length > 0 && !split ? "static" : ""}`}
         >
-          <Tray waiting={waiting} />
+          <Tray waiting={waiting} reach={arrived ? latestRequest?.tool_call_id : undefined} />
           {active.filter((run) => run.status === "running").map(strip)}
           {/* The composer's first focus loads the model picker (portalr ADR-0086). */}
           <div className="contents" ref={composer}>
@@ -958,10 +956,5 @@ function Sharing({
 
 /** To a request's own named part, such as "The agent asks", or else to where it is. */
 function toRequest(toolCallId: string | undefined) {
-  const at = document.getElementById(`request-${toolCallId}`);
-  const named = at?.querySelector<HTMLElement>("[aria-label], [aria-labelledby]") ?? at;
-  if (named && !named.hasAttribute("tabindex")) {
-    named.tabIndex = -1;
-  }
-  named?.focus();
+  reachWaiting(`request-${toolCallId}`);
 }

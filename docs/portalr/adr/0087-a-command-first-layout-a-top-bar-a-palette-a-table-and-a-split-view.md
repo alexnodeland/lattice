@@ -1,6 +1,6 @@
 # ADR-0087: A command-first layout: a top bar, a palette, a table and a split view
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0092](0092-a-thread-uses-its-height-one-tray-for-what-waits-one-strip-for-a-turn.md) (the composer's dock holds the tray of what waits; the field starts one line tall on a phone)
 **Date:** 2026-10-28
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0029](0029-ui-polish-from-the-screenshots.md) (one width rule, the phone's drawer), [ADR-0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md) (the rail's current area, in the app), [ADR-0085](0085-polish-one-shape-per-part-and-what-is-folded.md) (the threads' search, the page header's places above, a provider's error, the layout pass it promised)

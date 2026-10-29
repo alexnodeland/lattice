@@ -43,7 +43,7 @@ from artifactr.files.blobs import once
 from artifactr.files.checkouts import Checkout, InMemoryCheckouts
 from artifactr.files.manifest import DOCX, Blob, WordDocument
 from artifactr.files.native import ContentUnavailable, NativeFiles, Part
-from artifactr.files.native.files import _provenance, digests  # pyright: ignore[reportPrivateUsage]
+from artifactr.files.native.files import _provenance, digests
 from artifactr.workspace import (
     Access,
     ArtifactBusy,

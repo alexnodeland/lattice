@@ -817,7 +817,7 @@ jobs:
         ./
 
   # release-please's pull request for a package: its changelog and its version, on main's code,
-  # which passed CI. It is checked to be only that (scripts/release_pr_diff.py), in place of the
+  # which passed CI. It is checked to be only that by the base's scripts/release_pr_diff.py, in place of the
   # jobs above, which skip it by the same three parts as the merge queue's guard below: the
   # lattice App opened it, in this repository, on a branch of release-please's. Every merge to main
   # updates each package's, and seven full runs at once held real pull requests' CI for an hour.
@@ -837,7 +837,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - run: python3 scripts/release_pr_diff.py "$MOON_BASE"
+      # The base's checker, not the pull request's, which could change it.
+      - run: git show "$MOON_BASE:scripts/release_pr_diff.py" | python3 - "$MOON_BASE"
 
   ci:
     name: CI

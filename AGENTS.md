@@ -23,7 +23,7 @@ One repository: eight Python packages, two reference implementations, and the to
 
 ## Setup and commands
 
-The toolchain is pinned in `.prototools` (`proto use`): uv, Bun, moon. Don't use pip, npm, pnpm or Node.js.
+The toolchain is pinned in `.prototools` (`proto use`): uv, Bun, moon. Don't use pip, npm, pnpm or Node.js. proto installs moon in `~/.proto/bin`; if `moon` isn't found, put that on `PATH` (Claude Code's `.claude/settings.json` does it at the start of each session).
 
 ```bash
 make install                      # everything, in one environment
@@ -34,6 +34,10 @@ moon project <project>            # list a project's tasks
 ```
 
 Python projects have `lint`, `typecheck`, `test`, `format`, `check`; web packages the same through Bun, plus `build`. Run `moon run <project>:format` and then `moon run <project>:check` for every project you touched before you call a change done. A focused test run is `uv run pytest packages/<pkg>/tests/<file>.py -n0`.
+
+## Claude Code
+
+`.claude/settings.json` allows the project's commands, formats each edited file (ruff, or Biome in `web/`) and reports an inline suppression right away. The project's skills, in `.claude/skills/`, are `check-change` (run CI's checks for what a change affects), `regenerate` (the generated files) and `new-adr` (an ADR or RFC in the right series).
 
 ## Rules that CI enforces
 

@@ -94,9 +94,10 @@ function useNewVersion(page: string, every: number): [string | null, boolean] {
     }
     const stop = new AbortController();
     let last: string | null = null;
-    // A chunk that failed to load is a build gone: it needs no second read.
+    // A chunk that failed to load is a build gone: it needs no second read, and is read even in
+    // a hidden tab, which is told when it is shown again.
     const check = async (failed = false) => {
-      if (stop.signal.aborted || document.visibilityState === "hidden") {
+      if (stop.signal.aborted || (!failed && document.visibilityState === "hidden")) {
         return;
       }
       try {

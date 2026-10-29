@@ -178,6 +178,17 @@ export function Uploader({
   const [announced, setAnnounced] = useState("");
   const going = useRef<string | null>(null);
   const stop = useRef<AbortController | null>(null);
+  // A file still going is lost by leaving or reloading the page, a new version's Reload too:
+  // the browser asks first, as for an unsent message (portalr ADR-0058).
+  const uploading = items.some((item) => item.state === "waiting" || item.state === "sending");
+  useEffect(() => {
+    if (!uploading) {
+      return;
+    }
+    const ask = (event: BeforeUnloadEvent) => event.preventDefault();
+    addEventListener("beforeunload", ask);
+    return () => removeEventListener("beforeunload", ask);
+  }, [uploading]);
   const update = (id: string, change: Partial<Queued>) =>
     setItems((now) => now.map((item) => (item.id === id ? { ...item, ...change } : item)));
 

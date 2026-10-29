@@ -65,6 +65,7 @@ Without the `people` hook there is no people route, and the UIs show a short id 
 
 ## The browser
 
+- A message written and not yet sent is kept in the tab's `sessionStorage`, under `portalr:draft:` with the tenant, the person and the thread, so a reload brings it back (portalr ADR-0058). It is the tab's alone, gone when the tab closes, let go once sent, and every one is let go when the person signs out or the session ends.
 - The session lives in `localStorage`, under `portalr`. The UIs' Content-Security-Policy allows only their own origin and your Supabase project, no inline script, no framing, and no WebAssembly.
 - `config.json` is public and holds only Supabase's *publishable* key: `Site` refuses a secret key.
 - Reads that expose content are not kept: a revealed span or line is dropped when nothing shows it. An operator's links are read once each and not cached, because each is recorded.

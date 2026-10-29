@@ -621,7 +621,7 @@ function Chat() {
               onFiles={setDropped}
               // Each thread's words are its own: another thread's page starts with its draft.
               key={id}
-              draft={id}
+              draft={`${tenant}/${user}/${id}`}
               attach={
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
                   <Uploader

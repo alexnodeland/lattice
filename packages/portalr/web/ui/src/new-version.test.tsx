@@ -279,6 +279,27 @@ test("a later read of the same build keeps the tab told it was updated", async (
   await expect.element(screen.getByText("portalr was updated. Reload to continue.")).toBeVisible();
 });
 
+test("once told, a read of the tab's own build again, as after a rollback, doesn't clear it", async () => {
+  const fetched = serving(html(`${PAGE}assets/index-New.js`), html(RUNNING));
+  const screen = await render(<NewVersionOffer ui="app" page={PAGE} />);
+  chunkFailed(new TypeError("Failed to fetch dynamically imported module"));
+  await expect.element(screen.getByText("portalr was updated. Reload to continue.")).toBeVisible();
+  shown();
+  shown();
+  await answered(fetched, 3);
+  await expect.element(screen.getByText("portalr was updated. Reload to continue.")).toBeVisible();
+});
+
+test("a chunk that fails in a hidden tab is read all the same, and told when it is shown", async () => {
+  const fetched = serving(html(`${PAGE}assets/index-New.js`));
+  const hidden = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+  const screen = await render(<NewVersionOffer ui="app" page={PAGE} />);
+  chunkFailed(new TypeError("Failed to fetch dynamically imported module"));
+  await answered(fetched, 1);
+  hidden.mockRestore();
+  await expect.element(screen.getByText("portalr was updated. Reload to continue.")).toBeVisible();
+});
+
 test("Reload tells the page first, so a draft it keeps lets it go", async () => {
   const told = vi.fn();
   addEventListener("portalr:reload", told);

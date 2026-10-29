@@ -670,21 +670,23 @@ export function Composer({
    */
   keep?: boolean;
   /**
-   * Where the unsent words are kept for this tab, such as the thread's id: they come back after a
-   * reload, as the one a new version asks for (portalr ADR-0058).
+   * Where the unsent words are kept for this tab, such as the tenant, the person and the thread:
+   * they come back after a reload, as the one a new version asks for, and go as the person signs
+   * out (portalr ADR-0058).
    */
   draft?: string;
 }) {
   const kept = draft && `portalr:draft:${draft}`;
   const [text, setText] = useState(() => (kept && stored(kept)) || "");
-  useEffect(() => {
-    if (kept) {
-      store(kept, text);
-    }
-  }, [kept, text]);
   const hint = useId();
   const box = useRef<HTMLTextAreaElement>(null);
   const { pending, unsent, send: sending } = useSending();
+  // A message on its way is kept until it is answered: a reload meanwhile brings its words back.
+  useEffect(() => {
+    if (kept && (text || !pending)) {
+      store(kept, text);
+    }
+  }, [kept, text, pending]);
   // A draft not yet sent: leaving the page, or reloading it, asks first.
   const drafted = text.trim() !== "";
   useEffect(() => {

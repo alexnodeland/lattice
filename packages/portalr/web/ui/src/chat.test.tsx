@@ -270,6 +270,21 @@ test("a kept draft comes back after a reload, is let go once sent, and keeps its
   await vi.waitFor(() => expect(sessionStorage.getItem("portalr:draft:th_1")).toBeNull());
 });
 
+test("a message on its way stays kept until it is answered", async () => {
+  sessionStorage.removeItem("portalr:draft:th_5");
+  let answer: (sent: { outcome: "done" }) => void = () => {};
+  const onSend = vi.fn(() => new Promise<{ outcome: "done" }>((settle) => (answer = settle)));
+  const screen = await render(<Composer onSend={onSend} draft="th_5" />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("On its way");
+  await box.click();
+  await userEvent.keyboard("{Enter}");
+  await expect.element(box).toHaveValue("");
+  expect(sessionStorage.getItem("portalr:draft:th_5")).toBe("On its way");
+  answer({ outcome: "done" });
+  await vi.waitFor(() => expect(sessionStorage.getItem("portalr:draft:th_5")).toBeNull());
+});
+
 test("Reload chosen in a new version's offer leaves a kept draft without asking", async () => {
   const leave = () => {
     const event = new Event("beforeunload", { cancelable: true });

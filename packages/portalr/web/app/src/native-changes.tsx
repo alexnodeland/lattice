@@ -120,7 +120,6 @@ function ChangesSheet({
   preview: React.ReactNode;
 }) {
   const [chosen, setChosen] = useState<number | null>(null);
-  const heading = useId();
   // The change last opened, whose row takes the focus back from it.
   const [left, setLeft] = useState<number | null>(null);
   const item = chosen === null ? undefined : said.items[chosen];
@@ -183,8 +182,8 @@ function ChangesSheet({
           </ol>
           <Rest said={said} />
           {preview && (
-            <section aria-labelledby={heading} className="flex flex-col gap-2">
-              <Heading id={heading} level={3} look="label">
+            <section aria-label="Before and after" className="flex flex-col gap-2">
+              <Heading level={3} look="label">
                 Before and after
               </Heading>
               {preview}

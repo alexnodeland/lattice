@@ -307,7 +307,7 @@ function Compared(props: Compare) {
         <Diff changes={words} />
       )}
       <BeforeAfter {...props} shown={shown} />
-      {!NO_PICTURE.has(props.app) && (shown || 1) < most && (
+      {(shown || 1) < (NO_PICTURE.has(props.app) ? 0 : most) && (
         <Button
           variant="secondary"
           size="sm"
@@ -327,19 +327,21 @@ function Compared(props: Compare) {
  */
 function failed(page: number, read: UseQueryResult<string>, proposed: boolean): PageShown {
   const { error } = read;
-  const retry = () => void read.refetch();
-  if (!(error instanceof Refused)) {
-    return { page, state: "failed", onRetry: retry };
+  const refused = error instanceof Refused;
+  if (proposed && refused && record(record(error.detail).detail).reason === "content_unavailable") {
+    return { page, state: "failed", said: "The proposed file isn't stored." };
   }
-  if (error.status === 429 || error.status === 503) {
-    // The server's wait, at most five minutes, or ten seconds where it gave none.
-    const wait = Math.min(Math.max(error.retryAfter ?? 10, 0), 300);
-    const said = `Still preparing the picture. Try again ${wait > 1 ? `in ${wait} seconds` : wait ? "in a second" : "now"}.`;
-    return { page, state: "failed", said, onRetry: retry };
-  }
-  return proposed && record(record(error.detail).detail).reason === "content_unavailable"
-    ? { page, state: "failed", said: "The proposed file isn't stored." }
-    : { page, state: "failed", onRetry: retry };
+  // The server's wait, from one second to five minutes, or ten where it gave none.
+  const wait = refused && Math.min(Math.max(error.retryAfter ?? 10, 1), 300);
+  return {
+    page,
+    state: "failed",
+    onRetry: () => void read.refetch(),
+    ...(wait &&
+      (error.status === 429 || error.status === 503) && {
+        said: `Still preparing the picture. Try again in ${wait} second${wait > 1 ? "s" : ""}.`,
+      }),
+  };
 }
 
 /**

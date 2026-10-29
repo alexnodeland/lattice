@@ -903,7 +903,8 @@ class NativeFiles:
             commands = _COMMANDS.validate_json(batch)
         except ValidationError:
             raise ContentUnavailable(proposal.artifact_id, "commands") from None
-        pages = _pages(change.patch) if isinstance(change, EditArtifact) else None
+        patch = change.patch if isinstance(change, EditArtifact) else None
+        pages = _pages(patch) if isinstance(patch, JsonPatch) else None
         return describe(made.app, commands, after=pages)
 
     def _page(self, key: PageKey) -> bytes | None:
@@ -1165,14 +1166,14 @@ def _replaced(patch: Patch, part: Part) -> Blob | None:
     return None
 
 
-def _pages(patch: Patch) -> int | None:
+def _pages(patch: JsonPatch) -> int | None:
     """How many pages a native file's revision gives it, as `revise` builds it, if it says."""
-    if isinstance(patch, JsonPatch):
-        for op in reversed(patch.ops):
-            if op.get("op") == "replace" and op.get("path") == "/pages":
-                value = op.get("value")
-                return value if isinstance(value, int) and value >= 0 else None
-    return None
+    said = [
+        op.get("value")
+        for op in patch.ops
+        if op.get("op") == "replace" and op.get("path") == "/pages"
+    ]
+    return next((value for value in reversed(said) if isinstance(value, int)), None)
 
 
 def _provenance(patch: Patch) -> Provenance | None:

@@ -1,7 +1,9 @@
-"""A PNG's size and first pixel, for the tests of the adapters that draw a blank page."""
+"""A PNG's size and first pixel, and a script's refusals: for adapters drawing a blank page."""
 
+import ast
 import struct
 import zlib
+from pathlib import Path
 
 
 def pixels(png: bytes) -> tuple[int, int, bytes]:
@@ -19,3 +21,20 @@ def pixels(png: bytes) -> tuple[int, int, bytes]:
             data += png[at + 8 : at + 8 + length]
         at += 12 + length
     return width, height, zlib.decompress(data)[1 : 1 + channels]
+
+
+def refusals(script: Path, function: str) -> list[str]:
+    """The words of each `raise Refused("...")` in a script's function, as it raises them."""
+    tree = ast.parse(script.read_text())
+    [found] = [f for f in ast.walk(tree) if isinstance(f, ast.FunctionDef) and f.name == function]
+    return [
+        raised.exc.args[0].value
+        for raised in ast.walk(found)
+        if isinstance(raised, ast.Raise)
+        and isinstance(raised.exc, ast.Call)
+        and isinstance(raised.exc.func, ast.Name)
+        and raised.exc.func.id == "Refused"
+        and raised.exc.args
+        and isinstance(raised.exc.args[0], ast.Constant)
+        and isinstance(raised.exc.args[0].value, str)
+    ]

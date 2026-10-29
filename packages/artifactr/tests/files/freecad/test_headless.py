@@ -17,7 +17,7 @@ from artifactr.files.app import App, AppCommand, AppFailed
 from artifactr.files.freecad import COMMANDS, Subprocess, fingerprint
 from artifactr.files.freecad.headless import EMPTY, PAPER, SCRIPT
 from artifactr.files.manifest import FCSTD
-from tests.files.app.png import pixels
+from tests.files.app.png import pixels, refusals
 from tests.files.freecad.documents import fcstd, obj, xml
 
 FAKE = Path(__file__).with_name("fake_cli.py")
@@ -113,7 +113,7 @@ async def test_a_model_that_shows_no_edge_is_still_refused(freecad: Subprocess) 
 
 
 def test_no_shape_is_refused_in_the_scripts_own_words() -> None:
-    assert f'Refused("{EMPTY}")' in SCRIPT.read_text()
+    assert refusals(SCRIPT, "draw").count(EMPTY) == 1
 
 
 async def test_a_save_or_a_page_it_doesnt_write_is_a_crash(freecad: Subprocess) -> None:

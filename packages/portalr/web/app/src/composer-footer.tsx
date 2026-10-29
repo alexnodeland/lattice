@@ -17,7 +17,11 @@ type Mode = Artifactr.Thread["mode"];
 
 /** The agent's modes, each with what it means in one line. */
 const MODES = [
-  { value: "edit", label: "Auto", line: "The assistant makes changes itself." },
+  {
+    value: "edit",
+    label: "Auto",
+    line: "The assistant makes changes itself, unless review is required.",
+  },
   { value: "suggest", label: "Ask", line: "The assistant proposes changes for you to accept." },
 ] as const satisfies readonly { value: Mode; label: string; line: string }[];
 

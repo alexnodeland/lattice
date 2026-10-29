@@ -5,6 +5,12 @@
  * read twice running, is a new build. The person is told, politely, in a live region that is
  * always there, and chooses: "Reload", or "Not now", which holds for that build in that UI.
  * Nothing reloads by itself.
+ *
+ * A tab that outlived its build asks, sooner or later, for a chunk the server no longer has: Vite
+ * says so with `vite:preloadError`, for a failed import as for a failed preload. The page is then
+ * read at once, and a build other than the tab's is told as what it is, the app updated, with
+ * Reload and nothing else, since the tab can't go on (portalr ADR-0058). Offline, or with the
+ * server restarting, the read finds no other build, and the feature's own words stand.
  */
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -77,8 +83,9 @@ function useDismissed(page: string): [string | null, (build: string) => void] {
  * read again every `every` milliseconds and whenever the tab is shown again; a build is newer
  * once it is read twice running, so a rolling deploy or a rollback isn't offered mid-flight.
  */
-function useNewVersion(page: string, every: number): string | null {
+function useNewVersion(page: string, every: number): [string | null, boolean] {
   const [newer, setNewer] = useState<string | null>(null);
+  const [stale, setStale] = useState(false);
   useEffect(() => {
     // In development the entry is the source (`src/main.tsx`), under no `assets/`: no build.
     const running = buildOf(document, page);
@@ -87,38 +94,50 @@ function useNewVersion(page: string, every: number): string | null {
     }
     const stop = new AbortController();
     let last: string | null = null;
-    const check = async () => {
-      if (stop.signal.aborted || document.visibilityState === "hidden") {
+    // A chunk that failed to load is a build gone: it needs no second read, and is read even in
+    // a hidden tab, which is told when it is shown again.
+    const check = async (failed = false) => {
+      if (stop.signal.aborted || (!failed && document.visibilityState === "hidden")) {
         return;
       }
       try {
         const build = await served(page, stop.signal);
-        if (build !== null && build !== running && build === last) {
+        if (build !== null && build !== running && (failed || build === last)) {
           setNewer(build);
+          setStale((was) => was || failed);
         }
         last = build;
       } catch {
         // offline, aborted, or the server is restarting: asked again at the next turn
       }
     };
-    const timer = setInterval(check, every);
-    document.addEventListener("visibilitychange", check);
+    const looked = () => void check();
+    const failed = () => void check(true);
+    const timer = setInterval(looked, every);
+    document.addEventListener("visibilitychange", looked);
+    addEventListener("vite:preloadError", failed);
     return () => {
       stop.abort();
       clearInterval(timer);
-      document.removeEventListener("visibilitychange", check);
+      document.removeEventListener("visibilitychange", looked);
+      removeEventListener("vite:preloadError", failed);
     };
   }, [page, every]);
-  return newer;
+  return [newer, stale];
 }
 
-/** The offer of a new build of the UI `ui`: "Reload", or "Not now" for it. */
+/**
+ * The offer of a new build of the UI `ui`: "Reload", or "Not now" for it; a `stale` tab, whose
+ * chunks are gone, is told it was updated, and offered Reload alone.
+ */
 export function NewVersion({
   ui,
+  stale = false,
   onReload = () => location.reload(),
   onDismiss,
 }: {
   ui: Ui;
+  stale?: boolean;
   onReload?: () => void;
   onDismiss: () => void;
 }) {
@@ -126,12 +145,26 @@ export function NewVersion({
   return (
     <div className="pointer-events-auto mx-auto flex max-w-(--notice-width) flex-wrap items-center gap-3 rounded-(--notice-radius) border border-line bg-surface p-(--notice-pad) text-fg text-sm shadow-(--notice-shadow)">
       <Icon icon={glyphs.refreshCw} className="size-4 shrink-0" />
-      <p className="min-w-0 flex-1">A new version of {name} is ready. Reload to use it.</p>
+      <p className="min-w-0 flex-1">
+        {stale
+          ? `${name} was updated. Reload to continue.`
+          : `A new version of ${name} is ready. Reload to use it.`}
+      </p>
       <span className="flex gap-2">
-        <Button variant="secondary" onClick={onDismiss}>
-          Not now
+        {!stale && (
+          <Button variant="secondary" onClick={onDismiss}>
+            Not now
+          </Button>
+        )}
+        <Button
+          onClick={() => {
+            // The page is told first, so a draft it keeps lets it go without asking.
+            dispatchEvent(new Event("portalr:reload"));
+            onReload();
+          }}
+        >
+          Reload
         </Button>
-        <Button onClick={onReload}>Reload</Button>
       </span>
     </div>
   );
@@ -151,7 +184,7 @@ export function NewVersionOffer({
   page: string;
   every?: number;
 }) {
-  const newer = useNewVersion(page, every);
+  const [newer, stale] = useNewVersion(page, every);
   const [dismissed, dismiss] = useDismissed(page);
   const region = useRef<HTMLDivElement>(null);
   // A page with no build of its own, as in development, has nothing to offer, and no region.
@@ -167,9 +200,10 @@ export function NewVersionOffer({
       tabIndex={-1}
       className="pointer-events-none fixed inset-x-(--notice-inset) top-(--notice-top) z-50 outline-none"
     >
-      {newer !== null && newer !== dismissed && (
+      {newer !== null && (stale || newer !== dismissed) && (
         <NewVersion
           ui={ui}
+          stale={stale}
           onDismiss={() => {
             // The button pressed goes with the offer: the region it was in keeps the focus.
             region.current?.focus();

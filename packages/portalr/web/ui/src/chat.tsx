@@ -619,6 +619,28 @@ export function InlineArtifact({
   );
 }
 
+/** A tab's kept draft, or null where storage is refused. */
+function stored(key: string) {
+  try {
+    return sessionStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+/** Keep a tab's draft, or let it go once it is empty; refused storage keeps nothing. */
+function store(key: string, text: string) {
+  try {
+    if (text) {
+      sessionStorage.setItem(key, text);
+    } else {
+      sessionStorage.removeItem(key);
+    }
+  } catch {
+    // storage refused: the draft lives as long as the page
+  }
+}
+
 /**
  * Write a message: Enter sends it, Shift+Enter starts a new line, and composing text waits. It
  * grows with its lines, to a height, then scrolls (portalr ADR-0079). It clears as it sends, as
@@ -630,6 +652,7 @@ export function Composer({
   attach,
   onFiles,
   keep = false,
+  draft,
 }: {
   /**
    * Post the message; the text is cleared as it is sent, and comes back if the server refused
@@ -646,11 +669,24 @@ export function Composer({
    * to send them again, as the Threads page, which starts a thread from them, has none.
    */
   keep?: boolean;
+  /**
+   * Where the unsent words are kept for this tab, such as the tenant, the person and the thread:
+   * they come back after a reload, as the one a new version asks for, and go as the person signs
+   * out (portalr ADR-0058).
+   */
+  draft?: string;
 }) {
-  const [text, setText] = useState("");
+  const kept = draft && `portalr:draft:${draft}`;
+  const [text, setText] = useState(() => (kept && stored(kept)) || "");
   const hint = useId();
   const box = useRef<HTMLTextAreaElement>(null);
   const { pending, unsent, send: sending } = useSending();
+  // A message on its way is kept until it is answered: a reload meanwhile brings its words back.
+  useEffect(() => {
+    if (kept && (text || !pending)) {
+      store(kept, text);
+    }
+  }, [kept, text, pending]);
   // A draft not yet sent: leaving the page, or reloading it, asks first.
   const drafted = text.trim() !== "";
   useEffect(() => {
@@ -659,8 +695,16 @@ export function Composer({
     }
     const ask = (event: BeforeUnloadEvent) => event.preventDefault();
     addEventListener("beforeunload", ask);
-    return () => removeEventListener("beforeunload", ask);
-  }, [drafted]);
+    // Reload, chosen in a new version's offer, keeps a kept draft: the page goes without asking.
+    const reloading = () => removeEventListener("beforeunload", ask);
+    if (kept) {
+      addEventListener("portalr:reload", reloading);
+    }
+    return () => {
+      removeEventListener("beforeunload", ask);
+      removeEventListener("portalr:reload", reloading);
+    };
+  }, [drafted, kept]);
   async function send() {
     const message = text.trim();
     if (message && !pending) {

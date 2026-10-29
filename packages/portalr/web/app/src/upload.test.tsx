@@ -288,6 +288,24 @@ test("leaving the page stops the file going", async () => {
   expect(aborted).toHaveBeenCalled();
 });
 
+test("a file still going asks before the page is left or reloaded, a new version's Reload too", async () => {
+  vi.stubGlobal("XMLHttpRequest", Upload);
+  const leave = () => {
+    const event = new Event("beforeunload", { cancelable: true });
+    dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+  const { screen } = await open(PAGE, serving(offered()));
+  expect(leave()).toBe(false);
+  await screen.getByLabelText("Upload files").upload(new File(["x"], "brief.docx"));
+  const going = await sent(1);
+  await vi.waitFor(() => expect(leave()).toBe(true));
+  dispatchEvent(new Event("portalr:reload"));
+  expect(leave()).toBe(true);
+  going.answer(201, { outcome: "applied", artifact_id: "art_1", version: 1, proposal_id: null });
+  await vi.waitFor(() => expect(leave()).toBe(false));
+});
+
 test("a name's bidirectional controls are dropped from what is said of it", async () => {
   vi.stubGlobal("XMLHttpRequest", Upload);
   const { screen } = await open(PAGE, serving(offered()));

@@ -314,6 +314,8 @@ function Threads() {
             disabled={!live}
             onSend={write}
             keep
+            key={`${tenant}/${workspace}`}
+            draft={`${tenant}/${user}/${workspace}`}
             attach={
               // A quieter way in, inside the composer's row (portalr ADR-0085): name it, then
               // start it. It stays as the form opens, so the row keeps its shape.

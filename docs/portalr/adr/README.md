@@ -95,7 +95,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0087](0087-a-command-first-layout-a-top-bar-a-palette-a-table-and-a-split-view.md) | A command-first layout: a top bar, a palette, a table and a split view | Accepted |
 | [0088](0088-connected-apps-opened-from-the-admin-and-the-palette.md) | Connected apps, opened from the admin and the palette | Accepted |
 | [0089](0089-a-native-files-proposal-says-what-it-does-in-its-thread.md) | A native file's proposal says what it does, in its thread too | Accepted |
-||||||| parent of 5beffba4 (feat(portalr): a native file's editor takes a phone's whole window)
-| [0089](0089-a-native-files-editor-takes-a-phones-whole-window.md) | A native file's editor takes a phone's whole window | Accepted |
+| [0090](0090-a-native-files-editor-takes-a-phones-whole-window.md) | A native file's editor takes a phone's whole window | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

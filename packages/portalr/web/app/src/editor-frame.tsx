@@ -95,7 +95,7 @@ export function EditorFrame({
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
   // On a phone it takes the whole window, for as long as it is open: a turn to a wider window
-  // doesn't move the frame, which would load it again and lose the work in it (portalr ADR-0089).
+  // doesn't move the frame, which would load it again and lose the work in it (portalr ADR-0090).
   const phone = usePhone();
   const [whole] = useState(phone);
   // What was last said of it, said in the window it takes too, where the page's is out of sight.
@@ -355,7 +355,7 @@ export function EditorFrame({
           </StatusBadge>
         )}
         {whole ? (
-          // Its own tab, for an editor with no layout for a phone (portalr ADR-0089).
+          // Its own tab, for an editor with no layout for a phone (portalr ADR-0090).
           <TextLink variant="external" href={editor} className="ms-auto text-sm">
             Open in its own tab
           </TextLink>

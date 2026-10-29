@@ -1,4 +1,4 @@
-# ADR-0089: A native file's editor takes a phone's whole window
+# ADR-0090: A native file's editor takes a phone's whole window
 
 **Status:** Accepted
 **Date:** 2026-10-28

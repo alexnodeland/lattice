@@ -37,7 +37,7 @@ Python projects have `lint`, `typecheck`, `test`, `format`, `check`; web package
 
 ## Claude Code
 
-`.claude/settings.json` allows the project's commands, formats each edited file (ruff, or Biome in `web/`) and reports an inline suppression right away. The project's skills, in `.claude/skills/`, are `check-change` (run CI's checks for what a change affects), `regenerate` (the generated files) and `new-adr` (an ADR or RFC in the right series).
+`.claude/settings.json` allows the project's commands, formats each edited file (ruff, or Biome in `web/`), reports an inline suppression right away, and asks before an edit to an accepted ADR's body. The project's skills, in `.claude/skills/`, are `check-change` (run CI's checks for what a change affects), `regenerate` (the generated files), `review-context` (the ADRs and RFCs that govern a change), `new-adr` (an ADR or RFC in the right series) and `rfc-status` (an RFC's status and Tracking).
 
 ## Rules that CI enforces
 
@@ -56,7 +56,7 @@ Python projects have `lint`, `typecheck`, `test`, `format`, `check`; web package
 - Settings are typed, declared in lattice-core and only narrowed below ([ADR-0030](docs/adr/0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md)).
 - Markdown renders on GitHub and on the docs site (Python-Markdown): a blank line before every list, and nested items indented by the parent's text (two spaces after `-`, three after `1.`).
 - Don't edit any `CHANGELOG.md`; release-please writes them.
-- Accepted ADRs are not edited. A changed decision gets a new ADR that supersedes the old one. Architecture docs (`docs/<package>/architecture.md`) are updated in the same PR as the code they describe.
+- Accepted ADRs keep their body. A changed decision gets a new ADR that supersedes the old one; a small amendment is appended as a dated `## Amendment` section. Architecture docs (`docs/<package>/architecture.md`) are updated in the same PR as the code they describe.
 
 ## Commits and pull requests
 

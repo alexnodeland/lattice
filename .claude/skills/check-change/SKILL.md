@@ -17,7 +17,15 @@ CI runs each task in every project a change touches, and in every project that d
    It names each project it runs. For a quick loop on one project, `moon run <project>:check`, or `moon run <project>:test` alone.
 3. **If a generated file drifted,** use the `regenerate` skill.
 4. **If the public API changed,** `moon run lattice:breaks`. A break needs `!` in the PR title and a `BREAKING CHANGE:` footer.
-5. **Docs changed?** `moon run lattice:docs` (strict, and it checks that lists rendered).
+5. **Architecture docs.** A change to a package's code updates its `docs/<pkg>/architecture.md` in the same pull request when it changes what the doc describes. List the packages whose `src/` changed and whose architecture doc didn't:
+
+   ```bash
+   git diff --name-only origin/main...HEAD | awk -F/ '$1=="packages" && $3=="src" {print $2}' | sort -u |
+     while read -r pkg; do git diff --quiet origin/main...HEAD -- "docs/$pkg/architecture.md" && echo "$pkg"; done
+   ```
+
+   For each, read its architecture doc's section for what changed. Many changes alter nothing it describes; update it only where it is now wrong, and say which you checked.
+6. **Docs changed?** `moon run lattice:docs` (strict, and it checks that lists rendered).
 
 What `check` doesn't run locally needs Docker and runs in CI's Acceptance and Images jobs: `<pkg>:test-pg`, `<pkg>:api`, `app:bdd`, `<example>:image`. Run one only when the change is in what it covers, and say which you ran.
 

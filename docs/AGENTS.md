@@ -14,7 +14,7 @@ The root [AGENTS.md](../AGENTS.md) applies; this adds what is specific to the do
 
 - ADRs and RFCs are numbered per scope: `docs/adr/` and `docs/rfcs/` are lattice's, `docs/<package>/adr/` and `docs/<package>/rfcs/` each package's. Take the next free four-digit number in that folder: `NNNN-a-short-title.md`.
 - Start from [adr/template.md](adr/template.md) or [rfcs/template.md](rfcs/template.md), add the file to the folder's index (`README.md` or `index.md`) and to the `.nav.yml` that lists it.
-- **Accepted ADRs are not edited.** A changed decision gets a new ADR that supersedes the old one; only the old one's status line changes.
+- **Accepted ADRs keep their body.** A changed decision gets a new ADR that supersedes the old one, and only the old one's Status line changes; a small amendment is appended as a dated `## Amendment (YYYY-MM-DD)` section.
 
 ## Writing pages
 

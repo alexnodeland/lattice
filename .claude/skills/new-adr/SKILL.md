@@ -10,7 +10,7 @@ description: Write a new ADR or RFC in lattice, in the right series, with the ne
 3. **Write it from the template:** `docs/adr/template.md` or `docs/rfcs/template.md`. Status `Proposed` unless the user says the decision is made; today's date. Write the title as the decision, not the topic ("A merge queue on Mergify", not "Merge queues").
 4. **Refer to others with their series** outside their own: "reflexr ADR-0003", "lattice RFC-0002", with relative links.
 5. **List it** in the folder's `README.md` table (number, title, status), and add the path to the folder's section of the nav: `docs/.nav.yml` for lattice's own, `docs/<package>/.nav.yml` for a package's. A page missing from the nav is left out of the site's sections.
-6. **Superseding or amending:** never edit an accepted ADR's body. Write the new one, then change only the old one's **Status** line (`Superseded by ADR-NNNN`, or `Accepted, amended by NNNN`) and its row in the README.
+6. **Superseding or amending:** never edit an accepted ADR's body. A changed decision is a new ADR; then change only the old one's **Status** line (`Superseded by ADR-NNNN`, or `Accepted, amended by NNNN`) and its row in the README. A small amendment that doesn't change the decision may instead be appended to the ADR as a dated `## Amendment (YYYY-MM-DD)` section, with its Status line saying so (`Accepted, amended YYYY-MM-DD (see Amendment)`). The `adr-guard` hook asks before any other edit to an accepted ADR.
 7. **Check:** `moon run lattice:docs`. A list needs a blank line before it, and nested items are indented by their parent's text.
 
 If the decision changes what exists, update `docs/<package>/architecture.md` in the same pull request.

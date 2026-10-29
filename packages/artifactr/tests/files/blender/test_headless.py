@@ -16,9 +16,10 @@ from pydantic import JsonValue
 
 from artifactr.files.app import App, AppCommand, AppFailed
 from artifactr.files.blender import COMMANDS, Scanned, Subprocess, fingerprint, scan
-from artifactr.files.blender.headless import SCANNING, SCRIPT, _scanned
-from artifactr.files.craft import Ran
+from artifactr.files.blender.headless import EMPTY, SCANNING, SCRIPT, _scanned
+from artifactr.files.craft import PREVIEW, Ran
 from artifactr.files.manifest import BLEND
+from tests.files.app.png import pixels
 from tests.files.corpus.blender.corpus import CORPUS, HOSTILE, changed, inserted, plain
 
 FAKE = Path(__file__).with_name("fake_cli.py")
@@ -110,6 +111,20 @@ async def test_page_one_is_drawn_and_no_other(blender: Subprocess) -> None:
     assert await blender.render(SOURCE, 1, scale=0.5, deadline=10) == PNG
     with pytest.raises(AppFailed, match="no page 2"):
         await blender.render(SOURCE, 2, scale=1, deadline=10)
+
+
+async def test_an_empty_scene_is_drawn_transparent_and_one_with_no_camera_refused(
+    blender: Subprocess,
+) -> None:
+    empty = await blender.render(SOURCE, 1, scale=40 / PREVIEW, deadline=10)
+    assert pixels(empty) == (40, 40, b"\x00" * 4)
+    with pytest.raises(AppFailed, match="the scene has no camera") as refused:
+        await blender.render(SOURCE, 1, scale=48 / PREVIEW, deadline=10)
+    assert refused.value.failure == "refused"
+
+
+def test_the_empty_scene_is_refused_in_the_scripts_own_words() -> None:
+    assert f'Refused("{EMPTY}")' in SCRIPT.read_text()
 
 
 async def test_a_save_or_a_page_it_doesnt_write_is_a_crash(blender: Subprocess) -> None:

@@ -2,7 +2,9 @@
 
 It saves the source it is given as it was, or the corpus' primitives for a blank file, and reads
 an object for each `cube` command after the corpus' cube; any other command is refused, but
-`unsaved`, after which nothing is saved. A page narrower than 32 pixels isn't drawn. Run as
+`unsaved`, after which nothing is saved. A page narrower than 32 pixels isn't drawn; one 40
+wide is refused as the script refuses an empty scene, and one 48 wide as a scene with no camera.
+Run as
 `python -I fake_cli.py --background ... --python script.py -- --pass CALL`.
 """
 
@@ -30,6 +32,9 @@ def main() -> None:
 
 def step(here: Path, call: dict) -> dict:
     if call["step"] == "render":
+        refused = {40: "the scene is empty", 48: "the scene has no camera"}
+        if call["width"] in refused:
+            raise ValueError(f"nothing to draw: {refused[call['width']]}")
         if call["width"] >= 32:
             (here / "out" / "page.png").write_bytes(PNG)
         return {}

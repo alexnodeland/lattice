@@ -14,6 +14,7 @@ from typing import ClassVar, Final
 from pydantic import BaseModel, JsonValue
 
 from artifactr.files.app import AppCommand, AppFailed, Applied, CommandSpec, Inspection, Talk
+from artifactr.files.app.png import solid
 from artifactr.files.craft import CRAFTS, FOUND, PREVIEW, Craft, Script
 from artifactr.files.freecad.document import fingerprint, scan, with_gui
 from artifactr.files.manifest import FCSTD, OUTLINE_LIMIT
@@ -24,6 +25,12 @@ FreeCAD, and nothing that imports every module of artifactr must reach it."""
 
 SAVED: Final = "document.FCStd"
 """What the script saves a document as, in `out/`."""
+
+EMPTY: Final = "nothing to draw: no shape"
+"""How the script refuses to draw a model with no shape, such as a blank document: its words."""
+
+PAPER: Final = b"\xff\xff\xff"
+"""The white the script draws a model's edges on, and so a model with no shape as."""
 
 ARGUMENTS: Final = ("-u", "user.cfg", "-s", "system.cfg", "--safe-mode")
 """Its settings in the call's directory, and no user macro, addon or setting of its own."""
@@ -221,21 +228,34 @@ class Subprocess:
     async def render(self, source: bytes, page: int, *, scale: float, deadline: float) -> bytes:
         """Draw the model's visible edges, isometrically, `PREVIEW` times `scale` wide, as page 1.
 
+        A model with no shape, such as a blank document, has nothing to draw, so the script
+        refuses it. It is drawn as what is there, the white paper alone: a square as wide as the
+        page, at most `PREVIEW`, since an empty model has no extent. A blank document is new, not
+        damaged.
+
         Raises:
-            AppFailed: `refused` too for any page but the first, or a model with no shape.
+            AppFailed: `refused` too for any page but the first, or a model whose shapes show
+                no edge.
         """
         if page != 1:
             raise AppFailed("refused", f"no page {page}: a model is drawn as page 1")
         scanned = scan(source, self.limit)
+        width = max(16, round(PREVIEW * scale))
         call: dict[str, JsonValue] = {
             "step": "render",
             "label": scanned.label,
             "page": page,
-            "width": max(16, round(PREVIEW * scale)),
+            "width": width,
         }
-        ran = await self._script.run(
-            deadline, call, scanned.content, self.extension, wanted={"page.png"}
-        )
+        try:
+            ran = await self._script.run(
+                deadline, call, scanned.content, self.extension, wanted={"page.png"}
+            )
+        except AppFailed as failed:
+            if failed.failure != "refused" or str(failed) != f"refused: {EMPTY}":
+                raise
+            blank = min(width, PREVIEW)
+            return solid(blank, blank, PAPER)
         if (png := ran.files.get("page.png")) is None:
             raise AppFailed("crashed", "freecadcmd drew no page")
         return png

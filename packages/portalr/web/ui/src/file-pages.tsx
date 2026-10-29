@@ -89,7 +89,7 @@ function Page({ shown, name }: { shown: PageShown; name: string }) {
     <figure className="flex flex-col gap-1">
       <div className="flex aspect-[1/1.414] items-center justify-center overflow-hidden rounded-sm border border-line bg-surface forced-colors:border-system-text">
         {"src" in shown ? (
-          <img src={shown.src} alt={name} className="size-full object-contain" />
+          <img src={shown.src} alt={name} className="size-full bg-white object-contain" />
         ) : shown.state === "reading" ? (
           <Skeleton className="size-full rounded-none" />
         ) : (

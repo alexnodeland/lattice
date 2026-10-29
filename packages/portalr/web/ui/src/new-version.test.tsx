@@ -1,7 +1,8 @@
-import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, expect, onTestFinished, test, vi } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { buildOf, NewVersion, NewVersionOffer } from "./new-version";
+import { axeViolations } from "./test/axe";
 
 const PAGE = "/portalr/app/";
 const RUNNING = `${PAGE}assets/index-Old.js`;
@@ -230,4 +231,88 @@ test("a hidden tab isn't read", async () => {
   shown();
   await new Promise((settled) => setTimeout(settled, 100));
   expect(fetched).not.toHaveBeenCalled();
+});
+
+/** What Vite's preload helper dispatches when a chunk, or what it preloads, fails to load. */
+function chunkFailed(payload: Error) {
+  const failed = Object.assign(new Event("vite:preloadError", { cancelable: true }), { payload });
+  dispatchEvent(failed);
+  return failed;
+}
+
+test.each([
+  ["a rejected dynamic import", new TypeError("Failed to fetch dynamically imported module")],
+  ["a failed preload", new Error("Unable to preload CSS for /portalr/app/assets/_thread-Old.css")],
+])("%s, once the build is replaced, is told as the app updated, Reload alone", async (_, error) => {
+  const fetched = serving(html(`${PAGE}assets/index-New.js`));
+  // A "Not now" said before holds for the offer, not for a tab that can't go on.
+  localStorage.setItem(KEY, `${PAGE}assets/index-New.js`);
+  const screen = await render(<NewVersionOffer ui="app" page={PAGE} />);
+  // The import fails as it would: the feature's own error is left to it.
+  expect(chunkFailed(error).defaultPrevented).toBe(false);
+  await expect.element(screen.getByText("portalr was updated. Reload to continue.")).toBeVisible();
+  expect(fetched).toHaveBeenCalledOnce();
+  expect(screen.container.querySelectorAll("button")).toHaveLength(1);
+  await expect.element(offered(screen)).toBeVisible();
+});
+
+test.each<[string, Answer]>([
+  ["no network", () => Promise.reject(new TypeError("Failed to fetch"))],
+  ["a server failing", failing(503)],
+  ["the same build", html(RUNNING)],
+])("a chunk that fails with %s is no new build", async (_, answer) => {
+  const fetched = serving(answer);
+  const screen = await render(<NewVersionOffer ui="app" page={PAGE} />);
+  chunkFailed(new TypeError("Failed to fetch dynamically imported module"));
+  await answered(fetched, 1);
+  expect(screen.container.querySelector("button")).toBeNull();
+});
+
+test("a later read of the same build keeps the tab told it was updated", async () => {
+  const fetched = serving(html(`${PAGE}assets/index-New.js`));
+  const screen = await render(<NewVersionOffer ui="app" page={PAGE} />);
+  chunkFailed(new TypeError("Failed to fetch dynamically imported module"));
+  await expect.element(screen.getByText("portalr was updated. Reload to continue.")).toBeVisible();
+  shown();
+  shown();
+  await answered(fetched, 3);
+  await expect.element(screen.getByText("portalr was updated. Reload to continue.")).toBeVisible();
+});
+
+test("once told, a read of the tab's own build again, as after a rollback, doesn't clear it", async () => {
+  const fetched = serving(html(`${PAGE}assets/index-New.js`), html(RUNNING));
+  const screen = await render(<NewVersionOffer ui="app" page={PAGE} />);
+  chunkFailed(new TypeError("Failed to fetch dynamically imported module"));
+  await expect.element(screen.getByText("portalr was updated. Reload to continue.")).toBeVisible();
+  shown();
+  shown();
+  await answered(fetched, 3);
+  await expect.element(screen.getByText("portalr was updated. Reload to continue.")).toBeVisible();
+});
+
+test("a chunk that fails in a hidden tab is read all the same, and told when it is shown", async () => {
+  const fetched = serving(html(`${PAGE}assets/index-New.js`));
+  const hidden = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+  const screen = await render(<NewVersionOffer ui="app" page={PAGE} />);
+  chunkFailed(new TypeError("Failed to fetch dynamically imported module"));
+  await answered(fetched, 1);
+  hidden.mockRestore();
+  await expect.element(screen.getByText("portalr was updated. Reload to continue.")).toBeVisible();
+});
+
+test("Reload tells the page first, so a draft it keeps lets it go", async () => {
+  const told = vi.fn();
+  addEventListener("portalr:reload", told);
+  onTestFinished(() => removeEventListener("portalr:reload", told));
+  const onReload = vi.fn(() => expect(told).toHaveBeenCalledOnce());
+  const screen = await render(
+    <NewVersion ui="app" stale onReload={onReload} onDismiss={() => {}} />,
+  );
+  await offered(screen).click();
+  expect(onReload).toHaveBeenCalledOnce();
+});
+
+test("the notice of a build gone has nothing axe finds wrong", async () => {
+  const screen = await render(<NewVersion ui="app" stale onDismiss={() => {}} />);
+  expect(await axeViolations(screen.container)).toEqual([]);
 });

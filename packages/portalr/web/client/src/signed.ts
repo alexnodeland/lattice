@@ -29,6 +29,22 @@ const kept = (session: AuthSession | null): Current | null =>
 /** What a session did that a stream must follow: its token was refreshed, or it ended. */
 export type SessionChange = "refreshed" | "ended";
 
+/**
+ * Let go of the composers' unsent words this tab keeps (portalr ADR-0058): whoever signs in next,
+ * here, finds none of them. Refused storage keeps none.
+ */
+export function forgetDrafts(): void {
+  try {
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith("portalr:draft:")) {
+        sessionStorage.removeItem(key);
+      }
+    }
+  } catch {
+    // storage refused: nothing was kept
+  }
+}
+
 export class Signed {
   readonly auth: GoTrueClient;
   private current: Current | null = null;
@@ -52,6 +68,7 @@ export class Signed {
         this.tell("refreshed");
       }
       if (event === "SIGNED_OUT") {
+        forgetDrafts();
         this.tell("ended");
         onSignedOut();
       }

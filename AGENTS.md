@@ -35,6 +35,15 @@ moon project <project>            # list a project's tasks
 
 Python projects have `lint`, `typecheck`, `test`, `format`, `check`; web packages the same through Bun, plus `build`. Run `moon run <project>:format` and then `moon run <project>:check` for every project you touched before you call a change done. A focused test run is `uv run pytest packages/<pkg>/tests/<file>.py -n0`.
 
+## Worktrees
+
+Do each task in a worktree of its own, not in the main checkout, which stays on `main` for the person and for other agents.
+
+- Make it inside the repository, at `.claude/worktrees/<name>` (ignored by Git, and where Claude Code puts its own), on a new branch from the latest `main`: `git fetch origin && git worktree add .claude/worktrees/<name> -b <branch> origin/main`. Not beside the repository.
+- Work, run commands and commit from inside it. Run `make install` there first when the task runs code: each worktree has its own `.venv` and `node_modules`.
+- Runs in other worktrees don't collide: the tasks that start compose projects name each with a random token of its own.
+- Once its pull request merges, remove it: `git worktree remove .claude/worktrees/<name>`, then delete the branch.
+
 ## Claude Code
 
 `.claude/settings.json` allows the project's commands, formats each edited file (ruff, or Biome in `web/`), reports an inline suppression right away, and asks before an edit to an accepted ADR's body. The project's skills, in `.claude/skills/`, are `check-change` (run CI's checks for what a change affects), `regenerate` (the generated files), `review-context` (the ADRs and RFCs that govern a change), `new-adr` (an ADR or RFC in the right series) and `rfc-status` (an RFC's status and Tracking).

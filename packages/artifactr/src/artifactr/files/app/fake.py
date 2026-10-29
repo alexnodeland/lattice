@@ -8,13 +8,12 @@ only when the paragraphs or comments do.
 import hashlib
 import json
 import math
-import struct
-import zlib
 from collections.abc import Sequence
 from typing import Final
 
 from pydantic import BaseModel, JsonValue, ValidationError
 
+from artifactr.files.app.png import solid
 from artifactr.files.app.port import (
     AppCommand,
     AppFailed,
@@ -108,7 +107,7 @@ class FakeApp:
         if not 1 <= page <= pages:
             raise AppFailed("refused", f"page {page} is not in a file of {pages}")
         shown = file.paragraphs[(page - 1) * PAGE : page * PAGE]
-        return _png(hashlib.sha256(json.dumps([shown, scale]).encode()).digest()[:3])
+        return solid(1, 1, hashlib.sha256(json.dumps([shown, scale]).encode()).digest()[:3])
 
     async def commands(self, query: str) -> Sequence[CommandSpec]:
         """Find the commands whose name or description mentions the query."""
@@ -162,19 +161,3 @@ def _inspect(file: _File) -> Inspection:
 def _pages(file: _File) -> int:
     """A file's pages: one at least, as an empty document has."""
     return max(1, math.ceil(len(file.paragraphs) / PAGE))
-
-
-def _png(rgb: bytes) -> bytes:
-    """A PNG of one pixel of a colour."""
-
-    def chunk(kind: bytes, data: bytes) -> bytes:
-        body = kind + data
-        return struct.pack(">I", len(data)) + body + struct.pack(">I", zlib.crc32(body))
-
-    header = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
-    return (
-        b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", header)
-        + chunk(b"IDAT", zlib.compress(b"\x00" + rgb))
-        + chunk(b"IEND", b"")
-    )

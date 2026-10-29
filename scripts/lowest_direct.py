@@ -31,29 +31,16 @@ PACKAGES = {
 }
 """Each package that ships a wheel, by its directory, and the module it installs, in release order.
 stackr ships none."""
-FLOOR_LACKS = (
-    "lattice-core-ai 0.1.0, at its floor, has no lattice_core.integrations or lattice_core.settings"
-)
-LATTICE_CORE_MODULE = "No module named 'lattice_core."
-"""What an import says of a lattice-core module 0.1.0 lacks, whichever it reaches first: the
-integrations, or the settings (lattice ADR-0029, ADR-0030)."""
 EXPECTED: dict[str, tuple[str, str]] = {
     "artifactr": (
-        FLOOR_LACKS,
-        LATTICE_CORE_MODULE,
-    ),
-    "grantr": (
-        FLOOR_LACKS,
-        LATTICE_CORE_MODULE,
+        "pydantic-ai-slim 2.51, at its floor, fails to import repair_messages, which "
+        "pydantic-ai-slim has from 2.53",
+        "cannot import name 'repair_messages'",
     ),
     "relayr": (
         "artifactr-ai 0.2.0 and pydantic-ai-slim 2.51, at their floors, fail to import "
         "repair_messages, which pydantic-ai-slim has from 2.53",
         "cannot import name 'repair_messages'",
-    ),
-    "portalr": (
-        FLOOR_LACKS,
-        LATTICE_CORE_MODULE,
     ),
 }
 """The packages whose floors are known to be too low (the v0.2 release audit): why, and what the

@@ -22,13 +22,13 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "lattice-core-ai>=0.1.0",
+    "lattice-core-ai>=0.2.0",
     "pydantic>=2.13",
     "opentelemetry-api>=1.28",
 ]
 
 [project.optional-dependencies]
-sql = ["lattice-core-ai[sql]>=0.1.0", "sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
+sql = ["lattice-core-ai[sql]>=0.2.0", "sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
 sqlite = ["grantr[sql]", "aiosqlite>=0.22"]
 postgres = ["grantr[sql]", "asyncpg>=0.31"]
 fastapi = ["fastapi>=0.141", "starlette>=0.46.0"]

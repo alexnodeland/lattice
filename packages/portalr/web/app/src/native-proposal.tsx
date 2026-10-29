@@ -346,7 +346,7 @@ function failed(page: number, read: UseQueryResult<string>, proposed: boolean): 
  * The proposal's pages beside the head's: the first that changed alone, as its commands name it
  * or as the pages read say, or `shown` pages from the first; where its app draws none, that said.
  */
-export function BeforeAfter({
+function BeforeAfter({
   place,
   proposal,
   version,

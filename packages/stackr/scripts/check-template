@@ -246,12 +246,15 @@ def check_crafts() -> list[str]:
         problems.append(f"deploy/host/Caddyfile's editors aren't copier.yml's: {editors}")
     # Each app has an editor or says why it has none: a release with no browser build has none,
     # and one with a build has none only for want of a bridge (artifactr's tests hold copier.yml's
-    # editors to its registry's bridges).
+    # editors to its registry's bridges, and those to the pinned builds).
     for name, craft in crafts.items():
-        built = "-web-" in (theirs / "crafts" / f"{name}.sha256").read_text()
-        reasons = {"no host bridge"} if built else {"no browser build"}
-        if bool(craft.get("editor")) == (craft.get("no_editor") in reasons):
-            problems.append(f"copier.yml's {name} needs an editor or no_editor, one of {reasons}")
+        assets = (theirs / "crafts" / f"{name}.sha256").read_text().split()[1::2]
+        built = any(asset.startswith(f"{name}-web-") for asset in assets)
+        if craft.get("editor"):
+            if not built or "no_editor" in craft:
+                problems.append(f"copier.yml's {name} has an editor, so a build and no no_editor")
+        elif craft.get("no_editor") != ("no host bridge" if built else "no browser build"):
+            problems.append(f"copier.yml's {name} needs an editor, or no_editor saying why not")
     for name, craft in crafts.items():
         pin = Path("crafts", f"{name}.sha256")
         if (ours / pin).read_bytes() != (theirs / pin).read_bytes():

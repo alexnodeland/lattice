@@ -26,7 +26,7 @@ dependencies = [
     "pydantic>=2.13",
     "jsonpatch>=1.33",
     "jsonpointer>=1.9",
-    "pydantic-ai-slim>=2.51",
+    "pydantic-ai-slim>=2.53",
     "opentelemetry-api>=1.28",
 ]
 

@@ -112,7 +112,7 @@ test("where no editor is hosted, checking out downloads alone, and says to open 
   const opened = vi.spyOn(window, "open").mockReturnValue(null);
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   const { screen } = await open(PAGE, serving({ lease: null }), undefined, { editors: {} });
-  await expect.element(screen.getByText(/No editor is hosted here/)).toBeVisible();
+  await expect.element(screen.getByText(/can't be edited in this window/)).toBeVisible();
   await screen.getByRole("button", { name: "Check out and download" }).click();
   await told(screen, /^Checked out until .*, and downloading\.$/);
   expect(opened).not.toHaveBeenCalled();

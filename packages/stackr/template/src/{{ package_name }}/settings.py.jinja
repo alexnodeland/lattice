@@ -606,7 +606,7 @@ class Settings:
             gateway=gateway,
 {%- if use_artifactr %}
             agent_writes_direct=(
-                _names(env["AGENT_WRITES_DIRECT"]) if "AGENT_WRITES_DIRECT" in env else None
+                _names(direct) if (direct := env.get("AGENT_WRITES_DIRECT", "").strip()) else None
             ),
 {%- endif %}
 {%- if use_tracker %}

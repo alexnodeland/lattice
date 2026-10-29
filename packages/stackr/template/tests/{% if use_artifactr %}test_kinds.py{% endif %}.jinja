@@ -5,6 +5,7 @@ import asyncio
 {% else -%}
 from dataclasses import replace
 {% endif -%}
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -81,6 +82,17 @@ def test_agent_writes_direct_is_read_from_the_environment() -> None:
     named = Settings.from_environ({"AGENT_WRITES_DIRECT": "note, form"})
     assert named.agent_writes_direct == ("note", "form")
     assert Settings.from_environ({"AGENT_WRITES_DIRECT": "none"}).agent_writes_direct == ()
+    for unset in ("", "  "):
+        assert Settings.from_environ({"AGENT_WRITES_DIRECT": unset}).agent_writes_direct is None
+
+
+def test_an_env_copied_from_the_example_keeps_each_kinds_policy() -> None:
+    example = Path(__file__).parent.parent / ".env.example"
+    lines = example.read_text().splitlines()
+    env = dict(line.split("=", 1) for line in lines if "=" in line and not line.startswith("#"))
+    assert "AGENT_WRITES_DIRECT" in env
+    copied = Settings.from_environ({"AGENT_WRITES_DIRECT": env["AGENT_WRITES_DIRECT"]})
+    assert copied.agent_writes_direct is None
 
 
 def test_an_agents_note_applies_in_auto(script: Script) -> None:

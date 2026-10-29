@@ -11,7 +11,7 @@ native files are off: no route is mounted, and the agent has no tools for them.
   version's bytes, words and pages, beside artifactr's routes
 - the agent's tools: ``create_native_file``, ``read_native``, ``read_review``, ``find_commands``
   and ``edit_native``, and its instructions for them: that a file is made empty and written by its
-  edits, each a proposal a person reviews
+  edits, which wait for a person's review in Ask, or when review is enforced for the type
 
 Each app is an integration of its own, ``files:<app>``, switched per workspace like any other.
 {%- if use_diagrams %}
@@ -100,8 +100,7 @@ FILE_INSTRUCTIONS: Final = """\
 You can create files of any type `create_native_file` lists. Never say you can't create files.
 
 - A file is created empty: in the same turn, find its commands with `find_commands`, then put \
-its content in with `edit_native`, in as few batches as you can: each is a proposal a person \
-reviews.
+its content in with `edit_native`, in as few batches as you can.
 - In Ask, or when review is enforced for the type, your edits wait for review: the file stays \
 empty until a person accepts one, so say the content waits for review, never that the file is \
 written. Otherwise they apply. Each edit's result says which it was.

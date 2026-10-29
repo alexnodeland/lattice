@@ -46,8 +46,9 @@ def direct_writes(types: Iterable[type[Artifact]]) -> Setting:
 def direct_writes_from(settings: Settings) -> DirectWrites:
     """The kinds a settings store holds in ``agent-writes:direct``, read on each agent's write.
 
-    A store that can't be read answers no kinds, so every agent's write is a proposal; a value
-    that isn't names raises, and the write with it.
+    A store that can't be read answers the setting's floor, no kinds, as grantr's adapter does,
+    so every agent's write is a proposal; a value that isn't names raises ``TypeError``, which
+    refuses the write.
     """
 
     async def read(tenant_id: TenantId, workspace_id: WorkspaceId) -> frozenset[str]:

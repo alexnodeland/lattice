@@ -107,6 +107,37 @@ plugins:
   - search
   # Zensical implements awesome-nav itself: each folder's .nav.yml orders its section.
   - awesome-nav
+  # Instructions for coding agents, beside the pages they describe, aren't pages of the site.
+  # Zensical implements the exclude plugin itself and ignores mkdocs' exclude_docs.
+  # llms.txt and llms-full.txt at the site's root, for agents reading the docs without the
+  # source. Zensical implements the llmstxt plugin itself.
+  - llmstxt:
+      markdown_description: >-
+        Python libraries for applications in which people and agents work together, and the
+        stack they run on. Each package's section has its guides, reference, ADRs and RFCs.
+      full_output: llms-full.txt
+      sections:
+        lattice:
+          - index.md: Home
+          - architecture.md: How the repository and its packages fit together
+          - upgrading-to-0.2.md
+        Packages:
+          - artifactr/index.md: artifactr, versioned artifacts that people and agents share
+          - reflexr/index.md: reflexr, rules over event streams that run agents
+          - evalr/index.md: evalr, typed evaluations that learn from feedback
+          - relayr/index.md: relayr, events from artifactr and task trackers to reflexr
+          - grantr/index.md: grantr, identity and access
+          - portalr/index.md: portalr, the portal
+          - stackr/index.md: stackr, the stack and the application template
+          - lattice-core/index.md: lattice-core, what the libraries share
+        Guides:
+          - "*/guides/*.md"
+          - "*/getting-started.md"
+        Reference:
+          - "*/reference/*.md"
+          - "*/architecture.md"
+  - exclude:
+      regex: ['(^|/)AGENTS\.md$']
   - mkdocstrings:
       handlers:
         python:

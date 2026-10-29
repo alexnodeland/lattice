@@ -22,6 +22,8 @@ tasks:
   test:
     inputs:
       - '**/*'
+      # Not the instructions for coding agents, which no task reads.
+      - '!**/AGENTS.md'
       # The vectors artifactr.ui commits, which the forms' tests check against (lattice RFC-0005).
       - '/packages/artifactr/tests/ui/vectors/*.json'
       # The schema artifactr.ui's panels are held to, and lattice's integrations and their defaults.

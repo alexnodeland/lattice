@@ -81,3 +81,28 @@ def test_a_project_without_a_language_is_matched_by_no_language_but_still_runs_u
     projects = {"odd": {"tasks": {"test": {}}}}
     assert targets_of("test", {"odd"}, projects) == ["odd:test"]
     assert targets_of("test", {"odd"}, projects, "python") == []
+
+
+def test_the_instructions_for_coding_agents_affect_no_project() -> None:
+    without_inert = AFFECTED["without_inert"]
+    changed = {
+        "files": [
+            "AGENTS.md",
+            "packages/artifactr/AGENTS.md",
+            "packages/artifactr/src/artifactr/files/AGENTS.md",
+            "packages/artifactr/src/artifactr/core.py",
+            "docs/AGENTS.md.orig",
+            "docs/MY_AGENTS.md",
+        ],
+        "options": {"local": True},
+        "shallow": False,
+    }
+    assert without_inert(changed) == {
+        "files": [
+            "packages/artifactr/src/artifactr/core.py",
+            "docs/AGENTS.md.orig",
+            "docs/MY_AGENTS.md",
+        ],
+        "options": {"local": True},
+        "shallow": False,
+    }

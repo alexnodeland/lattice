@@ -23,6 +23,8 @@ tasks:
     command: 'uv run pytest --cov --cov-report=term-missing --durations=10'
     inputs:
       - '**/*'
+      # Not the instructions for coding agents, which no task reads.
+      - '!**/AGENTS.md'
 
   check:
     description: "Run the project's checks, as CI does"

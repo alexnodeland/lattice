@@ -18,6 +18,8 @@ tasks:
     command: 'make validate'
     inputs:
       - '**/*'
+      # Not the instructions for coding agents, which no task reads.
+      - '!**/AGENTS.md'
       - '/pyproject.toml'
       - '/uv.lock'
       - '/copier.yml'
@@ -30,6 +32,8 @@ tasks:
     command: 'uv run scripts/docs-reference --check'
     inputs:
       - '**/*'
+      # Not the instructions for coding agents, which no task reads.
+      - '!**/AGENTS.md'
       - '/pyproject.toml'
       - '/uv.lock'
       - '/docs/stackr/reference/**/*'
@@ -185,6 +189,8 @@ tasks:
     command: 'scripts/check-app'
     inputs:
       - '**/*'
+      # Not the instructions for coding agents, which no task reads.
+      - '!**/AGENTS.md'
       - '/copier.yml'
       - '/uv.lock'
     options:
@@ -196,6 +202,8 @@ tasks:
     # It also runs portalr's readers for Langfuse and LiteLLM, which nothing else runs up.
     inputs:
       - '**/*'
+      # Not the instructions for coding agents, which no task reads.
+      - '!**/AGENTS.md'
       - '/packages/portalr/src/portalr/readers/**/*'
       - '/packages/portalr/scripts/smoke_readers.py'
       # The portal's scenarios for a generated application, which smoke-app runs.
@@ -213,6 +221,8 @@ tasks:
     # It also runs the portal's scenarios for a generated application, on local Supabase.
     inputs:
       - '**/*'
+      # Not the instructions for coding agents, which no task reads.
+      - '!**/AGENTS.md'
       - '/packages/portalr/web/*/bdd/**/*'
       - '/packages/portalr/web/*/scripts/generated'
       - '/packages/portalr/web/*/playwright.config.ts'

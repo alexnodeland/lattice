@@ -13,6 +13,8 @@ tasks:
     # Its own files, and the packages it bundles, whose sources and styles it builds from.
     inputs:
       - '**/*'
+      # Not the instructions for coding agents, which no task reads.
+      - '!**/AGENTS.md'
       - '/packages/portalr/web/client/src/**/*'
       - '/packages/portalr/web/ui/src/**/*'
       # What the third-party notices are made of, and the policy they are checked against.

@@ -12,6 +12,8 @@ tasks:
     command: '$workspaceRoot/scripts/api $API_SERVICE'
     inputs:
       - '**/*'
+      # Not the instructions for coding agents, which no task reads.
+      - '!**/AGENTS.md'
       - '/scripts/api'
       - '/scripts/compose-project.sh'
       - '/schemathesis.toml'

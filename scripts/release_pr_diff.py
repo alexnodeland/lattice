@@ -5,7 +5,8 @@ Usage: python3 -I release_pr_diff.py BASE REPOSITORY   (the diff is BASE...HEAD,
 release-please's pull request for a package changes its CHANGELOG.md, the version in its
 pyproject.toml and in uv.lock, and its line in .release-please-manifest.json. CI runs the base's
 copy of this on those pull requests (ci.yml), and skips its other jobs only if it exits 0: their
-code is main's, which passed CI, and the merge queue runs all of CI on a release before it merges.
+code is main's, which passed CI, and a release queued with Mergify runs all of CI on its batch
+(the ruleset doesn't require the queue, so one merged directly ships on this check alone).
 Anything else exits 1, and all of CI runs, so a refusal costs time, not a check.
 
 It refuses another file, a file added, deleted or renamed, a mode or a binary, and in those files
@@ -19,6 +20,7 @@ import re
 import subprocess
 import sys
 import tomllib
+import unicodedata
 from pathlib import Path
 from typing import Any
 
@@ -27,20 +29,30 @@ CHANGELOG = re.compile(PACKAGE + r"/CHANGELOG\.md")
 PYPROJECT = re.compile(PACKAGE + r"/pyproject\.toml")
 LOCK = "uv.lock"
 MANIFEST = ".release-please-manifest.json"
-RELEASE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
-VERSION_LINE = re.compile(r'version = "\d+\.\d+\.\d+"')
+RELEASE = re.compile(r"([0-9]+)\.([0-9]+)\.([0-9]+)")
+VERSION_LINE = re.compile(r'version = "[0-9]+\.[0-9]+\.[0-9]+"')
 REPOSITORY = "https://github.com/alexnodeland/lattice/"
 
-DATE = r"\(\d{4}-\d{2}-\d{2}\)"
+DATE = r"\([0-9]{4}-[0-9]{2}-[0-9]{2}\)"
 HEADINGS = (
     re.compile(
-        r"## \[\d+\.\d+\.\d+\]\(" + re.escape(REPOSITORY) + r"compare/[a-z0-9.-]+\) " + DATE
+        r"## \[[0-9]+\.[0-9]+\.[0-9]+\]\("
+        + re.escape(REPOSITORY)
+        + r"compare/[a-z0-9.-]+\) "
+        + DATE
     ),
-    re.compile(r"## \d+\.\d+\.\d+ " + DATE),
+    re.compile(r"## [0-9]+\.[0-9]+\.[0-9]+ " + DATE),
     re.compile(r"### (⚠ )?[A-Z][A-Za-z ]+"),
 )
 BULLET = re.compile(r"\* .+")
 LINK = re.compile(r"\]\(([^)]*)\)")
+OURS = re.compile(re.escape(REPOSITORY) + r"[^\s()]*")
+ELSEWHERE = re.compile(r"://|www\.|\]:|\[\^|\*\[|\b[A-Za-z][A-Za-z0-9+.-]*:(?![\s*]|$)")
+"""What, once the repository's own URLs are taken out, would link elsewhere: any URL, a reference
+definition, a footnote, an abbreviation, or a scheme (`**scope:**` and `text: more` aren't)."""
+INVISIBLE = {"Cc", "Cf", "Zl", "Zp"}
+"""Control and format characters, bidi and zero-width among them, and line and paragraph
+separators."""
 NEVER = ("<", ">", "{", "}", "8<", "!!!", "\\")
 """What no changelog line may hold: HTML, attributes, includes, admonitions, escapes. The docs
 include each changelog (pymdownx.snippets), so these would reach the site's build. A release whose
@@ -146,7 +158,11 @@ def changelog(before: str, after: str) -> list[str]:
             line and not BULLET.fullmatch(line) and not any(h.fullmatch(line) for h in HEADINGS)
         ):
             found.append(f"not release-please's: {line}")
-        elif any(not url.startswith(REPOSITORY) for url in LINK.findall(line)):
+        elif any(unicodedata.category(c) in INVISIBLE for c in line):
+            found.append(f"a control or format character: {line!r}")
+        elif any(not url.startswith(REPOSITORY) for url in LINK.findall(line)) or (
+            ELSEWHERE.search(OURS.sub("", line))
+        ):
             found.append(f"a link outside the repository: {line}")
     return found
 

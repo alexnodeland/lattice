@@ -2,6 +2,7 @@
 ci.yml), in a repository of its own: only a release's version and changelog pass, and nothing
 else, not even a failure to check, skips CI's jobs."""
 
+import re
 import shutil
 import subprocess
 import sys
@@ -215,6 +216,17 @@ def test_a_symlink_fails(repo: Repo) -> None:
         "<script>x</script>",
         "a line of no shape",
         "* [x](https://example.com)",
+        "* see https://evil.example",
+        "* see www.evil.example",
+        "* [a]: javascript:alert(1)",
+        "[a]: https://evil.example",
+        "* a note[^1]",
+        "*[HTML]: x",
+        "* run javascript:alert(1)",
+        "* a \u202e reversed line",
+        "* a zero\u200bwidth line",
+        "* a line\u2028separated",
+        "* a bell\x07",
     ],
 )
 def test_a_changelog_line_not_release_pleases_fails(repo: Repo, line: str) -> None:
@@ -266,3 +278,48 @@ def test_a_base_without_the_checker_runs_ci(repo: Repo, tmp_path: Path) -> None:
     git(root, "commit", "-qm", "no checker")
     git(root, "checkout", "-q", "release")
     assert run_step(root, tmp_path) == ""
+
+
+def test_a_scope_and_a_colon_pass(repo: Repo) -> None:
+    assert problems(repo(changelog("* **relayr:** one thing: and another"))) == []
+
+
+def test_unicode_digits_are_not_a_version(repo: Repo) -> None:
+    assert problems(repo(released("\u0660.\u0661.\u0662"))) != []
+    assert rpd.release("\u0660.\u0661.\u0662") is None
+
+
+def test_a_newline_in_a_path_is_not_a_file_a_release_changes(repo: Repo) -> None:
+    assert problems(repo({"a\n::error::x": "x\n"})) == [
+        "a\n::error::x: not a file a release changes"
+    ]
+
+
+def test_the_step_stops_workflow_commands_around_the_checker() -> None:
+    step = checker_step()
+    assert (
+        step.index("::stop-commands::$token")
+        < step.index("python3 -I")
+        < step.index('"::$token::"')
+    )
+
+
+UNGATED = {"release-pr", "dependency-review", "osv", "ci", "release-images-publish", "aws-tier2"}
+"""The jobs that don't need the gate: itself, the two that run on a release too, the aggregate,
+and two that need a gated job, and so skip with it."""
+
+
+def test_every_other_job_is_gated_and_may_skip_only_when_light() -> None:
+    jobs = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
+    gated = set(jobs) - UNGATED
+    for name in gated:
+        assert jobs[name]["needs"] == "release-pr", name
+        assert jobs[name]["if"] == "${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}"
+    assert set(jobs["ci"]["needs"]) == set(jobs) - {"ci"}
+    skips = jobs["ci"]["steps"][0]["with"]["allowed-skips"]
+    light = re.search(r"needs\.release-pr\.outputs\.light == 'true'\s*&& '([^']*)'", skips)
+    assert light is not None
+    assert {each.strip() for each in light.group(1).split(",")} == gated | {
+        "release-images-publish",
+        "aws-tier2",
+    }

@@ -26,9 +26,11 @@ jobs:
   # real pull requests' CI for an hour. On one opened by the lattice App, in this repository, on a
   # branch of release-please's, the base's scripts/release_pr_diff.py checks the diff is only
   # that, and if it is, `light` skips the jobs below. Anything else, a diff it refuses or a check
-  # that can't run, leaves `light` unset, and all of CI runs, as on any pull request. The merge
-  # queue runs all of CI on a release before it merges in any case. On other pull requests this
-  # is skipped, without a runner, and the jobs that need it start at once.
+  # that can't run, leaves `light` unset, and all of CI runs, as on any pull request. A release
+  # queued with Mergify runs all of CI on its batch before it merges, but the ruleset doesn't
+  # require the queue: one merged directly ships on this check alone, which limits it to versions
+  # and changelog text the docs build includes. On other pull requests this is skipped, without a
+  # runner, and the jobs that need it start at once.
   release-pr:
     name: Release pull request
     if: >-
@@ -48,17 +50,26 @@ jobs:
           persist-credentials: false
       # The base's checker, not the pull request's, which could change it, run isolated from a
       # directory of its own, so no module the pull request adds can stand in for one it imports.
+      # It prints the pull request's paths and lines, so workflow commands are stopped around it,
+      # by a token of this run's.
       - id: diff
         shell: bash
         run: |
           checker="$RUNNER_TEMP/release_pr_diff/release_pr_diff.py"
           mkdir -p "$(dirname "$checker")"
+          token=$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n')
           if ! git show "$MOON_BASE:scripts/release_pr_diff.py" >"$checker"; then
             echo "The base has no checker: all of CI runs"
-          elif (cd "$(dirname "$checker")" && python3 -I "$checker" "$MOON_BASE" "$GITHUB_WORKSPACE"); then
-            echo "light=true" >>"$GITHUB_OUTPUT"
           else
-            echo "Not only a release's changes: all of CI runs"
+            echo "::stop-commands::$token"
+            verdict=0
+            (cd "$(dirname "$checker")" && python3 -I "$checker" "$MOON_BASE" "$GITHUB_WORKSPACE") || verdict=$?
+            echo "::$token::"
+            if [ "$verdict" = 0 ]; then
+              echo "light=true" >>"$GITHUB_OUTPUT"
+            else
+              echo "Not only a release's changes: all of CI runs"
+            fi
           fi
 
   # Whether a pull request changes tier 2's inputs: the recipe, the images' files, or the template

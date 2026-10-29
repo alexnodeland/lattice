@@ -46,6 +46,12 @@ nav:
       - adr/0028-a-stuck-test-fails-by-a-signal-and-its-worker-carries-on.md
       - adr/0029-each-wheel-checked-at-its-floors.md
       - adr/0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md
+      - adr/0031-data-space-models-in-apache-ossie-with-a-lattice-extension.md
+      - adr/0032-replicated-records-in-ducklake.md
+      - adr/0033-lattice-compiles-semantic-queries-itself-on-duckdb.md
+      - adr/0034-one-decide-port-on-decision-models-calibrated-before-it-acts.md
+      - adr/0035-every-number-an-agent-states-traces-to-a-computation.md
+      - adr/0036-lattice-supports-compliance-and-operators-are-certified.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr

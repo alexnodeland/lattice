@@ -36,5 +36,11 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0028](0028-a-stuck-test-fails-by-a-signal-and-its-worker-carries-on.md) | A stuck test fails by a signal, and its worker carries on | Accepted |
 | [0029](0029-each-wheel-checked-at-its-floors.md) | Each wheel checked at its floors | Accepted |
 | [0030](0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md) | Settings: typed, declared in lattice-core, and only narrowed below the operator | Accepted |
+| [0031](0031-data-space-models-in-apache-ossie-with-a-lattice-extension.md) | Data space models in Apache Ossie, with a full `LATTICE` extension | Proposed |
+| [0032](0032-replicated-records-in-ducklake.md) | Replicated records in DuckLake, so every answer cites a snapshot | Proposed |
+| [0033](0033-lattice-compiles-semantic-queries-itself-on-duckdb.md) | lattice compiles semantic queries itself, on DuckDB | Proposed |
+| [0034](0034-one-decide-port-on-decision-models-calibrated-before-it-acts.md) | One `decide` port on decision models, calibrated before it acts | Proposed |
+| [0035](0035-every-number-an-agent-states-traces-to-a-computation.md) | Every number an agent states traces to a computation | Proposed |
+| [0036](0036-lattice-supports-compliance-and-operators-are-certified.md) | lattice supports compliance, and operators are the ones certified | Proposed |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

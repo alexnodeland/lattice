@@ -6,7 +6,7 @@ Each package goes into a fresh environment with every extra it declares, its own
 dependencies at the lowest versions its ranges allow (`--resolution lowest-direct`), and its
 lattice siblings from PyPI, not the workspace (`--no-sources`): what a user who pins the floors
 gets. Then every module of the package is imported. A floor below what the code needs, such as
-`lattice-core-ai>=0.1.0` for code that imports what only 0.2.0 has, fails here.
+`artifactr-ai>=0.2.0` for code that imports what only 0.3.0 has, fails here.
 
 EXPECTED lists the packages known to fail until their floors are raised, as each package's release
 does (the owner's step): each must still fail, so a package that starts passing is flagged, and
@@ -31,33 +31,14 @@ PACKAGES = {
 }
 """Each package that ships a wheel, by its directory, and the module it installs, in release order.
 stackr ships none."""
-FLOOR_LACKS = (
-    "lattice-core-ai 0.1.0, at its floor, has no lattice_core.integrations or lattice_core.settings"
-)
-LATTICE_CORE_MODULE = "No module named 'lattice_core."
-"""What an import says of a lattice-core module 0.1.0 lacks, whichever it reaches first: the
-integrations, or the settings (lattice ADR-0029, ADR-0030)."""
 EXPECTED: dict[str, tuple[str, str]] = {
-    "artifactr": (
-        FLOOR_LACKS,
-        LATTICE_CORE_MODULE,
-    ),
-    "grantr": (
-        FLOOR_LACKS,
-        LATTICE_CORE_MODULE,
-    ),
     "relayr": (
-        "artifactr-ai 0.2.0 and pydantic-ai-slim 2.51, at their floors, fail to import "
-        "repair_messages, which pydantic-ai-slim has from 2.53",
-        "cannot import name 'repair_messages'",
-    ),
-    "portalr": (
-        FLOOR_LACKS,
-        LATTICE_CORE_MODULE,
+        "artifactr-ai 0.2.0, at its floor, has no artifactr.excalidraw, which relayr imports",
+        "No module named 'artifactr.excalidraw'",
     ),
 }
-"""The packages whose floors are known to be too low (the v0.2 release audit): why, and what the
-import says when it fails so. Each comes off as its floor is raised (lattice ADR-0029)."""
+"""The packages whose floors are known to be too low: why, and what the import says when it fails
+so. Each comes off as its floor is raised (lattice ADR-0029)."""
 CHECK = """
 import importlib, pkgutil, sys
 

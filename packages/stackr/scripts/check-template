@@ -25,7 +25,7 @@ and the Playwright image whose Chromium the worker drives, at its playwright-cor
 And the release pins: the template's crafting apps are lattice's own, each pinned
 by the same file as scripts/crafts, fetched by the same scripts/craft, at the version its pin
 names (lattice RFC-0003's release-pin check), so a worker's CLI and its editor's build are one
-release, the one lattice's tests ran.
+release, the one lattice's tests ran; and each app has an editor, or says why it has none.
 
 The generated applications' types and tests need their dependencies installed: CI's template
 job runs `make check` in each variant for that.
@@ -244,6 +244,17 @@ def check_crafts() -> list[str]:
     editors = sorted(name for name, craft in crafts.items() if craft.get("editor"))
     if served is None or sorted(served[1].split("|")) != editors:
         problems.append(f"deploy/host/Caddyfile's editors aren't copier.yml's: {editors}")
+    # Each app has an editor or says why it has none: a release with no browser build has none,
+    # and one with a build has none only for want of a bridge (artifactr's tests hold copier.yml's
+    # editors to its registry's bridges, and those to the pinned builds).
+    for name, craft in crafts.items():
+        assets = (theirs / "crafts" / f"{name}.sha256").read_text().split()[1::2]
+        built = any(asset.startswith(f"{name}-web-") for asset in assets)
+        if craft.get("editor"):
+            if not built or "no_editor" in craft:
+                problems.append(f"copier.yml's {name} has an editor, so a build and no no_editor")
+        elif craft.get("no_editor") != ("no host bridge" if built else "no browser build"):
+            problems.append(f"copier.yml's {name} needs an editor, or no_editor saying why not")
     for name, craft in crafts.items():
         pin = Path("crafts", f"{name}.sha256")
         if (ours / pin).read_bytes() != (theirs / pin).read_bytes():

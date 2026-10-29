@@ -1,8 +1,11 @@
 """The crafting apps' registry: one declaration each, held to lattice-core's and to the pins."""
 
+import os
 from pathlib import Path
+from typing import Final
 
 import pytest
+import yaml
 
 from artifactr.files.craft import CRAFTS, Craft
 from artifactr.files.manifest import (
@@ -26,6 +29,7 @@ from artifactr.files.wordcraft import Subprocess
 from lattice_core.integrations import KNOWN
 
 PINS = Path(__file__).parents[5] / "scripts" / "crafts"
+COPIER = Path(__file__).parents[4] / "stackr" / "copier.yml"
 BRAND = "artcraft"
 """The apps' brand, whose licence lets its name appear only in the official builds."""
 
@@ -57,6 +61,35 @@ def test_a_cli_that_confines_nothing_is_never_on_by_default() -> None:
 
 def test_each_app_is_pinned() -> None:
     assert sorted(path.stem for path in PINS.glob("*.sha256")) == sorted(CRAFTS)
+
+
+def test_the_template_hosts_an_editor_for_exactly_the_apps_whose_build_has_a_bridge() -> None:
+    """An app the template wires has an editor port where the registry says its build hands a
+    file over, and says why not otherwise (scripts/check-template holds which reason): this
+    holds copier.yml to the registry, and the live test below the registry to the build."""
+    crafts = yaml.safe_load(COPIER.read_text())["crafts"]["default"]
+    editors = {name for name, craft in crafts.items() if craft.get("editor")}
+    bridged = {name for name in crafts if CRAFTS[name].bridge == "parent"}
+    assert editors == bridged == {"wordcraft", "gridcraft", "pdfcraft", "cadcraft"}
+    assert all(crafts[name].get("no_editor") for name in crafts.keys() - editors)
+
+
+BRIDGE: Final = ".postMessage(arg1, getStringFromWasm0("
+"""A `?host=parent` bridge's mark in a build's wasm-bindgen glue: `window.postMessage` with a
+target origin, which only the bridged builds import (a worker's or worklet's port takes none)."""
+BUILT = [name for name in CRAFTS if "-web-" in (PINS / f"{name}.sha256").read_text()]
+
+
+@pytest.mark.parametrize(
+    "name", [pytest.param(name, marks=pytest.mark.craft(name)) for name in BUILT]
+)
+def test_the_registry_says_a_bridge_exactly_where_the_pinned_build_has_one(name: str) -> None:
+    """Live, with `ARTIFACTR_TEST_CRAFT_WEB`: a pin bump whose build gains or loses the bridge
+    fails here until the registry, and so copier.yml's editor, follow it."""
+    build = Path(os.environ["ARTIFACTR_TEST_CRAFT_WEB"])
+    glue = [path.read_text(errors="replace") for path in build.rglob("*.js")]
+    assert glue, f"{build} holds no build"
+    assert any(BRIDGE in text for text in glue) == (CRAFTS[name].bridge == "parent")
 
 
 THIRD_PARTIES = {"freecad", "blender"}

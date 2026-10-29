@@ -155,6 +155,8 @@ export function CheckOut({
   const [own, keep] = useOwnCheckout(place);
   // Its build hands the file over and back where its editor is hosted: it is edited here.
   const here = editor !== null && status.talk === "bridged";
+  // No editor of its app opens here at all: none is hosted, and its build hands no file over.
+  const nowhere = editor === null && status.talk !== "bridged";
   // One file is edited in place on a page at a time; the version checked out is what it opens,
   // which, once the page is loaded again, is the head the lease still holds.
   const editing = useEditing()?.artifact === artifact;
@@ -334,7 +336,9 @@ export function CheckOut({
           {here
             ? `Editing checks it out, so no one else changes it meanwhile, and opens it in ${app} here, on a site of its own that can't see your session. When you save there, it is checked in, and your check-out ends.`
             : editor === null
-              ? `Checking it out holds it for you and downloads it. No editor is hosted here: open it in ${app} yourself.`
+              ? nowhere
+                ? `${app} can't be edited in this window. Checking it out holds it for you and downloads it: open it in ${app} yourself.`
+                : `Checking it out holds it for you and downloads it. No editor is hosted here: open it in ${app} yourself.`
               : `Checking it out holds it for you, downloads it, and opens ${app} in a new tab, on a site of its own that can't see your session. Open the downloaded file there.`}
         </p>
       </div>
@@ -381,7 +385,9 @@ export function CheckOut({
         )}
         {here
           ? `Edit it in ${app} here, or save it to this computer from ${app} and check it in below.`
-          : `Edit it in ${app}, save it to this computer, then check it in here.`}
+          : nowhere
+            ? `${app} can't be edited in this window: edit it in ${app}, save it to this device, then check it in here.`
+            : `Edit it in ${app}, save it to this computer, then check it in here.`}
       </p>
       <div className="flex flex-wrap items-center gap-2">
         {here && !editing && !flips && (

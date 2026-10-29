@@ -33,6 +33,7 @@ interface Held {
   lease: unknown;
   limit?: number;
   refuse?: number;
+  talk?: string;
 }
 
 function serving(held: Held) {
@@ -41,7 +42,11 @@ function serving(held: Held) {
       case `${AT}/artifacts/doc_1/revisions`:
         return Response.json(REVISIONS);
       case FILE:
-        return Response.json({ ...status(held.lease), limit: held.limit ?? 26_214_400 });
+        return Response.json({
+          ...status(held.lease),
+          talk: held.talk ?? "save",
+          limit: held.limit ?? 26_214_400,
+        });
       case `${FILE}/checkouts`:
         if (held.refuse !== undefined) {
           return Response.json(
@@ -108,17 +113,34 @@ test("checking out holds the file, opens the editor apart, downloads the head, a
   await expect.element(editor).toHaveAttribute("target", "_blank");
 });
 
-test("where no editor is hosted, checking out downloads alone, and says to open it oneself", async () => {
+test("where its app has no editor at all, checking out downloads alone, and says it can't be edited here", async () => {
   const opened = vi.spyOn(window, "open").mockReturnValue(null);
   vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
   const { screen } = await open(PAGE, serving({ lease: null }), undefined, { editors: {} });
-  await expect.element(screen.getByText(/No editor is hosted here/)).toBeVisible();
+  await expect
+    .element(screen.getByText(/^WordCraft can't be edited in this window\. /))
+    .toBeVisible();
   await screen.getByRole("button", { name: "Check out and download" }).click();
   await told(screen, /^Checked out until .*, and downloading\.$/);
+  await expect
+    .element(screen.getByText(/WordCraft can't be edited in this window: edit it/))
+    .toBeVisible();
   expect(opened).not.toHaveBeenCalled();
   expect(
     screen.getByRole("link", { name: "Open WordCraft (opens in a new tab)" }).elements(),
   ).toHaveLength(0);
+});
+
+test("where its bridged editor isn't hosted, checking out says so, not that it can't be edited here", async () => {
+  vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+  const held = { lease: null, talk: "bridged" };
+  const { screen } = await open(PAGE, serving(held), undefined, { editors: {} });
+  await expect.element(screen.getByText(/No editor is hosted here/)).toBeVisible();
+  await screen.getByRole("button", { name: "Check out and download" }).click();
+  await expect
+    .element(screen.getByText(/Edit it in WordCraft, save it to this computer/))
+    .toBeVisible();
+  expect(screen.getByText(/can't be edited in this window/).elements()).toHaveLength(0);
 });
 
 test("a check-out refused says why, opens nothing, and reads the workspace's switches again", async () => {

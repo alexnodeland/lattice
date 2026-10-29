@@ -58,6 +58,7 @@ const LABELS: Readonly<Record<string, string>> = {
   "connect-per-hour:blender": "Blender's tries an hour",
   "connect-tools:freecad": "FreeCAD's tools",
   "connect-tools:blender": "Blender's tools",
+  "agent-writes:direct": "Kinds the agent edits directly in Auto",
 };
 
 /** A setting's name: its label, or, for one this admin doesn't know yet, its sentence. */

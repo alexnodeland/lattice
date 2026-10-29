@@ -184,6 +184,7 @@ def create_app(
 {%- endif %}
 {%- if use_artifactr %}
         gateway=settings.gateway,
+        direct=settings.agent_writes_direct,
 {%- endif %}
     )
 {%- if use_artifactr %}
@@ -266,6 +267,8 @@ def create_app(
 {%- if access == 'grantr' %}
         models=models,
         allowed=access.grants,
+{%- else %}
+        direct=settings.agent_writes_direct,
 {%- endif %}
         gateway=settings.gateway,
         database=database,

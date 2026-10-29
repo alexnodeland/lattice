@@ -96,6 +96,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `src/<package>/access.py` | `access == 'grantr'` | rendered |
 | `src/<package>/admin.py` | `access == 'grantr'` | rendered |
 | `src/<package>/collaboration.py` | `use_artifactr` | rendered |
+| `src/<package>/kinds.py` | `use_artifactr` | rendered |
 | `src/<package>/notes.py` | `use_artifactr` | rendered |
 | `src/<package>/files.py` | `use_files` | rendered |
 | `src/<package>/editor.py` | `use_files and use_portal` | rendered |
@@ -117,6 +118,7 @@ A file whose name ends in `.jinja` in `template/` is rendered with the answers; 
 | `tests/test_admin.py` | `access == 'grantr'` | rendered |
 | `tests/test_evals.py` | `evals` | rendered |
 | `tests/test_collaboration.py` | `use_artifactr` | rendered |
+| `tests/test_kinds.py` | `use_artifactr` | rendered |
 | `tests/test_models.py` | `use_artifactr` | rendered |
 | `tests/test_diagrams.py` | `use_diagrams` | rendered |
 | `tests/test_files.py` | `use_files` | rendered |

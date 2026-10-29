@@ -78,7 +78,9 @@ workspaces = Workspaces(InMemoryStorage(), types=[Plan, ReleaseNotes])
 | `"direct"` (the default) | is applied, and returns `Applied` |
 | `"propose"` | is recorded as a proposal, and returns `Proposed` |
 
-Write policies bind agents only: the thread's built-in agent and external agents connected over MCP. Changes by people and by the system always apply directly. A thread can also be switched into suggest mode (`SetThreadMode(thread_id=..., mode="suggest")`), which makes its agent propose every change whatever the type's policy. Anyone, person or agent, can propose explicitly with `ProposeChange`. [Workspaces, commits and the log](workspaces.md#proposals) covers how proposals are answered, and [The agent](agent.md#proposals) covers how the agent hears the outcome.
+Write policies bind agents only: the thread's built-in agent and external agents connected over MCP. Changes by people and by the system always apply directly. A thread can also be switched into suggest mode (`SetThreadMode(thread_id=..., mode="suggest")`), which makes its agent propose every change whatever the type's policy. Anyone, person or agent, can propose explicitly with `ProposeChange`.
+
+The policy is the type's default. An application that gives `Workspaces(direct_writes=direct_writes_from(settings))` reads the `agent-writes:direct` setting instead, declared with `direct_writes(types)`. That setting names the kinds whose agents' changes apply in Auto, and it defaults to the kinds whose policy is `"direct"`. The operator's configuration may add kinds, and a tenant's and a workspace's admins may only take them out ([ADR-0009](../adr/0009-write-policies-and-non-blocking-proposals.md)). [Workspaces, commits and the log](workspaces.md#proposals) covers how proposals are answered, and [The agent](agent.md#proposals) covers how the agent hears the outcome.
 
 ## What the agent sees
 

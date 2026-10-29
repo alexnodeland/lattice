@@ -10,7 +10,7 @@ clients are external agents acting for the user whose token they carry{% endif %
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncGenerator, Awaitable, Callable{% if use_ui and use_diagrams %}, Mapping{% endif %}
+from collections.abc import AsyncGenerator, Awaitable, Callable{% if use_ui and use_diagrams %}, Mapping{% endif %}, Sequence
 
 from fastapi import FastAPI{% if access == 'grantr' %}, HTTPException{% endif %}
 from mcp.server.mcpserver.exceptions import ToolError
@@ -30,20 +30,30 @@ from artifactr.mcp import ArtifactrMcp, McpContext
 from artifactr.scores import FeedbackMirror, sync_score_configs
 from artifactr.sql import SqlStorage, migrate
 {%- if use_ui %}
-from artifactr.ui import UI_TYPES, ui_checks, ui_key_of
+from artifactr.ui import ui_checks, ui_key_of
 {%- if access == 'grantr' %}
 from artifactr.ui.checks import IsAdmin
 {%- endif %}
 {%- endif %}
-from artifactr.workspace import Authorize, {% if use_ui and use_diagrams %}Check, {% endif %}Hidden{% if use_ui and use_diagrams %}, Workspace{% endif %}{% if use_ui or use_files %}, integration_gate{% endif %}
+from artifactr.workspace import (
+    Authorize,
+{%- if use_ui and use_diagrams %}
+    Check,
+{%- endif %}
+    Hidden,
+{%- if use_ui and use_diagrams %}
+    Workspace,
+{%- endif %}
+    direct_writes_from,
+{%- if use_ui or use_files %}
+    integration_gate,
+{%- endif %}
+)
 from evalr.langfuse import LangfuseScoreConfigStore, LangfuseScoreSink
 {%- if use_ui or use_files %}
 from lattice_core.integrations import Integrations
 {%- endif %}
 from lattice_core.settings import Settings
-{%- if use_relayr %}
-from relayr.rules import RuleDraft
-{%- endif %}
 
 {% if access == 'grantr' -%}
 from {{ package_name }}.access import Refused
@@ -54,10 +64,8 @@ from {{ package_name }}.database import Database
 from {{ package_name }}.files import Files
 {%- endif %}
 from {{ package_name }}.gateway import Guardrails, Models, TenantKeys
-{%- if use_relayr %}
-from {{ package_name }}.incidents import Postmortem, Timeline
-{%- endif %}
-from {{ package_name }}.notes import Note, Rating, {% if use_portal %}Thumbs, {% endif %}build_note_agent
+from {{ package_name }}.kinds import artifact_types, writes_defaults
+from {{ package_name }}.notes import Rating, {% if use_portal %}Thumbs, {% endif %}build_note_agent
 from {{ package_name }}.scores import Mirrors, {% if use_relayr %}OnOpen, {% endif %}opened, sync_configs
 from {{ package_name }}.settings import GatewaySettings
 from {{ package_name }}.telemetry import TelemetryHandle
@@ -113,8 +121,11 @@ class Collaboration:
         models: The models a message may name instead (artifactr ADR-0097); without it, those
             ``gateway`` lists.
         allowed: Which of them each workspace allows: its ``models:allowed``, which a turn's
-            ``artifactr:use_model`` is checked against before ``authorize`` is asked; without
-            it, the operator's, everywhere.
+            ``artifactr:use_model`` is checked against before ``authorize`` is asked; and its
+            ``agent-writes:direct``, the kinds whose agent's writes apply in Auto. Without it,
+            the operator's, everywhere.
+        direct: The operator's ``AGENT_WRITES_DIRECT``, which applies everywhere without
+            ``allowed``; each type's own policy if None.
         gateway: The gateway's settings: tenant keys and guardrails.
         database: The database; without one, workspaces live in memory.
         telemetry: OpenTelemetry, and Langfuse when it has a client.
@@ -145,6 +156,7 @@ class Collaboration:
         model: Model,
         models: Models | None = None,
         allowed: Settings | None = None,
+        direct: Sequence[str] | None = None,
         gateway: GatewaySettings,
         database: Database | None = None,
         telemetry: TelemetryHandle | None = None,
@@ -181,9 +193,11 @@ class Collaboration:
             if database
             else InMemoryStorage()
         )
+        types = artifact_types({% if use_files %}files.types{% endif %})
         self.workspaces = Workspaces(
             storage,
-            types=[Note{% if use_ui %}, *UI_TYPES{% endif %}{% if use_relayr %}, Timeline, Postmortem, RuleDraft{% endif %}{% if use_files %}, *files.types{% endif %}],
+            types=types,
+            direct_writes=direct_writes_from(allowed or writes_defaults(types, direct)),
 {%- if use_ui and use_diagrams %}
 {%- if access == 'grantr' %}
             checks=_together(

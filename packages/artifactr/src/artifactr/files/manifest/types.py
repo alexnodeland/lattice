@@ -113,8 +113,9 @@ class Provenance(BaseModel):
 class NativeFile(Artifact, abstract=True):
     """A file in a native format: its manifest. Subclass it once per format.
 
-    Agents' edits are proposals by default (`write_policy`), and write policies bind agents
-    only: a person's check-in commits directly.
+    Agents' edits are proposals by default (`write_policy`): always in a thread in Ask, and in
+    Auto unless the application's `agent-writes:direct` setting names the kind (ADR-0009).
+    Write policies bind agents only: a person's check-in commits directly.
     """
 
     formats: ClassVar[frozenset[str]]

@@ -1,0 +1,47 @@
+"""The kinds of artifact this application keeps, and which of them an agent's writes apply to.
+
+An agent's create, edit or archive waits for review in a thread in Ask. In Auto it applies when
+the workspace's ``agent-writes:direct`` setting names its kind (artifactr ADR-0009). That
+setting's default is each type's own policy: notes apply{% if use_relayr %}, rules' drafts wait for review{% endif %}{% if use_files %},
+native files wait for review{% endif %}.
+The operator's ``AGENT_WRITES_DIRECT`` replaces that default, and may name any kind; a tenant's
+and a workspace's admins only take kinds out (lattice ADR-0030).
+"""
+
+from collections.abc import Iterable, Sequence
+
+from artifactr import Artifact
+{%- if use_ui %}
+from artifactr.ui import UI_TYPES
+{%- endif %}
+from artifactr.workspace import DIRECT_WRITES, direct_writes
+from lattice_core.settings import SettingsDefaults, Value, registry
+{%- if use_relayr %}
+from relayr.rules import RuleDraft
+{%- endif %}
+
+{% if use_relayr -%}
+from {{ package_name }}.incidents import Postmortem, Timeline
+{% endif -%}
+from {{ package_name }}.notes import Note
+
+
+def artifact_types({% if use_files %}natives: Iterable[type[Artifact]] = (){% endif %}) -> list[type[Artifact]]:
+    """The kinds this application keeps{% if use_files %}, and ``natives``: the running apps' types{% endif %}."""
+    return [Note{% if use_ui %}, *UI_TYPES{% endif %}{% if use_relayr %}, Timeline, Postmortem, RuleDraft{% endif %}{% if use_files %}, *natives{% endif %}]
+
+
+def operator_writes(direct: Sequence[str] | None) -> dict[str, Value]:
+    """The operator's ``agent-writes:direct``: ``AGENT_WRITES_DIRECT``'s kinds, or none set."""
+    return {} if direct is None else {DIRECT_WRITES: tuple(direct)}
+
+
+def writes_defaults(
+    types: Iterable[type[Artifact]], direct: Sequence[str] | None
+) -> SettingsDefaults:
+    """``agent-writes:direct`` without a store: the operator's value, or each type's policy.
+
+    Raises:
+        ValueError: If ``direct`` names a kind ``types`` doesn't have.
+    """
+    return SettingsDefaults(registry(direct_writes(types)), operator=operator_writes(direct))

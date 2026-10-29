@@ -503,6 +503,11 @@ class Settings:
             which ``make db-roles`` creates.
         auth: How access tokens are verified.
         gateway: How agents reach models.
+{%- if use_artifactr %}
+        agent_writes_direct: ``AGENT_WRITES_DIRECT``: the kinds whose agents' writes apply
+            directly in Auto, the ceiling a tenant's and a workspace's admins only narrow; each
+            type's own policy when unset, in which notes apply and native files wait for review.
+{%- endif %}
 {%- if use_tracker %}
         tracker: Where rules' runs file work, and whose changes come back.
 {%- endif %}
@@ -528,6 +533,9 @@ class Settings:
     database_admin_url: str | None = None
     auth: AuthSettings = field(default_factory=AuthSettings)
     gateway: GatewaySettings = field(default_factory=GatewaySettings)
+{%- if use_artifactr %}
+    agent_writes_direct: tuple[str, ...] | None = None
+{%- endif %}
 {%- if use_tracker %}
     tracker: TrackerSettings = field(default_factory=TrackerSettings)
 {%- endif %}
@@ -596,6 +604,11 @@ class Settings:
             database_admin_url=env.get("DATABASE_ADMIN_URL"),
             auth=auth,
             gateway=gateway,
+{%- if use_artifactr %}
+            agent_writes_direct=(
+                _names(env["AGENT_WRITES_DIRECT"]) if "AGENT_WRITES_DIRECT" in env else None
+            ),
+{%- endif %}
 {%- if use_tracker %}
             tracker=TrackerSettings(
                 credentials=_tracker_credentials(env.get("TRACKER_CREDENTIALS", "{}")),

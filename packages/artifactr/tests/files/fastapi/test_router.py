@@ -236,7 +236,15 @@ async def test_a_proposal_is_read_and_rendered_beside_the_head(world: World) -> 
     page = world.client.get(f"{at}/pages/1")
     assert (page.status_code, page.headers["content-type"]) == (200, "image/png")
     assert world.client.get(f"{at}/pages/2").status_code == 422
-    for read in ("text", "pages/1"):
+    said = world.client.get(f"{at}/commands").json()
+    assert said == {
+        "summary": "Runs a command: add_paragraph.",
+        "items": [
+            {"text": "add_paragraph: “Fees”", "name": "add_paragraph", "args": {"text": "Fees"}}
+        ],
+        "total": 1,
+    }
+    for read in ("text", "pages/1", "commands"):
         assert world.client.get(f"{at}/{read}", headers=world.as_("eve")).status_code == 404
         assert world.client.get(f"/workspaces/w1/proposals/zz/{read}").status_code == 404
 

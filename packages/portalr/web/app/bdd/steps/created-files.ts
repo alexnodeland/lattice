@@ -29,6 +29,18 @@ Then("the proposal {string} waits for review", async ({ page }, what: string) =>
   await expect(proposal(page, what).getByRole("button", { name: "Accept" })).toBeVisible();
 });
 
+/** What a native file's proposal does, in words, which opens to each of its changes (ADR-0089). */
+Then(
+  "the proposal {string} says {string}, change by change",
+  async ({ page }, what: string, said: string) => {
+    const line = proposal(page, what).getByRole("button", { name: said });
+    await line.click();
+    await expect(line).toHaveAttribute("aria-expanded", "true");
+    const changes = proposal(page, what).getByRole("list", { name: "Its changes" });
+    await expect(changes.getByRole("listitem")).toHaveCount(3);
+  },
+);
+
 When("they accept the proposal {string}", async ({ page }, what: string) => {
   await proposal(page, what).getByRole("button", { name: "Accept" }).click();
   await expect(proposal(page, what)).toContainText("Accepted");

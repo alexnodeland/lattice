@@ -27,7 +27,7 @@ export default defineConfig({
   plugins: [excalidraw("/"), react(), tailwindcss()],
   // Found only as the canvas's tests import them, they'd be optimised mid-run, and Vite would
   // reload the browser under the tests then running: a file's tester never comes ready (#699).
-  optimizeDeps: { include: ["@excalidraw/excalidraw", "react-dom/client"] },
+  optimizeDeps: { include: ["@excalidraw/excalidraw", "axe-core", "react-dom/client"] },
   test: {
     projects: [
       { extends: true, test: { name: "logic", include: ["src/**/*.test.ts"] } },

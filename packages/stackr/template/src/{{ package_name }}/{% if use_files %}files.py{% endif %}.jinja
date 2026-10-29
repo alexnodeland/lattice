@@ -11,7 +11,7 @@ native files are off: no route is mounted, and the agent has no tools for them.
   version's bytes, words and pages, beside artifactr's routes
 - the agent's tools: ``create_native_file``, ``read_native``, ``read_review``, ``find_commands``
   and ``edit_native``, and its instructions for them: that a file is made empty and written by its
-  edits, each a proposal a person reviews
+  edits, which wait for a person's review in Ask, or when review is enforced for the type
 
 Each app is an integration of its own, ``files:<app>``, switched per workspace like any other.
 {%- if use_diagrams %}
@@ -37,7 +37,7 @@ import contextlib
 import logging
 import secrets
 import time
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Iterable, Mapping
 from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import {% if use_diagrams %}UTC, datetime, {% endif %}timedelta
@@ -91,14 +91,19 @@ TYPES: Final[Mapping[str, type[NativeFile]]] = {
 """The native type each app keeps."""
 
 
+def native_types(crafts: Iterable[str]) -> list[type[{% if use_diagrams %}Artifact{% else %}NativeFile{% endif %}]]:
+    """The native types of the apps named{% if use_diagrams %}, and diagrams{% endif %}."""
+    return [{% if use_diagrams %}Diagram, {% endif %}*(TYPES[craft] for craft in crafts)]
+
+
 FILE_INSTRUCTIONS: Final = """\
 You can create files of any type `create_native_file` lists. Never say you can't create files.
 
 - A file is created empty: in the same turn, find its commands with `find_commands`, then put \
-its content in with `edit_native`, in as few batches as you can: each is a proposal a person \
-reviews.
-- Your edits of these files are proposals, in Ask and Auto alike: the file stays empty until a \
-person accepts one. Say the content waits for review, never that the file is written.
+its content in with `edit_native`, in as few batches as you can.
+- In Ask, or when review is enforced for the type, your edits wait for review: the file stays \
+empty until a person accepts one, so say the content waits for review, never that the file is \
+written. Otherwise they apply. Each edit's result says which it was.
 """
 """What the agent is told of native files while any app runs."""
 
@@ -207,7 +212,7 @@ class Files:
     @property
     def types(self) -> list[type[{% if use_diagrams %}Artifact{% else %}NativeFile{% endif %}]]:
         """The native types of the apps that run{% if use_diagrams %}, and diagrams{% endif %}."""
-        return [{% if use_diagrams %}Diagram, {% endif %}*(TYPES[craft] for craft in self._workers)]
+        return native_types(self._workers)
 
     def key_of(self, kind: str, data: Mapping[str, JsonValue]) -> str | None:
         """The integration that governs an artifact: its app's, for a native file."""

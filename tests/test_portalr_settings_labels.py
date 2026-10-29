@@ -7,6 +7,7 @@ admin's `LABELS`, its field would be named by the registry's sentence (portalr A
 import re
 from pathlib import Path
 
+from artifactr.workspace import DIRECT_WRITES
 from lattice_core.settings import KNOWN_SETTINGS
 
 SETTINGS_TS = Path(__file__).parents[1] / "packages/portalr/web/admin/src/settings.ts"
@@ -17,4 +18,5 @@ def test_every_declared_setting_has_a_label_in_admin() -> None:
     table = source[source.index("const LABELS") :]
     table = table[: table.index("};")]
     labelled = set(re.findall(r'"([a-z][a-z0-9-]*(?::[a-z][a-z0-9-]*)?)":', table))
-    assert labelled == set(KNOWN_SETTINGS), "add each setting's label to LABELS"
+    # And artifactr's, which each application declares over its own kinds (ADR-0009).
+    assert labelled == {*KNOWN_SETTINGS, DIRECT_WRITES}, "add each setting's label to LABELS"

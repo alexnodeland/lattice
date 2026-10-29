@@ -1309,8 +1309,8 @@ def _named(key: str, workspace: WorkspaceId | None) -> None:
 
 
 def _said(value: int | list[str]) -> str:
-    """A value as a refusal says it: a number, or names joined."""
-    return ", ".join(value) if isinstance(value, list) else str(value)
+    """A value as a refusal says it: a number, or names joined, or none."""
+    return (", ".join(value) or "none") if isinstance(value, list) else str(value)
 
 
 def _tenant_id(tenant: TenantId) -> None:

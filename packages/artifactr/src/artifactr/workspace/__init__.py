@@ -18,6 +18,7 @@ from artifactr.workspace.workspace import (
     Authorize,
     Changes,
     Check,
+    DirectWrites,
     Gate,
     Hidden,
     OnOpen,
@@ -25,9 +26,11 @@ from artifactr.workspace.workspace import (
     Workspace,
     Workspaces,
 )
+from artifactr.workspace.writes import DIRECT_WRITES, direct_writes, direct_writes_from
 
 __all__ = [
     "ACTIONS",
+    "DIRECT_WRITES",
     "MAX_COUNT",
     "Access",
     "ArtifactBusy",
@@ -35,6 +38,7 @@ __all__ = [
     "Authorize",
     "Changes",
     "Check",
+    "DirectWrites",
     "Gate",
     "Hidden",
     "HistoryChunk",
@@ -48,6 +52,8 @@ __all__ = [
     "Workspace",
     "Workspaces",
     "dated",
+    "direct_writes",
+    "direct_writes_from",
     "integration_gate",
     "seal",
 ]

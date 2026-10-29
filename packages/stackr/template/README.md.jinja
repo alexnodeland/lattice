@@ -169,6 +169,9 @@ It talks to stackr's ports only, through the settings in `.env` ([`settings.py`]
 | Identity | `AUTH_JWKS_URL`, `AUTH_JWT_SECRET`, `AUTH_AUDIENCE`, `AUTH_ISSUER`, `AUTH_TENANT_CLAIM` | [`auth.py`](src/{{ package_name }}/auth.py): Supabase's ES256 tokens against its published keys, or HS256 tokens with a legacy secret |
 {%- endif %}
 | LLM gateway | `LITELLM_BASE_URL`, `LITELLM_API_KEY`, `LITELLM_TENANT_KEYS`, `LITELLM_MODEL`, `LITELLM_GUARDRAILS`{% if use_artifactr %}, `LITELLM_MODELS`, `LITELLM_MODELS_ALLOWED`{% endif %} | [`gateway.py`](src/{{ package_name }}/gateway.py): agents on the `default` model group, each request with its tenant's key and the `pii-mask` and `prompt-injection` guardrails{% if use_artifactr %}; `Models`, the closed list of models a message may name, `default`, `fast` and those listed, of which each workspace's `models:allowed` setting says which people may choose{% endif %} |
+{%- if use_artifactr %}
+| Agents' edits | `AGENT_WRITES_DIRECT` | [`kinds.py`](src/{{ package_name }}/kinds.py): the kinds whose agents' edits apply directly in Auto, each workspace's `agent-writes:direct` setting, which a tenant's and a workspace's admins only narrow; unset, each kind's own policy, so native files and rules' drafts wait for review. In Ask, every edit waits for review |
+{%- endif %}
 {%- if use_tracker %}
 | Task tracker | `TRACKER_CREDENTIALS`, `TRACKER_BINDINGS`, `TRACKER_BUDGET` | [`tracking.py`](src/{{ package_name }}/tracking.py): relayr's connector to {% if tracker == 'plane' %}Plane{% else %}Vikunja{% endif %}, where each tenant has a workspace and a user of its own. The example files each rule whose runs are dead-lettered as one item, and comments on it for each; a follower per bound workspace publishes what people change in its project as `tracker:` events. stackr's [tracker guide](https://lattice.alexnodeland.com/stackr/guides/trackers/) provisions a tenant, and its `make tracker-check` checks one |
 {%- endif %}

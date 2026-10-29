@@ -43,6 +43,8 @@ Integrations are booleans, switched per tenant and workspace through one port ([
 - **Packages ask a `Settings` port,** `value(tenant_id, workspace_id, key)`, each time they act, with no cache. An implementation that can't read its store answers the setting's floor (its lowest number, or no names), so a failure never widens anything. `SettingsDefaults` answers without a store: the operator's value, or the default.
 - **grantr stores the tenant and workspace layers** ([grantr ADR-0035](../grantr/adr/0035-settings-narrowed-per-tenant-and-workspace-in-grantrs-table-versioned-audited.md)), and artifactr reads the hourly limit through the port ([artifactr ADR-0087](../artifactr/adr/0087-a-connected-apps-hourly-limit-read-from-settings.md)).
 
+> **Amended (2026-10-29), for [issue #874](https://github.com/alexnodeland/lattice/issues/874):** this ADR's model holds for which kinds an agent's writes apply to directly. The operator widens, and the tiers below only narrow. An application declares `agent-writes:direct`, a `Subset` over its kinds, with artifactr's `direct_writes(types)` and passes it to `registry()` and grantr's `settings=`. It isn't in `KNOWN_SETTINGS`, since kinds register per application. Its default is each type's `write_policy` ([artifactr ADR-0009](../artifactr/adr/0009-write-policies-and-non-blocking-proposals.md)). The operator's configuration may add a kind, such as a native file's. A tenant's or a workspace's admins may only take kinds out, sending them for review in Auto too, and a workspace can't put back what its tenant took out.
+
 ## Options considered
 
 | Option | For | Against |

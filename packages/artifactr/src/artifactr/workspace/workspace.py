@@ -82,6 +82,7 @@ from artifactr.core import (
     commit,
     create_artifact,
     delivered_to,
+    is_agent,
     needs,
     new_message_id,
     record,
@@ -236,6 +237,9 @@ It starts a workspace's background work, such as a feedback mirror, so it must b
 a permission check has no side effects.
 """
 
+DirectWrites = Callable[[TenantId, WorkspaceId], Awaitable[frozenset[str]]]
+"""The kinds whose agents' writes apply directly in a thread in Auto, in a tenant's workspace."""
+
 Check = Callable[["Workspace", Command], Awaitable[None]]
 """Refuses a command before it commits, for what the application knows and core doesn't.
 
@@ -310,6 +314,10 @@ class Workspaces:
             hides nothing if omitted.
         gate: Refuses a command while an integration it needs is off, before ``authorize``
             hears it; gates nothing if omitted.
+        direct_writes: The kinds whose agents' writes apply directly in a thread in Auto, in a
+            workspace, asked on each agent's write (ADR-0009); without it, those whose
+            ``write_policy`` is ``"direct"``. Give it
+            :func:`~artifactr.workspace.direct_writes_from`.
         hidden_refresh: How often an open subscription asks ``hidden`` again.
         tracer_provider: Where commit spans go. Defaults to the global tracer provider.
         meter_provider: Where artifactr's metrics go. Defaults to the global meter provider.
@@ -325,6 +333,7 @@ class Workspaces:
         on_open: OnOpen | None = None,
         hidden: Hidden | None = None,
         gate: Gate | None = None,
+        direct_writes: DirectWrites | None = None,
         hidden_refresh: timedelta = timedelta(seconds=30),
         tracer_provider: TracerProvider | None = None,
         meter_provider: MeterProvider | None = None,
@@ -336,6 +345,7 @@ class Workspaces:
             authorize=authorize,
             hidden=hidden,
             gate=gate,
+            direct_writes=direct_writes,
             hidden_refresh=hidden_refresh.total_seconds(),
             telemetry=Telemetry(tracer_provider=tracer_provider, meter_provider=meter_provider),
         )
@@ -406,6 +416,7 @@ class _Context:
     authorize: Authorize | None
     hidden: Hidden | None
     gate: Gate | None
+    direct_writes: DirectWrites | None
     hidden_refresh: float
     telemetry: Telemetry
 
@@ -596,9 +607,10 @@ class Workspace:
                 self._check_kind(command)
                 if (check := self._context.checks.get(command.type)) is not None:
                     await check(self, command)
+                direct = await self._direct(command)
                 outcome = await self._transact(
                     command,
-                    lambda state: commit(command, state, actor=self._actor),
+                    lambda state: commit(command, state, actor=self._actor, direct=direct),
                     cursor=cursor,
                     claim=claim,
                 )
@@ -615,6 +627,15 @@ class Workspace:
             span.set_attributes(outcome_attributes(outcome))
             self._count(command, started, outcome=outcome.type)
             return outcome
+
+    async def _direct(self, command: Command) -> frozenset[str] | None:
+        """The kinds whose agents' writes apply directly here, for an agent's write."""
+        hook = self._context.direct_writes
+        if hook is None or not is_agent(self._actor):
+            return None
+        if not isinstance(command, CreateArtifact | EditArtifact | ArchiveArtifact):
+            return None
+        return await hook(self._scope.tenant_id, self._scope.workspace_id)
 
     def _count(
         self, command: Command, started: float, *, outcome: str, rejection: str | None = None

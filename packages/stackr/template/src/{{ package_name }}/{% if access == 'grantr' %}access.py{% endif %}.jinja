@@ -14,7 +14,7 @@ access-matrix``), which ``access.md`` holds and a test compares.
 
 import contextlib
 import sys
-from collections.abc import AsyncGenerator{% if use_files %}, Sequence{% endif %}
+from collections.abc import AsyncGenerator{% if use_files or use_artifactr %}, Sequence{% endif %}
 from typing import Final
 
 from fastapi import FastAPI
@@ -23,9 +23,7 @@ from starlette.requests import HTTPConnection
 {% if use_artifactr -%}
 import artifactr.core as artifactr
 from artifactr.workspace import ACTIONS as ARTIFACTR_ACTIONS
-{%- if use_ui %}
-from artifactr.workspace import Workspace
-{%- endif %}
+from artifactr.workspace import {% if use_ui %}Workspace, {% endif %}direct_writes
 {% endif -%}
 from grantr import (
     Agent,
@@ -72,8 +70,12 @@ from {{ package_name }}.auth import (
 from {{ package_name }}.chat_rules import BRIDGE_RULES
 {%- endif %}
 from {{ package_name }}.database import Database
+{%- if use_files %}
+from {{ package_name }}.files import native_types
+{%- endif %}
 {%- if use_artifactr %}
 from {{ package_name }}.gateway import MODELS_ALLOWED, models_allowed
+from {{ package_name }}.kinds import artifact_types, operator_writes
 from {{ package_name }}.settings import GatewaySettings
 {%- endif %}
 from {{ package_name }}.telemetry import TelemetryHandle
@@ -157,6 +159,7 @@ def build_grants(
 {%- endif %}
 {%- if use_artifactr %}
     gateway: GatewaySettings | None = None,
+    direct: Sequence[str] | None = None,
 {%- endif %}
 ) -> Grants:
     """Make grantr over a storage, with the libraries' catalogs, for the application ``name``.
@@ -171,7 +174,9 @@ def build_grants(
 {%- if use_artifactr %}
 
     Beside lattice's settings, it knows ``models:allowed``, over the models ``gateway`` lists,
-    with the operator's ``LITELLM_MODELS_ALLOWED`` as every tenant's ceiling.
+    with the operator's ``LITELLM_MODELS_ALLOWED`` as every tenant's ceiling; and
+    ``agent-writes:direct``, over the kinds the application keeps, with the operator's
+    ``AGENT_WRITES_DIRECT``, ``direct``, as every tenant's ceiling when it is set.
 {%- endif %}
     """
 {%- if use_artifactr %}
@@ -183,8 +188,15 @@ def build_grants(
         installed={% if use_files %}[*INSTALLED, *(f"files:{craft}" for craft in files)]{% else %}INSTALLED{% endif %},
         application=ServicePrincipal(id=name),
 {%- if use_artifactr %}
-        settings=registry(*KNOWN_SETTINGS.values(), models_allowed(gateway)),
-        operator_settings={MODELS_ALLOWED: list(gateway.allowed_models)},
+        settings=registry(
+            *KNOWN_SETTINGS.values(),
+            models_allowed(gateway),
+            direct_writes(artifact_types({% if use_files %}native_types(files){% endif %})),
+        ),
+        operator_settings={
+            MODELS_ALLOWED: list(gateway.allowed_models),
+            **operator_writes(direct),
+        },
 {%- endif %}
         tracer_provider=telemetry.tracer_provider if telemetry else None,
         meter_provider=telemetry.meter_provider if telemetry else None,
@@ -205,6 +217,8 @@ class Access:
 {%- endif %}
 {%- if use_artifactr %}
         gateway: The models a message may name, whose ``models:allowed`` grantr keeps.
+        direct: The operator's ``AGENT_WRITES_DIRECT``: the kinds whose agents' writes apply in
+            Auto, which tenants and workspaces only narrow; each type's own policy if None.
 {%- endif %}
     """
 
@@ -221,6 +235,7 @@ class Access:
 {%- endif %}
 {%- if use_artifactr %}
         gateway: GatewaySettings | None = None,
+        direct: Sequence[str] | None = None,
 {%- endif %}
     ) -> None:
         self._verifier = verifier
@@ -237,12 +252,19 @@ class Access:
         )
 {%- if use_files %}
         self.grants = grants or build_grants(
-            storage, name=name, telemetry=telemetry, files=files{% if use_artifactr %}, gateway=gateway{% endif %}
+            storage,
+            name=name,
+            telemetry=telemetry,
+            files=files,
+{%- if use_artifactr %}
+            gateway=gateway,
+            direct=direct,
+{%- endif %}
         )
 {%- else %}
 {%- if use_artifactr %}
         self.grants = grants or build_grants(
-            storage, name=name, telemetry=telemetry, gateway=gateway
+            storage, name=name, telemetry=telemetry, gateway=gateway, direct=direct
         )
 {%- else %}
         self.grants = grants or build_grants(storage, name=name, telemetry=telemetry)

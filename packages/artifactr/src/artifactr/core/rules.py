@@ -189,8 +189,19 @@ def _context_threads(thread_id: ThreadId | None, actor: Actor) -> frozenset[Thre
 # ─── commit ───────────────────────────────────────────────────────────────────
 
 
-def commit(command: Command, state: State, *, actor: Actor) -> CommitResult:
+def commit(
+    command: Command,
+    state: State,
+    *,
+    actor: Actor,
+    direct: frozenset[str] | None = None,
+) -> CommitResult:
     """Decide a command against the loaded state.
+
+    An agent's write is a proposal in a thread in Ask (``suggest``), and in Auto (``edit``)
+    unless its kind is in ``direct``: the kinds whose agents' writes apply directly, which the
+    host resolves (ADR-0009). Without ``direct``, they are the kinds whose ``write_policy`` is
+    ``"direct"``.
 
     Returns:
         What to persist, and the outcome to report.
@@ -203,11 +214,11 @@ def commit(command: Command, state: State, *, actor: Actor) -> CommitResult:
         raise Forbidden("an evaluator can only give feedback")
     match command:
         case CreateArtifact():
-            return _create(command, state, actor)
+            return _create(command, state, actor, direct)
         case EditArtifact():
-            return _edit(command, state, actor)
+            return _edit(command, state, actor, direct)
         case ArchiveArtifact():
-            return _archive(command, state, actor)
+            return _archive(command, state, actor, direct)
         case ProposeChange():
             return _propose(command.proposal_id, command.change, command.rationale, state, actor)
         case RespondToProposal():
@@ -228,9 +239,11 @@ def commit(command: Command, state: State, *, actor: Actor) -> CommitResult:
             assert_never(command)
 
 
-def _create(command: CreateArtifact, state: State, actor: Actor) -> CommitResult:
+def _create(
+    command: CreateArtifact, state: State, actor: Actor, direct: frozenset[str] | None
+) -> CommitResult:
     artifact_type = get_artifact_type(command.kind)
-    if _must_propose(artifact_type, command.thread_id, actor, state):
+    if _must_propose(artifact_type, command.thread_id, actor, state, direct):
         return _propose(command.proposal_id, command, None, state, actor)
     return _apply_create(
         command,
@@ -242,10 +255,12 @@ def _create(command: CreateArtifact, state: State, actor: Actor) -> CommitResult
     )
 
 
-def _edit(command: EditArtifact, state: State, actor: Actor) -> CommitResult:
+def _edit(
+    command: EditArtifact, state: State, actor: Actor, direct: frozenset[str] | None
+) -> CommitResult:
     current = _current(state, command.artifact_id)
     _check_version(current, command.base_version)
-    if _must_propose(type(current.data), command.thread_id, actor, state):
+    if _must_propose(type(current.data), command.thread_id, actor, state, direct):
         return _propose(command.proposal_id, command, None, state, actor)
     return _apply_edit(
         current,
@@ -258,10 +273,12 @@ def _edit(command: EditArtifact, state: State, actor: Actor) -> CommitResult:
     )
 
 
-def _archive(command: ArchiveArtifact, state: State, actor: Actor) -> CommitResult:
+def _archive(
+    command: ArchiveArtifact, state: State, actor: Actor, direct: frozenset[str] | None
+) -> CommitResult:
     current = _current(state, command.artifact_id)
     _check_version(current, command.base_version)
-    if _must_propose(type(current.data), command.thread_id, actor, state):
+    if _must_propose(type(current.data), command.thread_id, actor, state, direct):
         return _propose(command.proposal_id, command, None, state, actor)
     return _apply_archive(
         current,
@@ -805,11 +822,18 @@ def _run_id(actor: Actor) -> RunId | None:
 
 
 def _must_propose(
-    artifact_type: type[Artifact], thread_id: ThreadId | None, actor: Actor, state: State
+    artifact_type: type[Artifact],
+    thread_id: ThreadId | None,
+    actor: Actor,
+    state: State,
+    direct: frozenset[str] | None,
 ) -> bool:
     if not is_agent(actor):
         return False
-    if artifact_type.write_policy == "propose":
+    applies = (
+        artifact_type.write_policy == "direct" if direct is None else artifact_type.kind in direct
+    )
+    if not applies:
         return True
     context = _context_thread_id(thread_id, actor)
     return context is not None and _thread(state, context).mode == "suggest"

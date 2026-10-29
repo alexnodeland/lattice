@@ -1,7 +1,8 @@
 # lattice's CI, on every pull request (stackr's RFC-0003, CI and tooling). Each job runs its task
 # in every project the pull request affects, and in every project that depends on one, all the way
-# down (scripts/affected.py). nightly.yml runs everything on main. CI, the last job, and Title
-# (title.yml) are the required checks.
+# down (scripts/affected.py), but on release-please's pull requests, which run only the check of
+# their diff (Release pull request, below). nightly.yml runs everything on main. CI, the last job,
+# and Title (title.yml) are the required checks.
 
 name: CI
 
@@ -26,6 +27,10 @@ jobs:
   # gates the longest job after Check.
   aws-tier2-affected:
     name: AWS (tier 2) affected
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     # 20: the checkout alone stalled for 15 minutes in one run, and a timed-out job is a failed
     # `CI`, which dequeues the batch.
@@ -57,6 +62,10 @@ jobs:
 
   check:
     name: Check
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     # A change that reaches every package takes some 17 minutes, artifactr's and reflexr's tests
     # the longest, on SQLite and PostgreSQL: 30 leaves room as they grow, and for a slow runner.
@@ -119,6 +128,10 @@ jobs:
 
   tests:
     name: Tests (Python ${{ matrix.python }})
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -143,6 +156,10 @@ jobs:
   # docplan's and oncall's images, each built from the root and started on PostgreSQL.
   images:
     name: Images
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -160,6 +177,10 @@ jobs:
   # include its spec in docs/<package>/spec/. Nightly runs them deeper.
   specs:
     name: Specs
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -182,6 +203,10 @@ jobs:
   # and come off the list as each package's release raises its floors.
   floors:
     name: Floors (lowest direct)
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -202,6 +227,10 @@ jobs:
   # main is a merged pull request that ran it, so nothing runs it there.
   gotrue:
     name: GoTrue follows the Supabase CLI
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -236,6 +265,10 @@ jobs:
   # Nothing is published: the release does that.
   thin-images:
     name: Thin images (${{ matrix.arch }})
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     permissions:
@@ -262,6 +295,10 @@ jobs:
   # the pull request's merge commit, as the smoke test's does.
   files:
     name: Native files (${{ matrix.arch }})
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     permissions:
@@ -286,6 +323,10 @@ jobs:
   # recordings are deleted and nothing else, it is bounded and idempotent, and it fails loudly.
   umami-retention:
     name: Umami retention
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -303,6 +344,10 @@ jobs:
   # as release.yml builds them. They are kept a week.
   release-images:
     name: Release images (${{ matrix.arch }})
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     permissions:
@@ -397,6 +442,10 @@ jobs:
   # stops it. It runs when the library, its application or the tools change.
   acceptance:
     name: Acceptance
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -436,6 +485,10 @@ jobs:
   # tests against a mocked AWS. Never AWS, and no Floci: tier 2 starts Floci.
   aws:
     name: AWS (tier 1)
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -493,6 +546,10 @@ jobs:
   # matrix values aren't the task's inputs: moon counts a variable that is set as a change.
   template:
     name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}${{ matrix.access == 'none' && ', no access' || '' }}${{ matrix.bridge == 'false' && ', no bridge' || '' }}${{ matrix.portal == 'false' && ', no portal' || '' }}${{ matrix.ui == 'false' && ', no ui' || '' }}${{ matrix.files == 'false' && ', no native files' || '' }}${{ matrix.diagrams == 'false' && ', no diagrams' || '' }}${{ matrix.tracker && matrix.tracker != 'none' && format(', {0}', matrix.tracker) || '' }}, Python ${{ matrix.python }})
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -579,6 +636,10 @@ jobs:
   # request's libraries, from its merge commit.
   smoke:
     name: Smoke (${{ matrix.name }})
+    if: >-
+      !(github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -755,16 +816,43 @@ jobs:
         --recursive
         ./
 
+  # release-please's pull request for a package: its changelog and its version, on main's code,
+  # which passed CI. It is checked to be only that (scripts/release_pr_diff.py), in place of the
+  # jobs above, which skip it by the same three parts as the merge queue's guard below: the
+  # lattice App opened it, in this repository, on a branch of release-please's. Every merge to main
+  # updates each package's, and seven full runs at once held real pull requests' CI for an hour.
+  # The merge queue runs all of CI on a release before it merges, as on any pull request.
+  release-pr:
+    name: Release pull request
+    if: >-
+      github.event.pull_request.user.login == 'alexnodeland-lattice[bot]'
+      && github.event.pull_request.head.repo.full_name == github.repository
+      && startsWith(github.head_ref, 'release-please--')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - run: python3 scripts/release_pr_diff.py "$MOON_BASE"
+
   ci:
     name: CI
     if: always()
-    needs: [check, tests, images, specs, floors, thin-images, files, umami-retention, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
+    needs: [release-pr, check, tests, images, specs, floors, thin-images, files, umami-retention, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
     steps:
       - uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35 # v1.3.0
         with:
-          # Each runs only when its inputs changed, or, the last two, not on a merge queue's batch.
-          allowed-skips: release-images-publish, aws-tier2, dependency-review, osv
+          # Each runs only when its inputs changed, or, the last two, not on a merge queue's batch;
+          # Release pull request only on release-please's, whose own are the others, skipped.
+          allowed-skips: >-
+            ${{ needs.release-pr.result == 'success'
+            && 'aws-tier2-affected, check, tests, images, specs, floors, gotrue, thin-images, files, umami-retention, release-images, release-images-publish, acceptance, aws, aws-tier2, template, smoke'
+            || 'release-pr, release-images-publish, aws-tier2, dependency-review, osv' }}
           jobs: ${{ toJSON(needs) }}

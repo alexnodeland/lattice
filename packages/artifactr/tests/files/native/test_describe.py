@@ -129,15 +129,20 @@ def test_a_deck_numbers_the_slides_it_adds_as_they_end() -> None:
             run("slide.new", title="C", at=0),
             run("slide.new", title="D", at=40),
         ],
-        before=3,
+        after=7,
     )
     # A after the first slide; B after A; C first, moving A and B on; D clamped to the end.
     assert [item.pages for item in said.items] == [[3], [], [4], [1], [7]]
 
 
 def test_a_deck_numbers_no_slide_once_a_command_moves_one() -> None:
-    said = describe("deckcraft", [run("slide.new"), run("slide.delete", index=0)])
+    said = describe("deckcraft", [run("slide.new"), run("slide.delete", index=0)], after=3)
     assert [item.pages for item in said.items] == [[], []]
+    undone = describe("deckcraft", [run("slide.new"), run("edit.undo")], after=1)
+    assert [item.pages for item in undone.items] == [[], []]
+    # Where the proposal doesn't say how many slides it makes, none is numbered.
+    assert describe("deckcraft", [run("slide.new", at=99)]).items[0].pages == []
+    assert describe("deckcraft", [run("slide.new", at=99)], after=4).items[0].pages == [4]
 
 
 def test_a_document_names_only_the_pages_a_command_names() -> None:
@@ -187,3 +192,19 @@ def test_each_craft_says_its_commands_in_its_own_verbs() -> None:
         ],
     )
     assert said.summary == "Adds a cube and adds a light."
+
+
+def test_a_command_with_a_url_or_a_count_is_said_without_either() -> None:
+    link = describe("pdfcraft", [run("edit.link", url="https://example.test/secret")])
+    assert "example" not in link.items[0].text
+    assert describe("gridcraft", [run("home.insertRows", rows="3:5", count=3)]).summary == (
+        "Inserts a set of rows."
+    )
+
+
+def test_a_long_batch_of_a_new_table_is_listed_up_to_its_cap_and_cut() -> None:
+    said = describe("cadcraft", [run("text", at=[0, 0], text="x" * 500)] * (MOST_ITEMS + 5))
+    assert (len(said.items), said.total) == (MOST_ITEMS, MOST_ITEMS + 5)
+    assert said.items[0].text == f"Writes a text: “{'x' * 79}…”"
+    assert said.summary.startswith(f"Writes {MOST_ITEMS + 5} texts: x")
+    assert said.summary.endswith(f"and {MOST_ITEMS} more.")

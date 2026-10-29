@@ -102,7 +102,7 @@ CRAFTS: Final[Mapping[str, Mapping[str, Says]]] = {
         "insert.picture|Inserts|a picture|pictures|alt",
         "insert.textBox|Inserts|a text box|text boxes|text",
         "insert.shape|Inserts|a shape|shapes|kind",
-        "insert.link|Inserts|a link|links|url",
+        "insert.link|Inserts|a link|links",
         "insert.coverPage|Adds|a cover page|cover pages|title",
         "insert.header|Adds|a header|headers|text",
         "insert.footer|Adds|a footer|footers|text",
@@ -135,10 +135,10 @@ CRAFTS: Final[Mapping[str, Mapping[str, Says]]] = {
     "gridcraft": _says(
         "cell.set|Enters|a cell|cells|input",
         "range.setValues|Sets the values of|a range|ranges|range",
-        "home.insertRows|Inserts|a row|rows",
-        "home.insertColumns|Inserts|a column|columns",
-        "home.deleteRows|Deletes|a row|rows",
-        "home.deleteColumns|Deletes|a column|columns",
+        "home.insertRows|Inserts|a set of rows|sets of rows",
+        "home.insertColumns|Inserts|a set of columns|sets of columns",
+        "home.deleteRows|Deletes|a set of rows|sets of rows",
+        "home.deleteColumns|Deletes|a set of columns|sets of columns",
         "home.insertSheet|Adds|a sheet|sheets|name",
         "home.deleteSheet|Deletes|a sheet|sheets|sheet",
         "sheet.rename|Renames|a sheet|sheets|name",
@@ -150,15 +150,15 @@ CRAFTS: Final[Mapping[str, Mapping[str, Says]]] = {
     ),
     # PdfCraft 0.8's, as its `tools` names the commands they run.
     "pdfcraft": _says(
-        "page.rotate|Rotates|a set of pages|sets of pages|pages",
-        "page.delete|Deletes|a set of pages|sets of pages|pages",
+        "page.rotate|Rotates|a set of pages|sets of pages",
+        "page.delete|Deletes|a set of pages|sets of pages",
         "page.insert|Inserts pages from|a file|files",
         "page.insert_blank|Inserts|a blank page|blank pages",
-        "page.duplicate|Duplicates|a set of pages|sets of pages|pages",
-        "page.replace|Replaces|a set of pages|sets of pages|pages",
+        "page.duplicate|Duplicates|a set of pages|sets of pages",
+        "page.replace|Replaces|a set of pages|sets of pages",
         "edit.text|Adds|a text|texts|text",
         "edit.image|Adds|an image|images",
-        "edit.link|Adds|a link|links|url",
+        "edit.link|Adds|a link|links",
         "comment.stamp|Adds|a stamp|stamps|name",
         "protect.password|Protects|the file|files",
         "protect.remove|Removes the protection of|the file|files",
@@ -206,7 +206,7 @@ CRAFTS: Final[Mapping[str, Mapping[str, Says]]] = {
         "artboard.delete|Deletes|an artboard|artboards",
         "paint.setFill|Sets|a fill|fills|color",
         "paint.setStroke|Sets|a stroke|strokes|color",
-        "swatch.new|Adds|a swatch|swatches|name",
+        "swatch.new|Adds|a set of swatches|sets of swatches|name",
     ),
     # DesignCraft 0.9's, as its `commands` lists them.
     "designcraft": _says(
@@ -269,14 +269,14 @@ CRAFTS: Final[Mapping[str, Mapping[str, Says]]] = {
     ),
     # SoundCraft 0.8's, as its `commands` lists them.
     "soundcraft": _says(
-        "track.new|Adds|a track|tracks|name",
+        "track.new|Adds|a set of tracks|sets of tracks|name",
         "track.delete|Deletes|a track|tracks",
         "track.duplicate|Duplicates|a track|tracks",
         "track.rename|Renames|a track|tracks|name",
         "clip.rename|Renames|a clip|clips|name",
         "midi.new_clip|Adds|a MIDI clip|MIDI clips",
         "event.midi_note|Adds|a MIDI note|MIDI notes",
-        "mix.insert|Inserts|a plugin|plugins|plugin",
+        "mix.insert|Inserts|a plugin|plugins",
     ),
     # FreeCAD's steps, as the adapter's console script names them (native files ADR-0014).
     "freecad": _says(
@@ -322,18 +322,18 @@ GENERIC: Final = frozenset({"lightcraft"})
 
 
 def describe(
-    app: str | None, commands: Sequence[AppCommand], *, before: int | None = None
+    app: str | None, commands: Sequence[AppCommand], *, after: int | None = None
 ) -> ProposalDescription:
     """What a batch of `app`'s commands does: a line, and each command, in words.
 
     Args:
         app: The app the batch is for, as provenance records it, such as `wordcraft`.
         commands: The batch, as it was applied.
-        before: How many pages the file had before the batch, if known.
+        after: How many pages the file has after the batch, as the proposal says, if it does.
     """
     table = CRAFTS.get(app or "", {})
     listed = commands[:MOST_ITEMS]
-    pages = PAGES.get(app or "", _none)(listed, before)
+    pages = PAGES.get(app or "", _none)(commands, after)[:MOST_ITEMS]
     items = [
         _item(table.get(command.name), command).model_copy(update={"pages": named})
         for command, named in zip(listed, pages, strict=True)
@@ -345,12 +345,25 @@ type Pages = Callable[[Sequence[AppCommand], int | None], list[list[int]]]
 """The pages each of a batch's commands changes, from 1, by its craft: none where it can't say."""
 
 
-def _none(commands: Sequence[AppCommand], _before: int | None) -> list[list[int]]:
+def _none(commands: Sequence[AppCommand], _after: int | None) -> list[list[int]]:
     return [[] for _ in commands]
 
 
 DECK_REORDERS: Final = frozenset(
     {
+        "file.new",
+        "file.open",
+        "file.openBytes",
+        "file.revert",
+        "file.recovery.open",
+        "window.next",
+        "edit.undo",
+        "edit.redo",
+        "edit.cut",
+        "edit.paste",
+        "edit.pasteText",
+        "edit.duplicate",
+        "edit.delete",
         "slide.duplicate",
         "slide.delete",
         "slide.move",
@@ -362,36 +375,33 @@ DECK_REORDERS: Final = frozenset(
         "slide.selectSlides",
         "slide.fromOutline",
         "section.remove",
-        "edit.cut",
-        "edit.paste",
-        "edit.delete",
-        "window.next",
-        "file.recovery.open",
+        "section.removeAll",
+        "section.move",
     }
 )
 """DeckCraft's commands that add, remove, move or choose a slide other than by `slide.new`: past
 one, the batch's slides can't be numbered from its commands alone."""
 
 
-def _deck(commands: Sequence[AppCommand], before: int | None) -> list[list[int]]:
+def _deck(commands: Sequence[AppCommand], after: int | None) -> list[list[int]]:
     """The slides a deck's batch adds, numbered as they end.
 
     DeckCraft 0.7 adds one after the current slide, or at `at`, no further than the end, and makes
-    it current; a file opens at its first. A command in `DECK_REORDERS` leaves every slide
-    unnumbered.
+    it current; a file opens at its first. The deck's slides before the batch are those after it
+    less those it adds, so a slide is numbered only where the proposal says how many it makes. A
+    command in `DECK_REORDERS` leaves every slide unnumbered.
     """
-    if any(command.name in DECK_REORDERS for command in commands):
-        return _none(commands, before)
+    if after is None or any(command.name in DECK_REORDERS for command in commands):
+        return _none(commands, after)
     added: dict[int, int] = {}  # the command's place in the batch: its slide's index, from 0
-    current, count = 0, before
+    count = max(after - sum(command.name == "slide.new" for command in commands), 0)
+    current = 0
     for at, command in enumerate(commands):
         if command.name != "slide.new":
             continue
         asked = command.args.get("at")
-        index = asked if isinstance(asked, int) and asked >= 0 else current + 1
-        if count is not None:
-            index = min(index, count)
-            count += 1
+        index = min(asked if isinstance(asked, int) and asked >= 0 else current + 1, count)
+        count += 1
         added = {each: slide + (slide >= index) for each, slide in added.items()}
         added[at] = current = index
     return [[added[at] + 1] if at in added else [] for at in range(len(commands))]
@@ -409,7 +419,7 @@ WORD_PAGED: Final = frozenset(
 other command's page is known before the file is laid out."""
 
 
-def _word(commands: Sequence[AppCommand], _before: int | None) -> list[list[int]]:
+def _word(commands: Sequence[AppCommand], _after: int | None) -> list[list[int]]:
     return [
         [page + 1]
         if command.name in WORD_PAGED

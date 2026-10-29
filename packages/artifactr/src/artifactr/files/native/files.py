@@ -893,7 +893,7 @@ class NativeFiles:
                 holds no commands; or its provenance isn't one.
         """
         proposal = await ws.proposal(proposal_id)
-        head = await ws.get(NativeFile, proposal.artifact_id)
+        await ws.get(NativeFile, proposal.artifact_id)
         change = proposal.change
         made = _provenance(change.patch) if isinstance(change, EditArtifact) else None
         if made is None or made.commands is None or made.commands.size > BATCH_MOST:
@@ -903,7 +903,8 @@ class NativeFiles:
             commands = _COMMANDS.validate_json(batch)
         except ValidationError:
             raise ContentUnavailable(proposal.artifact_id, "commands") from None
-        return describe(made.app, commands, before=head.data.pages)
+        pages = _pages(change.patch) if isinstance(change, EditArtifact) else None
+        return describe(made.app, commands, after=pages)
 
     def _page(self, key: PageKey) -> bytes | None:
         """A page rendered before, if this process still keeps it."""
@@ -1161,6 +1162,16 @@ def _replaced(patch: Patch, part: Part) -> Blob | None:
         if op.get("op") == "replace" and op.get("path") == f"/{part}":
             value = op.get("value")
             return None if value is None else Blob.model_validate(value)
+    return None
+
+
+def _pages(patch: Patch) -> int | None:
+    """How many pages a native file's revision gives it, as `revise` builds it, if it says."""
+    if isinstance(patch, JsonPatch):
+        for op in reversed(patch.ops):
+            if op.get("op") == "replace" and op.get("path") == "/pages":
+                value = op.get("value")
+                return value if isinstance(value, int) and value >= 0 else None
     return None
 
 

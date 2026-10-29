@@ -1,165 +1,223 @@
 """Whether a pull request's diff is only a release: what release-please changes, and nothing else.
 
-Usage: git show BASE:scripts/release_pr_diff.py | python3 - BASE   (the diff is BASE...HEAD)
+Usage: python3 -I release_pr_diff.py BASE REPOSITORY   (the diff is BASE...HEAD, in REPOSITORY)
 
 release-please's pull request for a package changes its CHANGELOG.md, the version in its
-pyproject.toml and in uv.lock, and its line in .release-please-manifest.json. CI runs this, and not
-its other jobs, on those pull requests (ci.yml), from the base, so the pull request can't change
-it: their code is main's, which passed CI, and the merge queue runs all of CI again on a release
-before it is merged. It exits 1, failing CI, on anything else: another file, a file added, deleted
-or renamed, a mode or a binary, or a change to those files but a version or a changelog's entry.
+pyproject.toml and in uv.lock, and its line in .release-please-manifest.json. CI runs the base's
+copy of this on those pull requests (ci.yml), and skips its other jobs only if it exits 0: their
+code is main's, which passed CI, and the merge queue runs all of CI on a release before it merges.
+Anything else exits 1, and all of CI runs, so a refusal costs time, not a check.
 
-Each file is compared whole, at the merge base and at HEAD, not by parsing the patch.
+It refuses another file, a file added, deleted or renamed, a mode or a binary, and in those files
+anything but: one package's version, the same in all three, a release, and higher than before; and
+changelog lines of release-please's own shapes. Each file is compared whole, at the merge base and
+at HEAD, not by parsing the patch.
 """
 
-import difflib
 import json
 import re
 import subprocess
 import sys
 import tomllib
-from collections.abc import Callable, Iterator
 from pathlib import Path
 from typing import Any
 
-CHANGELOG = re.compile(r"packages/[a-z0-9-]+/CHANGELOG\.md")
-PYPROJECT = re.compile(r"packages/[a-z0-9-]+/pyproject\.toml")
+PACKAGE = r"packages/([a-z0-9-]+)"
+CHANGELOG = re.compile(PACKAGE + r"/CHANGELOG\.md")
+PYPROJECT = re.compile(PACKAGE + r"/pyproject\.toml")
 LOCK = "uv.lock"
 MANIFEST = ".release-please-manifest.json"
-VERSION = re.compile(r'version = "[^"]+"')
-DOCS_SYNTAX = ("--8<--", "<script", "{%", "{{")
-"""What a changelog's new lines may not hold: the docs include each changelog (pymdownx.snippets),
-so these would reach the site's build."""
+RELEASE = re.compile(r"(\d+)\.(\d+)\.(\d+)")
+VERSION_LINE = re.compile(r'version = "\d+\.\d+\.\d+"')
+REPOSITORY = "https://github.com/alexnodeland/lattice/"
+
+DATE = r"\(\d{4}-\d{2}-\d{2}\)"
+HEADINGS = (
+    re.compile(
+        r"## \[\d+\.\d+\.\d+\]\(" + re.escape(REPOSITORY) + r"compare/[a-z0-9.-]+\) " + DATE
+    ),
+    re.compile(r"## \d+\.\d+\.\d+ " + DATE),
+    re.compile(r"### (⚠ )?[A-Z][A-Za-z ]+"),
+)
+BULLET = re.compile(r"\* .+")
+LINK = re.compile(r"\]\(([^)]*)\)")
+NEVER = ("<", ">", "{", "}", "8<", "!!!", "\\")
+"""What no changelog line may hold: HTML, attributes, includes, admonitions, escapes. The docs
+include each changelog (pymdownx.snippets), so these would reach the site's build. A release whose
+notes hold one runs all of CI."""
+
+Bumps = dict[str, tuple[object, object]]
+"""Each package's version before and after, by its directory, as one file says."""
 
 
-def git(cwd: Path | None, *args: str) -> str:
+def git(repository: Path, *args: str) -> str:
     """Git's output, as text."""
     return subprocess.run(
-        ["git", *args], check=True, capture_output=True, text=True, cwd=cwd
+        ["git", *args], check=True, capture_output=True, text=True, cwd=repository
     ).stdout
 
 
-def changed_lines(before: str, after: str) -> tuple[list[str], list[str]] | None:
-    """The lines replaced and their replacements, or None if any were added or removed."""
+def release(version: object) -> tuple[int, ...] | None:
+    """A release's version as numbers, or None if it isn't one."""
+    match = RELEASE.fullmatch(version) if isinstance(version, str) else None
+    return tuple(map(int, match.groups())) if match else None
+
+
+def changed_lines(before: str, after: str) -> list[tuple[str, str]] | None:
+    """Each line replaced, and its replacement, or None if any were added or removed."""
     old, new = before.splitlines(), after.splitlines()
     if len(old) != len(new):
         return None
-    pairs = [(a, b) for a, b in zip(old, new, strict=True) if a != b]
-    return [a for a, _ in pairs], [b for _, b in pairs]
+    return [(a, b) for a, b in zip(old, new, strict=True) if a != b]
 
 
 def only_versions(before: str, after: str) -> bool:
-    """Whether every line changed, on either side, is a version line, and none added or removed."""
+    """Whether every line changed is a version line, on both sides, and none added or removed."""
     lines = changed_lines(before, after)
-    return lines is not None and all(VERSION.fullmatch(each) for each in lines[0] + lines[1])
+    return lines is not None and all(
+        VERSION_LINE.fullmatch(a) and VERSION_LINE.fullmatch(b) for a, b in lines
+    )
 
 
-def without_version(data: dict[str, Any]) -> dict[str, Any]:
+def without_version(table: dict[str, Any]) -> dict[str, Any]:
     """A table without its version."""
-    return {k: v for k, v in data.items() if k != "version"}
+    return {k: v for k, v in table.items() if k != "version"}
 
 
-def pyproject(before: str, after: str) -> Iterator[str]:
-    """One line changed, [project]'s version, and nothing else."""
+def pyproject(package: str, before: str, after: str) -> tuple[list[str], Bumps]:
+    """One line changed, [project]'s version."""
     lines = changed_lines(before, after)
-    if lines is None or len(lines[0]) != 1 or not only_versions(before, after):
-        yield "a change but one version line"
-        return
+    if lines is None or len(lines) != 1 or not only_versions(before, after):
+        return ["a change but one version line"], {}
     old, new = tomllib.loads(before), tomllib.loads(after)
     old_project, new_project = old.pop("project", {}), new.pop("project", {})
-    if old_project.get("version") == new_project.get("version"):
-        yield "the version changed isn't [project]'s"
-    elif old != new or without_version(old_project) != without_version(new_project):
-        yield "a change but [project]'s version"
+    if old != new or without_version(old_project) != without_version(new_project):
+        return ["a change but [project]'s version"], {}
+    return [], {package: (old_project.get("version"), new_project.get("version"))}
 
 
-def lock(before: str, after: str) -> Iterator[str]:
-    """Only version lines changed, each a workspace package's."""
+def lock(before: str, after: str) -> tuple[list[str], Bumps]:
+    """Only version lines changed, each a workspace package's: editable, or virtual (stackr)."""
     if not only_versions(before, after):
-        yield "a change but version lines"
-        return
+        return ["a change but version lines"], {}
     old, new = tomllib.loads(before), tomllib.loads(after)
     olds, news = old.pop("package", []), new.pop("package", [])
     if old != new or len(olds) != len(news):
-        yield "a change but packages' versions"
-        return
+        return ["a change but packages' versions"], {}
+    found: list[str] = []
+    bumps: Bumps = {}
     for a, b in zip(olds, news, strict=True):
-        if a != b and (
-            without_version(a) != without_version(b) or "editable" not in a.get("source", {})
-        ):
-            yield f"a version not of a workspace package's: {a.get('name')}"
+        if a == b:
+            continue
+        source = a.get("source", {})
+        editable = re.fullmatch(PACKAGE, str(source.get("editable", source.get("virtual", ""))))
+        if without_version(a) != without_version(b) or editable is None:
+            found.append(f"a version not of a workspace package's: {a.get('name')}")
+        else:
+            bumps[editable.group(1)] = (a.get("version"), b.get("version"))
+    return found, bumps
 
 
-def manifest(before: str, after: str) -> Iterator[str]:
-    """The same packages, their versions changed, on the same lines."""
+def manifest(before: str, after: str) -> tuple[list[str], Bumps]:
+    """The same packages, on the same lines."""
     old, new = json.loads(before), json.loads(after)
     if changed_lines(before, after) is None or old.keys() != new.keys():
-        yield "a package added or removed"
-    elif not all(isinstance(v, str) for v in new.values()):
-        yield "a version that isn't a string"
+        return ["a package added or removed"], {}
+    bumps: Bumps = {}
+    for key in old:
+        package = re.fullmatch(PACKAGE, key)
+        if package is None:
+            return [f"not a package: {key}"], {}
+        if old[key] != new[key]:
+            bumps[package.group(1)] = (old[key], new[key])
+    return [], bumps
 
 
-def changelog(before: str, after: str) -> Iterator[str]:
-    """New lines only, none of them the docs' syntax."""
-    for line in difflib.ndiff(before.splitlines(), after.splitlines()):
-        if line.startswith("- "):
-            yield "a line removed"
-        elif line.startswith("+ ") and any(s in line for s in DOCS_SYNTAX):
-            yield f"the docs' syntax: {line[2:]}"
-
-
-def rule(path: str) -> Callable[[str, str], Iterator[str]] | None:
-    """How a release may change this file, or None if it may not."""
-    if path == LOCK:
-        return lock
-    if path == MANIFEST:
-        return manifest
-    if CHANGELOG.fullmatch(path):
-        return changelog
-    if PYPROJECT.fullmatch(path):
-        return pyproject
-    return None
-
-
-def check(base: str, cwd: Path | None = None) -> list[str]:
-    """What, in base...HEAD, isn't release-please's."""
+def changelog(before: str, after: str) -> list[str]:
+    """Lines added at one place, each of release-please's shapes."""
+    old, new = before.splitlines(), after.splitlines()
+    start = next((i for i, (a, b) in enumerate(zip(old, new, strict=False)) if a != b), len(old))
+    added = len(new) - len(old)
+    if added <= 0 or new[:start] + new[start + added :] != old:
+        return ["not lines added at one place"]
     found: list[str] = []
+    for line in new[start : start + added]:
+        if any(each in line for each in NEVER) or (
+            line and not BULLET.fullmatch(line) and not any(h.fullmatch(line) for h in HEADINGS)
+        ):
+            found.append(f"not release-please's: {line}")
+        elif any(not url.startswith(REPOSITORY) for url in LINK.findall(line)):
+            found.append(f"a link outside the repository: {line}")
+    return found
+
+
+def agreement(bumps: dict[str, Bumps]) -> list[str]:
+    """One package's version, the same in all three files, a release, and higher than before."""
+    packages = {p for each in bumps.values() for p in each}
+    if len(packages) != 1:
+        return [f"not one package's version: {sorted(packages)}"]
+    found = [
+        f"no version changed in {f}" for f in (MANIFEST, LOCK, "pyproject.toml") if f not in bumps
+    ]
+    pairs = {pair for each in bumps.values() for pair in each.values()}
+    if len(pairs) != 1:
+        return [*found, f"the versions don't agree: {sorted(map(str, pairs))}"]
+    old, new = next(iter(pairs))
+    old_release, new_release = release(old), release(new)
+    if old_release is None or new_release is None or new_release <= old_release:
+        found.append(f"not a release higher than before: {old} to {new}")
+    return found
+
+
+def check(base: str, repository: Path) -> list[str]:
+    """What, in base...HEAD, isn't release-please's."""
     since = f"{base}...HEAD"
-    merge_base = git(cwd, "merge-base", base, "HEAD").strip()
-    raw = git(cwd, "diff", "--raw", "-z", "--no-renames", "--no-abbrev", since).split("\0")
-    numstat = git(cwd, "diff", "--numstat", "-z", "--no-renames", since).split("\0")
+    merge_base = git(repository, "merge-base", base, "HEAD").strip()
+    raw = git(repository, "diff", "--raw", "-z", "--no-renames", "--no-abbrev", since).split("\0")
+    numstat = git(repository, "diff", "--numstat", "-z", "--no-renames", since).split("\0")
     binary = {n.split("\t", 2)[2] for n in numstat if n.startswith("-\t-\t")}
     entries = list(zip(raw[0::2], raw[1::2], strict=False))
     if not entries:
         return ["the diff is empty: not a release"]
+    found: list[str] = []
+    bumps: dict[str, Bumps] = {}
     for meta, path in entries:
         old_mode, new_mode, _, _, status = meta.lstrip(":").split(" ")
-        compare = rule(path)
-        if compare is None:
+        pyproject_of, changelog_of = PYPROJECT.fullmatch(path), CHANGELOG.fullmatch(path)
+        if path not in (LOCK, MANIFEST) and not pyproject_of and not changelog_of:
             found.append(f"{path}: not a file a release changes")
             continue
         if status != "M" or old_mode != "100644" or new_mode != "100644" or path in binary:
             found.append(f"{path}: {status}, {old_mode} to {new_mode}: not a text file's change")
             continue
-        before = git(cwd, "show", f"{merge_base}:{path}")
-        after = git(cwd, "show", f"HEAD:{path}")
+        before = git(repository, "show", f"{merge_base}:{path}")
+        after = git(repository, "show", f"HEAD:{path}")
         if "\0" in before + after:
             found.append(f"{path}: binary")
             continue
+        bumped: Bumps = {}
         try:
-            found += [f"{path}: {each}" for each in compare(before, after)]
+            if changelog_of:
+                problems = changelog(before, after)
+            elif pyproject_of:
+                problems, bumped = pyproject(pyproject_of.group(1), before, after)
+            else:
+                problems, bumped = (lock if path == LOCK else manifest)(before, after)
         except (ValueError, AttributeError, TypeError) as error:
-            found.append(f"{path}: unreadable: {error}")
-    return found
+            problems = [f"unreadable: {error}"]
+        found += [f"{path}: {each}" for each in problems]
+        if bumped:
+            bumps["pyproject.toml" if pyproject_of else path] = bumped
+    return found or agreement(bumps)
 
 
 def main() -> int:
-    """Check BASE...HEAD; print what isn't a release's."""
-    found = check(sys.argv[1])
+    """Check BASE...HEAD in REPOSITORY; print what isn't a release's."""
+    found = check(sys.argv[1], Path(sys.argv[2]))
     for each in found:
         sys.stdout.write(each + "\n")
     if not found:
-        sys.stdout.write("Only a release's changes: versions and changelogs\n")
+        sys.stdout.write("Only a release's changes: a version and a changelog\n")
     return 1 if found else 0
 
 

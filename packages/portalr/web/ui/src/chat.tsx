@@ -1061,7 +1061,7 @@ export function ProposalCard({
 }: {
   proposal: Artifactr.Proposal;
   /** Its id in the page, to link to: focused when followed, and shown so. */
-  id?: string;
+  id?: string | undefined;
   onRespond?: (decision: "accept" | "reject") => Sent;
   /** Why it can't be accepted, or null where it can. */
   blocked?: string | null;

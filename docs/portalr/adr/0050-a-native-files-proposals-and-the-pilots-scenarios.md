@@ -1,6 +1,6 @@
 # ADR-0050: A native file's proposals: outdated, never rebased, and compared page by page; and the check-out pilot's scenarios
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0089](0089-a-native-files-proposal-says-what-it-does-in-its-thread.md) (what it does in words, and the card in the thread)
 **Date:** 2026-10-17
 **Deciders:** Alex Nodeland
 
@@ -50,3 +50,5 @@ The RFC's exit criterion for phase 4 is `bdd` scenarios for a check-in, a stale 
 
 1. [x] `NativeProposal` and `PageCompare`, `ProposalCard`'s `blocked`, and their tests and screenshots.
 2. [x] The test application's editor service, and the five scenarios.
+
+> **Amended (2026-10-28) by [ADR-0089](0089-a-native-files-proposal-says-what-it-does-in-its-thread.md):** a thread shows a native file's proposal as `NativeProposal` too. An open one's card says first what its commands do, in words, and then each change, with its arguments and the batch, before Compare ([native files ADR-0020](../../artifactr/files/adr/0020-a-proposal-said-in-words-and-previewed-by-its-own-pages.md)).

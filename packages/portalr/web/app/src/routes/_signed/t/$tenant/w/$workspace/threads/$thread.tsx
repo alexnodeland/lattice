@@ -54,6 +54,8 @@ import {
 } from "react";
 import { author, unnamedPeople } from "../../../../../../../author";
 import { ComposerFooter } from "../../../../../../../composer-footer";
+import { NativeProposal } from "../../../../../../../files";
+import { NATIVE } from "../../../../../../../native";
 import { usePosting } from "../../../../../../../posting";
 import { RENDERERS } from "../../../../../../../renderers";
 import { RuleProposal } from "../../../../../../../rule-proposal";
@@ -590,23 +592,32 @@ function Chat() {
           ].map(({ request, by }) => asked(run, request, by))}
         </div>
       ))}
-      {proposed.map((proposal) => (
-        <ProposalCard
-          key={proposal.id}
+      {proposed.map((proposal) => {
+        const artifact = proposedOn(proposal);
+        const kind = artifact === null ? undefined : artifacts[artifact]?.kind;
+        const native = NATIVE.get(kind ?? "");
+        const card = {
           // Where a file created blank links to the change that fills it.
-          id={`proposal-${proposal.id}`}
-          proposal={proposal}
-          onRespond={(decision) =>
-            stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision })
-          }
-        >
-          <RuleProposal
-            proposal={proposal}
-            kind={artifacts[proposedOn(proposal) ?? ""]?.kind}
-            place={{ context, tenant, workspace }}
+          id: `proposal-${proposal.id}`,
+          proposal,
+          onRespond: (decision: "accept" | "reject") =>
+            stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision }),
+        };
+        // A native file's says what it does and compares it with the head (portalr ADR-0050).
+        return artifact !== null && native ? (
+          <NativeProposal
+            key={proposal.id}
+            {...card}
+            place={{ context, tenant, workspace, artifact }}
+            native={native}
+            me={me}
           />
-        </ProposalCard>
-      ))}
+        ) : (
+          <ProposalCard key={proposal.id} {...card}>
+            <RuleProposal proposal={proposal} kind={kind} place={{ context, tenant, workspace }} />
+          </ProposalCard>
+        );
+      })}
       {canPost && (
         // While an approval waits in the column, the dock stays in the flow under it, so it never
         // covers Deny and Approve (portalr ADR-0087).

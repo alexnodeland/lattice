@@ -333,6 +333,12 @@ function useShimmer(running: boolean) {
   return words;
 }
 
+/**
+ * How many characters of a group's line fit a phone's width at its small size, beside the wrench,
+ * the caret and a count of failures, at the narrowest window (390px).
+ */
+const PHONE_ROOM = 48;
+
 /** Which groups the reader unfurled, by their first call, for the page's life: never stored. */
 const opened = new Map<string, boolean>();
 
@@ -370,7 +376,13 @@ export function RunSteps({
   const button = useRef<HTMLButtonElement>(null);
   const panel = useId();
   const calls = tools.map(([, tool]) => tool);
-  const { label, failed, running } = foldSummary(calls, runRunning);
+  // On a phone the line says what fits of it, whole kinds and a count of the rest; its name and
+  // the sheet's title keep it all.
+  const { label, full, failed, running } = foldSummary(
+    calls,
+    runRunning,
+    phone ? PHONE_ROOM : undefined,
+  );
   const words = useShimmer(running);
   // Said once, as a group that was running ends: never as each call does.
   const [ran, setRan] = useState(running);
@@ -379,7 +391,7 @@ export function RunSteps({
   const [said, setSaid] = useState("");
   if (ran !== running) {
     setRan(running);
-    setSaid(running ? "" : `${label}${marker}`);
+    setSaid(running ? "" : `${full}${marker}`);
   }
   const count = `${tools.length} tool call${tools.length === 1 ? "" : "s"}`;
   return (
@@ -391,7 +403,7 @@ export function RunSteps({
         {...((shown ?? (phone ? "sheet" : "list")) === "sheet"
           ? { "aria-haspopup": "dialog" as const }
           : { "aria-controls": panel })}
-        aria-label={`${label}${marker}: ${count}`}
+        aria-label={`${full}${marker}: ${count}`}
         onClick={() => show(open ? null : phoneNow() ? "sheet" : "list")}
         className={cn(
           "flex min-h-(--disclosure-target) max-w-full cursor-pointer items-center gap-1.5 self-start rounded-(--disclosure-radius) text-muted text-xs hover:text-fg phone:min-h-11",
@@ -431,7 +443,7 @@ export function RunSteps({
         <ToolSheet
           open={shown === "sheet"}
           onOpenChange={(next) => show(next ? "sheet" : null)}
-          title={`${label}${marker}`}
+          title={`${full}${marker}`}
           tools={tools}
           finalFocus={button}
         />

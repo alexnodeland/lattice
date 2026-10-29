@@ -124,3 +124,58 @@ test("a turn that failed, or was stopped, shows what it had streamed before why,
   // A stop is shown even where nothing had streamed; a failure with nothing streamed isn't.
   expect(kinds).toEqual(["message@1", "partial@3", "failed@3", "partial@5", "partial@9"]);
 });
+
+const decided = (id: string, runId: string | null): Artifactr.Proposal => ({
+  id,
+  threadId: "thr_1",
+  runId,
+  change: null,
+  rationale: null,
+  status: "accept",
+});
+
+test("a decided proposal is a line after the last entry of the run that made it, and the thread's last where none did", () => {
+  const tools = (seq: number) => ({
+    t1: {
+      name: "read_artifact",
+      status: "ok",
+      args: "{}",
+      result: "",
+      argsCut: false,
+      resultCut: false,
+      seq,
+    },
+  });
+  const first = run({ id: "run_1", status: "completed", started: 2, ended: 4, tools: tools(3) });
+  const second = run({ id: "run_2", status: "completed", started: 5, ended: 7, tools: tools(6) });
+  const log = threadLog(
+    { ...thread(message("m1", "alice")), messages: [message("m1", "alice")] },
+    { run_1: first, run_2: second },
+    [],
+    {},
+    [decided("p_second", "run_2"), decided("p_first", "run_1"), decided("p_person", null)],
+  );
+  const order = log.map((entry) => (entry.kind === "proposal" ? entry.proposal.id : entry.kind));
+  // Each follows its run's last entry, which is its call: half a place on; a person's is last.
+  expect(order).toEqual(["message", "tools", "p_first", "tools", "p_second", "p_person"]);
+});
+
+test("a run's later entries keep the proposal behind them: it moves on as the run does", () => {
+  const tool = {
+    name: "read_artifact",
+    status: "ok",
+    args: "{}",
+    result: "",
+    argsCut: false,
+    resultCut: false,
+  };
+  const going = run({
+    status: "running",
+    ended: null,
+    tools: { t1: { ...tool, seq: 3 }, t2: { ...tool, seq: 9 } },
+  });
+  const order = threadLog(thread(message("m1", "alice")), { run_1: going }, [], {}, [
+    decided("p_1", "run_1"),
+  ]).map((entry) => (entry.kind === "proposal" ? entry.proposal.id : entry.kind));
+  expect(order.at(-1)).toBe("p_1");
+});

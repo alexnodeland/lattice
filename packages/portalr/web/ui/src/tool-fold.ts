@@ -81,9 +81,14 @@ export function callLabel(tool: Artifactr.Tool): string {
 
 /**
  * The calls together, done: each tool's verb and its count, in the order first called, so
- * "Made an app, read 2 artifacts"; tools no table names are one "used 3 tools".
+ * "Made an app, read 2 artifacts"; tools no table names are one "used 3 tools". Past `room`
+ * characters it keeps whole kinds only, the first two if they fit, else the first, and counts the
+ * calls of the rest: "Made an app, read 2 artifacts and 3 more". A phrase is never cut.
  */
-export function doneLabel(tools: readonly Artifactr.Tool[]): string {
+export function doneLabel(
+  tools: readonly Artifactr.Tool[],
+  room = Number.POSITIVE_INFINITY,
+): string {
   // By their words, so two tools that say the same, as draw and draw_mermaid do, are one.
   const counts = new Map<string, [Phrase, number]>();
   for (const tool of tools) {
@@ -91,24 +96,46 @@ export function doneLabel(tools: readonly Artifactr.Tool[]): string {
     const key = said.join("|");
     counts.set(key, [said, (counts.get(key)?.[1] ?? 0) + 1]);
   }
-  const parts = [...counts.values()].map(([said, n]) => `${said[0]} ${object(said, n)}`);
-  const joined = parts.join(", ");
-  return joined.charAt(0) + joined.slice(1).toLowerCase();
+  const kinds = [...counts.values()].map(
+    ([said, n]) => [`${said[0]} ${object(said, n)}`, n] as const,
+  );
+  const say = (kept: number) => {
+    const more = kinds.slice(kept).reduce((sum, [, n]) => sum + n, 0);
+    const joined =
+      kinds
+        .slice(0, kept)
+        .map(([text]) => text)
+        .join(", ") + (more > 0 ? ` and ${more} more` : "");
+    return joined.charAt(0) + joined.slice(1).toLowerCase();
+  };
+  const kept = [kinds.length, 2, 1].find(
+    (each) => each <= kinds.length && say(each).length <= room,
+  );
+  return say(kept ?? 1);
 }
 
+/** The characters of a line that its count of what failed ("1 failed", and its mark) takes. */
+const FAILED_ROOM = 12;
+
 /**
- * The plain parts of a group's line: what it says, how many failed, and whether it runs: while a
- * call does, or its run does, between one call's answer and the next, it says what it is doing.
+ * The plain parts of a group's line: what it says (in `room` characters, if it is short of room),
+ * all it would say, how many failed, and whether it runs: while a call does, or its run does,
+ * between one call's answer and the next, it says what it is doing.
  */
-export function foldSummary(tools: readonly Artifactr.Tool[], runRunning = false) {
+export function foldSummary(
+  tools: readonly Artifactr.Tool[],
+  runRunning = false,
+  room = Number.POSITIVE_INFINITY,
+) {
   const latest = tools.findLast((tool) => tool.status === "called") ?? tools.at(-1);
   const running = runRunning || tools.some((tool) => tool.status === "called");
+  const doingNow =
+    running && latest ? `${doing(phrase(latest.name)[0])} ${phrase(latest.name)[1]}…` : null;
+  const failures = tools.filter(failed).length;
   return {
-    label:
-      running && latest
-        ? `${doing(phrase(latest.name)[0])} ${phrase(latest.name)[1]}…`
-        : doneLabel(tools),
-    failed: tools.filter(failed).length,
+    label: doingNow ?? doneLabel(tools, failures > 0 ? room - FAILED_ROOM : room),
+    full: doingNow ?? doneLabel(tools),
+    failed: failures,
     running,
   };
 }

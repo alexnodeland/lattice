@@ -45,7 +45,7 @@ import { useCoarsePointer } from "./touch";
 import { TYPE } from "./type";
 
 const card =
-  "flex flex-col gap-2 rounded-(--card-radius) border border-line bg-surface p-(--card-pad) text-sm";
+  "flex flex-col gap-2 rounded-(--card-radius) border border-line bg-surface p-(--card-pad) text-sm phone:p-3";
 
 /** A button that sends one command, waits while it is in flight, and says why one wasn't done. */
 export function CommandButton({
@@ -394,10 +394,12 @@ export function prefetchStreaming(): void {
 
 /**
  * What a run is streaming, as it arrives, in the bubble its message will have, so nothing moves
- * when the message replaces it: its thinking, folded, then its words; before either, three dots.
- * Nothing of it is announced as it grows (`aria-live="off"` in the log): the posted message is.
- * A run that failed, or was stopped, keeps what it had streamed, quietly, as `ended` says; the
- * thread says a stop as a line of the log, which announces it.
+ * when the message replaces it: its thinking, folded, then its words; before either, nothing, as
+ * the turn's strip says it works (portalr ADR-0083). Nothing of it is announced as it grows
+ * (`aria-live="off"` in the log): the posted message is. Its words are read as any message's are,
+ * though the model wrote them before a tool call, or the run ended. A run that failed, or was
+ * stopped, keeps what it had streamed, as `ended` says; the thread says a stop as a line of the
+ * log, which announces it.
  */
 export function Streaming({
   text,
@@ -416,14 +418,15 @@ export function Streaming({
   // How long it thought, in the add-on's words, loaded ahead as the thread opens.
   const addon = useRetrying(loadStreaming, thinking !== "", live?.phase);
   const state = ended ? "didn't finish" : text ? "is writing" : "is thinking";
+  const fingers = useCoarsePointer();
   // The start of what streamed may be missing: cut to its cap, or lost to a reconnect.
   const words = live?.truncated ? `…${text}` : text;
+  if (!text && !thinking) {
+    return null;
+  }
   return (
     <li
-      className={cn(
-        "flex max-w-[min(100%,var(--bubble-max-width))] flex-col items-start gap-1 self-start",
-        ended && "opacity-45",
-      )}
+      className="flex max-w-[min(100%,var(--bubble-max-width))] flex-col items-start gap-1 self-start"
       aria-live="off"
       aria-busy={ended ? undefined : "true"}
       aria-label={`${author} ${state}`}
@@ -450,31 +453,14 @@ export function Streaming({
           <p className="mt-1">Thinking isn't kept: it goes when the page does.</p>
         </Disclosure>
       )}
-      {/* Words the model wrote before calling a tool aren't the reply: they fade as it calls. */}
-      {(text || !ended) && (
-        <div className={cn(bubble(false), !ended && live?.reply === "stale" && "opacity-45")}>
-          {text ? <Markdown streaming={!ended}>{words}</Markdown> : <Thinking />}
+      {text && (
+        <div className={bubble(false)}>
+          <Markdown streaming={!ended}>{words}</Markdown>
         </div>
       )}
-      <div aria-hidden="true" className="min-h-7" />
+      {/* Where a message has a row of actions, its room, so nothing moves when it replaces this. */}
+      {!fingers && <div aria-hidden="true" className="min-h-7" />}
     </li>
-  );
-}
-
-/** Three dots that pulse in turn while the agent thinks, and stay still where motion is reduced. */
-function Thinking() {
-  return (
-    <span className="flex h-6 items-center gap-1 text-muted">
-      {/* Each dot a beat behind the last: a delay, not a duration, so reduced motion's pause holds. */}
-      {[0, 150, 300].map((delay) => (
-        <span
-          key={delay}
-          style={{ animationDelay: `${delay}ms` }}
-          className="size-1.5 rounded-full bg-current [animation-play-state:var(--motion-loop)] motion-safe:animate-pulse"
-        />
-      ))}
-      <span className="sr-only">Thinking</span>
-    </span>
   );
 }
 
@@ -521,7 +507,7 @@ export function Messages({ children, className }: { children: ReactNode; classNa
   return (
     <div className="relative">
       <div role="log" aria-label="Messages">
-        <ol ref={list} className={cn("flex flex-col gap-4", className)}>
+        <ol ref={list} className={cn("flex flex-col gap-4 phone:gap-2", className)}>
           {children}
         </ol>
       </div>
@@ -763,12 +749,12 @@ export function Composer({
         <Field.Label className="sr-only">Message</Field.Label>
         <Field.Control
           ref={box}
-          render={<textarea rows={2} enterKeyHint="send" aria-describedby={hint} />}
+          render={<textarea rows={1} enterKeyHint="send" aria-describedby={hint} />}
           value={text}
           placeholder="Write to the assistant"
           onValueChange={(value) => setText(String(value))}
           onKeyDown={key}
-          className="max-h-64 min-h-14 field-sizing-content resize-none bg-transparent px-2.5 py-2 text-base text-fg outline-none placeholder:text-muted data-disabled:cursor-not-allowed data-disabled:text-muted"
+          className="max-h-64 min-h-14 phone:min-h-10 field-sizing-content resize-none bg-transparent px-2.5 py-2 text-base text-fg outline-none placeholder:text-muted data-disabled:cursor-not-allowed data-disabled:text-muted"
         />
       </Field.Root>
       <div className="flex items-center justify-between gap-2 px-2.5 pb-1">
@@ -1091,6 +1077,30 @@ function describe(change: NonNullable<Artifactr.Proposal["change"]>): string {
   }
 }
 
+/** What a proposal would do, in a few words: the title of its card and of its line. */
+export function proposalTitle(proposal: Artifactr.Proposal): string {
+  return proposal.change ? describe(proposal.change) : "A change";
+}
+
+/**
+ * A proposal that was decided, as one line of the thread (portalr ADR-0092): what it was, and
+ * whether it was accepted or rejected. Its card is for the one that waits.
+ */
+export function ProposalLine({ proposal }: { proposal: Artifactr.Proposal }) {
+  const what = proposalTitle(proposal);
+  const accepted = proposal.status === "accept";
+  return (
+    <li>
+      <section aria-label={`Proposal: ${what}`} className="flex min-h-7 items-center gap-2 text-xs">
+        <StatusBadge tone={accepted ? "done" : "stopped"} className="shrink-0">
+          {accepted ? "Accepted" : "Rejected"}
+        </StatusBadge>
+        <span className="min-w-0 truncate text-muted">{what}</span>
+      </section>
+    </li>
+  );
+}
+
 /**
  * A proposed change, with accept and reject while it is open, and what its caller adds. Where its
  * caller knows it can't be accepted, such as one made against a version of a file since replaced,
@@ -1112,7 +1122,7 @@ export function ProposalCard({
   /** More about it, such as a link to the artifact it would change. */
   children?: ReactNode;
 }) {
-  const what = proposal.change ? describe(proposal.change) : "A change";
+  const what = proposalTitle(proposal);
   const { pending, unsent, send } = useSending();
   const why = useId();
   return (
@@ -1194,12 +1204,29 @@ function elapsed(from: string | undefined, now: Date): string | null {
 }
 
 /**
- * The strip over a turn under way (portalr ADR-0080): how it is going, what it is doing and for
- * how long (portalr ADR-0083), its tokens, and what can be done about it: Stop while it works,
- * where the reader may; and the way to its question while it waits. One status announces how it
- * goes and, once the add-on that words it has loaded, what it does, as that changes; the clock,
- * the idle count and the tokens are never announced; how the turn ended, the log says: its reply,
- * its failure's notice, or that it was stopped.
+ * A turn at work: a dot that breathes, slowly, and, where motion is reduced, stands still. A shape
+ * and the word beside it, never colour alone.
+ */
+function Working({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex shrink-0 items-center gap-2 font-medium text-sm">
+      <span
+        aria-hidden="true"
+        className="size-2 rounded-full bg-accent [animation-play-state:var(--motion-loop)] motion-safe:animate-pulse forced-color-adjust-none forced-colors:bg-system-text"
+      />
+      {children}
+    </span>
+  );
+}
+
+/**
+ * The strip over a turn under way (portalr ADR-0080, ADR-0092): how it is going, what it is doing
+ * and for how long (portalr ADR-0083), and what can be done about it, in one line, with its
+ * tokens in a quiet one beneath: Stop while it works, where the reader may; and the way to its
+ * question while it waits. One status announces how it goes and, once the add-on that words it has
+ * loaded, what it does, as that changes; the clock, the idle count and the tokens are never
+ * announced; how the turn ended, the log says: its reply, its failure's notice, or that it was
+ * stopped. It is the thread's one sign that the agent works.
  */
 export function RunStrip({
   run,
@@ -1238,40 +1265,34 @@ export function RunStrip({
     <fieldset
       aria-label="This turn"
       // While it waits, the request under it is the surface; the strip is a quiet line above it.
+      // It comes in with a short rise, and the words that say what it does change with a fade.
       className={cn(
-        "m-0 flex min-w-0 flex-wrap items-center gap-3 rounded-(--card-radius) border border-line bg-surface px-3 py-2",
+        "m-0 flex min-w-0 flex-col gap-0.5 rounded-(--card-radius) border border-line bg-surface px-3 py-1 transition-[opacity,translate] duration-(--dialog-duration) starting:translate-y-1 starting:opacity-0 motion-reduce:transition-none",
         run.status === "paused" && "border-transparent bg-transparent",
       )}
     >
-      {/* Its status, then what it does and for how long, then its counts: one left edge. */}
-      <span className="flex min-w-40 flex-1 flex-col items-start gap-1">
-        <StatusBadge tone={tone}>{status}</StatusBadge>
+      <span className="flex min-h-9 flex-wrap items-center gap-x-2 phone:min-h-11">
+        {working ? <Working>{status}</Working> : <StatusBadge tone={tone}>{status}</StatusBadge>}
         {/* One status, kept through the add-on's loading, so what it says changes in place. */}
         <span role="status" className="sr-only">
           {working && addon ? <addon.Said run={run} status={status} now={at} /> : status}
         </span>
-        {active && (since !== null || (working && addon)) && (
-          <span className={`${TYPE.note} flex flex-wrap gap-x-2 tabular-nums`}>
-            {working && addon && <addon.Phase run={run} now={at} />}
-            {working && addon && since !== null && <span aria-hidden="true">·</span>}
-            {since !== null && (
-              <span>
-                {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
-                {since}
-              </span>
-            )}
+        {/* What it does, however long, gives way to the clock and the buttons. */}
+        {working && addon && (
+          <span
+            key={`${run.live.phase} ${run.live.tool}`}
+            className={`${TYPE.note} min-w-0 flex-1 truncate transition-opacity duration-(--dialog-duration) starting:opacity-0 motion-reduce:transition-none`}
+          >
+            <addon.Phase run={run} now={at} />
           </span>
         )}
-        {/* The counts, once the add-on has loaded: the thread loads it as it opens. */}
-        {/* Folded for everyone (portalr ADR-0085): the strip says how the turn goes; its counts,
-            and the model that answered, are a press away. */}
-        {working && addon && (
-          <Disclosure summary="Tokens" className={TYPE.note}>
-            <addon.Tokens run={run} history={history ?? null} />
-          </Disclosure>
+        {active && since !== null && (
+          // Its width kept as the digits tick, and a minute's carry, from 9:59 to 10:00.
+          <span className={`${TYPE.note} ms-auto min-w-[4ch] shrink-0 text-end tabular-nums`}>
+            {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
+            {since}
+          </span>
         )}
-      </span>
-      <span className="flex shrink-0 items-center gap-2">
         {run.status === "paused" && onQuestion && (
           <Button variant="secondary" size="sm" onClick={onQuestion}>
             Go to the question
@@ -1279,6 +1300,12 @@ export function RunStrip({
         )}
         {working && onStop && <CommandButton onSend={onStop}>Stop</CommandButton>}
       </span>
+      {/* Its counts, in one line that is cut where it is long, never wrapped (portalr ADR-0092). */}
+      {working && addon && (
+        <span className={`${TYPE.note} pb-1`}>
+          <addon.Tokens run={run} history={history ?? null} />
+        </span>
+      )}
     </fieldset>
   );
 }

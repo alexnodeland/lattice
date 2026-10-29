@@ -1,6 +1,6 @@
 # ADR-0082: Sheets, the thumb bar, and a phone's tables
 
-**Status:** Accepted, amended by [ADR-0085](0085-polish-one-shape-per-part-and-what-is-folded.md) (a phone's bar without the mark)
+**Status:** Accepted, amended by [ADR-0085](0085-polish-one-shape-per-part-and-what-is-folded.md) (a phone's bar without the mark), and by [ADR-0092](0092-a-phones-thread-uses-its-height-one-tray-for-what-waits-one-strip-for-a-turn.md) (the sheet's handle; the bar and the tray)
 **Date:** 2026-10-27
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the small screens)

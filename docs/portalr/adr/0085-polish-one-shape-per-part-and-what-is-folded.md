@@ -1,6 +1,6 @@
 # ADR-0085: Polish: one shape per part, and what is folded
 
-**Status:** Accepted, amended by [ADR-0087](0087-a-command-first-layout-a-top-bar-a-palette-a-table-and-a-split-view.md) (the layout pass, the search, the follow-ups; on a phone the agent's mode leaves the composer's row for its Add sheet, and is named Auto or Ask)
+**Status:** Accepted, amended by [ADR-0087](0087-a-command-first-layout-a-top-bar-a-palette-a-table-and-a-split-view.md) (the layout pass, the search, the follow-ups; on a phone the agent's mode leaves the composer's row for its Add sheet, and is named Auto or Ask), and by [ADR-0092](0092-a-phones-thread-uses-its-height-one-tray-for-what-waits-one-strip-for-a-turn.md) (the strip's tokens, in one line)
 **Date:** 2026-10-27
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the rhythm, the mark in the frame), [ADR-0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md) (counts in mono, a table's head on the wash, an alert's edge), [ADR-0082](0082-sheets-the-thumb-bar-and-a-phone-s-tables.md) (a phone's bar), [ADR-0083](0083-a-turn-shows-its-progress-phase-thinking-and-an-estimated-count.md) (the strip's tokens)

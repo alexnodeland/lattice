@@ -148,6 +148,8 @@ test("while a turn runs the model is fixed for it: the sheet says so, and its ch
 });
 
 test("written, Send stands where Answer stood: never both", async () => {
+  // A window whose tray holds less than the question: its Answer is out of view, and the bar has it.
+  await page.viewport(390, 520);
   const { screen, box } = await thread();
   const bar = () => document.querySelector("[data-thumb-bar]") as HTMLElement | null;
   await expect.poll(() => bar()?.checkVisibility()).toBe(true);

@@ -10,6 +10,8 @@ import {
   Messages,
   ModeSwitch,
   ProposalCard,
+  ProposalLine,
+  proposalTitle,
   proposedOn,
   Request,
   RunStatus,
@@ -181,17 +183,14 @@ test("a message on its way says so, and can't be copied or judged yet", async ()
   expect(posting.getByRole("button").elements()).toHaveLength(0);
 });
 
-test("before its first words, a run says the agent is thinking, and stays still if asked", async () => {
+test("before its first words a run draws nothing: the strip is the one sign that it works", async () => {
   const screen = await render(
     <Messages>
       <Streaming text="" author="Assistant" />
     </Messages>,
   );
-  const thinking = screen.getByRole("listitem", { name: "Assistant is thinking" });
-  await expect.element(thinking).toHaveAttribute("aria-busy", "true");
-  await expect.element(thinking.getByText("Thinking")).toBeInTheDocument();
-  const dot = thinking.element().querySelector(".rounded-full") as Element;
-  expect(getComputedStyle(dot).animationName).toBe("none"); // the tests reduce motion
+  expect(screen.getByRole("listitem").elements()).toHaveLength(0);
+  expect(screen.container.querySelector(".animate-pulse")).toBeNull();
 });
 
 test("what streams sits where its message will, so nothing moves when it is posted", async () => {
@@ -1159,29 +1158,27 @@ test("the strip says what the turn is doing, in one status, and how long since i
   expect(group.getByRole("status").element().textContent).not.toContain("21 s");
 });
 
-test("the strip counts the turn's tokens as chips, each estimated and named in full", async () => {
+test("the strip counts the turn's tokens in one line, each estimated and named in full", async () => {
   const now = new Date();
   const screen = await render(strip({ outputChars: 401 }, now, { history: 4000 }));
   const group = screen.getByRole("group", { name: "This turn" });
-  // Folded for everyone (portalr ADR-0085): the strip stays quiet until Tokens is opened.
-  const tokens = group.getByRole("button", { name: "Tokens" });
-  await expect.element(tokens).toHaveAttribute("aria-expanded", "false");
-  await expect.element(group.getByText("in ~1,000")).not.toBeVisible();
-  await tokens.click();
-  await expect.element(group.getByText("in ~1,000")).toBeVisible();
-  await expect.element(group.getByText("out ~101")).toBeVisible();
-  await expect.element(group.getByText("Input tokens, estimated: 1,000")).toBeInTheDocument();
-  await expect.element(group.getByText("Output tokens, estimated: 101")).toBeInTheDocument();
-  // A chip never breaks across lines, and the counts are never announced.
-  const chip = group.getByText("out ~101").element().closest("[data-chip]") as HTMLElement;
-  expect(getComputedStyle(chip).whiteSpace).toBe("nowrap");
-  expect(chip.closest("[role=status], [aria-live]")).toBeNull();
+  // One line, there from the first, with nothing to open (portalr ADR-0092).
+  await expect.element(group.getByText("in ~1,000 · out ~101")).toBeVisible();
+  expect(group.getByRole("button", { name: "Tokens" }).elements()).toHaveLength(0);
+  await expect
+    .element(group.getByText("Input tokens, estimated: 1,000. Output tokens, estimated: 101"))
+    .toBeInTheDocument();
+  // Never broken across lines, set in digits of one width, and never announced.
+  const line = group.getByText("in ~1,000 · out ~101").element().parentElement as HTMLElement;
+  expect(getComputedStyle(line).whiteSpace).toBe("nowrap");
+  expect(getComputedStyle(line).fontVariantNumeric).toBe("tabular-nums");
+  expect(line.closest("[role=status], [aria-live]")).toBeNull();
   await screen.rerender(strip({ outputChars: 401 }, now, { history: null }));
   await expect.element(group.getByText("out ~101")).toBeVisible();
   expect(group.getByText(/^in ~/).elements()).toHaveLength(0);
 });
 
-test("once the provider has counted, the chips are exact, with the cache and reasoning where any, and the model", async () => {
+test("once the provider has counted, the line is exact, with the cache and reasoning where any, and the model", async () => {
   const now = new Date();
   const usage = {
     requests: 1,
@@ -1194,25 +1191,40 @@ test("once the provider has counted, the chips are exact, with the cache and rea
   };
   const screen = await render(strip({ outputChars: 401, usage }, now, { history: 4000 }));
   const group = screen.getByRole("group", { name: "This turn" });
-  await group.getByRole("button", { name: "Tokens" }).click();
-  await expect.element(group.getByText("in 1,030")).toBeVisible();
-  await expect.element(group.getByText("out 40")).toBeVisible();
-  await expect.element(group.getByText("Input tokens: 1,030")).toBeInTheDocument();
-  await expect.element(group.getByText("Output tokens: 40")).toBeInTheDocument();
-  await expect.element(group.getByText("Model: glm-4.7")).toBeVisible();
-  // None read from the cache, written to it, or spent reasoning: no chip says 0.
-  expect(group.getByText(/^(cached|cache write|reasoning) /).elements()).toHaveLength(0);
+  await expect.element(group.getByText("in 1,030 · out 40 · glm-4.7")).toBeVisible();
+  await expect
+    .element(group.getByText("Input tokens: 1,030. Output tokens: 40. Model: glm-4.7"))
+    .toBeInTheDocument();
+  // None read from the cache, written to it, or spent reasoning: the line says none of them.
+  expect(group.getByText(/(cached|cache write|reasoning) /).elements()).toHaveLength(0);
   expect(group.getByText(/~/).elements()).toHaveLength(0);
   const more = { cache_read_tokens: 800, cache_write_tokens: 200, reasoning_tokens: 12 };
   await screen.rerender(strip({ usage: { ...usage, ...more, model: null } }, now));
-  await expect.element(group.getByText("cached 800")).toBeVisible();
-  await expect.element(group.getByText("cache write 200")).toBeVisible();
-  await expect.element(group.getByText("reasoning 12")).toBeVisible();
-  await expect.element(group.getByText("Cached input tokens: 800")).toBeInTheDocument();
-  await expect.element(group.getByText("Reasoning tokens: 12")).toBeInTheDocument();
+  await expect
+    .element(group.getByText("in 1,030 · out 40 · cached 800 · cache write 200 · reasoning 12"))
+    .toBeVisible();
+  await expect.element(group.getByText(/Cached input tokens: 800/)).toBeInTheDocument();
+  await expect.element(group.getByText(/Reasoning tokens: 12/)).toBeInTheDocument();
   expect(group.getByText(/glm-4\.7/).elements()).toHaveLength(0);
-  const chip = group.getByText("cached 800").element().closest("[data-chip]") as HTMLElement;
-  expect(getComputedStyle(chip).fontVariantNumeric).toBe("tabular-nums");
+});
+
+test("a count that fits one line at a phone's width does, with the cache and reasoning in it", async () => {
+  await page.viewport(390, 700);
+  const usage = {
+    requests: 1,
+    input_tokens: 32_369,
+    output_tokens: 6925,
+    cache_read_tokens: 0,
+    cache_write_tokens: 0,
+    reasoning_tokens: 4955,
+    model: "default",
+  };
+  const screen = await render(strip({ usage }, new Date()));
+  const line = screen.getByText("in 32,369 · out 6,925 · reasoning 4,955 · default");
+  await expect.element(line).toBeVisible();
+  const box = line.element().parentElement as HTMLElement;
+  expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth);
+  expect(line.element().getBoundingClientRect().height).toBeLessThan(20);
 });
 
 test("what streams is never announced as it grows: only the posted message is", async () => {
@@ -1286,7 +1298,8 @@ test("a turn that was stopped, or failed, keeps what it streamed, quietly, and s
   await expect.element(left.getByText("Half a rep")).toBeVisible();
   expect(left.getByText("Stopped here.").elements()).toHaveLength(0); // the log's own line says it
   await expect.element(left.getByRole("button", { name: "Thought for 2 s" })).toBeVisible();
-  expect(left.element().classList).toContain("opacity-45");
+  // What it streamed is read as any message is: never faded.
+  expect(getComputedStyle(left.element()).opacity).toBe("1");
 });
 
 test("the strip over a turn says how it goes, for how long, and offers Stop while it works", async () => {
@@ -1473,7 +1486,7 @@ test("the log holds the messages alone: Jump to latest sits outside it", async (
   expect(jump.element().closest("[role=log]")).toBeNull();
 });
 
-test("what streamed says where its start is missing, fades before a tool call, and a thought of unknown length has none", async () => {
+test("what streamed says where its start is missing, is read as the reply is before a tool call, and a thought of unknown length has none", async () => {
   const screen = await render(
     <Messages>
       <Streaming
@@ -1491,10 +1504,15 @@ test("what streamed says where its start is missing, fades before a tool call, a
     </Messages>,
   );
   const item = screen.getByRole("listitem", { name: "Assistant is writing" });
-  await expect.element(item.getByText("…and so on.")).toBeVisible(); // its start is missing
+  const words = item.getByText("…and so on.");
+  await expect.element(words).toBeVisible(); // its start is missing
   await expect.element(item.getByRole("button", { name: "Thought", exact: true })).toBeVisible();
-  const bubble = item.getByText("…and so on.").element().closest(".opacity-45");
-  expect(bubble).not.toBeNull();
+  // Words before a tool call are not the reply, and are as legible as it: none of what holds them
+  // is faded, and their colour is the page's own.
+  for (let at: Element | null = words.element(); at; at = at.parentElement) {
+    expect(getComputedStyle(at).opacity).toBe("1");
+  }
+  expect(getComputedStyle(words.element()).color).toBe(getComputedStyle(document.body).color);
   await screen.rerender(
     <Messages>
       <Streaming
@@ -1506,17 +1524,15 @@ test("what streamed says where its start is missing, fades before a tool call, a
   );
   expect(item.getByText(/^…/).elements()).toHaveLength(0);
   await expect.element(item.getByRole("button", { name: "Thought for a moment" })).toBeVisible();
-  expect(item.getByText("The reply.").element().closest(".opacity-45")).toBeNull();
 });
 
-test("the strip shows its token chips, and says how a turn ended in the same status", async () => {
+test("the strip says how a turn ended in the same status", async () => {
   const now = new Date();
   const screen = await render(
     strip({ phase: "writing", at: now.getTime() }, now, { history: 400 }),
   );
   const group = screen.getByRole("group", { name: "This turn" });
-  await group.getByRole("button", { name: "Tokens" }).click();
-  await expect.element(group.getByText("in ~100")).toBeVisible();
+  await expect.element(group.getByText(/in ~100/)).toBeVisible();
   const status = group.getByRole("status").element();
   await screen.rerender(
     <RunStrip run={{ ...run("completed"), live: live() }} onStop={sent()} now={now} />,
@@ -1572,7 +1588,7 @@ test("thinking is isolated, so a direction mark in it can't reorder what follows
   expect(shown.element().tagName).toBe("BDI");
 });
 
-test("on a narrow phone, the strip's buttons wrap under it rather than squeeze it", async () => {
+test("on a narrow phone, the strip's button wraps under it rather than squeezing it", async () => {
   await page.viewport(320, 700);
   const now = new Date();
   const paused = { ...run("paused"), live: live() };
@@ -1580,11 +1596,79 @@ test("on a narrow phone, the strip's buttons wrap under it rather than squeeze i
     <RunStrip run={paused} onStop={sent()} onQuestion={() => {}} now={now} />,
   );
   const group = screen.getByRole("group", { name: "This turn" });
-  await expect.element(group.getByRole("button", { name: "Go to the question" })).toBeVisible();
+  const way = group.getByRole("button", { name: "Go to the question" });
+  await expect.element(way).toBeVisible();
   const strip = group.element();
   expect(strip.scrollWidth).toBeLessThanOrEqual(strip.clientWidth);
-  const column = strip.firstElementChild as HTMLElement;
-  expect(column.getBoundingClientRect().width).toBeGreaterThanOrEqual(160);
+  expect(way.element().getBoundingClientRect().right).toBeLessThanOrEqual(window.innerWidth);
+});
+
+test("the strip is one line: its state, what it does, its clock and Stop, and the clock's place never moves as it ticks", async () => {
+  await page.viewport(390, 700);
+  const at = Date.now();
+  const screen = await render(
+    strip({ phase: "tool", tool: "create_artifact", calls: 0, at }, new Date(at), {}),
+  );
+  const group = screen.getByRole("group", { name: "This turn" });
+  const stop = group.getByRole("button", { name: "Stop" });
+  await expect.element(stop).toBeVisible();
+  await expect.element(group.getByText("Preparing a create_artifact call")).toBeVisible();
+  const row = group.element().firstElementChild as HTMLElement;
+  const clock = group.getByText(/^for/).element().parentElement as HTMLElement;
+  const before = Math.round(clock.getBoundingClientRect().right);
+  expect(getComputedStyle(clock).fontVariantNumeric).toBe("tabular-nums");
+  // A minute's carry, from 9:59 to 10:00, moves nothing.
+  const started = new Date(Date.parse("2026-10-20T00:00:00Z"));
+  await screen.rerender(
+    <RunStrip
+      run={{ ...run("running"), live: live({ phase: "tool", tool: "create_artifact", at }) }}
+      onStop={sent()}
+      now={new Date(started.getTime() + 599_000)}
+    />,
+  );
+  await expect.element(group.getByText(/9:59/)).toBeVisible();
+  const nine = Math.round(group.getByText(/9:59/).element().getBoundingClientRect().right);
+  await screen.rerender(
+    <RunStrip
+      run={{ ...run("running"), live: live({ phase: "tool", tool: "create_artifact", at }) }}
+      onStop={sent()}
+      now={new Date(started.getTime() + 600_000)}
+    />,
+  );
+  await expect.element(group.getByText(/10:00/)).toBeVisible();
+  expect(Math.round(group.getByText(/10:00/).element().getBoundingClientRect().right)).toBe(nine);
+  expect(row.getBoundingClientRect().height).toBeLessThanOrEqual(44);
+  expect(before).toBeGreaterThan(0);
+});
+
+test("the model's thinking streams into its fold while the run is in flight", async () => {
+  const screen = await render(
+    <Messages>
+      <Streaming
+        text=""
+        live={live({ phase: "thinking", thinking: "Let me" })}
+        author="Assistant"
+      />
+    </Messages>,
+  );
+  await screen.getByRole("button", { name: "Thinking…" }).click();
+  const thought = () => screen.getByText(/^Let me/).element().textContent;
+  await expect.poll(thought).toBe("Let me");
+  await screen.rerender(
+    <Messages>
+      <Streaming
+        text=""
+        live={live({ phase: "thinking", thinking: "Let me see how this goes" })}
+        author="Assistant"
+      />
+    </Messages>,
+  );
+  await expect.poll(thought).toBe("Let me see how this goes");
+  // Still open, still thinking, and still no dots: the fold and the strip say it.
+  await expect
+    .element(screen.getByRole("button", { name: "Thinking…" }))
+    .toHaveAttribute("aria-expanded", "true");
+  expect(screen.container.querySelector(".animate-pulse")).toBeNull();
 });
 
 test("a stopped turn's kept words render as Markdown, its list cut mid-item and all", async () => {
@@ -1605,4 +1689,24 @@ test("a stopped turn's kept words render as Markdown, its list cut mid-item and 
   await expect.element(list.getByText("A hero with the tagline")).toBeVisible();
   await expect.element(list.getByText("Pricing, three")).toBeVisible();
   expect(item.element().textContent).not.toContain("\\n");
+});
+
+test("a proposal that was decided is one line: whether it was accepted or rejected, and what it was", async () => {
+  const screen = await render(
+    <Messages>
+      <ProposalLine proposal={proposal({ status: "accept" })} />
+      <ProposalLine proposal={proposal({ id: "prop_2", status: "reject" })} />
+    </Messages>,
+  );
+  const lines = screen.getByRole("region");
+  expect(lines.elements()).toHaveLength(2);
+  const [accepted, rejected] = lines.elements();
+  await expect.element(screen.getByText("Accepted")).toBeVisible();
+  await expect.element(screen.getByText("Rejected")).toBeVisible();
+  // Slim: one line of words, no buttons, nothing of its card.
+  for (const line of [accepted, rejected]) {
+    expect(line?.getBoundingClientRect().height).toBeLessThan(36);
+    expect(line?.querySelector("button")).toBeNull();
+  }
+  expect(accepted?.getAttribute("aria-label")).toBe(`Proposal: ${proposalTitle(proposal())}`);
 });

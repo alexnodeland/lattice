@@ -42,9 +42,67 @@ test("tools that say the same are counted together, and a name on Object's proto
   }
 });
 
+/** The calls of each tool, in turn: a name, and how many times it was called. */
+const run = (...each: readonly (readonly [string, number])[]) =>
+  each.flatMap(([name, n]) => Array.from({ length: n }, () => tool(name)));
+
+test("a run's calls are counted by kind, as the owner reads them, with the plurals right", () => {
+  expect(doneLabel(run(["create_artifact", 2], ["mystery", 3], ["create_app", 1]))).toBe(
+    "Made 2 artifacts, used 3 tools, made an app",
+  );
+  expect(doneLabel(run(["read_artifact", 1]))).toBe("Read an artifact");
+  expect(doneLabel(run(["find_commands", 1], ["list_artifacts", 1]))).toBe(
+    "Looked up commands, looked through the artifacts",
+  );
+});
+
+test("short of room, a line keeps whole kinds, the first two if they fit and else the first, and counts the rest", () => {
+  const four = run(
+    ["find_commands", 1],
+    ["edit_native", 1],
+    ["archive_artifact", 1],
+    ["mystery", 2],
+  );
+  // All of it fits: all of it is said.
+  expect(doneLabel(four, 80)).toBe(
+    "Looked up commands, edited a file, archived an artifact, used 2 tools",
+  );
+  // Two kinds fit; the calls of the others are counted.
+  expect(doneLabel(four, 45)).toBe("Looked up commands, edited a file and 3 more");
+  // Only the first fits.
+  expect(doneLabel(four, 30)).toBe("Looked up commands and 4 more");
+  // Not even that: the first is kept whole all the same, never cut.
+  expect(doneLabel(four, 5)).toBe("Looked up commands and 4 more");
+  // Two kinds, both fit, or the one that does.
+  const two = run(["create_artifact", 2], ["mystery", 3]);
+  expect(doneLabel(two, 40)).toBe("Made 2 artifacts, used 3 tools");
+  expect(doneLabel(two, 20)).toBe("Made 2 artifacts and 3 more");
+  // One kind has nothing to count after it.
+  expect(doneLabel(run(["draw", 30]), 3)).toBe("Drew 30 diagrams");
+  // Two kinds, the first too long for the line, and a third behind them.
+  expect(doneLabel(run(["comment_on_item", 1], ["mystery", 1], ["draw", 1]), 10)).toBe(
+    "Commented on an item and 2 more",
+  );
+});
+
+test("the line's words never end mid-phrase, however little room there is", () => {
+  const many = run(["find_commands", 2], ["edit_native", 1], ["archive_artifact", 3], ["x", 4]);
+  const kinds = doneLabel(many).split(", ");
+  for (let room = 0; room < 90; room += 1) {
+    // The first kinds of it, whole, then perhaps "and N more", and nothing else.
+    const [kept = "", more] = doneLabel(many, room).split(/ and (\d+) more$/);
+    const at = kept.split(", ").length;
+    expect(kinds.slice(0, at).join(", ")).toBe(kept);
+    expect(at === kinds.length || at <= 2).toBe(true);
+    expect(more === undefined).toBe(at === kinds.length);
+    expect(foldSummary(many, false, room).full).toBe(doneLabel(many));
+  }
+});
+
 test("while a call runs the line says it is doing it; a failure is counted", () => {
   expect(foldSummary([tool("read_artifact"), tool("create_app", "called")])).toEqual({
     label: "Making an app…",
+    full: "Making an app…",
     failed: 0,
     running: true,
   });

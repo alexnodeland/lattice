@@ -83,7 +83,8 @@
   max-width: 36rem;
   margin-inline: auto;
   max-height: 85dvh;
-  overflow-y: auto;
+  /* Up and down alone: nothing in a sheet may be dragged to its side. */
+  overflow: hidden auto;
   overscroll-behavior: contain;
   border-width: 1px 0 0;
   border-radius: var(--dialog-radius) var(--dialog-radius) 0 0;
@@ -91,6 +92,8 @@
   padding-inline: max(var(--dialog-pad), env(safe-area-inset-left))
     max(var(--dialog-pad), env(safe-area-inset-right));
   padding-bottom: calc(var(--dialog-pad) + env(safe-area-inset-bottom));
+  /* Little above the handle, which is the sheet's top. */
+  padding-top: var(--space-2);
   /* The drag's offset, which the touch module sets on the popup, so its place is never fought. */
   translate: 0 var(--sheet-drag, 0px);
   transition-property: translate;

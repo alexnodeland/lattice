@@ -91,9 +91,24 @@ def test_long_batches_and_arguments_are_cut() -> None:
     assert said.summary.endswith("and 245 more.")
 
 
-def test_a_counted_argument_that_isnt_text_is_counted_once_and_quoted_as_nothing() -> None:
-    said = describe("wordcraft", [run("text.insert", text=3)])
-    assert (said.summary, said.items[0].text) == ("Types a character.", "Types nothing")
+def test_a_counted_argument_with_no_text_is_said_by_its_name() -> None:
+    said = describe("wordcraft", [run("text.insert", text=3), run("text.insert", text="")])
+    assert said.summary == "Runs 2 commands: text.insert \N{MULTIPLICATION SIGN}2."
+    assert [item.text for item in said.items] == ["text.insert", "text.insert: “”"]
+    mixed = describe("wordcraft", [run("text.insert", text="Hi"), run("text.insert")])
+    assert mixed.summary == "Types 2 characters and runs another command."
     assert describe("wordcraft", [run("text.insert", text="a b\n c")] * 2).summary == (
         "Types 12 characters."
+    )
+
+
+def test_only_words_are_quoted_and_a_servers_path_is_never_listed() -> None:
+    said = describe("figcraft", [run("x.open", path="/srv/a.png", token="s3cret", label="Logo")])
+    assert said.items[0].text == "x.open: “Logo”"
+    assert said.items[0].args == {"path": "…", "token": "s3cret", "label": "Logo"}
+    assert describe("figcraft", [run("x.open", url="https://x")]).items[0].text == "x.open"
+    picture = describe("wordcraft", [run("insert.picture", path="/srv/p.png", alt="Map")])
+    assert (picture.items[0].text, picture.items[0].args["path"]) == (
+        "Inserts a picture: “Map”",
+        "…",
     )

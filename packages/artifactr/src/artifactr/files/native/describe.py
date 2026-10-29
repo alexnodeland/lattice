@@ -28,11 +28,18 @@ QUOTED: Final = 80
 TIMES: Final = "\N{MULTIPLICATION SIGN}"
 """Between a command's name and how many times a batch runs it."""
 
+QUOTABLE: Final = ("text", "title", "name", "label")
+"""The arguments a command no table names is quoted by, the first it has: words, never a path
+or a token."""
+
+MASKED: Final = frozenset({"path"})
+"""The arguments listed as `…`: a path on the server, which says nothing to a reviewer."""
+
 NAMED: Final = 5
 """The most things a description's line names, such as the titles of the slides it adds."""
 
 
-class Change(BaseModel):
+class CommandChange(BaseModel):
     """One command of a batch: what it does, in words, and the command, its long strings cut."""
 
     model_config = ConfigDict(frozen=True)
@@ -42,13 +49,13 @@ class Change(BaseModel):
     args: dict[str, JsonValue]
 
 
-class Described(BaseModel):
+class ProposalDescription(BaseModel):
     """What a batch of commands does: a line, its first `MOST_ITEMS` commands, and how many."""
 
     model_config = ConfigDict(frozen=True)
 
     summary: str
-    items: list[Change]
+    items: list[CommandChange]
     total: int
 
 
@@ -89,8 +96,6 @@ CRAFTS: Final[Mapping[str, Mapping[str, Says]]] = {
         f"para.heading2|{_HEADING}",
         f"para.heading3|{_HEADING}",
         "para.style|Applies|a style|styles|style",
-        "para.bullets|Makes|a bulleted list|bulleted lists",
-        "para.numbering|Makes|a numbered list|numbered lists",
         "insert.table|Inserts|a table|tables",
         "insert.picture|Inserts|a picture|pictures|alt",
         "insert.textBox|Inserts|a text box|text boxes|text",
@@ -128,7 +133,7 @@ CRAFTS: Final[Mapping[str, Mapping[str, Says]]] = {
 """Each craft's commands worth saying in its own words, by the craft's name."""
 
 
-def describe(app: str | None, commands: Sequence[AppCommand]) -> Described:
+def describe(app: str | None, commands: Sequence[AppCommand]) -> ProposalDescription:
     """What a batch of `app`'s commands does: a line, and each command, in words.
 
     Args:
@@ -137,20 +142,27 @@ def describe(app: str | None, commands: Sequence[AppCommand]) -> Described:
     """
     table = CRAFTS.get(app or "", {})
     items = [_item(table.get(command.name), command) for command in commands[:MOST_ITEMS]]
-    return Described(summary=_summary(table, commands), items=items, total=len(commands))
+    return ProposalDescription(summary=_summary(table, commands), items=items, total=len(commands))
 
 
-def _item(says: Says | None, command: AppCommand) -> Change:
-    args = {key: _cut(value) for key, value in command.args.items()}
+def _item(says: Says | None, command: AppCommand) -> CommandChange:
+    args = {key: "…" if key in MASKED else _cut(value) for key, value in command.args.items()}
+    says = None if says is None or _uncounted(says, command) else says
     if says is None:
-        quoted = next((value for value in command.args.values() if isinstance(value, str)), None)
+        quoted = next((v for k in QUOTABLE if isinstance(v := command.args.get(k), str)), None)
         text = command.name if quoted is None else f"{command.name}: {_quote(quoted)}"
     elif says.counts:
         text = f"{says.verb} {_quote(command.args.get(says.counts))}"
     else:
         name = command.args.get(says.named) if says.named else None
         text = f"{says.verb} {says.one}" + (f": {_quote(name)}" if isinstance(name, str) else "")
-    return Change(text=text, name=command.name, args=args)
+    return CommandChange(text=text, name=command.name, args=args)
+
+
+def _uncounted(says: Says, command: AppCommand) -> bool:
+    """Whether a command whose characters are counted has none to count: said by its name."""
+    value = command.args.get(says.counts)
+    return bool(says.counts) and not (isinstance(value, str) and value)
 
 
 def _summary(table: Mapping[str, Says], commands: Sequence[AppCommand]) -> str:
@@ -161,7 +173,7 @@ def _summary(table: Mapping[str, Says], commands: Sequence[AppCommand]) -> str:
     others = 0
     for command in commands:
         says = table.get(command.name)
-        if says is None:
+        if says is None or _uncounted(says, command):
             others += 1
             continue
         key = (says.verb, says.one, says.many)
@@ -215,7 +227,7 @@ def _short(text: str) -> str:
 
 
 def _quote(value: JsonValue) -> str:
-    return f"“{_short(value)}”" if isinstance(value, str) else "nothing"
+    return f"“{_short(str(value))}”"
 
 
 def _cut(value: JsonValue) -> JsonValue:

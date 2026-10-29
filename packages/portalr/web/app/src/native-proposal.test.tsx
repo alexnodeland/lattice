@@ -88,9 +88,6 @@ function serving(lease: unknown = null) {
     switch (path) {
       case `${AT}/proposals/p_now/commands`:
         return Response.json(SAID);
-      case `${AT}/proposals/p_in/commands`:
-      case `${AT}/proposals/p_old/commands`:
-        return Response.json({ detail: { type: "invalid_state" } }, { status: 409 });
       case `${AT}/artifacts/doc_1/revisions`:
         return Response.json(REVISIONS);
       case FILE:
@@ -150,11 +147,14 @@ test("an agent's edit says what it does, then each change, its arguments and its
   await expect.element(now.getByText("And 1 more.")).toBeVisible();
   await changes.getByRole("button", { name: "Types “Signed off by the agent.”" }).click();
   await expect.element(changes.getByText('"Signed off by the agent."')).toBeVisible();
-  await now.getByRole("button", { name: "Its commands" }).click();
+  await now.getByRole("button", { name: /^Its commands/ }).click();
   await expect.element(now.getByText('"text.newParagraph"')).toBeVisible();
   const { violations } = await axe.run(now.element(), { resultTypes: ["violations"] });
   expect(violations.map((violation) => violation.id)).toEqual([]);
-  // A check-in has no commands to say: its card says nothing of them.
+  // A read that failed says so; a check-in has no commands to say, and says nothing of them.
+  await expect
+    .element(card(screen, "Add a closing").getByText(/^Couldn't read what this does/))
+    .toBeVisible();
   const checkedIn = card(screen, "Checked in brief.docx");
   await expect.element(checkedIn.getByText(/^A check-in kept as a proposal/)).toBeVisible();
   expect(checkedIn.getByRole("button", { name: /^Types/ }).elements()).toHaveLength(0);
@@ -170,8 +170,8 @@ test("a check-in kept as a proposal is compared with the head, words and pages",
     fetched.mock.calls.filter(([input]) =>
       new URL((input as Request).url).pathname.startsWith(`${AT}/proposals/p_in/`),
     ).length;
-  // What it does in words is read at once; its words and pages only once asked for.
-  await expect.poll(read).toBe(1);
+  // A check-in has no commands to read; its words and pages are read only once asked for.
+  expect(read()).toBe(0);
   await checkedIn.getByText("Compare with version 2 (proposed: 48 kB)").click();
   await expect
     .poll(() => checkedIn.element().querySelector("ins")?.textContent)

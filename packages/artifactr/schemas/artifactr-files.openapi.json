@@ -53,33 +53,6 @@
       "ArtifactId": {
         "type": "string"
       },
-      "Change": {
-        "description": "One command of a batch: what it does, in words, and the command, its long strings cut.",
-        "properties": {
-          "args": {
-            "additionalProperties": {
-              "$ref": "#/components/schemas/JsonValue"
-            },
-            "title": "Args",
-            "type": "object"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          }
-        },
-        "required": [
-          "text",
-          "name",
-          "args"
-        ],
-        "title": "Change",
-        "type": "object"
-      },
       "CheckedIn": {
         "description": "What a check-in made: a revision, a proposal if it was stale, or nothing.",
         "properties": {
@@ -194,31 +167,31 @@
         "title": "Checkout",
         "type": "object"
       },
-      "Described": {
-        "description": "What a batch of commands does: a line, its first `MOST_ITEMS` commands, and how many.",
+      "CommandChange": {
+        "description": "One command of a batch: what it does, in words, and the command, its long strings cut.",
         "properties": {
-          "items": {
-            "items": {
-              "$ref": "#/components/schemas/Change"
+          "args": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
             },
-            "title": "Items",
-            "type": "array"
+            "title": "Args",
+            "type": "object"
           },
-          "summary": {
-            "title": "Summary",
+          "name": {
+            "title": "Name",
             "type": "string"
           },
-          "total": {
-            "title": "Total",
-            "type": "integer"
+          "text": {
+            "title": "Text",
+            "type": "string"
           }
         },
         "required": [
-          "summary",
-          "items",
-          "total"
+          "text",
+          "name",
+          "args"
         ],
-        "title": "Described",
+        "title": "CommandChange",
         "type": "object"
       },
       "EvaluatorActor": {
@@ -444,6 +417,33 @@
           "expires_at"
         ],
         "title": "Lease",
+        "type": "object"
+      },
+      "ProposalDescription": {
+        "description": "What a batch of commands does: a line, its first `MOST_ITEMS` commands, and how many.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/CommandChange"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "summary",
+          "items",
+          "total"
+        ],
+        "title": "ProposalDescription",
         "type": "object"
       },
       "Refused": {
@@ -1941,7 +1941,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Described"
+                  "$ref": "#/components/schemas/ProposalDescription"
                 }
               }
             },

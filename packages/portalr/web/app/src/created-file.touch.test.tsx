@@ -6,6 +6,7 @@
 
 import axe from "axe-core";
 import { afterEach, expect, test, vi } from "vitest";
+import { userEvent } from "vitest/browser";
 import { open } from "./test/app";
 
 const AGENT = { kind: "agent", thread_id: "thr_1", run_id: "run_1" };
@@ -130,6 +131,23 @@ test("on a phone, a proposal's changes open in a sheet, each to its arguments an
   await expect.element(sheet.getByText('"Lisbon"')).toBeVisible();
   await back.click();
   await expect.element(day).toHaveFocus();
+  // Escape from a change goes back to the list; from the list, it closes.
+  await day.click();
+  await expect.element(back).toHaveFocus();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(day).toHaveFocus();
+  await userEvent.keyboard("{Escape}");
+  await expect.element(line).toHaveFocus();
+  await line.click();
   await sheet.getByRole("button", { name: "Close" }).click();
   await expect.element(line).toHaveFocus();
+});
+
+test("a proposal on a native file is compared with the head from its thread", async () => {
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, undefined, {
+    artifactrLog: LOG,
+  });
+  const proposal = screen.getByRole("region", { name: "Proposal: Write the slides" });
+  await proposal.getByRole("button", { name: /^Compare with version 1/ }).click();
+  await expect.element(proposal.getByText("Its words")).toBeVisible();
 });

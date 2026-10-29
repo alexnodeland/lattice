@@ -13,14 +13,14 @@ A reviewer needs four things, each deeper than the last, the way a run's tool ca
 1. what the batch does, in words;
 2. each command, with its arguments;
 3. the pages after, beside the pages before;
-4. the batch as it was sent.
+4. the batch, as listed.
 
 Most of this already exists. An agent's edit runs its batch on the head's bytes in the app (`NativeFiles.edit`) before anything is committed. The proposal stores the result: its bytes, its words and its page count, all named in its JSON Patch. The batch itself is stored as canonical JSON, a blob that the proposal's `provenance.commands` names. The proposal's pages and words are already served (`GET .../proposals/{id}/pages/{n}` and `.../text`, [ADR-0008](0008-what-portalr-reads-of-a-native-file.md)), and portalr compares them with the head's on request ([portalr ADR-0050](../../../portalr/adr/0050-a-native-files-proposals-and-the-pilots-scenarios.md)). The missing pieces are levels 1, 2 and 4.
 
 ## Decision
 
 - **`GET /workspaces/{ws}/proposals/{id}/commands`** answers `{summary, items: [{text, name, args}], total}` through `NativeFiles.proposed_commands`. It reads the batch from the blob named by the provenance that the proposal's patch gives the file. It is read the way the proposal's other reads are: the proposal and then its file are resolved through the workspace. So a hidden proposal, or one on a hidden file, is answered as missing (404), and the workspace's `authorize` decides who may read it, as for any file read. A proposal made by no commands, such as a person's check-in kept as a proposal, has none: `ContentUnavailable`, 409, which the client reads as nothing to say. A batch blob that doesn't hold a list of commands gets the same answer.
-- **The words are made in Python, from the batch alone,** by `artifactr.files.native.describe(app, commands)`, keyed by the app named in the provenance. The worker is not called, so there is no deadline, no reading and no pace. One table serves every surface: the card now, and later the agent's tool result and change note. Each craft that has a table names its commands in its own verbs, read from its pinned release's `list_commands`. A command that no table names is counted ("and runs 2 other commands"). A batch from a craft with no table is said by its command names ("Runs 3 commands: add_paragraph ×3."). The line is in the present tense, because it says what accepting does. Each item quotes at most 80 characters of its argument. Its `args` keep at most 1,000 characters of each string, and at most 200 items are listed, with `total` counting them all. The other crafts' tables follow in their own change. The two tables say, for example:
+- **The words are made in Python, from the batch alone,** by `artifactr.files.native.describe(app, commands)`, keyed by the app named in the provenance. The worker is not called, so there is no deadline, no reading and no pace. One table serves every surface: the card now, and later the agent's tool result and change note. Each craft that has a table names its commands in its own verbs, read from its pinned release's `list_commands`. A command that no table names, or a counted one with no text, is counted ("and runs 2 other commands"), and listed by its name, quoting only a word-like argument (`text`, `title`, `name`, `label`), never a path or a token; a `path` argument is listed as `…`. A batch from a craft with no table is said by its command names ("Runs 3 commands: add_paragraph ×3."). The line is in the present tense, because it says what accepting does. Each item quotes at most 80 characters of its argument. Its `args` keep at most 1,000 characters of each string, and at most 200 items are listed, with `total` counting them all, so the batch as listed is not always the batch as sent. A batch over 4 MiB, or a provenance that doesn't validate, is not read: 409. The other crafts' tables follow in their own change. The two tables say, for example:
 
   - WordCraft 0.11: "Makes 2 headings, types 412 characters, starts 11 new paragraphs and inserts a table."
   - DeckCraft 0.7: "Adds 6 slides: Title, Itinerary, Budget, Day 1, Day 2 and 1 more."
@@ -59,6 +59,7 @@ Option A keeps every level read-only and cheap, and puts the wording where every
 ## Consequences
 
 - A reviewer reads what a proposal does before opening anything, and every level is a read-only GET.
+- The models are `ProposalDescription` and `CommandChange`.
 - `ContentUnavailable.part` widens to `Part | Literal["commands"]`.
 - The tables have to follow each craft's pinned release. When a command is renamed, it falls back to its own name.
 - The other crafts' tables, the open-by-default before and after, affected pages, and the can't-preview wording are later changes (issue 1090).

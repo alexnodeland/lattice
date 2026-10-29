@@ -282,20 +282,6 @@ export interface components {
         };
         ArtifactId: string;
         /**
-         * Change
-         * @description One command of a batch: what it does, in words, and the command, its long strings cut.
-         */
-        Change: {
-            /** Args */
-            args: {
-                [key: string]: components["schemas"]["JsonValue"];
-            };
-            /** Name */
-            name: string;
-            /** Text */
-            text: string;
-        };
-        /**
          * CheckedIn
          * @description What a check-in made: a revision, a proposal if it was stale, or nothing.
          */
@@ -336,16 +322,18 @@ export interface components {
             id: string;
         };
         /**
-         * Described
-         * @description What a batch of commands does: a line, its first `MOST_ITEMS` commands, and how many.
+         * CommandChange
+         * @description One command of a batch: what it does, in words, and the command, its long strings cut.
          */
-        Described: {
-            /** Items */
-            items: components["schemas"]["Change"][];
-            /** Summary */
-            summary: string;
-            /** Total */
-            total: number;
+        CommandChange: {
+            /** Args */
+            args: {
+                [key: string]: components["schemas"]["JsonValue"];
+            };
+            /** Name */
+            name: string;
+            /** Text */
+            text: string;
         };
         /**
          * EvaluatorActor
@@ -442,6 +430,18 @@ export interface components {
              * Format: date-time
              */
             expires_at: string;
+        };
+        /**
+         * ProposalDescription
+         * @description What a batch of commands does: a line, its first `MOST_ITEMS` commands, and how many.
+         */
+        ProposalDescription: {
+            /** Items */
+            items: components["schemas"]["CommandChange"][];
+            /** Summary */
+            summary: string;
+            /** Total */
+            total: number;
         };
         /**
          * Refused
@@ -1505,7 +1505,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Described"];
+                    "application/json": components["schemas"]["ProposalDescription"];
                 };
             };
             /** @description Refused */

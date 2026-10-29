@@ -13,14 +13,14 @@ import { useQuery } from "@tanstack/react-query";
 import { useId, useRef, useState } from "react";
 import type { Place } from "./check-out";
 
-type Said = FilesApi.components["schemas"]["Described"];
+type Said = FilesApi.components["schemas"]["ProposalDescription"];
 
 /** A button laid out as a line of words: as wide as they are, wrapping, from the start. */
 const ROW = "justify-start whitespace-normal px-0 text-start";
 
 export function NativeChanges({ place, proposal }: { place: Place; proposal: string }) {
   const { context, tenant, workspace } = place;
-  const { data: said } = useQuery(
+  const { data: said, isError } = useQuery(
     context.queries.files.proposedCommands(tenant, workspace, proposal),
   );
   const phone = usePhone();
@@ -28,8 +28,13 @@ export function NativeChanges({ place, proposal }: { place: Place; proposal: str
   const [shown, setShown] = useState<"list" | "sheet" | null>(null);
   const line = useRef<HTMLButtonElement>(null);
   const list = useId();
+  // A proposal made by no commands is null: nothing to say. A read that failed says so.
   if (!said) {
-    return null;
+    return isError ? (
+      <p className="text-muted text-sm">
+        Couldn't read what this does. You can still accept or reject it.
+      </p>
+    ) : null;
   }
   const sheet = (shown ?? (phone ? "sheet" : "list")) === "sheet";
   return (
@@ -83,7 +88,7 @@ function Rest({ said }: { said: Said }) {
   return (
     <>
       {more > 0 && <p className="text-muted">And {more.toLocaleString()} more.</p>}
-      <Disclosure summary="Its commands">
+      <Disclosure summary="Its commands, as listed: long text and server paths cut">
         <JsonView data={said.items.map(({ name, args }) => ({ name, args }))} name="commands" />
       </Disclosure>
     </>
@@ -106,10 +111,20 @@ function ChangesSheet({
   // The change last opened, whose row takes the focus back from it.
   const [left, setLeft] = useState<number | null>(null);
   const item = chosen === null ? undefined : said.items[chosen];
+  const back = () => {
+    setLeft(chosen);
+    setChosen(null);
+  };
   return (
     <Dialog
       open={open}
-      onOpenChange={(next) => {
+      onOpenChange={(next, details?: { reason: string; cancel: () => void }) => {
+        // Escape from a change goes back to the list; from the list, it closes (as ADR-0053's).
+        if (!next && item && details?.reason === "escape-key") {
+          details.cancel();
+          back();
+          return;
+        }
         setChosen(null);
         setLeft(null);
         onOpenChange(next);
@@ -125,10 +140,7 @@ function ChangesSheet({
             className="self-start"
             // The focus moves with the reader: to Back, and from it to the change's row.
             autoFocus
-            onClick={() => {
-              setLeft(chosen);
-              setChosen(null);
-            }}
+            onClick={back}
           >
             <Icon icon={glyphs.chevronLeft} className="size-3.5 rtl:-scale-x-100" />
             Back to the changes

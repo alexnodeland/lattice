@@ -43,7 +43,7 @@ from artifactr.files.blobs import once
 from artifactr.files.checkouts import Checkout, InMemoryCheckouts
 from artifactr.files.manifest import DOCX, Blob, WordDocument
 from artifactr.files.native import ContentUnavailable, NativeFiles, Part
-from artifactr.files.native.files import digests
+from artifactr.files.native.files import _provenance, digests  # pyright: ignore[reportPrivateUsage]
 from artifactr.workspace import (
     Access,
     ArtifactBusy,
@@ -572,11 +572,18 @@ async def test_a_proposal_whose_provenance_names_no_batch_has_none_to_say(world:
         JsonPatch(ops=({"op": "replace", "path": "/outline", "value": "x"},)),
         TextEdits(field="name", edits=(TextEdit(old="a", new="b"),)),
     ]
+    big = {"source": "commands", "commands": {**batch.model_dump(mode="json"), "size": 5 << 20}}
+    patches.append(JsonPatch(ops=({"op": "replace", "path": "/provenance", "value": big},)))
     for patch in patches:
         change = EditArtifact(artifact_id="a1", base_version=1, patch=patch)
         proposed = await world.agent.commit(ProposeChange(change=change))
         with pytest.raises(ContentUnavailable, match="commands"):
             await world.files.proposed_commands(world.ws, proposed.proposal_id)
+
+
+def test_a_provenance_that_isnt_one_is_read_as_none() -> None:
+    bad = JsonPatch(ops=({"op": "replace", "path": "/provenance", "value": {"source": 1}},))
+    assert _provenance(bad) is None
 
 
 async def test_a_hidden_file_answers_as_a_missing_one(stores: Stores, clock: FakeClock) -> None:

@@ -188,7 +188,7 @@ function OpenProposal({
           Outdated
         </StatusBadge>
       )}
-      <NativeChanges place={place} proposal={proposal.id} />
+      {proposed.source !== "check_in" && <NativeChanges place={place} proposal={proposal.id} />}
       {children}
       {(held?.kind === "person" || held?.kind === "you") && (
         <Alert tone="warn" live={false}>

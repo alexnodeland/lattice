@@ -5,7 +5,7 @@ the app's commands, reads of a revision's bytes, what a proposal's commands do i
 collection of bytes nothing names, and the pace and places that files are made at.
 """
 
-from artifactr.files.native.describe import Change, Described, describe
+from artifactr.files.native.describe import CommandChange, ProposalDescription, describe
 from artifactr.files.native.files import (
     CREATE_NATIVE_FILE,
     Busy,
@@ -22,9 +22,8 @@ __all__ = [
     "CREATE_NATIVE_FILE",
     "FORMATS",
     "Busy",
-    "Change",
+    "CommandChange",
     "ContentUnavailable",
-    "Described",
     "Format",
     "FormatChanged",
     "Gauge",
@@ -32,5 +31,6 @@ __all__ = [
     "Pace",
     "Paced",
     "Part",
+    "ProposalDescription",
     "describe",
 ]

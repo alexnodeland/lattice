@@ -56,7 +56,7 @@ from artifactr.files.blobs import Blobs, Clock, once
 from artifactr.files.blobs.port import TooLarge, spool, utc_now
 from artifactr.files.checkouts import Checkout, Checkouts, holder_of
 from artifactr.files.manifest import Blob, NativeFile, Provenance, revise
-from artifactr.files.native.describe import Described, describe
+from artifactr.files.native.describe import ProposalDescription, describe
 from artifactr.files.native.formats import FORMATS, Format, file_name, sniffed
 from artifactr.files.native.pace import Gauge, Pace
 from artifactr.workspace import Access, ArtifactBusy, Scope, Workspace
@@ -76,6 +76,9 @@ Part = Literal["content", "text", "review"]
 """What of a revision to read: the file, its words, or its comments and tracked changes."""
 
 _COMMANDS: Final = TypeAdapter(list[AppCommand])
+
+BATCH_MOST: Final = 4 << 20
+"""The most bytes of a proposal's batch that are read to say what it does: past it, none is."""
 
 
 class ContentUnavailable(InvalidState):
@@ -870,7 +873,9 @@ class NativeFiles:
 
         return await self._rendered(ws, app, key, proposed, admit)
 
-    async def proposed_commands(self, ws: Workspace, proposal_id: ProposalId) -> Described:
+    async def proposed_commands(
+        self, ws: Workspace, proposal_id: ProposalId
+    ) -> ProposalDescription:
         """Say what an agent's proposal on a native file does: a line, and each of its commands.
 
         The batch is read from the blob its provenance names, as it was applied, and said in its
@@ -880,13 +885,14 @@ class NativeFiles:
         Raises:
             NotFound: If there is no such proposal, it is to no native file, or either is hidden.
             ContentUnavailable: If the proposal was made by no commands, as a person's check-in,
-                or names a batch the blob store doesn't have, or that holds no commands.
+                or names a batch the blob store doesn't have, larger than `BATCH_MOST`, or that
+                holds no commands; or its provenance isn't one.
         """
         proposal = await ws.proposal(proposal_id)
         await ws.get(NativeFile, proposal.artifact_id)
         change = proposal.change
         made = _provenance(change.patch) if isinstance(change, EditArtifact) else None
-        if made is None or made.commands is None:
+        if made is None or made.commands is None or made.commands.size > BATCH_MOST:
             raise ContentUnavailable(proposal.artifact_id, "commands")
         batch = await self._bytes(_scope(ws), proposal.artifact_id, made.commands, "commands")
         try:
@@ -1157,14 +1163,18 @@ def _replaced(patch: Patch, part: Part) -> Blob | None:
 def _provenance(patch: Patch) -> Provenance | None:
     """The provenance a native file's revision gives it, as `revise` builds it, if it reads as one.
 
-    As `_replaced` reads a part, the last operation that replaces it is what the revision makes;
-    the proposed manifest was validated as the proposal was made, so what it holds is one.
+    As `_replaced` reads a part, the last operation that replaces it is what the revision makes.
+    The proposed manifest was validated as the proposal was made, but a proposal is a claim any
+    surface writes, so one that isn't a provenance is read as none.
     """
     if not isinstance(patch, JsonPatch):
         return None
     for op in reversed(patch.ops):
         if op.get("op") == "replace" and op.get("path") == "/provenance":
-            return Provenance.model_validate(op.get("value"))
+            try:
+                return Provenance.model_validate(op.get("value"))
+            except ValidationError:
+                return None
     return None
 
 

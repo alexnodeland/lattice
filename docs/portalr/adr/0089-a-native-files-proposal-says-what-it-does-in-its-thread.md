@@ -13,10 +13,10 @@ In a thread, a proposal on a native file used the plain `ProposalCard`: its one-
 
 - **The thread renders `NativeProposal` for a proposal on a native file,** chosen by the file's kind (`NATIVE`), as the proposals page does. Any other proposal keeps `ProposalCard` with `RuleProposal`. `NativeProposal` takes the card's `id`, so the created-empty card's link still reaches it. Its parts load with the files add-on, so the thread's own chunk pays only for the choice.
 - **An open proposal's card unfolds in levels,** as a run's calls do ([ADR-0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md)):
-  1. **The line in words,** in bold under the title: "Adds 6 slides: Title, Itinerary, …". It is read when the card is drawn. A proposal made by no commands, such as a check-in, shows no line.
+  1. **The line in words,** in bold under the title: "Adds 6 slides: Title, Itinerary, …". It is read when the card is drawn, except for a check-in, which the patch's provenance says was made by no commands and which shows no line. A read that fails says "Couldn't read what this does. You can still accept or reject it."
   2. **Its changes,** each a line ("Adds a slide: “Itinerary”"), which opens to its arguments in the JSON view, with Copy. When more were made than are listed, the card says "And N more."
   3. **Compare,** as before: the proposal's words and pages beside the head's, read only when asked.
-  4. **Its commands,** the batch as listed, in the JSON view, with Copy.
+  4. **Its commands, as listed** (long text and server paths cut, at most 200), in the JSON view, with Copy.
 - **On a desktop, the line unfurls the changes beneath it** (`aria-expanded`, `aria-controls`). **On a phone, it opens a sheet** (`aria-haspopup="dialog"`, [ADR-0082](0082-sheets-the-thumb-bar-and-a-phone-s-tables.md)), the kit's dialog titled by the line. The sheet lists the changes; one tapped goes on to its arguments, with "Back to the changes" focused, and Back returns the focus to that change's row. Closing returns the focus to the line. Which one opens is chosen at the tap, from the window as it is then.
 - **Accept and Reject stay whole.** A native file's proposal is never accepted with changes.
 
@@ -43,7 +43,7 @@ Option A keeps everything new in the files add-on. The first load pays only for 
 ## Consequences
 
 - A thread's native file proposals read their commands' words as soon as they are drawn: one small GET each, which the client keeps for the page's life.
-- Escape in the sheet closes it, even from a change's detail. The tool calls' sheet goes back to the list on Escape instead.
+- Escape in the sheet goes back from a change to the list, and closes it from the list, as the tool calls' sheet does.
 - Opening before and after by default, the affected pages, and the can't-preview wording and its retry come in the card's next change.
 
 ## Action items

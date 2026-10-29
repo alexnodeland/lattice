@@ -19,7 +19,9 @@ import pytest
 
 from artifactr.files.app import AppCommand, AppFailed
 from artifactr.files.freecad import COMMANDS, Subprocess, scan
+from artifactr.files.freecad.headless import PAPER
 from artifactr.files.manifest import FCSTD
+from tests.files.app.png import pixels
 from tests.files.corpus.freecad.corpus import CORPUS, python
 from tests.files.corpus.harness import pinned
 
@@ -115,15 +117,16 @@ async def test_what_the_commands_dont_allow_is_refused(
     assert refused.value.failure == "refused"
 
 
-async def test_an_empty_model_has_nothing_to_draw_and_no_page_two(freecad: Subprocess) -> None:
+async def test_an_empty_model_is_drawn_as_white_paper_and_has_no_page_two(
+    freecad: Subprocess,
+) -> None:
+    """If the script refuses an empty model in other words, it is refused here, and fails."""
     blank = await freecad.apply(None, [], deadline=DEADLINE)
-    for call in (
-        freecad.render(blank.content, 1, scale=1, deadline=DEADLINE),
-        freecad.render(CORPUS.source("primitives"), 2, scale=1, deadline=DEADLINE),
-    ):
-        with pytest.raises(AppFailed) as refused:
-            await call
-        assert refused.value.failure == "refused"
+    png = await freecad.render(blank.content, 1, scale=0.25, deadline=DEADLINE)
+    assert pixels(png) == (256, 256, PAPER)
+    with pytest.raises(AppFailed, match="no page 2") as refused:
+        await freecad.render(CORPUS.source("primitives"), 2, scale=1, deadline=DEADLINE)
+    assert refused.value.failure == "refused"
 
 
 async def test_its_commands_are_found(freecad: Subprocess) -> None:

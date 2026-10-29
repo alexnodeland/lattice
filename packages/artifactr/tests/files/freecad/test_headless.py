@@ -15,8 +15,9 @@ import pytest
 
 from artifactr.files.app import App, AppCommand, AppFailed
 from artifactr.files.freecad import COMMANDS, Subprocess, fingerprint
-from artifactr.files.freecad.headless import SCRIPT
+from artifactr.files.freecad.headless import EMPTY, PAPER, SCRIPT
 from artifactr.files.manifest import FCSTD
+from tests.files.app.png import pixels, refusals
 from tests.files.freecad.documents import fcstd, obj, xml
 
 FAKE = Path(__file__).with_name("fake_cli.py")
@@ -95,6 +96,24 @@ async def test_page_one_is_drawn_and_no_other(freecad: Subprocess) -> None:
     assert await freecad.render(fcstd(), 1, scale=0.5, deadline=10) == PNG
     with pytest.raises(AppFailed, match="no page 2"):
         await freecad.render(fcstd(), 2, scale=1, deadline=10)
+
+
+async def test_a_model_with_no_shape_is_drawn_as_white_paper(freecad: Subprocess) -> None:
+    blank = (await freecad.apply(None, [], deadline=10)).content
+    assert pixels(await freecad.render(blank, 1, scale=0.25, deadline=10)) == (256, 256, PAPER)
+    assert pixels(await freecad.render(blank, 1, scale=0, deadline=10))[:2] == (16, 16)
+    assert pixels(await freecad.render(blank, 1, scale=8, deadline=10))[:2] == (1024, 1024)
+
+
+async def test_a_model_that_shows_no_edge_is_still_refused(freecad: Subprocess) -> None:
+    edgeless = fcstd(xml(obj("Box", "Part::Box"), label="Edgeless"))
+    with pytest.raises(AppFailed, match="no visible edge") as refused:
+        await freecad.render(edgeless, 1, scale=1, deadline=10)
+    assert refused.value.failure == "refused"
+
+
+def test_no_shape_is_refused_in_the_scripts_own_words() -> None:
+    assert refusals(SCRIPT, "draw").count(EMPTY) == 1
 
 
 async def test_a_save_or_a_page_it_doesnt_write_is_a_crash(freecad: Subprocess) -> None:

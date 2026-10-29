@@ -2,7 +2,9 @@
 
 Its documents are `Document.xml` alone, whose objects are `Object` elements; `box` adds one, and
 any other command is refused. Each save writes the time, as FreeCAD's does. A document labelled
-`Unsaved` is neither saved nor drawn. Run as `python -I fake_cli.py ... script.py --pass CALL`.
+`Unsaved` is neither saved nor drawn; one with no object has nothing to draw, nor one labelled
+`Edgeless` an edge, and either is refused as the script refuses it. Run as
+`python -I fake_cli.py ... script.py --pass CALL`.
 """
 
 import datetime
@@ -47,6 +49,10 @@ def main() -> None:
 def step(here: Path, call: dict, document: str) -> dict:
     unsaved = 'value="Unsaved"' in document
     if call["step"] == "render":
+        if 'value="Edgeless"' in document:
+            raise ValueError("nothing to draw: no visible edge")
+        if not unsaved and not OBJECT.search(document):
+            raise ValueError("nothing to draw: no shape")
         if not unsaved:
             (here / "out" / "page.png").write_bytes(PNG)
         return {}

@@ -93,6 +93,10 @@ class ContentUnavailable(InvalidState):
         self.artifact_id = artifact_id
         self.part: Part | Literal["commands"] = part
 
+    def details(self) -> dict[str, JsonValue]:
+        """Say why, so a client tells bytes not stored from any other state by its fields."""
+        return {"reason": "content_unavailable", "part": self.part}
+
 
 class FormatChanged(InvalidState):
     """A check-in is in another format than the file checked out, which is never converted.
@@ -889,7 +893,7 @@ class NativeFiles:
                 holds no commands; or its provenance isn't one.
         """
         proposal = await ws.proposal(proposal_id)
-        await ws.get(NativeFile, proposal.artifact_id)
+        head = await ws.get(NativeFile, proposal.artifact_id)
         change = proposal.change
         made = _provenance(change.patch) if isinstance(change, EditArtifact) else None
         if made is None or made.commands is None or made.commands.size > BATCH_MOST:
@@ -899,7 +903,7 @@ class NativeFiles:
             commands = _COMMANDS.validate_json(batch)
         except ValidationError:
             raise ContentUnavailable(proposal.artifact_id, "commands") from None
-        return describe(made.app, commands)
+        return describe(made.app, commands, before=head.data.pages)
 
     def _page(self, key: PageKey) -> bytes | None:
         """A page rendered before, if this process still keeps it."""

@@ -1,10 +1,15 @@
 """What a batch of an app's commands does, in words (native files ADR-0020)."""
 
+import ast
+from pathlib import Path
+
+import yaml
 from pydantic import JsonValue
 
+import artifactr.files
 from artifactr.files.app import AppCommand
 from artifactr.files.native import describe
-from artifactr.files.native.describe import LONGEST, MOST_ITEMS
+from artifactr.files.native.describe import CRAFTS, GENERIC, LONGEST, MOST_ITEMS
 
 
 def run(name: str, **args: JsonValue) -> AppCommand:
@@ -112,3 +117,73 @@ def test_only_words_are_quoted_and_a_servers_path_is_never_listed() -> None:
         "Inserts a picture: “Map”",
         "…",
     )
+
+
+def test_a_deck_numbers_the_slides_it_adds_as_they_end() -> None:
+    said = describe(
+        "deckcraft",
+        [
+            run("slide.new", title="A"),
+            run("text.set", text="x"),
+            run("slide.new", title="B"),
+            run("slide.new", title="C", at=0),
+            run("slide.new", title="D", at=40),
+        ],
+        before=3,
+    )
+    # A after the first slide; B after A; C first, moving A and B on; D clamped to the end.
+    assert [item.pages for item in said.items] == [[3], [], [4], [1], [7]]
+
+
+def test_a_deck_numbers_no_slide_once_a_command_moves_one() -> None:
+    said = describe("deckcraft", [run("slide.new"), run("slide.delete", index=0)])
+    assert [item.pages for item in said.items] == [[], []]
+
+
+def test_a_document_names_only_the_pages_a_command_names() -> None:
+    said = describe(
+        "wordcraft",
+        [run("insert.editHeader", page=2), run("text.insert", text="Hi"), run("insert.footer")],
+    )
+    assert [item.pages for item in said.items] == [[3], [], []]
+    assert describe("gridcraft", [run("cell.set", value=1)]).items[0].pages == []
+
+
+COPIER = Path(__file__).parents[4] / "stackr" / "copier.yml"
+SCRIPTS = Path(artifactr.files.__file__).parent
+
+
+def test_every_craft_the_template_wires_has_a_table_or_is_said_by_names_on_purpose() -> None:
+    crafts = yaml.safe_load(COPIER.read_text())["crafts"]["default"]
+    assert set(crafts) - set(CRAFTS) - GENERIC == set()
+    assert set(CRAFTS) & GENERIC == set()
+
+
+def test_a_script_crafts_table_names_only_steps_its_script_runs() -> None:
+    for craft in ("freecad", "blender"):
+        tree = ast.parse((SCRIPTS / craft / "console" / "script.py").read_text())
+        steps = next(
+            {key.value for key in node.value.keys if isinstance(key, ast.Constant)}
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and any(isinstance(t, ast.Name) and t.id == "COMMANDS" for t in node.targets)
+            and isinstance(node.value, ast.Dict)
+        )
+        assert set(CRAFTS[craft]) <= steps, craft
+
+
+def test_each_craft_says_its_commands_in_its_own_verbs() -> None:
+    assert describe("gridcraft", [run("cell.set", cell="B2", input="Fees")]).summary == (
+        "Enters a cell: Fees."
+    )
+    assert describe("figcraft", [AppCommand(name="page.add", args={"name": "Home"})]).items[
+        0
+    ].text == ("Adds a page: “Home”")
+    said = describe(
+        "blender",
+        [
+            AppCommand(name="cube", args={"name": "Box"}),
+            AppCommand(name="light", args={"name": "Sun", "type": "SUN"}),
+        ],
+    )
+    assert said.summary == "Adds a cube and adds a light."

@@ -25,6 +25,7 @@ import { type UseQueryResult, useQueries, useQuery } from "@tanstack/react-query
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 import type { Place } from "./check-out";
 import { fields, type Native } from "./native";
+import { NativeChanges } from "./native-changes";
 import { holderOf, PAGES_AT_ONCE, userOf } from "./native-file";
 import { useWorkspace } from "./workspace";
 
@@ -94,8 +95,11 @@ export function NativeProposal({
   me,
   proposal,
   onRespond,
+  id,
   children,
 }: {
+  /** Its id in the page, to link to, as `ProposalCard`'s. */
+  id?: string;
   /** Where it is shown, and the file it would change. */
   place: Place;
   native: Native;
@@ -109,7 +113,7 @@ export function NativeProposal({
   const made = madeBy(proposed, native.app);
   if (proposal.status !== "open" || proposed === null) {
     return (
-      <ProposalCard proposal={proposal} onRespond={onRespond}>
+      <ProposalCard id={id} proposal={proposal} onRespond={onRespond}>
         {children}
         {made && <p className="text-sm">{made}</p>}
       </ProposalCard>
@@ -117,6 +121,7 @@ export function NativeProposal({
   }
   return (
     <OpenProposal
+      id={id}
       place={place}
       me={me}
       proposal={proposal}
@@ -130,6 +135,7 @@ export function NativeProposal({
 }
 
 function OpenProposal({
+  id,
   place,
   me,
   proposal,
@@ -137,6 +143,7 @@ function OpenProposal({
   onRespond,
   children,
 }: {
+  id: string | undefined;
   place: Place;
   me: string;
   proposal: Artifactr.Proposal;
@@ -171,6 +178,7 @@ function OpenProposal({
   const pages = head === undefined ? undefined : head.data.pages;
   return (
     <ProposalCard
+      id={id}
       proposal={proposal}
       onRespond={onRespond}
       blocked={outdated && head !== undefined ? outdatedBy(proposed, head.version) : null}
@@ -180,6 +188,7 @@ function OpenProposal({
           Outdated
         </StatusBadge>
       )}
+      {proposed.source !== "check_in" && <NativeChanges place={place} proposal={proposal.id} />}
       {children}
       {(held?.kind === "person" || held?.kind === "you") && (
         <Alert tone="warn" live={false}>

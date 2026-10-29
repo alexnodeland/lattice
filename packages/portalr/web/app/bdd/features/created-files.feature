@@ -1,8 +1,9 @@
 Feature: Files the agent creates
   Asked for a travel plan as a Word document and a presentation, the agent creates both, blank,
   and proposes what goes in each (lattice#874). Each file's card in the thread says it was created
-  empty and that the agent's changes wait for review; once a change is accepted, its file's card
-  is a file's again, read a page at a time.
+  empty and that the agent's changes wait for review, and each proposal says what it does, change
+  by change (lattice#1090); once a change is accepted, its file's card is a file's again, read a
+  page at a time.
 
   Background:
     Given bob has signed in
@@ -16,6 +17,7 @@ Feature: Files the agent creates
     And "Travel plan.pptx" was created empty, its changes waiting for review
     And the proposal "Write the travel plan" waits for review
     And the proposal "Write the travel plan's slides" waits for review
+    And the proposal "Write the travel plan" says "Runs 3 commands: add_paragraph ×3.", change by change
     When they accept the proposal "Write the travel plan"
     Then "Travel plan.docx" is a file to read
     And "Travel plan.pptx" was created empty, its changes waiting for review

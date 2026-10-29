@@ -55,7 +55,7 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0047](0047-dashboards-on-demand-tables-and-the-panel-registry.md) | Dashboards on demand, tables by TanStack Table, the panel registry, and one seam for integrations | Accepted |
 | [0048](0048-native-files-in-the-app.md) | Native files in the app: the manifest, who has the file, its pages, a download, and its words compared | Accepted |
 | [0049](0049-checking-a-native-file-out-and-in.md) | Checking a native file out and in: the editor on its own origin, an upload with its progress, and a retry that is safe | Accepted |
-| [0050](0050-a-native-files-proposals-and-the-pilots-scenarios.md) | A native file's proposals: outdated, never rebased, and compared page by page; and the check-out pilot's scenarios | Accepted |
+| [0050](0050-a-native-files-proposals-and-the-pilots-scenarios.md) | A native file's proposals: outdated, never rebased, and compared page by page; and the check-out pilot's scenarios | Accepted; amended by [0089](0089-a-native-files-proposal-says-what-it-does-in-its-thread.md) |
 | [0051](0051-mini-apps-the-sandboxed-frame-and-its-bridge.md) | Mini apps: the sandboxed frame and its bridge | Accepted, amended by 0084 |
 | [0052](0052-artifacts-inline-in-their-thread.md) | Artifacts inline in their thread, a mini app first | Accepted |
 | [0053](0053-the-chats-questions-tool-calls-sides-failures-and-streaming.md) | The chat's questions, tool calls, sides, failures and streaming | Accepted, amended by 0079, 0080, 0081 and 0083 |
@@ -94,5 +94,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0086](0086-the-composer-chooses-the-model-of-the-next-turn.md) | The composer chooses the model of the next turn | Accepted |
 | [0087](0087-a-command-first-layout-a-top-bar-a-palette-a-table-and-a-split-view.md) | A command-first layout: a top bar, a palette, a table and a split view | Accepted |
 | [0088](0088-connected-apps-opened-from-the-admin-and-the-palette.md) | Connected apps, opened from the admin and the palette | Accepted |
+| [0089](0089-a-native-files-proposal-says-what-it-does-in-its-thread.md) | A native file's proposal says what it does, in its thread too | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

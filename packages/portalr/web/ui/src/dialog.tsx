@@ -83,14 +83,16 @@ export function Dialog({
   );
 }
 
+// The window's safe areas kept clear on a phone, the notch and the home indicator (portalr ADR-0080).
 const whole =
-  "fixed inset-0 z-50 flex flex-col bg-surface text-fg outline-none transition-[opacity,scale] duration-(--dialog-duration) data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none";
+  "fixed inset-0 z-50 flex flex-col bg-surface pt-[env(safe-area-inset-top)] pr-[env(safe-area-inset-right)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] text-fg outline-none transition-[opacity,scale] duration-(--dialog-duration) data-ending-style:opacity-0 data-starting-style:opacity-0 motion-reduce:transition-none";
 
 /**
  * A dialog that fills the window, for a part that needs all of it, such as a diagram's canvas: its
  * title and a way to close it in a bar along its top, what it holds below. Focus is kept in it as
  * in `Dialog`, and goes to `finalFocus`, or back where it was, when it closes. What it holds is
- * drawn only while it is open.
+ * drawn only while it is open. `bar` takes the Close button's place, for a part that asks before
+ * it is closed, such as an editor with unsaved changes.
  */
 export function WholeDialog({
   open,
@@ -99,6 +101,7 @@ export function WholeDialog({
   close = "Close",
   describedBy,
   finalFocus,
+  bar,
   children,
 }: {
   open: boolean;
@@ -109,6 +112,8 @@ export function WholeDialog({
   /** The id of what describes it, such as a diagram's text version. */
   describedBy?: string;
   finalFocus?: RefObject<HTMLElement | null>;
+  /** What the bar holds in place of its Close button. */
+  bar?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -121,11 +126,15 @@ export function WholeDialog({
           className={whole}
           {...(finalFocus && { finalFocus })}
         >
-          <div className="flex items-center justify-between gap-3 border-line border-b px-4 py-2">
-            <BaseDialog.Title className={`${TYPE.subsection} truncate`}>{named}</BaseDialog.Title>
-            <BaseDialog.Close render={<Button variant="secondary" size="sm" />}>
-              {close}
-            </BaseDialog.Close>
+          <div className="flex shrink-0 items-center gap-3 border-line border-b px-4 py-2">
+            <BaseDialog.Title className={`${TYPE.subsection} me-auto min-w-0 truncate`}>
+              {named}
+            </BaseDialog.Title>
+            {bar ?? (
+              <BaseDialog.Close render={<Button variant="secondary" size="sm" />}>
+                {close}
+              </BaseDialog.Close>
+            )}
           </div>
           <div className="relative min-h-0 flex-1">{open && children}</div>
         </BaseDialog.Popup>

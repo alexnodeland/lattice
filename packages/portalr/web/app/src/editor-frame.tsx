@@ -7,7 +7,17 @@
  */
 
 import { checkIn, type FilesApi } from "@portalr/client";
-import { Alert, Button, ConfirmDialog, Dialog, fileSize, StatusBadge } from "@portalr/ui";
+import {
+  Alert,
+  Button,
+  ConfirmDialog,
+  Dialog,
+  fileSize,
+  StatusBadge,
+  TextLink,
+  usePhone,
+  WholeDialog,
+} from "@portalr/ui";
 import { useBlocker } from "@tanstack/react-router";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { checkedIn, type Place, refused, type Said } from "./check-out";
@@ -84,6 +94,12 @@ export function EditorFrame({
   const [phase, setPhase] = useState<Phase>("starting");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
+  // On a phone it takes the whole window, for as long as it is open: a turn to a wider window
+  // doesn't move the frame, which would load it again and lose the work in it (portalr ADR-0090).
+  const phone = usePhone();
+  const [whole] = useState(phone);
+  // What was last said of it, said in the window it takes too, where the page's is out of sight.
+  const [said, setSaid] = useState<Said | null>(null);
   const src = shimAt(editor);
   const shim = src === null ? null : new URL(src).origin;
   // Never the portal's own origin: a frame allowed its origin's scripts would run beside the
@@ -139,7 +155,10 @@ export function EditorFrame({
     app,
     version,
     checkout,
-    onSaid,
+    onSaid: (now: Said | null) => {
+      setSaid(now);
+      onSaid(now);
+    },
     onEnded,
     onAnswered,
     dirtyNow: dirty,
@@ -284,9 +303,34 @@ export function EditorFrame({
       </Alert>
     );
   }
-  return (
-    <div className={flipped ? "flex h-full flex-col gap-2" : "flex flex-col gap-2"}>
-      <div className="flex flex-wrap items-center gap-2">
+  // On a phone, "Back"; in the page, "Back to preview" where it took the preview's box, or "Close".
+  const back = whole ? "Back" : flipped ? "Back to preview" : null;
+  const closer = dirty ? (
+    <ConfirmDialog
+      label={back ?? "Close without saving"}
+      size="sm"
+      className="ms-auto"
+      title={flipped ? `Back to the preview without saving?` : `Close ${app} without saving?`}
+      confirm={flipped ? "Discard and go back" : "Close without saving"}
+      dismiss="Keep editing"
+      // Not while a save is being checked in: it would race the save on the same check-out.
+      disabled={saving}
+      onConfirm={async () => onClose()}
+    >
+      Your changes to {status.name} in {app} haven't been saved, so they aren't checked in.
+      {flipped
+        ? ` Going back discards them: to keep them, save in ${app} first.`
+        : " Closing loses them."}
+    </ConfirmDialog>
+  ) : (
+    <Button variant="secondary" size="sm" className="ms-auto" disabled={saving} onClick={onClose}>
+      {back ?? `Close ${app}`}
+    </Button>
+  );
+  const pad = whole ? "px-4" : "";
+  const body = (
+    <div className={flipped || whole ? "flex h-full flex-col gap-2" : "flex flex-col gap-2"}>
+      <div className={`flex flex-wrap items-center gap-2 ${pad}`}>
         {phase === "failed" ? (
           <StatusBadge tone="stopped" live>
             {app} didn't open here
@@ -310,40 +354,27 @@ export function EditorFrame({
             Opening {status.name} in {app}
           </StatusBadge>
         )}
-        {dirty ? (
-          <ConfirmDialog
-            label={flipped ? "Back to preview" : "Close without saving"}
-            size="sm"
-            className="ms-auto"
-            title={flipped ? `Back to the preview without saving?` : `Close ${app} without saving?`}
-            confirm={flipped ? "Discard and go back" : "Close without saving"}
-            dismiss="Keep editing"
-            // Not while a save is being checked in: it would race the save on the same check-out.
-            disabled={saving}
-            onConfirm={async () => onClose()}
-          >
-            Your changes to {status.name} in {app} haven't been saved, so they aren't checked in.
-            {flipped
-              ? ` Going back discards them: to keep them, save in ${app} first.`
-              : " Closing loses them."}
-          </ConfirmDialog>
+        {whole ? (
+          // Its own tab, for an editor with no layout for a phone (portalr ADR-0090).
+          <TextLink variant="external" href={editor} className="ms-auto text-sm">
+            Open in its own tab
+          </TextLink>
         ) : (
-          <Button
-            variant="secondary"
-            size="sm"
-            className="ms-auto"
-            disabled={saving}
-            onClick={onClose}
-          >
-            {flipped ? "Back to preview" : `Close ${app}`}
-          </Button>
+          closer
         )}
       </div>
+      {whole && said !== null && (
+        <div className={pad}>
+          <Alert tone={said.tone}>{said.text}</Alert>
+        </div>
+      )}
       {phase === "failed" && (
-        <Alert tone="warn">
-          {app} didn't start here. Close it, then download the file, edit it in {app} yourself, and
-          check it in below.
-        </Alert>
+        <div className={pad}>
+          <Alert tone="warn">
+            {app} didn't start here. Close it, then download the file, edit it in {app} yourself,
+            and check it in below.
+          </Alert>
+        </div>
       )}
       <Dialog
         open={leaving.status === "blocked"}
@@ -369,8 +400,27 @@ export function EditorFrame({
         sandbox="allow-scripts allow-same-origin allow-downloads allow-modals allow-forms allow-popups"
         allow="clipboard-read; clipboard-write"
         referrerPolicy="no-referrer"
-        className={`block w-full rounded-md border border-edge bg-paper forced-colors:border-[CanvasText] ${flipped ? "min-h-0 flex-1" : "h-[min(80dvh,48rem)]"}`}
+        // The window's width and height in CSS pixels on a phone, which the editor lays out for.
+        className={`block w-full bg-paper ${whole ? "min-h-0 flex-1 border-edge border-t" : `rounded-md border border-edge forced-colors:border-[CanvasText] ${flipped ? "min-h-0 flex-1" : "h-[min(80dvh,48rem)]"}`}`}
       />
     </div>
+  );
+  return whole ? (
+    <WholeDialog
+      open
+      // Escape goes back as "Back" does; with unsaved changes it does nothing, since a key meant
+      // for the editor shouldn't lose them: "Back" asks first.
+      onOpenChange={(open) => {
+        if (!(open || dirty || saving)) {
+          onClose();
+        }
+      }}
+      title={status.name}
+      bar={closer}
+    >
+      {body}
+    </WholeDialog>
+  ) : (
+    body
   );
 }

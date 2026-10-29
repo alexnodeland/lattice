@@ -641,9 +641,9 @@ What artifactr and reflexr shared verbatim is in [lattice-core](../lattice-core/
 | Dependency | Used for | Current major (2026-09) |
 |---|---|---|
 | pydantic | Artifact types, commands, events, JSON Schema | 2.13 |
-| lattice-core-ai | What artifactr shares with lattice's other packages ([lattice-core](../lattice-core/index.md)); on PyPI | 0.1 |
+| lattice-core-ai | What artifactr shares with lattice's other packages ([lattice-core](../lattice-core/index.md)); on PyPI | 0.2 |
 | jsonpatch | RFC 6902 apply and diff in core | 1.33 |
-| pydantic-ai-slim | Agent runtime: capabilities, toolsets, deferred tools, message history | 2.51 |
+| pydantic-ai-slim | Agent runtime: capabilities, toolsets, deferred tools, message history | 2.53 |
 | SQLAlchemy (asyncio) | SQL storage | 2.1 |
 | Alembic | SQL migrations | 1.20 |
 | asyncpg, aiosqlite | PostgreSQL and SQLite drivers (extras; the library imports neither) | 0.31, 0.22 |

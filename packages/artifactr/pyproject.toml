@@ -22,30 +22,30 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "lattice-core-ai>=0.1.0",
+    "lattice-core-ai>=0.2.0",
     "pydantic>=2.13",
     "jsonpatch>=1.33",
     "jsonpointer>=1.9",
-    "pydantic-ai-slim>=2.51",
+    "pydantic-ai-slim>=2.53",
     "opentelemetry-api>=1.28",
 ]
 
 [project.optional-dependencies]
-sql = ["lattice-core-ai[sql]>=0.1.0", "sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
+sql = ["lattice-core-ai[sql]>=0.2.0", "sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
 sqlite = ["artifactr-ai[sql]", "aiosqlite>=0.22"]
 postgres = ["artifactr-ai[sql]", "asyncpg>=0.31"]
 fastapi = ["fastapi>=0.141", "starlette>=0.46.0"]
 mcp = ["mcp>=2.2", "starlette>=0.27"]
 # The SDK's setup is lattice-core's; this package imports the SDK for its own views.
-otel = ["lattice-core-ai[otel]>=0.1.0", "opentelemetry-sdk>=1.45"]
+otel = ["lattice-core-ai[otel]>=0.2.0", "opentelemetry-sdk>=1.45"]
 langfuse = [
-    "lattice-core-ai[langfuse]>=0.1.0",
+    "lattice-core-ai[langfuse]>=0.2.0",
     "langfuse>=4.15,<5",
     # The score mapping and ports that artifactr.scores' mirror builds on, and evalr.langfuse's
     # score adapters, which send the mirror's scores to Langfuse.
     "evalr[langfuse]>=0.1.0",
 ]
-litellm = ["lattice-core-ai[litellm]>=0.1.0"]
+litellm = ["lattice-core-ai[litellm]>=0.2.0"]
 evals = ["evalr>=0.1.0"]
 # Native files (lattice RFC-0003): artifactr.files, with its SQL stores in the sql extra. The
 # extra names the integration, and carries the apps' adapters' dependencies: WordCraft's speaks

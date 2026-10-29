@@ -23,21 +23,21 @@ classifiers = [
 dependencies = [
     "artifactr-ai>=0.2.0",
     "reflexr>=0.1.0",
-    "lattice-core-ai>=0.1.0",
+    "lattice-core-ai>=0.2.0",
     "pydantic>=2.13",
-    "pydantic-ai-slim>=2.51",
+    "pydantic-ai-slim>=2.53",
     "opentelemetry-api>=1.45",
 ]
 
 [project.optional-dependencies]
-sql = ["lattice-core-ai[sql]>=0.1.0", "sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
+sql = ["lattice-core-ai[sql]>=0.2.0", "sqlalchemy[asyncio]>=2.1", "alembic>=1.20"]
 sqlite = ["relayr-ai[sql]", "aiosqlite>=0.22"]
 postgres = ["relayr-ai[sql]", "asyncpg>=0.31"]
-otel = ["lattice-core-ai>=0.1.0", "opentelemetry-sdk>=1.45"]
+otel = ["lattice-core-ai>=0.2.0", "opentelemetry-sdk>=1.45"]
 evals = ["evalr>=0.1.0"]
 plane = ["httpx>=0.28"]
 vikunja = ["httpx>=0.28"]
-fastapi = ["lattice-core-ai>=0.1.0", "fastapi>=0.141", "starlette>=0.46.0"]
+fastapi = ["lattice-core-ai>=0.2.0", "fastapi>=0.141", "starlette>=0.46.0"]
 # ui:form_submitted from artifactr's forms (relayr.ui), for an application that has them.
 forms = ["artifactr-ai[forms]>=0.2.0"]
 # excalidraw:elements_changed from artifactr's diagrams (relayr.excalidraw), for an application

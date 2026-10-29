@@ -254,6 +254,58 @@ test("a draft not yet sent asks before the page is left or reloaded", async () =
   await vi.waitFor(() => expect(leave()).toBe(false));
 });
 
+test("a kept draft comes back after a reload, is let go once sent, and keeps its own thread", async () => {
+  sessionStorage.removeItem("portalr:draft:th_1");
+  const first = await render(<Composer onSend={sent()} draft="th_1" />);
+  await first.getByRole("textbox", { name: "Message" }).fill("Half a thought");
+  await first.unmount();
+  const other = await render(<Composer onSend={sent()} draft="th_2" />);
+  await expect.element(other.getByRole("textbox", { name: "Message" })).toHaveValue("");
+  await other.unmount();
+  const again = await render(<Composer onSend={sent()} draft="th_1" />);
+  const box = again.getByRole("textbox", { name: "Message" });
+  await expect.element(box).toHaveValue("Half a thought");
+  await box.click();
+  await userEvent.keyboard("{Enter}");
+  await vi.waitFor(() => expect(sessionStorage.getItem("portalr:draft:th_1")).toBeNull());
+});
+
+test("Reload chosen in a new version's offer leaves a kept draft without asking", async () => {
+  const leave = () => {
+    const event = new Event("beforeunload", { cancelable: true });
+    dispatchEvent(event);
+    return event.defaultPrevented;
+  };
+  const kept = await render(<Composer onSend={sent()} draft="th_3" />);
+  await kept.getByRole("textbox", { name: "Message" }).fill("Half a thought");
+  await vi.waitFor(() => expect(leave()).toBe(true));
+  dispatchEvent(new Event("portalr:reload"));
+  expect(leave()).toBe(false);
+  await kept.unmount();
+  sessionStorage.removeItem("portalr:draft:th_3");
+  // One not kept would lose its words: it still asks.
+  const unkept = await render(<Composer onSend={sent()} />);
+  await unkept.getByRole("textbox", { name: "Message" }).fill("Half a thought");
+  dispatchEvent(new Event("portalr:reload"));
+  await vi.waitFor(() => expect(leave()).toBe(true));
+});
+
+test("storage refused, a draft still lives as long as the page", async () => {
+  onTestFinished(() => {
+    vi.restoreAllMocks();
+  });
+  vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+    throw new DOMException("refused", "SecurityError");
+  });
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+    throw new DOMException("refused", "SecurityError");
+  });
+  const screen = await render(<Composer onSend={sent()} draft="th_4" />);
+  const box = screen.getByRole("textbox", { name: "Message" });
+  await box.fill("Half a thought");
+  await expect.element(box).toHaveValue("Half a thought");
+});
+
 test("Enter while an input method composes doesn't send", async () => {
   const onSend = sent();
   const screen = await render(<Composer onSend={onSend} />);

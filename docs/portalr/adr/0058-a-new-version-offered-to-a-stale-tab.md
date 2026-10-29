@@ -1,6 +1,6 @@
 # ADR-0058: A new version offered to a stale tab
 
-**Status:** Accepted
+**Status:** Accepted, amended 2026-10-28 (see Amendment: a tab whose build is gone)
 **Date:** 2026-10-20
 **Deciders:** Alex Nodeland
 
@@ -22,3 +22,16 @@ A tab opened before a deploy keeps running the build it loaded. The owner opened
 
 - Easier: a tab that outlived a deploy says so within five minutes, or as soon as it is looked at again.
 - Harder: each open tab reads its UI's page every five minutes, a few kilobytes, and on each return to it.
+
+## Amendment, 2026-10-28: a tab whose build is gone
+
+A tab left open across a redeploy asked for the old build's chunks, which the new one no longer has: the server answered 404, and each part loaded on demand failed in its own words, a blank file preview, "The app read no outline from this file", "Its words couldn't be read" ([#1059](https://github.com/alexnodeland/lattice/issues/1059)). Nothing was wrong but the tab's build, and the offer above could be up to five minutes away.
+
+- **A chunk that fails to load reads the page at once.** Vite's preload helper wraps every dynamic import in both UIs, the routes' split components and the add-ons alike, and dispatches `vite:preloadError` when the chunk itself or what it preloads fails to load. `NewVersionOffer` listens for it and reads the page then, with no second read: a build other than the tab's is the cause.
+- **It is said as what it is, with Reload alone.** "portalr was updated. Reload to continue." ("portalr admin" in the admin), in the same region, with the same Reload, and no "Not now": the tab can't go on, so a "Not now" said to that build doesn't hold it back. A later read of the same build keeps it so.
+- **Offline, or with the server restarting, nothing is said.** The read then names no other build, and the feature's own error stands, as it would for any failed read.
+- **The import still fails.** The event is not cancelled: cancelled, Vite resolves the import to nothing, and the feature would fail in a newer, stranger way. The notice sits above the feature's own error, which the reload clears.
+- **A thread's draft survives the reload.** The composer keeps its unsent words in the tab's session storage, under the thread (or, on the Threads page, the workspace), and takes them back as it mounts; they are let go as they are sent or cleared. Each thread's page starts with its own draft. Reload, chosen in the notice or the offer, tells the page first (`portalr:reload`), and a composer whose draft is kept lets the page go without the browser's question; one that keeps nothing still asks. Closing the tab still asks, as session storage goes with the tab.
+- **A route's own chunk reloads once by itself.** TanStack Router's `lazyRouteComponent` reloads the page once when a route's chunk is not found, before this notice is seen; the draft survives that too, though the browser asks first. That is the library's, and is left as it is.
+- **The page is never cached, and the old chunks are not kept.** portalr's router already serves the page `no-cache`, with an `ETag`, and the hashed assets `immutable`, so a reload always finds the new build. The old chunks are gone with the old wheel; keeping them for a while would need a store outside the package, which a deployment of a wheel doesn't have.
+- **It costs the first page tens of bytes.** The listener and the notice's words are in the offer, already in both UIs' first chunk: about 100 bytes compressed in each. The draft is the composer's, which is loaded with the thread.

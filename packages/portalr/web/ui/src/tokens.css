@@ -349,8 +349,6 @@
   --bubble-pad-y: var(--space-3);
   --composer-radius: var(--radius-4);
   --composer-pad: var(--space-2);
-  /* The most of the window the tray over the composer takes, less the keyboard's room (portalr ADR-0092). */
-  --tray-max-height: calc((100dvh - var(--keyboard-inset, 0px)) * 0.4);
 
   /*
    * An alert's corners and padding; inline code's corners and padding; and the sign-in card's

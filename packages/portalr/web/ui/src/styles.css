@@ -109,6 +109,17 @@
 }
 
 /*
+ * The body of the tray over the composer (portalr ADR-0092): at most two fifths of what the window
+ * has left of its height, the on-screen keyboard's room (`--keyboard-inset`) taken away, so the
+ * composer and the tray both fit above the keyboard; it scrolls up and down inside itself alone.
+ */
+@utility as-tray-body {
+  max-height: calc((100dvh - var(--keyboard-inset, 0px)) * 0.4);
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+}
+
+/*
  * What scrolls sideways on a phone shows it: a shadow at each edge that is scrolled past, drawn
  * by the stylesheet alone (the covers scroll with the content, the shadows don't). The covers are
  * the box's own colour, `--scroll-cover`, the surface unless the box says otherwise; the shadow

@@ -70,12 +70,7 @@ export function Tray({ waiting }: { waiting: readonly Waiting[] }) {
           />
         </BaseButton>
       )}
-      <div
-        ref={body}
-        id={list}
-        hidden={!open}
-        className="flex max-h-(--tray-max-height) min-w-0 flex-col gap-2 overflow-x-hidden overflow-y-auto overscroll-contain"
-      >
+      <div ref={body} id={list} hidden={!open} className="as-tray-body flex min-w-0 flex-col gap-2">
         {waiting.map(({ key, children }) => (
           <Fragment key={key}>{children}</Fragment>
         ))}

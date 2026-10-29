@@ -4,11 +4,11 @@
 **Date:** 2026-10-23
 **Deciders:** Alex Nodeland
 
-Records portalr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-drawn-live.md)'s phase 3, its first part: the renderer for `excalidraw_diagram` and the canvas that shows a diagram whole. It builds on [artifactr ADR-0088](../../artifactr/adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md)'s measurements, on the description the agent reads ([artifactr ADR-0091](../../artifactr/adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md)), and on the add-ons [ADR-0044](0044-highlighting-and-math-on-demand.md) set up.
+Records portalr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-drawn-live.md)'s phase 3, its first part: the renderer for `excalidraw_diagram` and the canvas that shows a diagram whole. It builds on [artifactr ADR-0088](../../artifactr/adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md)'s measurements, on the description the agent reads ([artifactr ADR-0090](../../artifactr/adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md)), and on the add-ons [ADR-0044](0044-highlighting-and-math-on-demand.md) set up.
 
 ## Context
 
-- **The agent draws diagrams** (artifactr ADR-0091), and the app showed them as JSON.
+- **The agent draws diagrams** (artifactr ADR-0090), and the app showed them as JSON.
 - **Excalidraw is large.** Its canvas, with the code it reaches, is hundreds of kilobytes gzipped. The app's first load had about 600 bytes of room below its ceiling, and its total about 12 kB.
 - **Excalidraw's build reaches for more than the canvas needs.** It has font subsetting (741 kB, with WebAssembly), Mermaid's converter, image resizing, 55 locales, esm.sh as a fallback for its faces, and Xiaolai, a CJK face of 12 MB whose reserved name Excalidraw's copy keeps (lattice#679).
 - **Editing needs more than this phase has.** An edit needs three things that don't exist yet:

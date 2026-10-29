@@ -4,11 +4,11 @@
 **Date:** 2026-10-23
 **Deciders:** Alex Nodeland
 
-Records stackr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-drawn-live.md)'s phase 2: the worker that artifactr's converter calls ([artifactr ADR-0091](../../artifactr/adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md)). It is the worker [artifactr ADR-0088](../../artifactr/adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md) measured, and it is built and isolated as native files' workers are ([ADR-0043](0043-native-files-in-the-template.md), [ADR-0046](0046-native-files-a-relay-a-slimmer-worker-blender-and-the-editors-at-the-edge.md)).
+Records stackr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-drawn-live.md)'s phase 2: the worker that artifactr's converter calls ([artifactr ADR-0090](../../artifactr/adr/0090-diagrams-drawn-by-the-agent-through-a-converter.md)). It is the worker [artifactr ADR-0088](../../artifactr/adr/0088-excalidraws-phase-0-what-the-canvas-costs-and-needs.md) measured, and it is built and isolated as native files' workers are ([ADR-0043](0043-native-files-in-the-template.md), [ADR-0046](0046-native-files-a-relay-a-slimmer-worker-blender-and-the-editors-at-the-edge.md)).
 
 ## Context
 
-- **artifactr draws through a port,** `Converter`, with three calls: Mermaid to elements, skeletons to elements, and a diagram rendered as SVG or PNG. `WorkerConverter` calls them over HTTP, with a token, and holds every reply to limits and checks (ADR-0091). Nothing answered it.
+- **artifactr draws through a port,** `Converter`, with three calls: Mermaid to elements, skeletons to elements, and a diagram rendered as SVG or PNG. `WorkerConverter` calls them over HTTP, with a token, and holds every reply to limits and checks (ADR-0090). Nothing answered it.
 - **Only Excalidraw's own code draws as Excalidraw does.** `parseMermaidToExcalidraw`, `convertToExcalidrawElements` and `exportToSvg` are browser code. ADR-0088 measured them in headless Chromium and in jsdom with resvg, and chose Chromium: its PNGs are right, and it is faster at the 2,000-element limit.
 - **Font subsetting needs `'unsafe-eval'`.** Without it, an export embeds whole faces: an SVG of 299 kB against 15 kB. The portal's policy never allows it (ADR-0088), so a small export is the worker's.
 - **Xiaolai, Excalidraw's CJK face, stays out of the worker's image** until its author answers (lattice#679): it is OFL 1.1, but its README reserves the names Xiaolai and Kose, and Excalidraw's modified copy keeps the name. Without a CJK face, Chromium draws tofu.
@@ -29,7 +29,7 @@ Records stackr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-
   - A job that runs past it is answered `timeout`. A job the page didn't answer, because the page or the browser failed, is answered `crashed`, in fixed words. After either, the page is thrown away, and a new one is made at once, in the background, so the next job finds it warm unless it comes within the few seconds a cold page takes. A browser that died is started again.
   - **`invalid` is the page's own refusal alone:** Mermaid that doesn't parse, or skeletons Excalidraw can't convert, which the page answers with, in their words. Such a job, and a `too_large` one, leaves the page as it was.
   - The page is made at most once at a time: a job that gives up waiting for a cold page leaves no second one being made behind it.
-- **Its replies are what artifactr checks for** (ADR-0091). Running the real worker's replies through artifactr's own `Converted` and `checked()` found four things, each fixed in the worker; artifactr needed no change:
+- **Its replies are what artifactr checks for** (ADR-0090). Running the real worker's replies through artifactr's own `Converted` and `checked()` found four things, each fixed in the worker; artifactr needed no change:
   - **Mermaid names its nodes as it likes,** `中文` among them, and Excalidraw keeps the names as element ids. A Mermaid diagram's ids are made new, as the canvas's are. The agent's skeletons keep the ids it gave them, which artifactr holds to `[A-Za-z0-9_-]`.
   - **A Mermaid `click` gives an element a link,** which an export draws as `<a href>`. Converted elements keep no link.
   - **Mermaid's pictures are SVGs,** such as a Gantt chart's, with `foreignObject` and styles of their own. Each is drawn once, on a canvas in the page, and kept as a PNG.
@@ -82,7 +82,7 @@ Records stackr's half of [lattice RFC-0006](../../rfcs/0006-excalidraw-diagrams-
 - **The application's side.**
   - `Files` registers `Diagram`, its checks and its integration key, `excalidraw`, whether the worker runs or not, so diagrams already made stay readable.
   - With `DIAGRAMS=on`, it gives the agent `diagram_tools`, over a `WorkerConverter` at `http://diagrams:8080`, with native files' store as `blobs`.
-  - Native files' collection is told about diagrams (`naming=(Diagram,)`), so it keeps their images (ADR-0091).
+  - Native files' collection is told about diagrams (`naming=(Diagram,)`), so it keeps their images (ADR-0090).
   - The tools are offered only where `excalidraw` is on, and it is off in every workspace until switched on (lattice-core's `KNOWN`).
 - **Diagrams without forms.** The template's `diagrams` doesn't need its `ui`: the application gates every artifact by its integration either way (`integration_gate(integrations, files.key_of)`), so `excalidraw` is a switch in both.
 

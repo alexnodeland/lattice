@@ -1,7 +1,7 @@
 # ADR-0091: A native file's proposal opens on its first changed page
 
 **Status:** Accepted
-**Date:** 2026-10-28
+**Date:** 2026-10-29
 **Deciders:** Alex Nodeland
 **Amends:** [ADR-0089](0089-a-native-files-proposal-says-what-it-does-in-its-thread.md) (what an open proposal's card shows before it is asked)
 
@@ -11,12 +11,12 @@
 
 ## Decision
 
-- **Each change names the pages it changes, where its craft can say** (`pages` on each item, [native files ADR-0020](../../artifactr/files/adr/0020-a-proposal-said-in-words-and-previewed-by-its-own-pages.md)). DeckCraft names the slides a batch adds, numbered as they end; WordCraft only the page a header or footer command names, since its words flow. Any other craft names none.
+- **Each change names the pages it changes, where its craft can say** (`pages` on each item, [native files ADR-0020](../../artifactr/files/adr/0020-a-proposal-said-in-words-and-previewed-by-its-own-pages.md)). DeckCraft names the slides a batch adds, numbered as they end, the deck's slides before it counted from the proposal's page count less those it adds (none numbered where the proposal gives no count, or past a command that moves, removes, undoes or reopens slides); WordCraft only the page a header or footer command names, since its words flow. Any other craft names none.
 - **Every craft the template wires says its commands in its own verbs** (native files ADR-0020's tables, now for GridCraft, PdfCraft, CADCraft, PhotoCraft, VectorCraft, DesignCraft, FigCraft, FilmCraft, EffectCraft, SoundCraft, FreeCAD and Blender), each read from its pinned release's catalogue, or for FreeCAD and Blender from the adapter's script's steps. A test fails when the template wires a craft that has no table and isn't in `GENERIC` (LightCraft alone, which keeps no native file).
-- **On a desktop, Compare is open at first, on the first changed page alone:** the least page a change names, or else the first page whose picture differs from the head's, read a page at a time, at most four. "Compare more pages" shows them from the first, as before.
+- **On a desktop, the first proposal drawn on a page has Compare open at first** (the others are a tap away, so a thread of proposals reads one comparison, not one each), **on the first changed page alone:** the least page a change names, or else the first page whose picture differs from the head's, read a page at a time, at most four. "Compare more pages" shows them from the first, as before.
 - **On a phone, the sheet shows that page under "Before and after"**, below the changes; Compare stays closed.
 - **A page that isn't drawn says why, in the card's words, never the server's:**
-  - busy, paced or too slow (429, 503): "Still preparing the picture. Try again in N seconds.", N being the server's `Retry-After`, or 10, with Try again; a page's picture isn't asked again on its own;
+  - busy, paced or too slow (429, 503): "Still preparing the picture. Try again in N seconds.", N being the server's `Retry-After` (at most 300), or 10, "in a second" for one, and "now" for none, with Try again; a page's picture isn't asked again on its own;
   - the proposal's bytes not stored (409, `reason: content_unavailable`): "The proposed file isn't stored.";
   - any other: "This page couldn't be shown.", with Try again.
 - **An app that draws no pages** (GridCraft and SoundCraft) says "<App> can't show a picture of this change. Its words and commands are listed above." and reads none.

@@ -3,9 +3,13 @@
  * calls, the questions its runs asked through `ask_user` (artifactr ADR-0083), and the turns that
  * failed, or were stopped, with what they had streamed, each where the log has it. A run's calls
  * in a row are one group; a mini app updated by one is shown again beneath it (portalr ADR-0055).
+ * A proposal that was decided is a line after its run's last entry (portalr ADR-0092).
  */
 
 import type { Artifactr } from "@portalr/client";
+
+/** A question a run asked: the entry of the log that holds it, answered or not. */
+export type Asking = Extract<Entry, { kind: "question" }>;
 
 export type Entry =
   | { readonly kind: "message"; readonly seq: number; readonly message: Artifactr.Message }
@@ -22,6 +26,12 @@ export type Entry =
       readonly question: Artifactr.Question;
     }
   | { readonly kind: "failed"; readonly seq: number; readonly run: Artifactr.Run }
+  | {
+      readonly kind: "proposal";
+      readonly seq: number;
+      /** One that was accepted or rejected. */
+      readonly proposal: Artifactr.Proposal;
+    }
   /** What a run that failed, or was stopped, had streamed before it ended; a stop itself (portalr ADR-0083). */
   | {
       readonly kind: "partial";
@@ -86,13 +96,16 @@ function shownAsCall(run: Artifactr.Run, call: string, tool: Artifactr.Tool): bo
 /**
  * A thread's entries, in the log's order, of its messages, the runs in it, and `inline`: the
  * artifacts made in it that it shows, where each was made. A call that updated a mini app, of the
- * workspace's `artifacts`, has the app again beneath it, at its latest version.
+ * workspace's `artifacts`, has the app again beneath it, at its latest version. Each of the
+ * `decided` proposals, which carry no place of their own, follows the last entry of the run that
+ * made it, and the thread's last where no run did.
  */
 export function threadLog(
   thread: Artifactr.Thread,
   runs: Readonly<Record<string, Artifactr.Run>>,
   inline: readonly Artifactr.Artifact[] = [],
   artifacts: Readonly<Record<string, Artifactr.Artifact>> = {},
+  decided: readonly Artifactr.Proposal[] = [],
 ): Entry[] {
   const mine = Object.values(runs).filter((run) => run.threadId === thread.id);
   // Each call, and, beneath one that updated an app, the app again, as where it was made.
@@ -128,6 +141,20 @@ export function threadLog(
       ];
     }),
   ];
+  entries.sort((a, b) => a.seq - b.seq);
+  // The last place of each run (the entries are in order), which a proposal it made follows, half
+  // a place on; the thread's last for one no run made.
+  const last = new Map(
+    entries.map((entry) => [
+      entry.kind === "message" ? entry.message.runId : "run" in entry ? entry.run.id : null,
+      entry.seq,
+    ]),
+  );
+  const end = entries.at(-1)?.seq ?? 0;
+  for (const proposal of decided) {
+    const after = last.get(proposal.runId ?? "") ?? end;
+    entries.push({ kind: "proposal", seq: after + 0.5, proposal });
+  }
   entries.sort((a, b) => a.seq - b.seq);
   // An app runs in its newest card alone; each before it shows the version it made, or its first.
   const newest = new Map(

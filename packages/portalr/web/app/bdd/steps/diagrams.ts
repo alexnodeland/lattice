@@ -20,7 +20,9 @@ When("they accept the diagram the assistant proposed", async ({ page }) => {
   await expect(posted(page, "Assistant")).toContainText("Drew the stack.");
   const proposal = page.getByRole("region", { name: /^Proposal:/ });
   await proposal.getByRole("button", { name: "Accept" }).click();
-  await expect(proposal).toContainText("Accepted");
+  await expect(
+    page.getByRole("log").getByRole("listitem").filter({ hasText: "Accepted" }),
+  ).toBeVisible();
 });
 
 Then(

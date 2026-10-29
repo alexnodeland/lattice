@@ -207,14 +207,19 @@ export function Palette({
   const results = (
     <>
       {choices.length === 0 && <p className="px-2.5 py-2 text-muted text-sm">Nothing matches.</p>}
-      <div id={list} role="listbox" aria-label="Results" className="overflow-y-auto p-1.5">
+      <div
+        id={list}
+        role="listbox"
+        aria-label="Results"
+        className="overflow-y-auto overflow-x-hidden p-1.5"
+      >
         {[...groups].map(([group, members], place) => (
           // A fieldset is a group to assistive technology, which a listbox may hold; the lint takes
           // no `role="group"` on another element, and the repository takes no suppression.
           <fieldset
             key={group}
             aria-labelledby={`${list}-group-${place}`}
-            className="m-0 border-0 p-0"
+            className="m-0 min-w-0 border-0 p-0"
           >
             <div id={`${list}-group-${place}`} className="px-2.5 pt-2 pb-1 text-muted text-xs">
               {group}

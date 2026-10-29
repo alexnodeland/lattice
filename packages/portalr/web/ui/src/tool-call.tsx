@@ -7,7 +7,7 @@ import { Button as BaseButton } from "@base-ui/react/button";
 import { Dialog as BaseDialog } from "@base-ui/react/dialog";
 import type { Artifactr } from "@portalr/client";
 import type { ReactNode } from "react";
-import { type RefObject, useEffect, useId, useRef, useState } from "react";
+import { type RefObject, useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { CopyButton } from "./copy-button";
@@ -370,8 +370,32 @@ export function RunSteps({
   const button = useRef<HTMLButtonElement>(null);
   const panel = useId();
   const calls = tools.map(([, tool]) => tool);
-  const { label, failed, running } = foldSummary(calls, runRunning);
+  const { labels, failed, running } = foldSummary(calls, runRunning);
+  const full = labels[0] ?? "";
   const words = useShimmer(running);
+  // The line says the longest of its ways that fits, measured, where it is set, and again as the
+  // line's own box, whose width its words don't change, as the button's they do, changes (the
+  // sheet's title and the button's name keep all of it).
+  const ways = labels.join("\n");
+  useLayoutEffect(() => {
+    const box = words.current;
+    const line = button.current?.parentElement;
+    if (!(box && line)) {
+      return;
+    }
+    const fit = () => {
+      for (const said of ways.split("\n")) {
+        box.textContent = said;
+        if (box.scrollWidth <= box.clientWidth) {
+          break;
+        }
+      }
+    };
+    fit();
+    const resized = new ResizeObserver(fit);
+    resized.observe(line);
+    return () => resized.disconnect();
+  }, [ways, failed]);
   // Said once, as a group that was running ends: never as each call does.
   const [ran, setRan] = useState(running);
   const marker = failed > 0 ? ` · ${failed} failed` : "";
@@ -379,11 +403,12 @@ export function RunSteps({
   const [said, setSaid] = useState("");
   if (ran !== running) {
     setRan(running);
-    setSaid(running ? "" : `${label}${marker}`);
+    setSaid(running ? "" : `${full}${marker}`);
   }
   const count = `${tools.length} tool call${tools.length === 1 ? "" : "s"}`;
   return (
-    <li className="flex flex-col">
+    // On a phone its target, 44px, overlaps what is above and below it, as its words are not that tall.
+    <li className="flex flex-col phone:-my-1.5">
       <BaseButton
         ref={button}
         aria-expanded={open}
@@ -391,7 +416,7 @@ export function RunSteps({
         {...((shown ?? (phone ? "sheet" : "list")) === "sheet"
           ? { "aria-haspopup": "dialog" as const }
           : { "aria-controls": panel })}
-        aria-label={`${label}${marker}: ${count}`}
+        aria-label={`${full}${marker}: ${count}`}
         onClick={() => show(open ? null : phoneNow() ? "sheet" : "list")}
         className={cn(
           "flex min-h-(--disclosure-target) max-w-full cursor-pointer items-center gap-1.5 self-start rounded-(--disclosure-radius) text-muted text-xs hover:text-fg phone:min-h-11",
@@ -399,9 +424,7 @@ export function RunSteps({
         )}
       >
         <Icon icon={glyphs.wrench} className="size-3.5 shrink-0" />
-        <span ref={words} className="min-w-0 truncate">
-          {label}
-        </span>
+        <span ref={words} className="min-w-0 truncate" />
         {failed > 0 && (
           <span className="flex shrink-0 items-center gap-1 text-danger">
             <Icon icon={glyphs.circleAlert} className="size-3.5" />
@@ -431,7 +454,7 @@ export function RunSteps({
         <ToolSheet
           open={shown === "sheet"}
           onOpenChange={(next) => show(next ? "sheet" : null)}
-          title={`${label}${marker}`}
+          title={`${full}${marker}`}
           tools={tools}
           finalFocus={button}
         />

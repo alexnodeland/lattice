@@ -13,6 +13,7 @@ import {
   Alert,
   ASK_FORM,
   ASK_USER,
+  askedOf,
   ButtonLink,
   Composer,
   ComposerDock,
@@ -23,19 +24,24 @@ import {
   NotFound as NotFoundPage,
   PageHeader,
   ProposalCard,
+  ProposalLine,
   prefetchStreaming,
+  proposalTitle,
   proposedOn,
   Questions,
   Request,
   RunFailed,
   RunSteps,
   RunStrip,
+  reachWaiting,
   rendererFor,
   SelectField,
   StatusBadge,
   Streaming,
   ThumbBar,
+  Tray,
   useLoaded,
+  type Waiting,
 } from "@portalr/ui";
 import {
   type UseSuspenseQueryOptions,
@@ -62,7 +68,7 @@ import { RuleProposal } from "../../../../../../../rule-proposal";
 import { markSeen } from "../../../../../../../seen";
 import { ShareDialog } from "../../../../../../../share-dialog";
 import { ThreadArtifact } from "../../../../../../../thread-artifact";
-import { RETRY_TAKEN, retryOf, threadLog } from "../../../../../../../thread-log";
+import { type Asking, RETRY_TAKEN, retryOf, threadLog } from "../../../../../../../thread-log";
 import { ThreadMenu } from "../../../../../../../thread-menu";
 import { Uploader } from "../../../../../../../upload";
 import { Connection, useStream, useWorkspace } from "../../../../../../../workspace";
@@ -303,12 +309,12 @@ function Chat() {
     (run) => run.threadId === id && (run.status === "running" || run.status === "paused"),
   );
   const proposed = Object.values(proposals).filter((proposal) => proposal.threadId === id);
+  // Those open wait in the tray; those decided are lines of the thread (portalr ADR-0092).
+  const open = proposed.filter((proposal) => proposal.status === "open");
   /** The thread's open proposals that would change an artifact: the first, to review in order. */
   const waitingOn = (artifact: string) => {
-    const open = proposed.filter(
-      (proposal) => proposal.status === "open" && proposedOn(proposal) === artifact,
-    );
-    return open[0] ? { first: open[0].id, count: open.length } : null;
+    const here = open.filter((proposal) => proposedOn(proposal) === artifact);
+    return here[0] ? { first: here[0].id, count: here.length } : null;
   };
   // The artifacts made here whose kind the thread shows, each once, where it was made.
   const inline = Object.values(artifacts).filter(
@@ -363,7 +369,13 @@ function Chat() {
     }
     return sent;
   };
-  const log = threadLog(thread, runs, inline, artifacts);
+  const log = threadLog(
+    thread,
+    runs,
+    inline,
+    artifacts,
+    proposed.filter((proposal) => proposal.status !== "open"),
+  );
   // The thread's latest turn, if it failed, can be tried again by whoever may post.
   const retry = allowed.has("artifactr:post_message") ? retryOf(thread, runs, me) : null;
   const latestRequest = active.flatMap((run) => run.requests).at(-1);
@@ -430,6 +442,83 @@ function Chat() {
       />
     </div>
   );
+  /** Whether a question's run waits on it. */
+  const waitsFor = ({ run, question }: Asking) =>
+    run.status === "paused" && question.answer === null;
+  const questions = (entry: Asking) => {
+    const { request, answer: given } = entry.question;
+    return (
+      <Questions
+        request={request}
+        answer={given?.value ?? null}
+        answeredBy={given ? author(given.actor, me, names) : null}
+        focus={request === latestRequest && arrived}
+        onAnswer={(value) => answer(entry.run, request)({ answer: value })}
+      />
+    );
+  };
+  // What waits for the reader, as one tray above the composer: the questions asked, the forms
+  // to fill in, and the proposals to review (portalr ADR-0092).
+  const waiting: Waiting[] = [
+    ...log.flatMap((entry): Waiting[] =>
+      entry.kind === "question" && waitsFor(entry)
+        ? [
+            {
+              label: askedOf(entry.question.request),
+              children: (
+                <div
+                  key={entry.question.request.tool_call_id}
+                  id={`request-${entry.question.request.tool_call_id}`}
+                  tabIndex={-1}
+                  className="outline-none"
+                >
+                  {questions(entry)}
+                </div>
+              ),
+            },
+          ]
+        : [],
+    ),
+    ...active.flatMap((run) =>
+      run.requests
+        .filter((request) => request.kind !== "approval" && request.tool_name !== ASK_USER)
+        .map((request) => ({ label: askedOf(request), children: asked(run, request, undefined) })),
+    ),
+    ...open.map((proposal) => {
+      const artifact = proposedOn(proposal);
+      const kind = artifact === null ? undefined : artifacts[artifact]?.kind;
+      const native = NATIVE.get(kind ?? "");
+      const card = {
+        key: proposal.id,
+        // Where a file created blank links to the change that fills it.
+        id: `proposal-${proposal.id}`,
+        proposal,
+        onRespond: (decision: "accept" | "reject") =>
+          stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision }),
+      };
+      return {
+        label: proposalTitle(proposal),
+        // A native file's says what it does and compares it with the head (portalr ADR-0050).
+        children:
+          artifact !== null && native ? (
+            <NativeProposal
+              {...card}
+              place={{ context, tenant, workspace, artifact }}
+              native={native}
+              me={me}
+            />
+          ) : (
+            <ProposalCard {...card}>
+              <RuleProposal
+                proposal={proposal}
+                kind={kind}
+                place={{ context, tenant, workspace }}
+              />
+            </ProposalCard>
+          ),
+      };
+    }),
+  ];
   const chat = (
     <section
       aria-labelledby="thread"
@@ -478,25 +567,20 @@ function Chat() {
                   running={entry.run.status === "running"}
                 />
               );
-            case "question": {
-              const { request, answer: given } = entry.question;
-              return (
+            case "question":
+              // One that waits is in the tray, until it is answered.
+              return waitsFor(entry) ? null : (
                 <li
-                  key={request.tool_call_id}
-                  id={`request-${request.tool_call_id}`}
+                  key={entry.question.request.tool_call_id}
+                  id={`request-${entry.question.request.tool_call_id}`}
                   tabIndex={-1}
                   className="outline-none"
                 >
-                  <Questions
-                    request={request}
-                    answer={given?.value ?? null}
-                    answeredBy={given ? author(given.actor, me, names) : null}
-                    focus={request === latestRequest && arrived}
-                    onAnswer={(value) => answer(entry.run, request)({ answer: value })}
-                  />
+                  {questions(entry)}
                 </li>
               );
-            }
+            case "proposal":
+              return <ProposalLine key={entry.proposal.id} proposal={entry.proposal} />;
             case "artifact":
               return entry.artifact === beside ? null : (
                 <ThreadArtifact
@@ -579,11 +663,9 @@ function Chat() {
           {(!canPost || run.status !== "running") && strip(run)}
           {picker && <picker.AnsweredBy place={place} run={run} />}
           {[
+            // An approval waits in its own card, which holds the window's foot (ADR-0085).
             ...run.requests
-              .filter(
-                (request) =>
-                  request.tool_name !== ASK_USER && !(split && request.kind === "approval"),
-              )
+              .filter((request) => request.kind === "approval" && !split)
               .map((request) => ({ request, by: undefined })),
             // A form stays where it was asked once it is answered, until its run ends, and says by whom.
             ...run.answered
@@ -592,38 +674,13 @@ function Chat() {
           ].map(({ request, by }) => asked(run, request, by))}
         </div>
       ))}
-      {proposed.map((proposal) => {
-        const artifact = proposedOn(proposal);
-        const kind = artifact === null ? undefined : artifacts[artifact]?.kind;
-        const native = NATIVE.get(kind ?? "");
-        const card = {
-          // Where a file created blank links to the change that fills it.
-          id: `proposal-${proposal.id}`,
-          proposal,
-          onRespond: (decision: "accept" | "reject") =>
-            stream.send({ type: "respond_to_proposal", proposal_id: proposal.id, decision }),
-        };
-        // A native file's says what it does and compares it with the head (portalr ADR-0050).
-        return artifact !== null && native ? (
-          <NativeProposal
-            key={proposal.id}
-            {...card}
-            place={{ context, tenant, workspace, artifact }}
-            native={native}
-            me={me}
-          />
-        ) : (
-          <ProposalCard key={proposal.id} {...card}>
-            <RuleProposal proposal={proposal} kind={kind} place={{ context, tenant, workspace }} />
-          </ProposalCard>
-        );
-      })}
       {canPost && (
         // While an approval waits in the column, the dock stays in the flow under it, so it never
         // covers Deny and Approve (portalr ADR-0087).
         <ComposerDock
           className={`mt-auto flex flex-col gap-2 ${approvals.length > 0 && !split ? "static" : ""}`}
         >
+          <Tray waiting={waiting} reach={arrived ? latestRequest?.tool_call_id : undefined} />
           {active.filter((run) => run.status === "running").map(strip)}
           {/* The composer's first focus loads the model picker (portalr ADR-0086). */}
           <div className="contents" ref={composer}>
@@ -688,6 +745,7 @@ function Chat() {
           </div>
         </ComposerDock>
       )}
+      {!canPost && <Tray waiting={waiting} />}
       {snapshot.status !== "closed" && !allowed.has("artifactr:post_message") && (
         <>
           {/* Who may set the mode but not post has it on its own, where the composer would be. */}
@@ -898,10 +956,5 @@ function Sharing({
 
 /** To a request's own named part, such as "The agent asks", or else to where it is. */
 function toRequest(toolCallId: string | undefined) {
-  const at = document.getElementById(`request-${toolCallId}`);
-  const named = at?.querySelector<HTMLElement>("[aria-label], [aria-labelledby]") ?? at;
-  if (named && !named.hasAttribute("tabindex")) {
-    named.tabIndex = -1;
-  }
-  named?.focus();
+  reachWaiting(`request-${toolCallId}`);
 }

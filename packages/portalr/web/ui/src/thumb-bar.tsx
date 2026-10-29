@@ -5,7 +5,8 @@
  * the request's own, marked `data-thumb-action` by its card, so the handlers are the card's; it
  * is hidden from assistive technology, which reaches the one in the card, so there is one tab
  * stop. Its words and its disabled state follow that button's. It gives way while the card's own
- * button is on screen, while the on-screen keyboard is up, and in a short window.
+ * button is in view, not off the window, scrolled out of the tray it sits in or under the dock,
+ * while the on-screen keyboard is up, and in a short window.
  */
 
 import { useEffect, useState } from "react";
@@ -42,7 +43,11 @@ export function ThumbBar({ target }: { target: string }) {
         return;
       }
       const box = action.getBoundingClientRect();
-      const seen = box.width > 0 && box.bottom > 0 && box.top < window.innerHeight;
+      // Seen where what is at its centre is the button: not off the window, nor scrolled out of the
+      // tray it may sit in, nor under the dock.
+      const seen = action.contains(
+        document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2),
+      );
       // The keyboard's inset is kept on the root (`keyboardInset`): up, the bar would crowd it.
       const keyboard = Number.parseFloat(root.style.getPropertyValue("--keyboard-inset")) > 0;
       setMirror(

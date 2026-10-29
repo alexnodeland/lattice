@@ -79,44 +79,16 @@ export function Phase({ run, now }: { run: Artifactr.Run; now: Date }) {
   );
 }
 
-/**
- * One count, as a chip: "in ~1,060" while estimated, "in 1,060" once the provider's, named in
- * full for a screen reader.
- */
-function Chip({
-  short,
-  name,
-  n,
-  exact = false,
-}: {
-  short: string;
-  name: string;
-  n: number;
-  exact?: boolean;
-}) {
-  return (
-    <span
-      data-chip=""
-      className="inline-flex items-center whitespace-nowrap rounded-(--badge-radius) bg-subtle px-(--badge-pad-end) py-(--badge-pad-y) font-medium text-muted text-xs tabular-nums"
-    >
-      <span aria-hidden="true">
-        {short} {exact ? "" : "~"}
-        {count(n)}
-      </span>
-      <span className="sr-only">
-        {name}
-        {exact ? "" : ", estimated"}: {count(n)}
-      </span>
-    </span>
-  );
-}
+/** A count of tokens: what it says, its full name, and how many. */
+type Count = readonly [short: string, name: string, n: number];
 
 /**
- * The turn's tokens, as chips in the strip: the provider's counts once a model request has
- * ended (artifactr ADR-0096), with what was read from and written to its prompt cache, and spent
- * reasoning, where any was, and the model that answered; until then estimated from the
- * characters sent and streamed, "~" and their names saying so, where what was sent counts the
- * thread's messages alone, so it is a floor. Never announced, as they change with every frame.
+ * The turn's tokens, in one line the strip cuts where it is long: the provider's counts once a
+ * model request has ended (artifactr ADR-0096), "in 32,369 · out 6,925", with what was read from
+ * and written to its prompt cache, and spent reasoning, where any was, and the model that
+ * answered last; until then estimated from the characters sent and streamed, "~" and the names
+ * saying so, where what was sent counts the thread's messages alone, so it is a floor. A screen
+ * reader gets each count by its full name. Never announced, as they change with every frame.
  */
 export function Tokens({
   run,
@@ -127,32 +99,36 @@ export function Tokens({
   history: number | null;
 }) {
   const usage = run.live.usage;
-  if (usage) {
-    const extra = [
-      ["cached", "Cached input tokens", usage.cache_read_tokens],
-      ["cache write", "Input tokens written to the cache", usage.cache_write_tokens],
-      ["reasoning", "Reasoning tokens", usage.reasoning_tokens],
-    ] as const;
-    return (
-      <span className="flex flex-wrap items-center gap-1">
-        <Chip short="in" name="Input tokens" n={usage.input_tokens ?? 0} exact />
-        <Chip short="out" name="Output tokens" n={usage.output_tokens ?? 0} exact />
-        {extra.map(
-          ([short, name, n]) => !!n && <Chip key={short} short={short} name={name} n={n} exact />,
-        )}
-        {usage.model && (
-          <span className="text-muted text-xs">
-            <span className="sr-only">Model: </span>
-            {usage.model}
-          </span>
-        )}
-      </span>
-    );
-  }
+  const counts: readonly Count[] = usage
+    ? [
+        ["in", "Input tokens", usage.input_tokens ?? 0],
+        ["out", "Output tokens", usage.output_tokens ?? 0],
+        // What the cache and reasoning took, where any was.
+        ...(
+          [
+            ["cached", "Cached input tokens", usage.cache_read_tokens ?? 0],
+            ["cache write", "Input tokens written to the cache", usage.cache_write_tokens ?? 0],
+            ["reasoning", "Reasoning tokens", usage.reasoning_tokens ?? 0],
+          ] as const
+        ).filter(([, , n]) => n),
+      ]
+    : [
+        ...(history === null ? [] : ([["in", "Input tokens", Math.ceil(history / 4)]] as const)),
+        ["out", "Output tokens", Math.ceil(run.live.outputChars / 4)],
+      ];
+  const model = usage?.model;
   return (
-    <span className="flex flex-wrap gap-1">
-      {history !== null && <Chip short="in" name="Input tokens" n={Math.ceil(history / 4)} />}
-      <Chip short="out" name="Output tokens" n={Math.ceil(run.live.outputChars / 4)} />
+    <span className="block truncate">
+      <span aria-hidden="true">
+        {counts.map(([short, , n]) => `${short} ${usage ? "" : "~"}${count(n)}`).join(" · ")}
+        {model && ` · ${model}`}
+      </span>
+      <span className="sr-only">
+        {counts
+          .map(([, name, n]) => `${name}${usage ? "" : ", estimated"}: ${count(n)}`)
+          .join(". ")}
+        {model && `. Model: ${model}`}
+      </span>
     </span>
   );
 }

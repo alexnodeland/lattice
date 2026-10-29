@@ -80,10 +80,12 @@ export function callLabel(tool: Artifactr.Tool): string {
 }
 
 /**
- * The calls together, done: each tool's verb and its count, in the order first called, so
- * "Made an app, read 2 artifacts"; tools no table names are one "used 3 tools".
+ * The calls together, done, as the line may say them, longest first: each tool's verb and its
+ * count, in the order first called, so "Made an app, read 2 artifacts"; tools no table names are
+ * one "used 3 tools". Then, for a line short of room, the first two kinds, then the first, each
+ * whole, with the calls of the rest counted: "Made an app, read 2 artifacts and 3 more".
  */
-export function doneLabel(tools: readonly Artifactr.Tool[]): string {
+export function doneLabels(tools: readonly Artifactr.Tool[]): string[] {
   // By their words, so two tools that say the same, as draw and draw_mermaid do, are one.
   const counts = new Map<string, [Phrase, number]>();
   for (const tool of tools) {
@@ -91,26 +93,36 @@ export function doneLabel(tools: readonly Artifactr.Tool[]): string {
     const key = said.join("|");
     counts.set(key, [said, (counts.get(key)?.[1] ?? 0) + 1]);
   }
-  const parts = [...counts.values()].map(([said, n]) => `${said[0]} ${object(said, n)}`);
-  const joined = parts.join(", ");
-  return joined.charAt(0) + joined.slice(1).toLowerCase();
+  const kinds = [...counts.values()].map(
+    ([said, n]) => [`${said[0]} ${object(said, n)}`, n] as const,
+  );
+  const say = (kept: number) => {
+    const more = kinds.slice(kept).reduce((sum, [, n]) => sum + n, 0);
+    const joined =
+      kinds
+        .slice(0, kept)
+        .map(([text]) => text)
+        .join(", ") + (more > 0 ? ` and ${more} more` : "");
+    return joined.charAt(0) + joined.slice(1).toLocaleLowerCase();
+  };
+  return [...new Set([kinds.length, 2, 1].map(say))];
 }
 
+/** The calls together, done, all of them: the longest of `doneLabels`. */
+export const doneLabel = (tools: readonly Artifactr.Tool[]): string => doneLabels(tools)[0] ?? "";
+
 /**
- * The plain parts of a group's line: what it says, how many failed, and whether it runs: while a
- * call does, or its run does, between one call's answer and the next, it says what it is doing.
+ * The plain parts of a group's line: what it may say, longest first, how many failed, and whether
+ * it runs: while a call does, or its run does, between one call's answer and the next, it says
+ * what it is doing.
  */
 export function foldSummary(tools: readonly Artifactr.Tool[], runRunning = false) {
   const latest = tools.findLast((tool) => tool.status === "called") ?? tools.at(-1);
   const running = runRunning || tools.some((tool) => tool.status === "called");
-  return {
-    label:
-      running && latest
-        ? `${doing(phrase(latest.name)[0])} ${phrase(latest.name)[1]}…`
-        : doneLabel(tools),
-    failed: tools.filter(failed).length,
-    running,
-  };
+  const doingNow =
+    running && latest ? `${doing(phrase(latest.name)[0])} ${phrase(latest.name)[1]}…` : null;
+  const labels = doingNow === null ? doneLabels(tools) : [doingNow];
+  return { labels, failed: tools.filter(failed).length, running };
 }
 
 /** Where a value holds what a call was about, the first of these keys a string has. */

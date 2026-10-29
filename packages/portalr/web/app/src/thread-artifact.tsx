@@ -123,24 +123,20 @@ export function ThreadArtifact({
       ) : native && createdBlank(latest) ? (
         // Its name and kind are the header's; the change that fills it is the proposal's. Nothing
         // is checked out or edited until it has content: its page still offers both.
-        <div className="flex flex-col gap-1 text-muted text-sm">
-          <p>
-            Created empty.
-            {waiting !== null && (
-              <>
-                {" "}
-                <TextLink href={`#proposal-${waiting.first}`}>
-                  {waiting.count === 1
-                    ? "The agent's changes are waiting for your review."
-                    : `${waiting.count} changes by the agent are waiting for your review.`}
-                </TextLink>
-              </>
-            )}
-          </p>
-          <TextLink className="self-start" render={open}>
-            Open the file's page
-          </TextLink>
-        </div>
+        <p className="text-muted text-sm">
+          Created empty.
+          {waiting !== null && (
+            <>
+              {" "}
+              <TextLink href={`#proposal-${waiting.first}`}>
+                {waiting.count === 1
+                  ? "The agent's changes are waiting for your review."
+                  : `${waiting.count} changes by the agent are waiting for your review.`}
+              </TextLink>
+            </>
+          )}{" "}
+          <TextLink render={open}>Open the file's page</TextLink>
+        </p>
       ) : native ? (
         <NativeInline
           place={{ context, tenant, workspace, artifact: artifact.id }}

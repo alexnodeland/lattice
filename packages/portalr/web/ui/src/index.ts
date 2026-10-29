@@ -65,6 +65,7 @@ export {
   ModeSwitch,
   ProposalCard,
   prefetchStreaming,
+  proposalTitle,
   proposedOn,
   Request,
   RunStatus,
@@ -158,5 +159,6 @@ export { useCoarsePointer, usePhone, useTouch } from "./touch";
 export { duration, type Reveal, type Standing, TraceView } from "./trace-view";
 export { type Block, type Level, Tracker } from "./tracker";
 export { type TrackerItem, TrackerItems, trackerName } from "./tracker-items";
+export { askedOf, ProposalLine, reachWaiting, Tray, type Waiting } from "./tray";
 export { type FormHost, FormHostContext, UI_RENDERERS } from "./ui-renderers";
 export { plainName, type UploadItem, UploadList } from "./upload-list";

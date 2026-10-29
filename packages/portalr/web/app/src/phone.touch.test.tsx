@@ -1,6 +1,7 @@
 /**
  * The app on a phone (portalr ADR-0082): the request's next step within the thumb's reach, one
- * tab stop, and gone while the card's own button is in view or the keyboard is up; what floats
+ * tab stop, and gone while the card's own button is in view or the keyboard is up; what waits for
+ * the reader docked with the composer, in one tray (portalr ADR-0092); what floats
  * as a sheet along the bottom; the composer above the on-screen keyboard; nothing wider than the
  * page with a sheet open, the keyboard up or a step unfolded, down to a window at 400% zoom.
  */
@@ -12,6 +13,7 @@ import { AT } from "./test/files";
 import { APPROVAL, serve as notes, STEPPED, WORLD } from "./test/notes";
 import { wider } from "./test/overflow";
 import * as rules from "./test/rules";
+import { ALICE, ASKING, logged, stream, TOUR, serve as tour } from "./test/tour";
 
 /** Files may be attached: a kind offered, so the composer can add them. */
 const OFFERED = {
@@ -38,6 +40,9 @@ const press = () => {
   }
 };
 const dock = () => document.querySelector("[data-composer-dock]") as HTMLElement;
+/** What waits for the reader, docked above the composer: its box, and the part of it that scrolls. */
+const tray = () => document.querySelector("[aria-label='Waiting for you']") as HTMLElement | null;
+const trayBody = () => tray()?.querySelector("[data-tray]") as HTMLElement;
 const noneWider = () => {
   const found = wider();
   expect(found, found.join("\n")).toEqual([]);
@@ -57,24 +62,27 @@ function keyboard(covered: number) {
   return viewport;
 }
 
-test("the question's Answer sits in the composer's row, presses the card's own, and is one tab stop", async () => {
-  await page.viewport(390, 844);
+test("the question waits in the dock above the composer, and its Answer is in the thumb's reach: the bar stands in where the tray scrolls it away", async () => {
+  // A short window, whose tray holds less than the card: its Answer is below the tray's fold.
+  await page.viewport(390, 520);
   // A visual viewport of the test's own: the real one's scrolls would measure the keyboard down.
   const viewport = keyboard(0);
   const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
   await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
-  // The card's Answer is below the fold: the bar shows it.
+  // Docked with the composer: never in the thread's flow, never scrolled away.
+  expect(dock().contains(document.getElementById("request-q1"))).toBe(true);
+  expect(screen.getByRole("log").element().querySelector("#request-q1")).toBeNull();
+  expect(getComputedStyle(trayBody()).overflowY).toBe("auto");
   await expect.poll(() => bar()?.textContent).toContain("Answer");
   expect(bar()?.getAttribute("aria-hidden")).toBe("true");
   expect(bar()?.querySelector("button")?.tabIndex).toBe(-1);
   // One Answer for a reader: the card's.
   expect(screen.getByRole("button", { name: "Answer" }).elements()).toHaveLength(1);
   expect(bottom(dock())).toBeLessThanOrEqual(window.innerHeight);
-  expect(dock().getBoundingClientRect().height).toBeLessThanOrEqual(window.innerHeight / 4);
-  // The card's own button scrolled into view: the bar gives way; scrolled away, it is back.
-  document.getElementById("request-q1")?.scrollIntoView({ block: "center" });
+  // The card's own button scrolled into view in the tray: the bar gives way; scrolled away, it is back.
+  trayBody().scrollTo(0, trayBody().scrollHeight);
   await expect.poll(() => bar(), { timeout: 3000 }).toBeNull();
-  window.scrollTo(0, 0);
+  trayBody().scrollTo(0, 0);
   await expect.poll(() => bar()?.textContent).toContain("Answer");
   // The keyboard up: the bar gives way too.
   viewport.height = window.innerHeight - 300;
@@ -82,12 +90,23 @@ test("the question's Answer sits in the composer's row, presses the card's own, 
   await expect.poll(() => bar()).toBeNull();
 });
 
-test("a stepped question's bar says Next, then Answer, and gives way as it brings the card into view", async () => {
+test("a window with room shows the question whole, its Answer in view, and the bar has nothing to mirror", async () => {
   await page.viewport(390, 844);
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
+  await expect.element(screen.getByRole("button", { name: "Answer" })).toBeVisible();
+  const answer = screen.getByRole("button", { name: "Answer" }).element().getBoundingClientRect();
+  expect(answer.bottom).toBeLessThanOrEqual(dock().getBoundingClientRect().bottom);
+  expect(answer.height).toBeGreaterThanOrEqual(44);
+  await new Promise((settled) => setTimeout(settled, 300));
+  expect(bar()).toBeNull();
+});
+
+test("a stepped question's bar says Next, then Answer, and gives way as it brings the card into view", async () => {
+  await page.viewport(390, 520);
   const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, STEPPED);
   await expect.element(screen.getByText("Which week should the note cover?")).toBeInTheDocument();
   const away = async (word: string) => {
-    window.scrollTo(0, 0);
+    trayBody().scrollTo(0, 0);
     await expect.poll(() => bar()?.textContent).toContain(word);
   };
   await away("Next");
@@ -97,7 +116,6 @@ test("a stepped question's bar says Next, then Answer, and gives way as it bring
   await away("Next");
   press();
   await expect.element(screen.getByText("Formal, or plain?")).toBeInTheDocument();
-  await expect.poll(() => bar()).toBeNull();
   await screen.getByRole("radio", { name: /^Yes/ }).click();
   await away("Next");
   press();
@@ -189,12 +207,13 @@ for (const [width, height] of [
     const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
     await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
     // The bar mirrors the card's Answer only while the card's own is out of view: from the top.
-    window.scrollTo(0, 0);
+    trayBody().scrollTo(0, 0);
     await expect.poll(() => bar()?.textContent).toContain("Answer");
     const tall = await settled();
     // One footer (portalr ADR-0087): "+" at its start, and, while nothing is written, the thumb
     // bar's Answer where Send would be; every control a finger's 44px, on one line.
-    const shown = [...dock().querySelectorAll("form button")].filter((b) =>
+    const composer = dock().querySelector("textarea")?.form;
+    const shown = [...(composer?.querySelectorAll("button") ?? [])].filter((b) =>
       (b as HTMLElement).checkVisibility(),
     );
     expect(shown.map((b) => b.getAttribute("aria-label") ?? b.textContent?.trim())).toEqual([
@@ -210,7 +229,9 @@ for (const [width, height] of [
     await expect.element(screen.getByRole("button", { name: "Send" })).toBeVisible();
     await screen.getByRole("textbox", { name: "Message" }).fill("");
     if (width >= 375) {
-      expect(tall).toBeLessThanOrEqual(window.innerHeight / 4);
+      // What waits for the reader is the tray's, and scrolls inside it: the composer's is a quarter.
+      const waiting = tray()?.getBoundingClientRect().height ?? 0;
+      expect(tall - waiting).toBeLessThanOrEqual(window.innerHeight / 4);
     }
   });
 }
@@ -311,4 +332,201 @@ test("a rule's proposal, to a finger at 393px: its JSON's fold, Copy, Accept and
     expect(target.getBoundingClientRect().height, String(name)).toBeGreaterThanOrEqual(44);
   }
   noneWider();
+});
+
+const THREAD = "/t/acme/w/notes/threads/thr_1";
+
+test("the thread on a phone: one compact strip with its tokens on one line, one tray for what waits, decided proposals as slim lines, and the agent's words read as any are", async () => {
+  await page.viewport(390, 844);
+  const { screen } = await open(THREAD, tour, () => null, { artifactrLog: TOUR });
+  await expect
+    .element(screen.getByRole("region", { name: "Proposal: Add a closing line" }))
+    .toBeVisible();
+  stream();
+  // The strip is the one sign that the agent works: a line of state, what it does, the clock and
+  // Stop, and a line of tokens, which does not wrap (portalr ADR-0092).
+  const strip = screen.getByRole("group", { name: "This turn" });
+  const tokens = strip.getByText("in 32,369 · out 6,925 · reasoning 4,955 · default");
+  await expect.element(tokens).toBeVisible();
+  expect(tokens.element().getBoundingClientRect().height).toBeLessThan(20);
+  expect(tokens.element().parentElement?.scrollWidth).toBeLessThanOrEqual(
+    tokens.element().parentElement?.clientWidth ?? 0,
+  );
+  expect(strip.getByRole("button", { name: "Tokens" }).elements()).toHaveLength(0);
+  const stop = strip.getByRole("button", { name: "Stop" });
+  await expect.element(stop).toBeVisible();
+  expect(stop.element().getBoundingClientRect().height).toBeGreaterThanOrEqual(44);
+  expect(strip.element().getBoundingClientRect().height).toBeLessThanOrEqual(88);
+  // One proposal waits, in the tray above the composer; the one decided is a slim line of the
+  // thread, which the tray has no part of.
+  const waiting = tray();
+  expect(waiting?.querySelectorAll("section[aria-label^='Proposal:']")).toHaveLength(1);
+  expect(waiting?.getBoundingClientRect().bottom).toBeLessThanOrEqual(
+    dock().getBoundingClientRect().bottom,
+  );
+  expect(dock().contains(waiting)).toBe(true);
+  const log = screen.getByRole("log").element();
+  const decided = [...log.querySelectorAll("ol > li")].find((each) =>
+    each.textContent?.startsWith("AcceptedAdd a demo heading and two paragraphs"),
+  );
+  expect(decided).toBeDefined();
+  expect(decided?.getBoundingClientRect().height).toBeLessThan(36);
+  expect(log.querySelector("[aria-label='Proposal: Add a closing line']")).toBeNull();
+  expect(waiting?.textContent).not.toContain("Add a demo heading and two paragraphs");
+  // The composer starts one line tall, and a message followed by a fold leaves no dead space.
+  expect(dock().querySelector("textarea")?.getBoundingClientRect().height).toBeLessThanOrEqual(44);
+  const said = [...log.querySelectorAll("ol > li")].find((each) =>
+    each.textContent?.startsWith("AssistantHappy to"),
+  );
+  const fold = said?.nextElementSibling;
+  expect(fold?.querySelector("button")).not.toBeNull();
+  expect(
+    (fold?.getBoundingClientRect().top ?? 99) - (said?.getBoundingClientRect().bottom ?? 0),
+  ).toBeLessThanOrEqual(4);
+  // Words written before a tool call are not faded, and are the page's ink; no dots say it thinks.
+  const words = screen
+    .getByRole("listitem", { name: "Assistant is writing" })
+    .getByText(/^Happy to - quick tour/);
+  await expect.element(words).toBeVisible();
+  for (let at: Element | null = words.element(); at; at = at.parentElement) {
+    expect(getComputedStyle(at).opacity).toBe("1");
+  }
+  expect(getComputedStyle(words.element()).color).toBe(getComputedStyle(document.body).color);
+  expect(document.querySelector(".animate-pulse")).toBeNull();
+  noneWider();
+});
+
+test("a question and a proposal waiting are one line over the composer, counted, and open to both", async () => {
+  await page.viewport(390, 844);
+  const { screen } = await open(THREAD, tour, () => null, { artifactrLog: ASKING });
+  const line = screen.getByRole("button", { name: /2 waiting for you/ });
+  await expect.element(line).toBeVisible();
+  await expect.element(line).toHaveAttribute("aria-expanded", "false");
+  expect(line.element().getBoundingClientRect().height).toBeLessThan(60);
+  // Neither is a card of the thread, nor floats by itself.
+  const log = screen.getByRole("log").element();
+  expect(log.querySelector("#request-q1")).toBeNull();
+  expect(log.querySelector("[aria-label='Proposal: Add a closing line']")).toBeNull();
+  expect(dock().getBoundingClientRect().height).toBeLessThan(window.innerHeight / 3);
+  await line.click();
+  await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
+  await expect
+    .element(screen.getByRole("region", { name: "Proposal: Add a closing line" }))
+    .toBeInTheDocument();
+  expect(dock().contains(document.getElementById("request-q1"))).toBe(true);
+  expect(trayBody().getBoundingClientRect().height).toBeLessThanOrEqual(
+    window.innerHeight * 0.4 + 1,
+  );
+  noneWider();
+});
+
+/** Titles and arguments longer than a phone is wide, and a thread to hold the longest. */
+const LONG = `What tools do you have access to and what can you do for me today ${"x".repeat(160)}`;
+const LONG_WORLD = {
+  artifactrLog: [
+    ...TOUR.map((entry) =>
+      entry.event.tool_name === "mystery_tool" && entry.event.type === "tool_called"
+        ? {
+            ...entry,
+            event: {
+              ...entry.event,
+              args_summary: `{"query": "${"q".repeat(240)}", "code": "${"y".repeat(240)}"}`,
+            },
+          }
+        : entry,
+    ),
+    logged(20, { type: "thread_created", thread_id: "thr_9", title: LONG }, ALICE),
+  ],
+};
+
+/**
+ * That a sheet or a page doesn't move sideways at all: nothing in it is wider than it, but a code
+ * block's own box, which the keyboard reaches, and what scrolls up and down in it has no sideways
+ * scroll to drag.
+ */
+function stillSideways(within: Element) {
+  const scrolled = [within, ...within.querySelectorAll("*")].filter((element) => {
+    const style = getComputedStyle(element);
+    return /auto|scroll/.test(style.overflowY) && !element.closest("pre, textarea, [tabindex='0']");
+  });
+  for (const element of scrolled) {
+    const name = `${element.tagName.toLowerCase()}.${String(element.className).slice(0, 50)}`;
+    expect(element.scrollWidth, name).toBeLessThanOrEqual(element.clientWidth);
+    expect(getComputedStyle(element).overflowX, name).not.toMatch(/auto|scroll/);
+    // It can't be dragged to the side: a scroll there stays where it was.
+    element.scrollLeft = 40;
+    expect(element.scrollLeft, name).toBe(0);
+  }
+  expect(document.documentElement.scrollWidth).toBeLessThanOrEqual(
+    document.documentElement.clientWidth,
+  );
+  expect(window.scrollX).toBe(0);
+  noneWider();
+}
+
+test("the palette, the calls' sheet and its detail, the Add sheet and the tray never scroll or move sideways, with titles and code far wider than the window", async () => {
+  await page.viewport(390, 844);
+  const { screen } = await open(THREAD, tour, () => null, {
+    artifactrLog: LONG_WORLD.artifactrLog,
+  });
+  await expect
+    .element(screen.getByRole("region", { name: "Proposal: Add a closing line" }))
+    .toBeVisible();
+  stillSideways(document.body);
+  // The palette, whose groups list threads by titles of any length: each row is the list's width.
+  await screen
+    .getByRole("button", { name: /Search/ })
+    .first()
+    .click();
+  const list = screen.getByRole("listbox", { name: "Results" });
+  await expect.element(list).toBeVisible();
+  await expect.element(screen.getByRole("option").first()).toBeVisible();
+  const popup = screen.getByRole("dialog").element();
+  stillSideways(popup);
+  const frame = list.element().getBoundingClientRect();
+  for (const option of screen.getByRole("option").elements()) {
+    const box = option.getBoundingClientRect();
+    expect(box.left).toBeGreaterThanOrEqual(frame.left);
+    expect(box.right).toBeLessThanOrEqual(frame.right);
+  }
+  await userEvent.keyboard("{Escape}");
+  await expect.element(screen.getByRole("dialog")).not.toBeInTheDocument();
+  // The calls' sheet, and a call whose arguments are a long line of code.
+  await screen
+    .getByRole("button", { name: /tool calls?$/ })
+    .last()
+    .click();
+  const sheet = screen.getByRole("dialog");
+  await expect.element(sheet).toBeVisible();
+  stillSideways(sheet.element());
+  await sheet.getByRole("button", { name: /^Used a tool/ }).click();
+  await expect.element(screen.getByText("What it was asked")).toBeVisible();
+  stillSideways(sheet.element());
+  await userEvent.keyboard("{Escape}");
+  await userEvent.keyboard("{Escape}");
+  // The Add sheet, and the tray open.
+  await screen.getByRole("button", { name: "Add", exact: true }).click();
+  await expect.element(screen.getByRole("dialog", { name: "Add" })).toBeVisible();
+  stillSideways(screen.getByRole("dialog", { name: "Add" }).element());
+});
+
+test("with the keyboard up in a short window, the tray keeps its few lines, and its last control is reachable", async () => {
+  await page.viewport(390, 560);
+  const viewport = keyboard(0);
+  const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
+  await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
+  viewport.height = window.innerHeight - 300;
+  viewport.dispatchEvent(new Event("resize"));
+  await expect.poll(() => getComputedStyle(dock()).bottom).toBe("300px");
+  const body = trayBody();
+  // What is left of the window is little, but the tray is never less than nine rem...
+  expect(body.getBoundingClientRect().height).toBeGreaterThanOrEqual(143);
+  // ...and it scrolls to the last control, which is then in its view and above the keyboard.
+  body.scrollTo(0, body.scrollHeight);
+  await new Promise((settled) => setTimeout(settled, 100));
+  const answer = screen.getByRole("button", { name: "Answer" }).element().getBoundingClientRect();
+  const box = body.getBoundingClientRect();
+  expect(answer.top).toBeGreaterThanOrEqual(box.top);
+  expect(answer.bottom).toBeLessThanOrEqual(box.bottom);
+  expect(answer.bottom).toBeLessThanOrEqual(window.innerHeight - 300);
 });

@@ -428,7 +428,7 @@ test("a file created blank with no change waiting says only that it was created"
     artifactrLog: [...CREATED_BLANK, filling(4), resolved(5, "reject")],
   });
   const file = screen.getByRole("listitem", { name: "Travel plan.docx" });
-  await expect.element(file.getByText("Created empty.", { exact: true })).toBeVisible();
+  await expect.element(file.getByText(/^Created empty\./)).toBeVisible();
   expect(file.getByRole("link", { name: /waiting/ }).elements()).toHaveLength(0);
 });
 

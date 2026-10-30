@@ -132,6 +132,15 @@ Each Python package's `pyproject.toml` states the **oldest** versions it support
 
 The web packages are private and pin exact versions, which `bun.lock` records and Renovate moves. A web package names a sibling as `"@portalr/ui": "workspace:*"`, and its `moon.yml` names it in `dependsOn`, which the root's tests check.
 
+`make install` installs the web packages with `scripts/bun-install`: `bun install --frozen-lockfile`, as CI runs it, with the Bun `.prototools` pins. It fails, and says why, when the Bun on `PATH` is another version or when the install would change `bun.lock`, which it never changes itself. The one way to add, remove or move a JS dependency, and so change `bun.lock`, is Bun's own command run in the web package, with the pinned Bun on `PATH` (`proto use`):
+
+```bash
+cd packages/portalr/web/<package>   # or the root, for the shared tools (Biome, knip, TypeScript)
+bun add --exact <name>@<version>    # or `bun add --exact --dev`, or `bun remove <name>`
+```
+
+Commit `bun.lock` with the `package.json` it belongs to, and nothing else in it.
+
 ## Design: RFCs, ADRs and evergreen docs
 
 Each package's documentation is in `docs/<package>/`, with its RFCs in `rfcs/`, its ADRs in `adr/` and its architecture in `architecture.md`. An ADR or an RFC keeps its package's numbering, and outside its package it is named with the package, as in "reflexr ADR-0003".

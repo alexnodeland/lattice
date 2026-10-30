@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Installs the web packages exactly as bun.lock pins them, with the Bun that .prototools pins, as
+# CI does (`bun install --frozen-lockfile`). `make install` and the dev container run it. It fails,
+# saying why, when the Bun on PATH isn't the pinned one or when the install would change bun.lock;
+# a different Bun is what rewrote the lockfile wholesale before (#782). To add, remove or move a
+# JS dependency, which is the one time bun.lock should change, see CONTRIBUTING.md.
+set -euo pipefail
+
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$root"
+bun="${BUN:-bun}"
+
+pinned="$(sed -n 's/^bun *= *"\(.*\)"$/\1/p' .prototools)"
+actual="$("$bun" --version 2>/dev/null || true)"
+if [[ "$actual" != "$pinned" ]]; then
+  echo "error: .prototools pins Bun $pinned, but '$bun' is ${actual:-not found}." >&2
+  echo "Run 'proto use' and put ~/.proto/shims and ~/.proto/bin on PATH, then try again." >&2
+  exit 1
+fi
+
+before="$(git hash-object bun.lock)"
+if ! "$bun" install --frozen-lockfile; then
+  echo "error: bun.lock doesn't match the package.json files, and an install would change it." >&2
+  echo "To change a dependency, use 'bun add --exact' or 'bun remove' (Bun $pinned), as CONTRIBUTING.md" >&2
+  echo "says, and commit bun.lock with it; otherwise restore it: 'git checkout bun.lock'." >&2
+  exit 1
+fi
+
+# --frozen-lockfile shouldn't write the lockfile; make sure, as a different Bun once did.
+if [[ "$(git hash-object bun.lock)" != "$before" ]]; then
+  echo "error: the install changed bun.lock:" >&2
+  git diff --stat -- bun.lock >&2
+  echo "Restore it ('git checkout bun.lock') and check the Bun on PATH is $pinned." >&2
+  exit 1
+fi

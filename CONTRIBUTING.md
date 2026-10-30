@@ -73,10 +73,12 @@ stackr keeps its Makefile for the stack: run `make` in `packages/stackr` to list
 artifactr's, reflexr's and grantr's storage tests, and relayr's ledger tests, run against in-memory storage, SQLite and PostgreSQL. SQLite needs nothing extra, and it alone reaches the coverage gate. The PostgreSQL tests run only when `ARTIFACTR_TEST_POSTGRES_URL`, `REFLEXR_TEST_POSTGRES_URL`, `GRANTR_TEST_POSTGRES_URL` or `RELAYR_TEST_POSTGRES_URL` is set (otherwise pytest reports them as deselected), and CI always runs them.
 
 ```bash
-moon run artifactr:pg-up        # postgres:17 on localhost:54329 (reflexr's is on 54330, grantr's on 54331, relayr's on 54332)
+moon run artifactr:pg-up        # postgres:17, as a compose project of its own on a port the system picks
 moon run artifactr:test-pg      # the whole suite, with the PostgreSQL tests included
 moon run artifactr:pg-down
 ```
+
+`pg-up` names the compose project with a random token (`artifactr-pg-3f9a1c0e`) and records it in the package's `.pg-project`, so each worktree has a stack of its own; `test-pg` reads the URL from it (`scripts/pg url`), and `pg-down` removes only that project, with its volumes. `app-up` and relayr's `vikunja-up` join the same project.
 
 To use another database, set the variable yourself, for example `postgresql+asyncpg://user:password@host:5432/db`, and run `moon run artifactr:test`. Each test creates its own schema there and drops it afterwards. Give each library its own database.
 

@@ -13,12 +13,6 @@
   ],
   "exceptions": [
     {
-      "package": "victory-vendor",
-      "licence": "MIT AND ISC",
-      "kind": "text",
-      "reason": "Its modules re-export the d3 packages, which are bundled and noticed as entries of their own; it ships no licence file for its shim, and Recharts needs it. Its source is named in its entry."
-    },
-    {
       "package": "remark-math",
       "licence": "MIT",
       "kind": "text",

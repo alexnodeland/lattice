@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+# A library's contributor stack: its compose.yaml's PostgreSQL, for the SQL tests, and whatever else
+# its profiles start beside it (the reference application, Vikunja). The stack outlives the task
+# that starts it, so unlike scripts/api it can't stop in an EXIT trap: `up` names the compose
+# project with a token of its own (compose-project.sh), on a port the system picks, and records the
+# name in the package's .pg-project, which the later commands read. The record is in the checkout,
+# so each worktree has its own stack, and `down` removes only the project it names.
+#
+# Usage, from the package's directory, as its tasks:
+#   scripts/pg up [SERVICE...]   start the stack (postgres if no SERVICE), reusing the recorded one
+#   scripts/pg url               print the URL of its PostgreSQL, for <PACKAGE>_TEST_POSTGRES_URL
+#   scripts/pg down              stop the recorded stack, with its volumes, and drop the record
+#
+# COMPOSE_PROFILES selects the profiles `up` and `down` include (app, trackers).
+set -euo pipefail
+command=${1:?usage: scripts/pg up [SERVICE...] | url | down}
+shift
+package=$(basename "$PWD")
+root=$(cd ../.. && pwd)
+record=.pg-project
+# shellcheck source-path=SCRIPTDIR source=compose-project.sh
+source "$root/scripts/compose-project.sh"
+
+recorded() {
+  [[ -s $record ]] || { echo "scripts/pg: no stack for $package here; run moon run $package:pg-up" >&2; return 1; }
+  cat "$record"
+}
+
+url() {
+  local address
+  address=$(docker compose -p "$1" port postgres 5432) \
+    || { echo "scripts/pg: $1 has no PostgreSQL running; run moon run $package:pg-up" >&2; return 1; }
+  printf 'postgresql+asyncpg://postgres:%s@%s/postgres\n' "$package" "$address"
+}
+
+case $command in
+  up)
+    if [[ -s $record ]]; then
+      project=$(cat "$record")
+    else
+      project=$(unique_project "$package-pg")
+      printf '%s\n' "$project" > "$record"
+    fi
+    # The port the system picks, unless the caller chose one.
+    port_variable="$(tr '[:lower:]' '[:upper:]' <<< "$package")_PG_PORT"
+    export "$port_variable=${!port_variable:-0}"
+    docker compose -p "$project" up --detach --wait "${@:-postgres}"
+    echo "$project: $(url "$project")"
+    ;;
+  url)
+    url "$(recorded)"
+    ;;
+  down)
+    # Nothing recorded, nothing to stop: never a name that another checkout's stack might have.
+    [[ -s $record ]] || { echo "scripts/pg: no stack for $package here" >&2; exit 0; }
+    docker compose -p "$(cat "$record")" down --volumes
+    rm "$record"
+    ;;
+  *)
+    echo "usage: scripts/pg up [SERVICE...] | url | down" >&2
+    exit 2
+    ;;
+esac

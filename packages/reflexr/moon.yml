@@ -44,31 +44,29 @@ tasks:
       runInCI: false
 
   pg-up:
-    description: "Start PostgreSQL for the SQL tests, from compose.yaml, on port 54330"
-    command: 'docker compose up -d --wait postgres'
+    description: 'Start PostgreSQL for the SQL tests, from compose.yaml, as a compose project of its own on a port the system picks'
+    command: '$workspaceRoot/scripts/pg up'
     options:
       cache: false
       runInCI: false
 
   pg-down:
     description: 'Stop the contributor stack: PostgreSQL, and oncall if it runs'
-    command: 'docker compose --profile app down'
+    script: 'COMPOSE_PROFILES=app $workspaceRoot/scripts/pg down'
     options:
       cache: false
       runInCI: false
 
   app-up:
     description: 'Build and start oncall, the reference app, on PostgreSQL, at http://localhost:8000'
-    command: 'docker compose --profile app up -d --build --wait'
+    script: 'COMPOSE_PROFILES=app $workspaceRoot/scripts/pg up --build'
     options:
       cache: false
       runInCI: false
 
   test-pg:
     description: 'Run the tests on PostgreSQL as well as SQLite (after pg-up)'
-    command: 'uv run pytest --cov --cov-report=term-missing --durations=10'
-    env:
-      REFLEXR_TEST_POSTGRES_URL: 'postgresql+asyncpg://postgres:reflexr@localhost:54330/postgres'
+    script: 'url=$($workspaceRoot/scripts/pg url) && REFLEXR_TEST_POSTGRES_URL=$url uv run pytest --cov --cov-report=term-missing --durations=10'
     options:
       cache: false
       runInCI: false

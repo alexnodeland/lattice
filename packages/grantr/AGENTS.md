@@ -19,7 +19,7 @@ grantr is identity and access for artifactr, reflexr and portalr: tenants, membe
 moon run grantr:test          # SQLite and memory; PostgreSQL tests deselected
 moon run grantr:check
 moon run grantr:schema        # regenerate schemas/grantr.openapi.json
-moon run grantr:pg-up         # PostgreSQL from compose.yaml on port 54331
+moon run grantr:pg-up         # PostgreSQL from compose.yaml, on a free port
 moon run grantr:test-pg       # the tests on PostgreSQL as well (after pg-up)
 moon run grantr:pg-down
 uv run pytest packages/grantr/tests/grants -n0

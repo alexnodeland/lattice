@@ -123,6 +123,34 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/**
+ * Wait until `sent` holds, moving the page meanwhile: an attribute changed on an element of its
+ * own, a frame apart, is an event a running recorder records. A recorder sends once it holds
+ * `BATCH` events, so a batch goes in about a second, not after the `WAIT` a few events wait,
+ * which left too little of a test's 15 s for the window after it on a busy runner.
+ */
+async function moving(sent: () => boolean) {
+  const mover = document.body.appendChild(document.createElement("div"));
+  let moves = 0;
+  try {
+    await expect
+      .poll(
+        () => {
+          moves += 1;
+          mover.dataset.moves = String(moves);
+          return sent();
+        },
+        { interval: 16, timeout: 10_000 },
+      )
+      .toBe(true);
+  } finally {
+    mover.remove();
+  }
+}
+
+/** Until a first batch has gone. */
+const aBatch = (relay: Relay) => () => relay.replayed.length > 0;
+
 test("where the deployment records no replays there is no switch, and nothing is asked of replay", async () => {
   const relay = relayOf(true, false);
   const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, {
@@ -186,7 +214,7 @@ test("off until turned on: the switch says what it records, and then the page is
 test("a no stops the recording and nothing more is sent", async () => {
   const relay = relayOf(true, true);
   const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, world);
-  await expect.poll(() => relay.replayed.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await moving(aBatch(relay));
   await openMenu(screen);
   await screen.getByRole("menuitemcheckbox", { name: SWITCH }).click();
   await expect.poll(() => relay.replayAnswers).toEqual([false]);
@@ -202,7 +230,7 @@ test("a no stops the recording and nothing more is sent", async () => {
 test("a no to sharing is a no to recording too: the switch goes, and nothing more is sent", async () => {
   const relay = relayOf(true, true);
   const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, world);
-  await expect.poll(() => relay.replayed.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await moving(aBatch(relay));
   await openMenu(screen);
   await screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" }).click();
   await expect
@@ -249,7 +277,7 @@ test("a deletion of recordings still owed is said in the menu, and to a screen r
 test("analytics yes, replay yes, analytics no, analytics yes: the switch is off, and nothing is recorded or sent", async () => {
   const relay = relayOf(true, true);
   const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, world);
-  await expect.poll(() => relay.replayed.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await moving(aBatch(relay));
   await openMenu(screen);
   const sharing = screen.getByRole("menuitemcheckbox", { name: "Share how I use the app" });
   await sharing.click();
@@ -285,7 +313,9 @@ test("a relay that records none of a batch stops the recording", async () => {
   const relay = relayOf(true, true);
   relay.refuses = true;
   await open("/t/acme/w/notes", serving(relay), undefined, world);
-  await expect.poll(() => relay.replayed.length, { timeout: 15_000 }).toBe(1);
+  // Moved until the batch is on its way, and no further: a second 50 events would be a second batch.
+  await moving(() => relay.asked.includes("POST /portalr/v1/analytics/session"));
+  await expect.poll(() => relay.replayed.length).toBe(1);
   await new Promise((resolve) => setTimeout(resolve, 6_000));
   expect(relay.replayed.length, "no second batch is sent").toBe(1);
 });
@@ -293,7 +323,7 @@ test("a relay that records none of a batch stops the recording", async () => {
 test("a withdrawal made in another tab is seen when this one is focused again, and the recording stops", async () => {
   const relay = relayOf(true, true);
   const { screen } = await open("/t/acme/w/notes", serving(relay), undefined, world);
-  await expect.poll(() => relay.replayed.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await moving(aBatch(relay));
   relay.replay = false;
   document.dispatchEvent(new Event("visibilitychange", { bubbles: true }));
   await openMenu(screen);
@@ -340,31 +370,25 @@ const sentFrom = (relay: Relay, from: number) =>
 test("the runs page, opened first, is recorded once it has read, though it suspended at the start", async () => {
   const relay = relayOf(true, true);
   await open("/t/acme/w/notes/runs", serving(relay), undefined, world);
-  await expect
-    .poll(() => sentFrom(relay, 0).includes('"data-portalr-replay":"allow"'), { timeout: 15_000 })
-    .toBe(true);
+  await moving(() => sentFrom(relay, 0).includes('"data-portalr-replay":"allow"'));
 });
 
 test("the runs page, reached from one that is blocked, is recorded too", async () => {
   const relay = relayOf(true, true);
   const { router } = await open("/t/acme/w/notes", serving(relay), undefined, world);
-  await expect.poll(() => relay.replayed.length, { timeout: 15_000 }).toBeGreaterThan(0);
+  await moving(aBatch(relay));
   expect(sentFrom(relay, 0)).not.toContain('"data-portalr-replay":"allow"');
   await router.navigate({
     to: "/t/$tenant/w/$workspace/runs",
     params: { tenant: "acme", workspace: "notes" },
   });
-  await expect
-    .poll(() => sentFrom(relay, 0).includes('"data-portalr-replay":"allow"'), { timeout: 15_000 })
-    .toBe(true);
+  await moving(() => sentFrom(relay, 0).includes('"data-portalr-replay":"allow"'));
 });
 
 test("leaving the runs page for a thread records nothing of the thread", async () => {
   const relay = relayOf(true, true);
   const { router } = await open("/t/acme/w/notes/runs", serving(relay), undefined, world);
-  await expect
-    .poll(() => sentFrom(relay, 0).includes('"data-portalr-replay":"allow"'), { timeout: 15_000 })
-    .toBe(true);
+  await moving(() => sentFrom(relay, 0).includes('"data-portalr-replay":"allow"'));
   const before = relay.replayed.length;
   await router.navigate({
     to: "/t/$tenant/w/$workspace/threads/$thread",

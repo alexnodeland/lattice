@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/alexnodeland/lattice/compare/portalr-v0.2.0...portalr-v0.2.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **portalr:** design pass follow-ups from [#779](https://github.com/alexnodeland/lattice/issues/779)'s review ([#1159](https://github.com/alexnodeland/lattice/issues/1159)) ([0837644](https://github.com/alexnodeland/lattice/commit/0837644ebef2817f15e3afd125ea3b29371ae78a)), closes [#780](https://github.com/alexnodeland/lattice/issues/780)
+* **portalr:** phone chat space follow-ups from [#1114](https://github.com/alexnodeland/lattice/issues/1114)'s review ([#1154](https://github.com/alexnodeland/lattice/issues/1154)) ([3e5ade7](https://github.com/alexnodeland/lattice/commit/3e5ade78616b8b705dee7d1381c5c351114561bc)), closes [#1132](https://github.com/alexnodeland/lattice/issues/1132)
+
 ## [0.2.0](https://github.com/alexnodeland/lattice/compare/portalr-v0.1.1...portalr-v0.2.0) (2026-10-29)
 
 

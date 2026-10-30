@@ -109,14 +109,52 @@ jobs:
             echo "stackr:aws-tier2 isn't affected"
           fi
 
+  # Whether the change reaches any project but the root, lattice, whose docs and own tests Check
+  # runs: by moon's answer, as scripts/affected.py reads it, dependents included. A pull request
+  # that changes only lattice's docs or root files no task of a package reads starts none of the
+  # heavy jobs below, each of which would otherwise take a runner, install the toolchain and find
+  # nothing to do (#785). A merge queue's batch is asked by its whole diff, so one code change in
+  # it starts them all.
+  affected:
+    name: Affected
+    needs: release-pr
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      packages: ${{ steps.affected.outputs.packages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - id: affected
+        shell: bash
+        run: |
+          # moon's answer first, on its own: if it fails, so does this, rather than skipping.
+          affected=$(uv run --no-project python scripts/affected.py --projects)
+          echo "affected: $affected"
+          # A list, or fail: a malformed answer isn't "nothing affected".
+          if jq --exit-status 'type == "array" and any(.[]; . != "lattice")' <<<"$affected" >/dev/null; then
+            echo "packages=true" >>"$GITHUB_OUTPUT"
+          elif ! jq --exit-status 'type == "array"' <<<"$affected" >/dev/null; then
+            exit 1
+          else
+            echo "No project but lattice is affected: the heavy jobs are skipped"
+          fi
+
   check:
     name: Check
     needs: release-pr
     if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
     runs-on: ubuntu-latest
-    # A change that reaches every package takes some 17 minutes, artifactr's and reflexr's tests
-    # the longest, on SQLite and PostgreSQL: 30 leaves room as they grow, and for a slow runner.
-    # in parallel.
+    # Every project's checks but the web packages', which Check (web) runs beside it, so a
+    # screenshot or a lint failure there doesn't hold these. A change that reaches every package
+    # takes some 17 minutes, artifactr's and reflexr's tests the longest, on SQLite and
+    # PostgreSQL: 30 leaves room as they grow, and for a slow runner.
     timeout-minutes: 30
     permissions:
       contents: read
@@ -149,11 +187,32 @@ jobs:
           PGPASSWORD: lattice
         run: psql -h localhost -U postgres -c 'CREATE DATABASE artifactr' -c 'CREATE DATABASE reflexr' -c 'CREATE DATABASE grantr' -c 'CREATE DATABASE relayr'
       - run: uv sync --locked --all-packages --all-groups --all-extras
+      # portalr's checks build the web packages into its wheel.
+      - run: bun install --frozen-lockfile
+      - run: uv run --no-project python scripts/affected.py check --except-language typescript
+
+  # The web packages' checks: Biome, TypeScript, Vitest (ui's in Chromium, with its screenshots),
+  # and the builds, apart from Check's, with no database.
+  check-web:
+    name: Check (web)
+    needs: release-pr
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # moon compares with main to find what a change affects
+          persist-credentials: false
+      - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - run: uv sync --locked --all-packages --all-groups --all-extras
       - run: bun install --frozen-lockfile
       # ui's tests run in Chromium, through Vitest's browser mode; ui holds Playwright.
       - run: bun x --bun --no-install playwright install --with-deps --only-shell chromium
         working-directory: packages/portalr/web/ui
-      - run: uv run --no-project python scripts/affected.py check
+      - run: uv run --no-project python scripts/affected.py check --language typescript
       # ui's screenshots as this run took them, beside any baseline they missed: a new or changed
       # look's baselines are these files, reviewed and committed (portalr ADR-0019).
       - name: Upload ui's screenshots
@@ -201,8 +260,8 @@ jobs:
   # docplan's and oncall's images, each built from the root and started on PostgreSQL.
   images:
     name: Images
-    needs: release-pr
-    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    needs: [release-pr, affected]
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' && needs.affected.outputs.packages == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -220,8 +279,8 @@ jobs:
   # include its spec in docs/<package>/spec/. Nightly runs them deeper.
   specs:
     name: Specs
-    needs: release-pr
-    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    needs: [release-pr, affected]
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' && needs.affected.outputs.packages == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -244,8 +303,8 @@ jobs:
   # and come off the list as each package's release raises its floors.
   floors:
     name: Floors (lowest direct)
-    needs: release-pr
-    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    needs: [release-pr, affected]
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' && needs.affected.outputs.packages == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -302,8 +361,8 @@ jobs:
   # Nothing is published: the release does that.
   thin-images:
     name: Thin images (${{ matrix.arch }})
-    needs: release-pr
-    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    needs: [release-pr, affected]
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' && needs.affected.outputs.packages == 'true' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     permissions:
@@ -330,8 +389,8 @@ jobs:
   # the pull request's merge commit, as the smoke test's does.
   files:
     name: Native files (${{ matrix.arch }})
-    needs: release-pr
-    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    needs: [release-pr, affected]
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' && needs.affected.outputs.packages == 'true' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     permissions:
@@ -356,8 +415,8 @@ jobs:
   # recordings are deleted and nothing else, it is bounded and idempotent, and it fails loudly.
   umami-retention:
     name: Umami retention
-    needs: release-pr
-    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    needs: [release-pr, affected]
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' && needs.affected.outputs.packages == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -375,8 +434,8 @@ jobs:
   # as release.yml builds them. They are kept a week.
   release-images:
     name: Release images (${{ matrix.arch }})
-    needs: release-pr
-    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    needs: [release-pr, affected]
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' && needs.affected.outputs.packages == 'true' }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     permissions:
@@ -471,8 +530,8 @@ jobs:
   # stops it. It runs when the library, its application or the tools change.
   acceptance:
     name: Acceptance
-    needs: release-pr
-    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    needs: [release-pr, affected]
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' && needs.affected.outputs.packages == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -512,8 +571,8 @@ jobs:
   # tests against a mocked AWS. Never AWS, and no Floci: tier 2 starts Floci.
   aws:
     name: AWS (tier 1)
-    needs: release-pr
-    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    needs: [release-pr, affected]
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' && needs.affected.outputs.packages == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -571,8 +630,8 @@ jobs:
   # matrix values aren't the task's inputs: moon counts a variable that is set as a change.
   template:
     name: Template (${{ matrix.libraries }}${{ matrix.evals && ', evals' || '' }}${{ matrix.access == 'none' && ', no access' || '' }}${{ matrix.bridge == 'false' && ', no bridge' || '' }}${{ matrix.portal == 'false' && ', no portal' || '' }}${{ matrix.ui == 'false' && ', no ui' || '' }}${{ matrix.files == 'false' && ', no native files' || '' }}${{ matrix.diagrams == 'false' && ', no diagrams' || '' }}${{ matrix.tracker && matrix.tracker != 'none' && format(', {0}', matrix.tracker) || '' }}, Python ${{ matrix.python }})
-    needs: release-pr
-    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    needs: [release-pr, affected]
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' && needs.affected.outputs.packages == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -659,8 +718,8 @@ jobs:
   # request's libraries, from its merge commit.
   smoke:
     name: Smoke (${{ matrix.name }})
-    needs: release-pr
-    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}
+    needs: [release-pr, affected]
+    if: ${{ !cancelled() && needs.release-pr.outputs.light != 'true' && needs.affected.outputs.packages == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -840,7 +899,7 @@ jobs:
   ci:
     name: CI
     if: always()
-    needs: [release-pr, check, tests, images, specs, floors, thin-images, files, umami-retention, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
+    needs: [release-pr, affected, check, check-web, tests, images, specs, floors, thin-images, files, umami-retention, gotrue, release-images, release-images-publish, acceptance, aws, aws-tier2-affected, aws-tier2, template, smoke, dependency-review, osv]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}
@@ -849,9 +908,12 @@ jobs:
         with:
           # Each runs only when its inputs changed, or, the last two, not on a merge queue's batch;
           # Release pull request only on release-please's, and on those whose diff it found to be
-          # a release's, every job it skips.
+          # a release's, every job it skips; and Affected, when no project but lattice is
+          # affected, the heavy jobs it gates.
           allowed-skips: >-
             ${{ needs.release-pr.outputs.light == 'true'
-            && 'aws-tier2-affected, check, tests, images, specs, floors, gotrue, thin-images, files, umami-retention, release-images, release-images-publish, acceptance, aws, aws-tier2, template, smoke'
+            && 'aws-tier2-affected, affected, check, check-web, tests, images, specs, floors, gotrue, thin-images, files, umami-retention, release-images, release-images-publish, acceptance, aws, aws-tier2, template, smoke'
+            || needs.affected.outputs.packages != 'true'
+            && 'release-pr, release-images-publish, aws-tier2, dependency-review, osv, images, specs, floors, thin-images, files, umami-retention, release-images, acceptance, aws, template, smoke'
             || 'release-pr, release-images-publish, aws-tier2, dependency-review, osv' }}
           jobs: ${{ toJSON(needs) }}

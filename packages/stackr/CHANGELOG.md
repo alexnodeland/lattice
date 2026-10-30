@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1](https://github.com/alexnodeland/lattice/compare/stackr-v0.2.0...stackr-v0.2.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **stackr:** tier 2 checks the listener's rules before its smoke ([#1155](https://github.com/alexnodeland/lattice/issues/1155)) ([c70cc6a](https://github.com/alexnodeland/lattice/commit/c70cc6ae7682127ce0404f19fc4a862d6ffc77ff)), closes [#810](https://github.com/alexnodeland/lattice/issues/810)
+
 ## [0.2.0](https://github.com/alexnodeland/lattice/compare/stackr-v0.1.0...stackr-v0.2.0) (2026-10-29)
 
 

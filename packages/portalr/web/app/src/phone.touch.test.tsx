@@ -97,7 +97,7 @@ test("a window with room shows the question whole, its Answer in view, and the b
   const answer = screen.getByRole("button", { name: "Answer" }).element().getBoundingClientRect();
   expect(answer.bottom).toBeLessThanOrEqual(dock().getBoundingClientRect().bottom);
   expect(answer.height).toBeGreaterThanOrEqual(44);
-  await new Promise((settled) => setTimeout(settled, 300));
+  await quiet();
   expect(bar()).toBeNull();
 });
 
@@ -168,9 +168,19 @@ for (const [what, review] of [
     );
     await expect.element(screen.getByRole("button", { name: "Approve" })).toBeInTheDocument();
     window.scrollTo(0, 0);
-    await new Promise((settled) => setTimeout(settled, 300));
+    await quiet();
     expect(bar()).toBeNull();
   });
+}
+
+/**
+ * Once the page has settled and the bar has read it: the dock's height steady, then two frames,
+ * the one the bar reads in and the one its answer is drawn in. What the bar does then, it does.
+ */
+async function quiet() {
+  await settled();
+  await new Promise(requestAnimationFrame);
+  await new Promise(requestAnimationFrame);
 }
 
 /**
@@ -296,7 +306,8 @@ for (const width of [320, 390, 768]) {
     const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
     await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
     // On a phone the calls are a sheet, a call's detail a tap further.
-    await screen.getByRole("button", { name: /: 2 tool calls$/ }).click();
+    // Where the line says less than all of it (320px), its name goes on to all of it, then the count.
+    await screen.getByRole("button", { name: /[:,] 2 tool calls$/ }).click();
     const step = screen.getByRole("dialog").getByRole("button", { name: /^Looked through/ });
     await expect.element(step).toBeVisible();
     await step.click();
@@ -414,8 +425,9 @@ test("a question and a proposal waiting are one line over the composer, counted,
     .element(screen.getByRole("region", { name: "Proposal: Add a closing line" }))
     .toBeInTheDocument();
   expect(dock().contains(document.getElementById("request-q1"))).toBe(true);
+  // Its share of the window, or nine rem where that is less (a window under about 360px).
   expect(trayBody().getBoundingClientRect().height).toBeLessThanOrEqual(
-    window.innerHeight * 0.4 + 1,
+    Math.max(window.innerHeight * 0.4, 144) + 1,
   );
   noneWider();
 });
@@ -523,10 +535,12 @@ test("with the keyboard up in a short window, the tray keeps its few lines, and 
   expect(body.getBoundingClientRect().height).toBeGreaterThanOrEqual(143);
   // ...and it scrolls to the last control, which is then in its view and above the keyboard.
   body.scrollTo(0, body.scrollHeight);
-  await new Promise((settled) => setTimeout(settled, 100));
+  const answerIn = () => {
+    const answer = screen.getByRole("button", { name: "Answer" }).element().getBoundingClientRect();
+    const box = body.getBoundingClientRect();
+    return answer.top >= box.top && answer.bottom <= box.bottom;
+  };
+  await expect.poll(answerIn).toBe(true);
   const answer = screen.getByRole("button", { name: "Answer" }).element().getBoundingClientRect();
-  const box = body.getBoundingClientRect();
-  expect(answer.top).toBeGreaterThanOrEqual(box.top);
-  expect(answer.bottom).toBeLessThanOrEqual(box.bottom);
   expect(answer.bottom).toBeLessThanOrEqual(window.innerHeight - 300);
 });

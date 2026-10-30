@@ -1688,9 +1688,10 @@ test("the strip is one line: its state, what it does, its clock and Stop, and th
   await expect.element(stop).toBeVisible();
   await expect.element(group.getByText("Preparing a create_artifact call")).toBeVisible();
   const row = group.element().firstElementChild as HTMLElement;
-  const clock = group.getByText(/^for/).element().parentElement as HTMLElement;
+  // The box that holds "for" (said, not shown) and the time.
+  const clock = group.getByText(/^for /, { exact: true }).element().parentElement as HTMLElement;
   const before = Math.round(clock.getBoundingClientRect().right);
-  expect(getComputedStyle(clock).fontVariantNumeric).toBe("tabular-nums");
+  expect(getComputedStyle(clock).fontVariantNumeric).toBe("normal");
   // A minute's carry, from 9:59 to 10:00, moves nothing.
   const started = new Date(Date.parse("2026-10-20T00:00:00Z"));
   await screen.rerender(
@@ -1701,6 +1702,10 @@ test("the strip is one line: its state, what it does, its clock and Stop, and th
     />,
   );
   await expect.element(group.getByText(/9:59/)).toBeVisible();
+  // Its digits tabular and its colon not, so it reads "9:59", not "9 : 59" (as `Num` sets them).
+  const digits = [...clock.querySelectorAll(".tabular-nums")];
+  expect(digits.map((each) => each.textContent)).toEqual(["9", "59"]);
+  expect(getComputedStyle(digits[0] as Element).fontVariantNumeric).toBe("tabular-nums");
   const nine = Math.round(group.getByText(/9:59/).element().getBoundingClientRect().right);
   await screen.rerender(
     <RunStrip

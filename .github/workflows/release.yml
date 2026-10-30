@@ -15,18 +15,21 @@
 # (a release created on a later push than the one that merged its pull request) the plan refuses
 # before anything is built, and says how to run the workflow again on the tag (#206).
 #
-# PyPI (ADR-0023): a release run never publishes. It attests and attaches the wheels, and lists, in
-# its summary, the dispatches that publish them: one `gh workflow run release.yml --ref <tag>
-# -f tag=<tag> -f mode=publish` for each package, in dependency order. Each dispatch publishes
-# that package through trusted publishing, in a job gated by the package's own environment,
-# `pypi-<distribution>`, whose required reviewers are the approval (so: one approval a package,
-# one at a time), and only where the repository variable PYPI_PUBLISH is `true`. A dispatch fails
-# unless PyPI serves the packages of this repository that the package requires. The workflow can
+# PyPI (ADR-0023, ADR-0031): a release run never publishes. It attests and attaches the wheels,
+# and lists, in its summary, the one dispatch that publishes them: `gh workflow run release.yml
+# --ref <first tag> -f tag="<tag> <tag> ..." -f mode=publish`, naming every tag the release made,
+# all at its commit, in dependency order. That dispatch waits once, at the `pypi-approval`
+# environment, whose required reviewers are the approval; then it publishes each package through
+# trusted publishing, one at a time in dependency order, in a job in the package's own
+# environment, `pypi-<distribution>`, which PyPI's trusted publisher names and which has no
+# reviewers of its own; and only where the repository variable PYPI_PUBLISH is `true`. A tag can
+# still be dispatched alone. Each leg fails unless PyPI serves the packages of this repository
+# that its package requires. The workflow can
 # also be run by hand and by default it WRITES NOTHING: mode `rehearse` builds and checks, on a
 # branch (every wheel at its head) or on a tag (that release, again): it attaches nothing to a
 # release, attests nothing, pushes no image, rewrites no release notes and publishes nothing (the
 # run keeps the built files as artifacts). Mode `publish`, on a tag, attaches, attests and pushes
-# as a release run does, for that tag alone, and publishes it.
+# as a release run does, for the tags it names, and publishes them.
 #
 # release-please acts as lattice's GitHub App, with a token minted for each run and narrowed to
 # what it needs, so that its pull request's CI and Title checks run, which they never do for the
@@ -41,7 +44,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "A release to build again, such as portalr-v0.1.0: run on that tag. Empty to rehearse at the branch's head."
+        description: "Releases to build again, such as portalr-v0.1.0, or several tags of one release separated by spaces: run on the first. Empty to rehearse at the branch's head."
         required: false
         default: ""
       mode:
@@ -120,6 +123,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # The commit each tag the dispatch names is at, for the plan to hold them to this run's.
+      # release-please's tags are lightweight; an annotated one's `^{}` line is its commit.
       - id: plan
         env:
           EVENT: ${{ github.event_name }}
@@ -131,7 +136,15 @@ jobs:
           PATHS_RELEASED: ${{ needs.release-please.outputs.released }}
           RELEASES: ${{ needs.release-please.outputs.releases }}
           PYPI_PUBLISH: ${{ vars.PYPI_PUBLISH }}
-        run: python3 scripts/release_plan.py
+        run: |
+          read -ra tags <<<"$INPUT_TAG"
+          TAGGED='{}'
+          for tag in "${tags[@]}"; do
+            sha=$(git ls-remote origin "refs/tags/$tag" "refs/tags/$tag^{}" | sort -k2 | tail -n1 | cut -f1)
+            TAGGED=$(jq --compact-output --arg tag "$tag" --arg sha "$sha" '. + {($tag): $sha}' <<<"$TAGGED")
+          done
+          export TAGGED
+          python3 scripts/release_plan.py
 
   # Builds and checks each wheel, and writes nothing: its permissions are read-only, so a
   # rehearsal, which never reaches the jobs below that write, cannot write whatever else changes.
@@ -255,12 +268,30 @@ jobs:
           ORDERED: ${{ needs.plan.outputs.ordered }}
         run: |
           if [[ $PUBLISH == true ]]; then
-            echo "This run publishes these, one at a time, each after the ones before it:"
+            echo "This run publishes these, after one approval, one at a time, each after the ones before it:"
           else
             echo "This run publishes nothing. A release run with PYPI_PUBLISH set would, in this order:"
           fi
           jq --raw-output 'to_entries[] | "  \(.key + 1). \(.value.name) \(.value.version) (stage \(.value.stage))"' <<<"$ORDERED"
           python3 scripts/pypi.py report dist
+
+  # The one approval (ADR-0031): the `pypi-approval` environment's required reviewers approve this
+  # job, once for every package the run publishes. It does nothing else and holds no permission.
+  # The environment allows deployments from `*-v*` tags only, as each package's does.
+  pypi-approve:
+    name: PyPI, approved
+    needs: [plan, pypi-check]
+    if: ${{ !cancelled() && needs.pypi-check.result == 'success' && needs.plan.outputs.publish == 'true' && needs.plan.outputs.ordered != '[]' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    environment: pypi-approval
+    permissions: {}
+    steps:
+      - name: Approved
+        env:
+          ORDERED: ${{ needs.plan.outputs.ordered }}
+        run: |
+          jq --raw-output '"Approved: " + ([.[] | "\(.name) \(.version)"] | join(", "))' <<<"$ORDERED"
 
   # Publishes the wheels, one package at a time, in the order their requirements need: a matrix
   # that runs one leg at once, in plan order, and stops at the first failure (fail-fast), so a
@@ -268,13 +299,13 @@ jobs:
   # every package before it in this release, before it publishes its own. Each leg runs in its
   # package's own environment, `pypi-<distribution>`, since PyPI lets one pending publisher's
   # configuration (owner, repository, workflow, environment) stand for one project only, and the
-  # environment is the field that differs; its required reviewers approve the leg. Each should
-  # allow deployments from tags only (`*-v*`), and only maintainers may create such tags: see
-  # ADR-0023.
+  # environment is the field that differs. It has no required reviewers: the approval is
+  # pypi-approve's, once for the run (ADR-0031). Each allows deployments from tags only (`*-v*`),
+  # and only maintainers may create such tags: see ADR-0023.
   pypi-publish:
     name: PyPI, ${{ matrix.package.name }}
-    needs: [plan, pypi-check]
-    if: ${{ !cancelled() && needs.pypi-check.result == 'success' && needs.plan.outputs.publish == 'true' && needs.plan.outputs.ordered != '[]' }}
+    needs: [plan, pypi-check, pypi-approve]
+    if: ${{ !cancelled() && needs.pypi-approve.result == 'success' && needs.plan.outputs.publish == 'true' && needs.plan.outputs.ordered != '[]' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     environment: pypi-${{ matrix.package.name }}

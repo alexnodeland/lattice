@@ -1,6 +1,6 @@
 # ADR-0023: Publishing to PyPI from the release workflow
 
-**Status:** Accepted, amended 2026-10-16, four times on 2026-10-17, 2026-10-29 and 2026-10-30 (see the amendments), and by [ADR-0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md)
+**Status:** Accepted, amended 2026-10-16, four times on 2026-10-17, 2026-10-29 and 2026-10-30 (see the amendments), and by [ADR-0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md); its approval rule (one approval a package, one package a dispatch) superseded by [ADR-0031](0031-one-approval-publishes-every-package-a-release-made.md)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 

@@ -53,11 +53,9 @@ REMAINING = (
     ("ui/src/dashboard-view.tsx", "grid-cols-[repeat(auto-fit,minmax(9rem,1fr))]"),
     ("ui/src/file-preview.tsx", "h-[min(70dvh,32rem)]"),
     ("ui/src/log-list.tsx", "lg:grid-cols-[minmax(0,1fr)_22rem]"),
-    ("ui/src/log-list.tsx", "max-h-[30rem]"),
     ("ui/src/file-pages.tsx", "grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))]"),
     ("ui/src/select-field.tsx", "max-h-[min(18rem,var(--available-height))]"),
     ("ui/src/trace-view.tsx", "lg:grid-cols-[minmax(0,1fr)_22rem]"),
-    ("ui/src/trace-view.tsx", "max-h-[28rem]"),
     ("ui/src/trace-view.tsx", "grid-cols-[minmax(0,1fr)_4.5rem]"),
     ("ui/src/trace-view.tsx", "xl:grid-cols-[minmax(11rem,2fr)_minmax(8rem,3fr)_4.5rem]"),
     (

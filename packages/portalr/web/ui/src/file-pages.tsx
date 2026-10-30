@@ -87,11 +87,11 @@ export type PageShown =
 function Page({ shown, name }: { shown: PageShown; name: string }) {
   return (
     <figure className="flex flex-col gap-1">
-      <div className="flex aspect-[1/1.414] items-center justify-center overflow-hidden rounded-sm border border-line bg-surface forced-colors:border-system-text">
+      <div className="flex aspect-[1/1.414] items-center justify-center overflow-hidden rounded-(--radius-2) border border-line bg-surface forced-colors:border-system-text">
         {"src" in shown ? (
           <img src={shown.src} alt={name} className="size-full bg-white object-contain" />
         ) : shown.state === "reading" ? (
-          <Skeleton className="size-full rounded-none" />
+          <Skeleton className="size-full rounded-(--radius-0)" />
         ) : (
           <div className="flex flex-col items-center gap-1 p-2 text-center text-muted text-xs">
             <p>{shown.said ?? "This page couldn't be shown."}</p>
@@ -164,7 +164,7 @@ export interface PagePair {
 /** One side of a page's pair: the page, or where it has none, a box that says so. */
 function Side({ side, page, shown }: { side: string; page: number; shown: PageShown | null }) {
   return shown === null ? (
-    <p className="flex aspect-[1/1.414] items-center justify-center rounded-sm border border-line border-dashed p-2 text-center text-muted text-xs forced-colors:border-system-text">
+    <p className="flex aspect-[1/1.414] items-center justify-center rounded-(--radius-2) border border-line border-dashed p-2 text-center text-muted text-xs forced-colors:border-system-text">
       No page {page} here
     </p>
   ) : (

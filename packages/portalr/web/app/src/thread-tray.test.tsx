@@ -28,8 +28,8 @@ test("a question and a proposal waiting are one line over the composer, opened b
   await screen.getByRole("button", { name: "Go to the question" }).click();
   await expect.element(line).toHaveAttribute("aria-expanded", "true");
   await expect.element(screen.getByText("Which week should the note cover?").last()).toBeVisible();
-  await expect.poll(() => document.activeElement?.closest("#request-q1") !== null).toBe(true);
-  expect(document.activeElement?.closest("[data-tray]")).not.toBeNull();
+  await expect.poll(() => Boolean(document.activeElement?.closest("#request-q1"))).toBe(true);
+  expect(Boolean(document.activeElement?.closest("[data-tray]"))).toBe(true);
 });
 
 test("a link to a request, as Needs you gives, opens the tray at it", async () => {
@@ -38,7 +38,7 @@ test("a link to a request, as Needs you gives, opens the tray at it", async () =
   });
   const line = screen.getByRole("button", { name: /2 waiting for you/ });
   await expect.element(line).toHaveAttribute("aria-expanded", "true");
-  await expect.poll(() => document.activeElement?.closest("#request-q1") !== null).toBe(true);
+  await expect.poll(() => Boolean(document.activeElement?.closest("#request-q1"))).toBe(true);
 });
 
 test("a proposal waiting is announced, politely, where it sits", async () => {

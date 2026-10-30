@@ -62,6 +62,8 @@ export function ThumbBar({ target }: { target: string }) {
     read();
     const heard = new MutationObserver(soon);
     heard.observe(card, { subtree: true, childList: true, characterData: true, attributes: true });
+    // The root's style also changes as the tray shows or hides (its `hidden`): the dock's
+    // ResizeObserver writes `--composer-clearance` there, and that is what reads the bar again.
     const keyboarded = new MutationObserver(soon);
     keyboarded.observe(root, { attributes: true, attributeFilter: ["style"] });
     // Scrolls anywhere, as the card may sit in a box that scrolls on its own.

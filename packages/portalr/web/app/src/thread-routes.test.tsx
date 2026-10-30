@@ -296,10 +296,10 @@ test("a question waiting when the thread is opened leaves the focus be, and is r
   expect(document.activeElement?.getAttribute("role")).not.toBe("radio");
   await screen.getByRole("button", { name: "Go to the question" }).click();
   // To the question's own named part, inside the request.
-  expect(document.activeElement?.closest("#request-q1")).not.toBeNull();
+  expect(Boolean(document.activeElement?.closest("#request-q1"))).toBe(true);
   expect(document.activeElement?.getAttribute("aria-label")).toBe("The agent asks");
   await userEvent.tab();
-  expect(document.activeElement?.closest("#request-q1")).not.toBeNull();
+  expect(Boolean(document.activeElement?.closest("#request-q1"))).toBe(true);
 });
 
 test("opened at a request, as from Needs you, the page goes to it once the thread is shown", async () => {
@@ -311,7 +311,7 @@ test("opened at a request, as from Needs you, the page goes to it once the threa
     artifactrLog: waiting,
   });
   await expect.element(screen.getByRole("radio", { name: "This week" })).toBeVisible();
-  await expect.poll(() => document.activeElement?.closest("#request-q1")).not.toBeNull();
+  await expect.poll(() => Boolean(document.activeElement?.closest("#request-q1"))).toBe(true);
   expect(document.activeElement?.getAttribute("aria-label")).toBe("The agent asks");
 });
 

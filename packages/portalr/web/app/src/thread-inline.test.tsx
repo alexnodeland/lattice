@@ -256,7 +256,7 @@ test("a diagram opens on its canvas from its full view, and each gives the focus
   await expect.element(canvas.getByRole("button", { name: "Close canvas" })).toBeVisible();
   await expect.poll(() => document.querySelector(".excalidraw canvas")).not.toBeNull();
   const inCanvas = () =>
-    document.activeElement?.closest(".excalidraw, [data-base-ui-portal]") !== null &&
+    Boolean(document.activeElement?.closest(".excalidraw, [data-base-ui-portal]")) &&
     document.activeElement !== document.body;
   // Tab stays in the canvas, the full view's own trap leaving it be.
   for (let step = 0; step < 12; step += 1) {

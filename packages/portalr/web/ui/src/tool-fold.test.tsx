@@ -116,7 +116,7 @@ test("a group is one quiet line, closed, named by what it did and its count", as
   expect(await axeViolations(screen.container)).toEqual([]);
 });
 
-test("a long line says the longest way it has that fits, whole, with the whole in its name", async () => {
+test("a long line says the longest way it has that fits, whole, and its name says that, then the whole", async () => {
   const many = ["create_app", "read_artifact", "draw", "fetch", "send_message", "post_notice"];
   const screen = await render(
     <div className="w-60">
@@ -129,11 +129,16 @@ test("a long line says the longest way it has that fits, whole, with the whole i
   await expect.poll(() => words.textContent).toBe("Made an app and 5 more");
   expect(words.scrollWidth).toBeLessThanOrEqual(words.clientWidth);
   await expect
-    .element(screen.getByRole("button", { name: /posted a notice: 6 tool calls$/ }))
+    .element(
+      // The words seen start the name (WCAG 2.5.3), so a voice user can say them.
+      screen.getByRole("button", {
+        name: /^Made an app and 5 more: Made an app, .+posted a notice, 6 tool calls$/,
+      }),
+    )
     .toBeVisible();
 });
 
-test("where not even its shortest way fits, a line is cut by an ellipsis, with the whole in its name", async () => {
+test("where not even its shortest way fits, a line is cut by an ellipsis, and its name says that, then the whole", async () => {
   const screen = await render(
     <div className="w-24">
       <ul>
@@ -147,7 +152,9 @@ test("where not even its shortest way fits, a line is cut by an ellipsis, with t
   expect(getComputedStyle(words).textOverflow).toBe("ellipsis");
   await expect
     .element(
-      screen.getByRole("button", { name: "Commented on an item, drew a diagram: 2 tool calls" }),
+      screen.getByRole("button", {
+        name: "Commented on an item and 1 more: Commented on an item, drew a diagram, 2 tool calls",
+      }),
     )
     .toBeVisible();
 });
@@ -164,6 +171,25 @@ test("the line says its longest way again as its box grows", async () => {
   await expect.poll(() => words.textContent).toBe("Made an app and 1 more");
   (screen.container.querySelector("#box") as HTMLElement).style.width = "30rem";
   await expect.poll(() => words.textContent).toBe("Made an app, read an artifact");
+  await expect
+    .element(screen.getByRole("button", { name: "Made an app, read an artifact: 2 tool calls" }))
+    .toBeVisible();
+});
+
+test("the line is fitted again as a face loads, which may change its words' width", async () => {
+  const screen = await render(
+    <div className="w-40">
+      <ul>
+        <RunSteps tools={calls(tool("create_app"), tool("read_artifact"))} />
+      </ul>
+    </div>,
+  );
+  const words = screen.container.querySelector("button span.truncate") as HTMLElement;
+  await expect.poll(() => words.textContent).toBe("Made an app and 1 more");
+  // As a fit made before the face arrived would have left it.
+  words.textContent = "Made an app, read an artifact";
+  document.fonts.dispatchEvent(new Event("loadingdone"));
+  expect(words.textContent).toBe("Made an app and 1 more");
 });
 
 test("Enter and Space unfurl the calls beneath, the focus staying on the line", async () => {

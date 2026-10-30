@@ -34,7 +34,7 @@ async function matches(name: string) {
 test("a thread: sides, questions, tool calls with one open, and thinking, wide", async () => {
   const screen = await shown(900, <Thread />);
   // The quiet line opened, a failed call among its calls.
-  await screen.getByRole("button", { name: /· 1 failed: 2 tool calls$/ }).click();
+  await screen.getByRole("button", { name: /· 1 failed: (.+, )?2 tool calls$/ }).click();
   await matches("chat-wide");
 });
 

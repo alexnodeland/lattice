@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { afterEach, expect, test } from "vitest";
+import { afterEach, expect, onTestFinished, test } from "vitest";
 import { userEvent } from "vitest/browser";
 import { render } from "vitest-browser-react";
 import { axeViolations } from "./test/axe";
@@ -122,6 +122,45 @@ test("a hash the page opens at, and a link to it shut again, open the tray and b
   await screen.getByRole("link", { name: "Review" }).click();
   await expect.element(line).toHaveAttribute("aria-expanded", "true");
   await expect.poll(() => document.activeElement?.id).toBe("proposal-p");
+});
+
+test("a router's link to this page with a hash opens the tray at it; one to another page does not", async () => {
+  // Neither navigates, so the test's page stays: the tray hears the click, not a hash change.
+  const stay = (event: MouseEvent) => event.preventDefault();
+  document.addEventListener("click", stay);
+  onTestFinished(() => document.removeEventListener("click", stay));
+  const screen = await render(
+    <>
+      <a href={`${location.pathname}#proposal-p`}>Review here</a>
+      <a href="/elsewhere#proposal-p">Review there</a>
+      <Tray waiting={SOME} />
+    </>,
+  );
+  const line = screen.getByRole("button", { name: /2 waiting/ });
+  await expect.element(line).toHaveAttribute("aria-expanded", "false");
+  await screen.getByRole("link", { name: "Review there" }).click();
+  await expect.element(line).toHaveAttribute("aria-expanded", "false");
+  await screen.getByRole("link", { name: "Review here" }).click();
+  await expect.element(line).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(() => document.activeElement?.id).toBe("proposal-p");
+});
+
+test("the hash the page opened at is read once: when something waits again, it takes no focus", async () => {
+  location.hash = "#proposal-p";
+  const screen = await render(<Tray waiting={[]} />);
+  // It is reached once there is something to reach, as the thread loads.
+  await screen.rerender(<Tray waiting={SOME} />);
+  const line = screen.getByRole("button", { name: /2 waiting/ });
+  await expect.element(line).toHaveAttribute("aria-expanded", "true");
+  await expect.poll(() => document.activeElement?.id).toBe("proposal-p");
+  // All answered, and two more come: closed, as several are at first, and the hash takes nothing.
+  await screen.rerender(<Tray waiting={[]} />);
+  (document.activeElement as HTMLElement | null)?.blur();
+  await screen.rerender(<Tray waiting={SOME} />);
+  await expect
+    .element(screen.getByRole("button", { name: /2 waiting/ }))
+    .toHaveAttribute("aria-expanded", "false");
+  expect(document.activeElement).toBe(document.body);
 });
 
 test("reaching a request, as Go to the question does, opens the tray and focuses its card's first named part", async () => {

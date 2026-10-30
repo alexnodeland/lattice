@@ -373,9 +373,13 @@ export function RunSteps({
   const { labels, failed, running } = foldSummary(calls, runRunning);
   const full = labels[0] ?? "";
   const words = useShimmer(running);
-  // The line says the longest of its ways that fits, measured, where it is set, and again as the
-  // line's own box, whose width its words don't change, as the button's they do, changes (the
-  // sheet's title and the button's name keep all of it).
+  const marker = failed > 0 ? ` · ${failed} failed` : "";
+  const count = `${tools.length} tool call${tools.length === 1 ? "" : "s"}`;
+  // The line says the longest of its ways that fits, measured, where it is set, again as the
+  // line's own box, whose width its words don't change, as the button's they do, changes, and again
+  // as a face loads, which may make the words wider or narrower. The button's name starts with
+  // what the line says, so the name a voice user speaks is the one they see, and goes on to all of
+  // it (as the sheet's title does).
   const ways = labels.join("\n");
   useLayoutEffect(() => {
     const box = words.current;
@@ -384,28 +388,36 @@ export function RunSteps({
       return;
     }
     const fit = () => {
-      for (const said of ways.split("\n")) {
+      const all = ways.split("\n");
+      for (const said of all) {
         box.textContent = said;
         if (box.scrollWidth <= box.clientWidth) {
           break;
         }
       }
+      const said = box.textContent;
+      button.current?.setAttribute(
+        "aria-label",
+        said === all[0] ? `${said}${marker}: ${count}` : `${said}${marker}: ${all[0]}, ${count}`,
+      );
     };
     fit();
     const resized = new ResizeObserver(fit);
     resized.observe(line);
-    return () => resized.disconnect();
-  }, [ways, failed]);
+    document.fonts.addEventListener("loadingdone", fit);
+    return () => {
+      resized.disconnect();
+      document.fonts.removeEventListener("loadingdone", fit);
+    };
+  }, [ways, marker, count]);
   // Said once, as a group that was running ends: never as each call does.
   const [ran, setRan] = useState(running);
-  const marker = failed > 0 ? ` · ${failed} failed` : "";
   // What is said as the run ends, kept as it was then: a later change to the line says nothing.
   const [said, setSaid] = useState("");
   if (ran !== running) {
     setRan(running);
     setSaid(running ? "" : `${full}${marker}`);
   }
-  const count = `${tools.length} tool call${tools.length === 1 ? "" : "s"}`;
   return (
     // On a phone its target, 44px, overlaps what is above and below it, as its words are not that tall.
     <li className="flex flex-col phone:-my-1.5">
@@ -416,7 +428,6 @@ export function RunSteps({
         {...((shown ?? (phone ? "sheet" : "list")) === "sheet"
           ? { "aria-haspopup": "dialog" as const }
           : { "aria-controls": panel })}
-        aria-label={`${full}${marker}: ${count}`}
         onClick={() => show(open ? null : phoneNow() ? "sheet" : "list")}
         className={cn(
           "flex min-h-(--disclosure-target) max-w-full cursor-pointer items-center gap-1.5 self-start rounded-(--disclosure-radius) text-muted text-xs hover:text-fg phone:min-h-11",

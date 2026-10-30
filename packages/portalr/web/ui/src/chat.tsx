@@ -1272,10 +1272,16 @@ export function RunStrip({
           </span>
         )}
         {active && since !== null && (
-          // Its width kept as the digits tick, and a minute's carry, from 9:59 to 10:00.
-          <span className={`${TYPE.note} ms-auto min-w-9 shrink-0 text-end tabular-nums`}>
+          // Its width kept as the digits tick, and a minute's carry, from 9:59 to 10:00; the digits
+          // tabular, the colon its own width (as `Num` sets them), so it reads "2:52", not "2 : 52".
+          <span className={`${TYPE.note} ms-auto min-w-9 shrink-0 text-end`}>
             {run.status === "paused" ? "waiting " : <span className="sr-only">for </span>}
-            {since}
+            {since.split(":").map((part, at) => (
+              <span key={at}>
+                {at > 0 && ":"}
+                <span className="tabular-nums">{part}</span>
+              </span>
+            ))}
           </span>
         )}
         {run.status === "paused" && onQuestion && (

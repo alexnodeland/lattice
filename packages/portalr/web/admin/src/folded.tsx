@@ -17,6 +17,7 @@ import {
   useContext,
   useEffect,
   useId,
+  useLayoutEffect,
   useRef,
   useState,
 } from "react";
@@ -24,6 +25,9 @@ import { createPortal } from "react-dom";
 
 /** Where a toolbar's open forms go: the row beneath its buttons. */
 const Beneath = createContext<HTMLDivElement | null>(null);
+
+/** Each action's place in the row beneath, by the button it belongs to. */
+const places = new WeakMap<Element, HTMLButtonElement>();
 
 /**
  * The row above a table that holds its actions, and beneath it the forms they open. The row
@@ -33,12 +37,13 @@ const Beneath = createContext<HTMLDivElement | null>(null);
 export function Toolbar({ children }: { children: ReactNode }) {
   const [beneath] = useState(() => {
     const row = document.createElement("div");
-    row.className = "flex flex-col gap-3 empty:hidden";
+    // Each action keeps a place of its own here, in its button's order; hidden while none is open.
+    row.className = "flex flex-col gap-3 [&:not(:has(>*>*))]:hidden";
     return row;
   });
   return (
     <Beneath value={beneath}>
-      <div className="flex flex-col gap-3 empty:hidden">
+      <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-end gap-2 empty:hidden">{children}</div>
         <div
           // Attached once: moving it again would drop the focus from a field inside it.
@@ -89,6 +94,27 @@ export function Folded({
   const id = useId();
   const beneath = useContext(Beneath);
   const trigger = useRef<HTMLButtonElement>(null);
+  // Its place in the row beneath, put among the others in the order of their buttons, so the open
+  // forms read in the order they are seen, whichever was opened first. It is placed once, empty:
+  // a form that is open is never moved, which would drop the focus from a field inside it.
+  const [place] = useState(() => {
+    const held = document.createElement("div");
+    held.className = "contents";
+    return held;
+  });
+  useLayoutEffect(() => {
+    const button = trigger.current;
+    if (!(beneath && button)) {
+      return;
+    }
+    places.set(place, button);
+    const after = [...beneath.children].find((other) => {
+      const theirs = places.get(other);
+      return theirs && button.compareDocumentPosition(theirs) & Node.DOCUMENT_POSITION_FOLLOWING;
+    });
+    beneath.insertBefore(place, after ?? null);
+    return () => place.remove();
+  }, [beneath, place]);
   const [opened, setOpened] = useState(defaultOpen);
   const shown = open ?? opened;
   const show = (next: boolean) => {
@@ -111,19 +137,55 @@ export function Folded({
   };
   // In the card; in the sheet, the dialog itself focuses its first field, and remembers the
   // button to come back to.
+  // A form with no field, only buttons, focuses its heading: a button first would be pressed by
+  // the Enter or Space that opened it.
   useEffect(() => {
     if (shown && byButton && !heading) {
-      body.querySelector<HTMLElement>("input, select, textarea, [role=combobox], button")?.focus();
+      const field = body.querySelector<HTMLElement>("input, select, textarea, [role=combobox]");
+      const title = document.getElementById(`${id}-title`);
+      if (field) {
+        field.focus();
+      } else if (title) {
+        title.tabIndex = -1;
+        title.focus();
+      }
     }
-  }, [shown, byButton, heading, body]);
+  }, [shown, byButton, heading, body, id]);
+  const close = () => {
+    show(false);
+    trigger.current?.focus();
+  };
+  // Only a key from inside the card: one from a popup or a dialog of its own, portalled
+  // elsewhere but bubbling here through React's tree, is theirs to close.
   const closeOnEscape = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Escape" && !event.defaultPrevented) {
+    if (
+      event.key === "Escape" &&
+      !event.defaultPrevented &&
+      event.currentTarget.contains(event.target as Node)
+    ) {
       event.preventDefault();
-      show(false);
-      trigger.current?.focus();
+      close();
     }
   };
   const asSheet = usePhone() && kind === "form";
+  // The form's own keys, heard where its element is: in React's tree the form is beside the card,
+  // not in it, so the card's handler never hears them. A popup of the form's, put elsewhere, is
+  // not in it either way.
+  const closed = useRef(close);
+  closed.current = close;
+  useEffect(() => {
+    if (!shown || asSheet) {
+      return;
+    }
+    const heard = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape" && !event.defaultPrevented) {
+        event.preventDefault();
+        closed.current();
+      }
+    };
+    body.addEventListener("keydown", heard);
+    return () => body.removeEventListener("keydown", heard);
+  }, [shown, asSheet, body]);
   const panel = shown && (
     <>
       {asSheet ? (
@@ -167,7 +229,7 @@ export function Folded({
       >
         {action}
       </Button>
-      {beneath ? createPortal(panel, beneath) : panel}
+      {beneath ? createPortal(panel, place) : panel}
     </>
   );
 }

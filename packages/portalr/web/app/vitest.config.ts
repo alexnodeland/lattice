@@ -8,6 +8,9 @@ import { excalidraw } from "./excalidraw";
 // thread's menu, run in Chromium. The bdd task drives the app itself.
 // A phone: a finger as the pointer, a narrow window, the device's scale, in each scheme (portalr
 // ADR-0082). Its tests are `*.touch.test.tsx`, run in this project alone; the rest see a mouse.
+// The tests' iframe is the window's size too: at Vitest's default, 414 by 896, its foot fell below
+// the window, and a sheet's buttons there were out of Playwright's reach.
+const PHONE = { width: 390, height: 844 };
 const phone = (colorScheme: "light" | "dark") => ({
   browser: "chromium" as const,
   name: colorScheme,
@@ -17,7 +20,7 @@ const phone = (colorScheme: "light" | "dark") => ({
       hasTouch: true,
       isMobile: true,
       deviceScaleFactor: 2,
-      viewport: { width: 390, height: 844 },
+      viewport: PHONE,
       reducedMotion: "reduce",
     },
   }),
@@ -63,6 +66,7 @@ export default defineConfig({
             headless: true,
             provider: playwright(),
             instances: [phone(scheme)],
+            viewport: PHONE,
             // Its DOM and its actions, without screenshots, which a page that stalls can't
             // take: what CI uploads as app-traces.
             trace: {

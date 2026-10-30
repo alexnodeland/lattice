@@ -1,6 +1,6 @@
 """Run a task in every project a change affects, and in every project that depends on one.
 
-Usage: scripts/affected.py TASK [--language LANGUAGE | --except-language LANGUAGE]
+Usage: scripts/affected.py TASK [--language LANGUAGE | --except-language LANGUAGE] [--all]
        scripts/affected.py --projects        (MOON_BASE and MOON_HEAD name the change)
 
 With --language, only the projects of that language run the task, as their moon.yml declares it:
@@ -9,6 +9,7 @@ With --except-language, every project but those of that language does: CI's Chec
 web packages' checks (`typescript`) in a job of its own, and the rest in another.
 With --projects, it runs nothing, and prints the affected projects, dependents included, as a JSON
 list: CI starts its heavy jobs only when a project other than the root, `lattice`, is in it.
+With --all, every project runs the task, whatever changed, batched as a change's are: Nightly's.
 
 `moon ci --downstream deep` follows the task graph, so it reaches a dependent's task only
 through that task's own dependencies: a change to evalr alone would run evalr's checks and no
@@ -126,11 +127,12 @@ def main() -> int:
     languages.add_argument("--language")
     languages.add_argument("--except-language")
     arguments.add_argument("--projects", action="store_true")
+    arguments.add_argument("--all", action="store_true")
     given = arguments.parse_args()
     if given.projects == (given.task is not None):
         arguments.error("give a task, or --projects")
     projects = {project["id"]: project for project in query("projects")["projects"]}
-    affected = affected_projects(projects)
+    affected = set(projects) if given.all else affected_projects(projects)
     if given.projects:
         sys.stdout.write(json.dumps(sorted(affected)) + "\n")
         return 0

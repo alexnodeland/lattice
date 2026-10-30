@@ -123,3 +123,15 @@ def test_the_instructions_for_coding_agents_affect_no_project() -> None:
         "options": {"local": True},
         "shallow": False,
     }
+
+
+def test_nightly_checks_every_project_batched_as_a_change_is() -> None:
+    """Nightly's checks run each browser project apart, as a pull request's do (#875).
+
+    `moon run '#browser:check'` ran ui's, app's and admin's Chromium suites at once, and the
+    phone tests missed their 15 s every night while pull requests passed.
+    """
+    nightly = yaml.safe_load((ROOT / ".github" / "workflows" / "nightly.yml").read_text())
+    runs = [step.get("run", "") for step in nightly["jobs"]["check"]["steps"]]
+    assert "uv run --no-project python scripts/affected.py check --all" in runs
+    assert not [run for run in runs if run.startswith("moon run")]

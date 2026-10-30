@@ -19,6 +19,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import { chromium } from "playwright";
 import { preview } from "vite";
 import type { TestProject } from "vitest/node";
 
@@ -32,6 +33,8 @@ declare module "vitest" {
     localhost: { harness: string; apps: string };
     /** The editor's origin, where the shim is served before a stand-in build, on 127.0.0.1. */
     editor: string;
+    /** Where the Chromium the test files share is reached, which they connect to. */
+    chromium: string;
   }
 }
 
@@ -126,7 +129,13 @@ export default async function serve(project: TestProject) {
   project.provide("apps", apps.origin);
   project.provide("localhost", { harness: `http://localhost:${port}/`, apps: apps.alias });
   project.provide("editor", editor.origin);
+  // One Chromium, started here, for the files that need no flags of their own. Launched and closed
+  // in each file's hooks, a loaded runner took longer than a hook's 10 s to close one: connecting
+  // and disconnecting are quick, and the start and the end are here, where no hook times them.
+  const browser = await chromium.launchServer();
+  project.provide("chromium", browser.wsEndpoint());
   return async () => {
+    await browser.close();
     apps.server.close();
     editor.server.close();
     await server.close();

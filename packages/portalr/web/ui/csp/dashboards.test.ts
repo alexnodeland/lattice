@@ -5,14 +5,14 @@
  * (portalr ADR-0047).
  */
 
-import { type Browser, chromium } from "playwright";
+import type { Browser } from "playwright";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { open } from "./harness";
+import { connected, open } from "./harness";
 
 let browser: Browser;
 
 beforeAll(async () => {
-  browser = await chromium.launch();
+  browser = await connected();
 });
 
 afterAll(() => browser.close());

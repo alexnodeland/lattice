@@ -12,12 +12,13 @@ import argparse
 import asyncio
 import base64
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
-from mcp.server.mcpserver import Image, MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
-from mcp.types import CallToolResult, TextContent
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # `python -I` leaves it off
+
+from tests.files.craft.stdio_mcp import CallToolResult, Image, MCPServer, TextContent, ToolError
 
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC"

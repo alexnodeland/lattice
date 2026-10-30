@@ -14,6 +14,7 @@ import pytest
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader, NumberDataPoint
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from sqlalchemy import event
 
 from artifactr.core import Envelope, GiveFeedback, ThreadTarget, UserActor
 from artifactr.otel import TelemetryHandle, configure_telemetry
@@ -44,6 +45,10 @@ class App:
         self.received: list[Envelope] = []
         self.scores = InMemoryScoreSink()
         self.tasks: list[asyncio.Task[None]] = []
+        self.queries = 0  # the statements run on the engine: an idle application's, its polls
+
+    def query(self, *args: object) -> None:
+        self.queries += 1
 
     def start(self) -> None:
         self.tasks = [
@@ -111,6 +116,7 @@ async def app(tmp_path: Path) -> AsyncIterator[App]:
     )
     ws = await workspaces.open("acme", "launch", actor=UserActor(id="alice"))
     app = App(telemetry, ws, exported, reader)
+    event.listen(engine.sync_engine, "before_cursor_execute", app.query)
     app.start()
     try:
         yield app
@@ -121,7 +127,12 @@ async def app(tmp_path: Path) -> AsyncIterator[App]:
 
 
 async def test_an_idle_application_exports_no_spans(app: App) -> None:
-    await asyncio.sleep(20 * POLL.total_seconds())
+    async def polled() -> bool:
+        return app.queries >= 20
+
+    # Twenty statements of the subscriber's and the mirror's polls, however long a busy machine
+    # takes to run them: on a fixed sleep, a busy machine had run none.
+    await eventually(polled)
     assert app.spans() == [], "no trace per poll"
     pool = app.pool()
     assert sum(pool.values()) == 1, f"the pool's one connection, which a poll opened: {pool}"

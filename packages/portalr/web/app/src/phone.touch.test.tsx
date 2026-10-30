@@ -306,7 +306,8 @@ for (const width of [320, 390, 768]) {
     const { screen } = await open("/t/acme/w/notes/threads/thr_1", serve, () => null, WORLD);
     await expect.element(screen.getByText("Which week should the note cover?")).toBeVisible();
     // On a phone the calls are a sheet, a call's detail a tap further.
-    await screen.getByRole("button", { name: /: 2 tool calls$/ }).click();
+    // Where the line says less than all of it (320px), its name goes on to all of it, then the count.
+    await screen.getByRole("button", { name: /[:,] 2 tool calls$/ }).click();
     const step = screen.getByRole("dialog").getByRole("button", { name: /^Looked through/ });
     await expect.element(step).toBeVisible();
     await step.click();

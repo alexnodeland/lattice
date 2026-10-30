@@ -65,7 +65,7 @@ fi
 exit 0
 FAKE
 # uv runs Python itself; Copier, the lock and stackr's scripts are made up, each call logged with
-# its arguments. Copier records the commit as `git describe` says it, as Copier does.
+# its arguments; an update changes pyproject.toml, as the template's can. Copier records the commit as `git describe` says it, as Copier does.
 # Without Copier where FAKE_NO_COPIER says, until stackr's dev group is synced.
 cat >"$scratch/bin/uv" <<FAKE
 #!/usr/bin/env bash
@@ -86,8 +86,20 @@ case "\$*" in
     printf '_commit: %s\n' "\$(git -C "$root" describe --tags --always "\$ref")" >"\$dest/.copier-answers.yml"
     printf 'name: portal\n' >"\$dest/compose.yaml"
     printf '[project]\nname = "portal"\n' >"\$dest/pyproject.toml"
+    printf '.env\n' >"\$dest/.gitignore"
     exit 0 ;;
-  lock*) exit 0 ;;
+  *"copier update"*)
+    args=("\$@") dest="\${*: -1}"
+    for ((i = 0; i < \${#args[@]}; i++)); do [[ \${args[i]} == --vcs-ref ]] && ref=\${args[i + 1]}; done
+    printf '_commit: %s\n' "\$(git -C "$root" describe --tags --always "\$ref")" >"\$dest/.copier-answers.yml"
+    printf '# at %s\\n' "\$ref" >>"\$dest/pyproject.toml"
+    case \${FAKE_CONFLICT:-} in
+      rej) echo 'a hunk' >"\$dest/compose.yaml.rej" ;;
+      markers) printf '<<<<<<< before updating\nmine\n=======\ntheirs\n>>>>>>> after updating\n' >"\$dest/notes.md" ;;
+    esac
+    exit 0 ;;
+  # The lock follows pyproject.toml, as uv's does.
+  lock*) cksum <"\${*: -1}/pyproject.toml" >"\${*: -1}/uv.lock"; exit 0 ;;
   *scripts/create-tenant*) printf '%s' "\${FAKE_TENANT_KEY-sk-tenant-made-up}"; exit 0 ;;
   *scripts/create-portal-key*)
     [[ \${FAKE_PORTAL:-0} == 0 ]] && echo sk-portal-made-up
@@ -157,8 +169,43 @@ check "and says nothing of a stale application" refused said "was generated from
 check "up with DEV_DIAGRAMS=off" up env DEV_DIAGRAMS=off
 check "and sets DIAGRAMS from DEV_DIAGRAMS" test "$(sed -n 's/^DIAGRAMS=//p' "$scratch/app/.env" | tail -n 1)" = off
 # A commit made here, not HEAD~1, which a shallow checkout (Nightly's Check) hasn't.
-check "up from another commit" up env DEV_REF="$unpushed"
-check "an application from another commit is said, with copier update" said "copier update"
+answered() { test "$(git rev-parse "$(sed -n 's/^_commit: *//p' "$scratch/app/.copier-answers.yml")^{commit}")" = "$1"; }
+check "up, behind DEV_REF, updates the application" up env DEV_REF="$unpushed"
+check "with copier update to it, keeping its answers" grep -qx \
+  "uv run --no-sync copier update --quiet --defaults --vcs-ref $unpushed $scratch/app" "$scratch/calls"
+check "which records the commit" answered "$unpushed"
+check "and relocks the application after the update" test \
+  "$(grep -oE "copier update|^uv lock --quiet --directory $scratch/app$" "$scratch/calls" | tr '\n' '|')" = \
+  "copier update|uv lock --quiet --directory $scratch/app|"
+check "committing the lockfile with it" test -z "$(git -C "$scratch/app" status --porcelain -- uv.lock)" -a \
+  "$(git -C "$scratch/app" log -1 --format=%s -- uv.lock)" = "chore: update from template"
+check "and commits the update in the application's repository" test \
+  "$(git -C "$scratch/app" log -1 --format=%s) $(git -C "$scratch/app" status --porcelain | wc -l | tr -d ' ')" = "chore: update from template 0"
+check "and starts both" grep -qE "^make -s -C $scratch/app up$" "$scratch/calls"
+check "up again, at DEV_REF, updates nothing" up env DEV_REF="$unpushed"
+check "and runs no copier" refused grep -q copier "$scratch/calls"
+# Whether no copier ran and nothing started; whether, besides, the application's last commit is
+# still the update before.
+untouched() { refused grep -q copier "$scratch/calls" && nothing_started; }
+uncommitted() { test "$(git -C "$scratch/app" rev-parse HEAD)" = "$updated" && nothing_started; }
+later=$(git commit-tree "HEAD^{tree}" -p "$unpushed" -m "not pushed either")
+check "up refuses an update to a commit that isn't on origin" refused up env DEV_REF="$later" UNPUSHED="$later"
+check "and says so" said "isn't on origin"
+check "and updates and starts nothing" untouched
+echo mine >"$scratch/app/notes.md"
+check "up, behind DEV_REF with uncommitted changes, refuses" refused up
+check "and says so" said "has changes that aren't committed"
+check "and updates and starts nothing" untouched
+check "and leaves the changes" test "$(cat "$scratch/app/notes.md")" = mine
+rm "$scratch/app/notes.md"
+updated=$(git -C "$scratch/app" rev-parse HEAD)
+check "up, when the update leaves a .rej file, refuses" refused up env FAKE_CONFLICT=rej
+check "and names it" said "left conflicts in $scratch/app: compose.yaml.rej."
+check "and commits and starts nothing" uncommitted
+git -C "$scratch/app" checkout --quiet -- . && git -C "$scratch/app" clean --quiet -fd
+check "up, when the update leaves conflict markers, refuses" refused up env FAKE_CONFLICT=markers
+check "and names the file" said "left conflicts in $scratch/app: notes.md."
+check "and starts nothing" nothing_started
 
 fresh
 check "a key made before a later failure is kept" refused dev postgres env FAKE_PORTAL=1 scripts/dev up

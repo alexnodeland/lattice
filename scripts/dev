@@ -9,14 +9,18 @@
 #   scripts/dev up|down|status|reset
 #   DEV_APP_DIR     where the application is generated (default: .local/run/portal, gitignored)
 #   DEV_APP_NAME    its name, from which its package and Compose project are named (default: Portal)
-#   DEV_REF         the commit it is generated from, which must be on origin, since the image
-#                   installs the libraries from GitHub at it (default: HEAD)
+#   DEV_REF         the commit it is generated from, or updated to, which must be on origin,
+#                   since the image installs the libraries from GitHub at it (default: HEAD)
 #   DEV_TENANT      the gateway's tenant whose key the application uses (default: dev)
 #   DEV_DIAGRAMS    the application's DIAGRAMS, set on every run (default: on)
 #   DEV_LAN         yes, to start with STACKR_BIND or APP_BIND beyond the loopback (default: no)
 #   DEV_STACKR_DIR  stackr's directory, for scripts/check-dev (default: packages/stackr)
 #
-# `up` is safe to run again. It generates the application and makes its two gateway keys once,
+# `up` is safe to run again. It generates the application and makes its two gateway keys once.
+# When the application was generated from another commit than DEV_REF, it runs `copier update`
+# there to DEV_REF, keeping its answers, and commits the result ("chore: update from template");
+# it refuses, before anything starts, an application with uncommitted changes, and an update that
+# leaves conflicts (`.rej` files or conflict markers), naming the files. It makes the keys once,
 # writing each key into the application's .env (mode 0600) as soon as it is made, and never
 # printing it. It sets FILES_CRAFTS there only while it is unset, so your choice stays, and
 # DIAGRAMS from DEV_DIAGRAMS every time. The image build, the database role (`db-roles`) and the
@@ -83,7 +87,8 @@ print(",".join(name for name, craft in crafts.items() if "platform" not in craft
 }
 
 # What `up` needs, checked before anything starts: the tools, the adapter, where the application
-# goes, and, for an application not generated yet, a commit on origin (into `commit`).
+# goes, and, for an application not generated yet or generated from another commit, a commit on
+# origin (into `commit`, and the one it was generated from into `from`).
 preflight() {
   need docker "Docker, with Compose v2, runs both projects"
   docker compose version >/dev/null 2>&1 || die "Docker has no Compose v2 (\`docker compose\`)"
@@ -116,8 +121,14 @@ preflight() {
   want=$(git rev-parse --verify "${DEV_REF:-HEAD}^{commit}") || die "DEV_REF=${DEV_REF:-HEAD} isn't a commit"
   if generated; then
     recorded=$(sed -n 's/^_commit: *//p' "$app/.copier-answers.yml" | head -n 1)
-    [[ $(git rev-parse --verify --quiet "$recorded^{commit}" || true) == "$want" ]] ||
-      say "$app was generated from $recorded, not ${DEV_REF:-HEAD} ($want): \`copier update\` there moves it, or \`make dev-reset\` and removing it starts again"
+    [[ $(git rev-parse --verify --quiet "$recorded^{commit}" || true) != "$want" ]] || return 0
+    local changes
+    changes=$(git -C "$app" status --porcelain 2>&1) ||
+      die "$app isn't a git repository, which \`copier update\` needs: $changes"
+    [[ -z $changes ]] ||
+      die "$app was generated from $recorded, not ${DEV_REF:-HEAD} ($want), and has changes that aren't committed: commit or discard them there, and \`make dev\` updates it; nothing was started"
+    commit=$want from=${recorded:-another commit}
+    pushed
     return
   fi
   [[ ! -e $app || -z $(ls -A "$app") ]] ||
@@ -131,6 +142,11 @@ preflight() {
   [[ -z $(git status --porcelain) ]] ||
     say "lattice's working tree has changes, which aren't generated: the application is lattice at a commit"
   commit=$want
+  pushed
+}
+
+# Whether `commit` is on origin, where the image installs the libraries from.
+pushed() {
   git remote get-url origin >/dev/null 2>&1 ||
     die "this clone has no remote origin: the image installs the libraries from GitHub, at a commit there"
   git fetch --quiet origin ||
@@ -154,6 +170,27 @@ render() {
   git_quietly -C "$rendering" commit --quiet --no-verify --message "Generated from lattice at $commit"
   rmdir "$app" 2>/dev/null || true
   mv "$rendering" "$app"
+}
+
+# The application, moved to the commit preflight checked when it was generated from another, with
+# `copier update` and its answers, and committed in its own repository. An update that leaves
+# conflicts stops here, before anything starts, naming the files.
+update() {
+  [[ -n $from ]] || return 0
+  local conflicts
+  say "updating $app from $from to $commit"
+  uv run --no-sync copier update --quiet --defaults --vcs-ref "$commit" "$app" ||
+    die "\`copier update\` failed in $app: see above; nothing was started"
+  conflicts=$({
+    (cd "$app" && find . -name '*.rej' -not -path './.git/*' -not -path './.venv/*' -not -path '*/node_modules/*' | sed 's|^\./||')
+    git -C "$app" grep --untracked -I -l -E '^(<<<<<<<|>>>>>>>)( |$)' || true
+  } | sort -u | tr '\n' ' ')
+  [[ -z $conflicts ]] ||
+    die "\`copier update\` to $commit left conflicts in $app: ${conflicts% }. Resolve them there, remove the .rej files and commit, then run \`make dev\` again; nothing was started"
+  uv lock --quiet --directory "$app"
+  git -C "$app" add --all
+  git -C "$app" diff --cached --quiet ||
+    git_quietly -C "$app" commit --quiet --no-verify --message "chore: update from template"
 }
 
 # stackr's .env, on the postgres adapter: chosen when there is none (preflight refused another).
@@ -234,9 +271,10 @@ choices() {
 }
 
 up() {
-  local commit="" admin
+  local commit="" from="" admin
   preflight
   render
+  update
   stack_env
   stack_volume
   say "starting stackr's stack: $PROFILES"

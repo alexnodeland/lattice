@@ -19,15 +19,15 @@ tasks:
       runInCI: false
 
   pg-up:
-    description: 'Start PostgreSQL for the SQL tests, from compose.yaml, on port 54331'
-    command: 'docker compose up -d --wait postgres'
+    description: 'Start PostgreSQL for the SQL tests, from compose.yaml, as a compose project of its own on a port the system picks'
+    command: '$workspaceRoot/scripts/pg up'
     options:
       cache: false
       runInCI: false
 
   pg-down:
     description: 'Stop PostgreSQL'
-    command: 'docker compose down'
+    command: '$workspaceRoot/scripts/pg down'
     options:
       cache: false
       runInCI: false
@@ -38,9 +38,7 @@ tasks:
   # them.
   test-pg:
     description: 'Run the tests on PostgreSQL as well as SQLite (after pg-up)'
-    command: 'uv run pytest --cov --cov-report=term-missing --durations=10'
-    env:
-      GRANTR_TEST_POSTGRES_URL: 'postgresql+asyncpg://postgres:grantr@localhost:54331/postgres'
+    script: 'url=$($workspaceRoot/scripts/pg url) && GRANTR_TEST_POSTGRES_URL=$url uv run pytest --cov --cov-report=term-missing --durations=10'
     options:
       cache: false
       runInCI: false

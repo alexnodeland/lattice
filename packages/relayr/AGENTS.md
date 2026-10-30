@@ -21,7 +21,7 @@ relayr is the bridge between artifactr and reflexr: events from chats and artifa
 moon run relayr:test            # memory and SQLite; PostgreSQL tests deselected
 moon run relayr:check
 moon run relayr:schema          # regenerate schemas/relayr.openapi.json
-moon run relayr:pg-up           # PostgreSQL from compose.yaml on port 54332
+moon run relayr:pg-up           # PostgreSQL from compose.yaml, on a free port
 moon run relayr:test-pg         # the tests on PostgreSQL as well (after pg-up)
 moon run relayr:vikunja-up      # Vikunja on port 54333 (compose profile `trackers`)
 moon run relayr:test-vikunja    # the tracker contract test, live (after vikunja-up)

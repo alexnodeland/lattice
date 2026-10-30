@@ -21,15 +21,15 @@ tasks:
       runInCI: false
 
   pg-up:
-    description: 'Start PostgreSQL for the SQL tests, from compose.yaml, on port 54332'
-    command: 'docker compose up -d --wait postgres'
+    description: 'Start PostgreSQL for the SQL tests, from compose.yaml, as a compose project of its own on a port the system picks'
+    command: '$workspaceRoot/scripts/pg up'
     options:
       cache: false
       runInCI: false
 
   pg-down:
     description: 'Stop the contributor stack: PostgreSQL, and Vikunja if it runs'
-    command: 'docker compose --profile trackers down'
+    script: 'COMPOSE_PROFILES=trackers $workspaceRoot/scripts/pg down'
     options:
       cache: false
       runInCI: false
@@ -40,16 +40,14 @@ tasks:
   # them.
   test-pg:
     description: 'Run the tests on PostgreSQL as well as SQLite (after pg-up)'
-    command: 'uv run pytest --cov --cov-report=term-missing --durations=10'
-    env:
-      RELAYR_TEST_POSTGRES_URL: 'postgresql+asyncpg://postgres:relayr@localhost:54332/postgres'
+    script: 'url=$($workspaceRoot/scripts/pg url) && RELAYR_TEST_POSTGRES_URL=$url uv run pytest --cov --cov-report=term-missing --durations=10'
     options:
       cache: false
       runInCI: false
 
   vikunja-up:
     description: 'Start Vikunja for the tracker contract test, live, from compose.yaml, on port 54333'
-    command: 'docker compose --profile trackers up -d --wait vikunja'
+    script: 'COMPOSE_PROFILES=trackers $workspaceRoot/scripts/pg up vikunja'
     options:
       cache: false
       runInCI: false

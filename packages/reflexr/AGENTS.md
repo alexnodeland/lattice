@@ -27,7 +27,7 @@ Inherited: `lint`, `typecheck`, `test`, `format`, `check`, plus `build`, `standa
 ```bash
 moon run reflexr:schema       # regenerate everything in schemas/
 moon run reflexr:dashboards   # regenerate deploy/grafana/dashboards/
-moon run reflexr:pg-up        # PostgreSQL on port 54330
+moon run reflexr:pg-up        # PostgreSQL, as a compose project of its own on a free port
 moon run reflexr:test-pg      # the tests on SQLite and PostgreSQL (after pg-up)
 moon run reflexr:pg-down      # stop PostgreSQL, and oncall if it runs
 moon run reflexr:app-up       # oncall on PostgreSQL at http://localhost:8000

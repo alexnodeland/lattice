@@ -285,7 +285,7 @@ External agents connect over MCP (`artifactr.mcp.ArtifactrMcp`) with the same au
 | Tool `list_revisions` | `GET .../artifacts/{artifact_id}/revisions`, as JSON lines. |
 | Tools `list_proposals`, `respond_to_proposal` | Review others' proposals. `list_proposals` takes REST's `status`, `pending` by default. |
 | Tools `list_threads`, `get_thread` | `GET .../threads` and `GET .../threads/{thread_id}`, as JSON lines and JSON. |
-| Tool `post_message` | A message in a thread, handled like any other: it starts, steers or answers the thread's agent. The reply names the run it started. `kind="notice"` posts a notice, which starts no run. |
+| Tool `post_message` | A message in a thread, handled like any other: it starts, steers or answers the thread's agent. The reply names the run it started. `kind="notice"` posts a notice, which starts no run. `model` names the model to answer with when the message starts a new turn, as the command's `model` does ([ADR-0097](adr/0097-a-message-chooses-the-model-of-the-turn-it-starts.md)); with a notice, or a name outside the command's pattern, the tool is refused. |
 | Tool `get_run` | `GET .../runs/{run_id}`, as JSON. |
 | Tool `give_feedback` | Feedback of an application's type on an artifact version, a thread, a turn or a message. |
 | Tool `read_events` | `GET .../events`, as JSON lines, with its window, `threads` and tail. It returns 50 when given neither `limit` nor `last`. |

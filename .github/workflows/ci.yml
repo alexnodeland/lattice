@@ -410,6 +410,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - uses: ./.github/actions/disk # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv run --no-project python scripts/affected.py files
 
   # Umami's replay retention (portalr ADR-0077), against the pinned Umami and PostgreSQL: old
@@ -543,6 +544,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - uses: ./.github/actions/disk # zizmor: ignore[self-repository] actionlint rejects `$/`
       # scripts/api installs Schemathesis itself, with `uv run --group acceptance`, only when a
       # library is affected.
       - run: bun install --frozen-lockfile
@@ -616,6 +618,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - uses: ./.github/actions/disk # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: proto trust .prototools && proto install tofu
       # Restored only: nightly.yml saves it from main. Saved from every pull request's ref, its
       # 135 MB evicted main's own caches.
@@ -781,6 +784,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
+      - uses: ./.github/actions/disk # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv sync --locked --all-packages --all-groups --all-extras
       - name: Read versions.env
         run: grep -E '^[A-Z_]+=' packages/stackr/versions.env >> "$GITHUB_ENV"
@@ -810,6 +814,10 @@ jobs:
       - run: uv run --no-project python scripts/affected.py smoke
         timeout-minutes: 15
       # An application from the template, beside the whole stack (stackr ADR-0011).
+      # The stack's build cache, which its running containers don't need, before the application
+      # builds its own images beside it.
+      - if: matrix.app
+        run: docker builder prune --all --force && df -h /
       - if: matrix.app
         run: uv run --no-project python scripts/affected.py smoke-app
       # A single host's backups, to the job's own MinIO, and the restore drill (RFC-0004),

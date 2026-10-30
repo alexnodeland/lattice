@@ -14,6 +14,7 @@ The root [AGENTS.md](../AGENTS.md) applies; this adds what is specific to workfl
 | `workflows/renovate.yml` | Renovate, as lattice's GitHub App |
 | `workflows/codeql.yml`, `workflows/scorecard.yml` | Code scanning and OpenSSF Scorecard |
 | `actions/toolchain/` | Installs proto and `.prototools`' tools, from cache with retries (ADR-0017) |
+| `actions/disk/` | Frees the runner's disk (unused toolchains, preinstalled images) and prints `df -h`, for the jobs that start stacks |
 
 ## Rules
 

@@ -3451,7 +3451,7 @@ wheels = [
 
 [[package]]
 name = "portalr"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/portalr" }
 dependencies = [
     { name = "fastapi" },
@@ -4163,7 +4163,7 @@ wheels = [
 
 [[package]]
 name = "reflexr"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/reflexr" }
 dependencies = [
     { name = "cronsim" },
@@ -4429,7 +4429,7 @@ wheels = [
 
 [[package]]
 name = "relayr-ai"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/relayr" }
 dependencies = [
     { name = "artifactr-ai" },

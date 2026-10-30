@@ -1,6 +1,7 @@
-# Releases (stackr's RFC-0003, Releases and versioning). release-please keeps a release pull
-# request open for each package with unreleased changes (ADR-0023). Merging one tags its package
-# <package>-v<version>, updates its CHANGELOG.md and creates its GitHub release. A plan job then
+# Releases (stackr's RFC-0003, Releases and versioning). release-please keeps one release pull
+# request open for every package with unreleased changes (ADR-0023's 2026-10-30 amendment). Merging
+# it tags each package <package>-v<version>, at its own version, updates each one's CHANGELOG.md
+# and creates each one's GitHub release, all at one commit. A plan job then
 # decides what to build (scripts/release_plan.py, tested): each released package that ships a
 # wheel is built alone, as it is published, and its wheel and sdist are attached to its release
 # with a build-provenance attestation, and are published to PyPI once the repository turns that on.

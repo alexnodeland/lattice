@@ -27,6 +27,15 @@
 # - This needs the ruleset not to require branches to be up to date
 #   (`strict_required_status_checks_policy: false`): a pull request's checks are those of the batch
 #   it is in, not of its own head against the `main` of the moment.
+#
+# Release pull requests skip the wait (ADR-0024's 2026-10-30 amendment). release-please's pull
+# request (author the lattice GitHub App, `alexnodeland-lattice[bot]`; branch
+# `release-please--branches--main...`; title `chore: release main`, or `chore(main): release ...`
+# from one a package) gets the `queue` label from the rule at the end, but only once its own `CI`
+# and `Title` have passed, so it enters the queue as any pull request does, and its batch must
+# still pass `CI` (`merge_conditions`). Renovate is the same App: the branch and title tell them
+# apart. In the queue it goes first (`priority_rules`), so it is in the next batch to be checked.
+# Nothing here bypasses a check or the ruleset.
 queue_rules:
   - name: default
     batch_size:
@@ -50,9 +59,31 @@ queue_rules:
     merge_conditions:
       - check-success = CI
 
+priority_rules:
+  - name: release pull requests first
+    conditions:
+      - author = alexnodeland-lattice[bot]
+      - head ~= ^release-please--branches--main
+      - "title ~= ^chore(\\(main\\))?: release"
+    priority: high
+
 merge_queue:
   max_parallel_checks: 2
 
 merge_protections_settings:
   auto_merge_conditions:
     - label = queue
+
+pull_request_rules:
+  - name: queue release-please's pull request once its checks pass
+    conditions:
+      - base = main
+      - author = alexnodeland-lattice[bot]
+      - head ~= ^release-please--branches--main
+      - "title ~= ^chore(\\(main\\))?: release"
+      - -draft
+      - check-success = CI
+      - check-success = Title
+    actions:
+      label:
+        add: [queue]

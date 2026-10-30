@@ -269,7 +269,7 @@ wheels = [
 
 [[package]]
 name = "artifactr-ai"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/artifactr" }
 dependencies = [
     { name = "jsonpatch" },
@@ -1527,7 +1527,7 @@ wheels = [
 
 [[package]]
 name = "grantr"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/grantr" }
 dependencies = [
     { name = "lattice-core-ai" },
@@ -3451,7 +3451,7 @@ wheels = [
 
 [[package]]
 name = "portalr"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/portalr" }
 dependencies = [
     { name = "fastapi" },
@@ -4163,7 +4163,7 @@ wheels = [
 
 [[package]]
 name = "reflexr"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/reflexr" }
 dependencies = [
     { name = "cronsim" },
@@ -4429,7 +4429,7 @@ wheels = [
 
 [[package]]
 name = "relayr-ai"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/relayr" }
 dependencies = [
     { name = "artifactr-ai" },
@@ -5031,7 +5031,7 @@ wheels = [
 
 [[package]]
 name = "stackr"
-version = "0.2.0"
+version = "0.2.1"
 source = { virtual = "packages/stackr" }
 
 [package.dev-dependencies]

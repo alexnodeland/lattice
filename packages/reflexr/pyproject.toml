@@ -1,6 +1,6 @@
 [project]
 name = "reflexr"
-version = "0.2.0"
+version = "0.2.1"
 description = "Rules over event streams that run LLM workflows: pydantic-ai agents, pydantic-graph graphs and functions."
 readme = "README.md"
 license = "MIT"

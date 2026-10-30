@@ -8,8 +8,11 @@
  * there passes where the page's own would be refused (portalr ADR-0047).
  */
 
-import type { Browser, Page } from "playwright";
+import { type Browser, chromium, type Page } from "playwright";
 import { inject } from "vitest";
+
+/** The Chromium the test files share, which `serve.ts` started: closing this disconnects. */
+export const connected = (): Promise<Browser> => chromium.connect(inject("chromium"));
 
 /** What compiles or instantiates WebAssembly: a page that calls one of these uses it. */
 const COMPILING = ["compile", "compileStreaming", "instantiate", "instantiateStreaming", "Module"];
@@ -17,7 +20,10 @@ const COMPILING = ["compile", "compileStreaming", "instantiate", "instantiateStr
 export async function open(
   browser: Browser,
   search = "",
-): Promise<{ page: Page; reported: () => Promise<string[]> }> {
+): Promise<{
+  page: Page;
+  reported: (atLeast?: number) => Promise<string[]>;
+}> {
   // The clipboard is the page's to write, so Copy copies, as it does for a person.
   const context = await browser.newContext({ permissions: ["clipboard-read", "clipboard-write"] });
   const page = await context.newPage();
@@ -57,8 +63,16 @@ export async function open(
     }
   }, COMPILING);
   await page.goto(`${inject("harness")}${search}`);
-  const reported = async () => {
-    // A violation is reported as a task of its own, after what caused it.
+  /**
+   * What the page has reported. A violation is reported as a task of its own, after what caused
+   * it, and a loaded runner may take longer than a moment to run it: given `atLeast`, a test that
+   * expects reports waits until the page has that many, rather than a fixed while.
+   */
+  const reported = async (atLeast = 0) => {
+    await page.waitForFunction(
+      (count) => (window as unknown as { violations: string[] }).violations.length >= count,
+      atLeast,
+    );
     await page.evaluate(() => new Promise((settled) => setTimeout(settled, 50)));
     const violations = await page.evaluate(
       () => (window as unknown as { violations: string[] }).violations,

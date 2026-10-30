@@ -134,7 +134,7 @@ portalr's web packages are a Bun workspace rooted at lattice's root, so TypeScri
 | | Where it lives |
 |---|---|
 | The members | `packages/portalr/web/*` in the root `package.json`'s `workspaces`: `client`, `ui`, `app` and `admin`, each private, named `@portalr/<name>`, and without a version of its own: portalr's is its `pyproject.toml`'s |
-| The lock | One `bun.lock`, the text lockfile. `bun install` installs it into `node_modules/`, and CI adds `--frozen-lockfile` |
+| The lock | One `bun.lock`, the text lockfile. `bun install --frozen-lockfile` installs it into `node_modules/` as it is, in CI and in `make install` (`scripts/bun-install`, with the pinned Bun) |
 | The shared tools | The root `package.json`'s devDependencies: TypeScript 7, Biome, Vitest and knip. A package's own tools, such as Vite, are its own. Every version is exact |
 | TypeScript | `tsconfig.base.json`, strict, which each package's `tsconfig.json` extends. `tsc` is TypeScript 7.0, the native compiler; no tool in the workspace needs TypeScript's library API yet ([portalr ADR-0007](portalr/adr/0007-typescript-7-and-6-only-where-a-tool-needs-its-api.md)) |
 | Biome | `biome.json`: formatting and the recommended lint rules, for the web packages and the workspace's own configuration |

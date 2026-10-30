@@ -28,7 +28,7 @@ Inherited: `lint`, `typecheck`, `test`, `format`, `check`, plus `build`, `standa
 ```bash
 moon run artifactr:schema       # regenerate everything in schemas/
 moon run artifactr:dashboards   # regenerate deploy/grafana/dashboards/
-moon run artifactr:pg-up        # PostgreSQL on port 54329
+moon run artifactr:pg-up        # PostgreSQL, as a compose project of its own on a free port
 moon run artifactr:test-pg      # the tests on SQLite and PostgreSQL (after pg-up)
 moon run artifactr:pg-down      # stop PostgreSQL, and docplan if it runs
 moon run artifactr:app-up       # docplan on PostgreSQL at http://localhost:8000

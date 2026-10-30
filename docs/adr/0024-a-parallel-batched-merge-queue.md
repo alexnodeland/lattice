@@ -52,3 +52,12 @@ The owner decided that release-please's pull requests skip the wait for a person
 - **Merging a release is then not a person's step;** publishing still is: the release run never publishes, and PyPI waits for the approval [ADR-0023](0023-publishing-to-pypi-from-the-release-workflow.md) and its successors require.
 - **Meant for one release pull request** ([ADR-0023's 2026-10-30 amendment](0023-publishing-to-pypi-from-the-release-workflow.md)). With one a package, several would be queued and batched together, and a batch of release pull requests builds nothing (ADR-0023's 2026-10-29 amendment), so this lands after that change.
 - **To turn it off,** delete the rule; a `queue` label already added stays.
+
+## Amendment (2026-10-30): retry a failed check once
+
+The owner decided that a failed check is retried once before a pull request is dequeued. Flakes made dequeues common (17 of 57 entries in the 2026-10-24 sample), and each one needed a person to comment `@mergifyio requeue`.
+
+- **`max_checks_retries: 1`** on the default queue. Mergify's published schema says it recreates the draft pull request and runs the checks again, and dequeues only if they fail again. A value above 0 always uses a draft pull request, which this queue does already.
+- **A real failure costs one more `CI` run** before the batch is split and the culprit found; the docs don't say whether the retry happens once per batch or once per split part, so the cost in a failed batch of five is to be watched.
+- **`@mergifyio requeue`** stays the way to requeue a pull request that failed twice (CONTRIBUTING.md, Merging).
+- **Rollback:** remove the setting (its default is 0).

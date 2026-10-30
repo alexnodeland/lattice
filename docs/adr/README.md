@@ -29,7 +29,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0021](0021-the-refusal-schema-needs-no-extra.md) | The refusal schema needs no extra | Accepted |
 | [0022](0022-litellm-requests-carry-the-propagated-trace-tags.md) | LiteLLM requests carry the propagated trace tags | Accepted |
 | [0023](0023-publishing-to-pypi-from-the-release-workflow.md) | Publishing to PyPI from the release workflow | Accepted, amended by [0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md) |
-| [0024](0024-a-parallel-batched-merge-queue.md) | A parallel, batched merge queue | Accepted |
+| [0024](0024-a-parallel-batched-merge-queue.md) | A parallel, batched merge queue | Accepted, amended 2026-10-30 |
 | [0025](0025-formal-specs-in-tla-and-lean.md) | Formal specs in TLA+ and Lean | Accepted |
 | [0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md) | A distribution needs a reason; integrations are extras | Accepted |
 | [0027](0027-integrations-switched-per-workspace-through-one-port.md) | Integrations switched per workspace, through one port | Accepted |

@@ -156,18 +156,22 @@ def test_a_change_on_uv_locks_last_line_fails(repo: Repo) -> None:
 
 
 def test_a_lone_uv_lock_bump_fails(repo: Repo) -> None:
-    assert problems(repo({PYPROJECT_PATH: PYPROJECT})) == ["no version changed in pyproject.toml"]
+    assert problems(repo({PYPROJECT_PATH: PYPROJECT})) == [
+        "no version of relayr changed in pyproject.toml"
+    ]
 
 
 def test_versions_that_disagree_fail(repo: Repo) -> None:
     pyproject = PYPROJECT.replace('"0.1.1"', '"99.0.0"')
     assert problems(repo({PYPROJECT_PATH: pyproject})) == [
-        "the versions don't agree: [\"('0.1.1', '0.2.0')\", \"('0.1.1', '99.0.0')\"]"
+        "relayr's versions don't agree: [\"('0.1.1', '0.2.0')\", \"('0.1.1', '99.0.0')\"]"
     ]
 
 
 def test_a_lower_version_fails(repo: Repo) -> None:
-    assert problems(repo(released("0.1.0"))) == ["not a release higher than before: 0.1.1 to 0.1.0"]
+    assert problems(repo(released("0.1.0"))) == [
+        "relayr: not a release higher than before: 0.1.1 to 0.1.0"
+    ]
 
 
 def test_a_binary_fails(repo: Repo) -> None:
@@ -355,3 +359,67 @@ def test_every_other_job_is_gated_and_may_skip_only_when_light() -> None:
     otherwise = re.search(r"\|\| '([^']*)' \}\}\s*$", skips)
     assert otherwise is not None
     assert {each.strip() for each in otherwise.group(1).split(",")} == always
+
+
+EVALR = '[project]\nname = "evalr"\nversion = "0.3.0"\n'
+TWO_LOCK = LOCK + (
+    '\n[[package]]\nname = "evalr"\nversion = "0.3.0"\nsource = { editable = "packages/evalr" }\n'
+)
+TWO_MANIFEST = '{\n  "packages/evalr": "0.3.0",\n  "packages/relayr": "0.1.1"\n}\n'
+
+
+@pytest.fixture
+def two(tmp_path: Path) -> Callable[[str], Path]:
+    """A base with two packages, and a release of both, evalr's lock line at ``evalr_lock``."""
+    base: dict[str, str | bytes | None] = {
+        PYPROJECT_PATH: PYPROJECT,
+        "packages/evalr/pyproject.toml": EVALR,
+        "uv.lock": TWO_LOCK,
+        ".release-please-manifest.json": TWO_MANIFEST,
+    }
+    write(tmp_path, base)
+    git(tmp_path, "init", "-q", "-b", "main")
+    git(tmp_path, "add", "-A")
+    git(tmp_path, "commit", "-qm", "base")
+    git(tmp_path, "checkout", "-qb", "release")
+
+    def head(evalr_lock: str) -> Path:
+        lock = TWO_LOCK.replace('"0.1.1"', '"0.2.0"')
+        lock = lock.replace(
+            'name = "evalr"\nversion = "0.3.0"', f'name = "evalr"\nversion = "{evalr_lock}"'
+        )
+        write(
+            tmp_path,
+            {
+                PYPROJECT_PATH: PYPROJECT.replace('"0.1.1"', '"0.2.0"'),
+                "packages/evalr/pyproject.toml": EVALR.replace("0.3.0", "0.3.1"),
+                "uv.lock": lock,
+                ".release-please-manifest.json": TWO_MANIFEST.replace("0.1.1", "0.2.0").replace(
+                    "0.3.0", "0.3.1"
+                ),
+            },
+        )
+        git(tmp_path, "add", "-A")
+        git(tmp_path, "commit", "-qm", "release")
+        return tmp_path
+
+    return head
+
+
+def test_one_release_of_several_packages_at_their_own_versions_passes(
+    two: Callable[[str], Path],
+) -> None:
+    assert problems(two("0.3.1")) == []
+
+
+def test_one_package_of_several_that_disagrees_fails(two: Callable[[str], Path]) -> None:
+    assert problems(two("0.4.0")) == [
+        "evalr's versions don't agree: [\"('0.3.0', '0.3.1')\", \"('0.3.0', '0.4.0')\"]"
+    ]
+
+
+def test_a_changelog_alone_changes_no_version(repo: Repo) -> None:
+    root = repo(
+        {PYPROJECT_PATH: PYPROJECT, "uv.lock": LOCK, ".release-please-manifest.json": MANIFEST}
+    )
+    assert problems(root) == ["no package's version changed"]

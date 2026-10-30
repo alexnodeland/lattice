@@ -21,8 +21,9 @@ env:
   MOON_HEAD: HEAD
 
 jobs:
-  # release-please's pull request for a package: its changelog and its version, on main's code,
-  # which passed CI. Every merge to main updates each package's, and seven full runs at once held
+  # release-please's pull request (one for every package it releases): their changelogs and
+  # versions, on main's code, which passed CI. Every merge to main updates it; when there was one
+  # a package, seven full runs at once held
   # real pull requests' CI for an hour. On one opened by the lattice App, in this repository, on a
   # branch of release-please's, the base's scripts/release_pr_diff.py checks the diff is only
   # that, and if it is, `light` skips the jobs below. Anything else, a diff it refuses or a check

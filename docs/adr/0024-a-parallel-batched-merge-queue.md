@@ -1,6 +1,6 @@
 # ADR-0024: A parallel, batched merge queue
 
-**Status:** Accepted, amended 2026-10-16 and 2026-10-24 (see Amendments)
+**Status:** Accepted, amended 2026-10-16, 2026-10-24 and 2026-10-30 (see Amendments)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 
@@ -42,3 +42,13 @@ The queue's time is bound by runner slots, not compute. Over 40 merged pull requ
 - **`batch_max_failure_resolution_attempts` stays 3.** A failed batch is split into two parts, so five pull requests need at most ceil(log2(5)) = 3 rounds, which the cap allows (the docs don't define a round precisely). A failed batch of five costs more rounds than with three parts, which is the price of the smaller slot budget.
 - **Rollback:** restore `batch_size.min`, `batch_max_wait_time` and `max_parallel_checks` to 1, 30 seconds and 3, and remove `checks_timeout`.
 - The Decision above is otherwise unchanged; its numbers are superseded by these and the 2026-10-16 ones.
+
+## Amendment (2026-10-30)
+
+The owner decided that release-please's pull requests skip the wait for a person to label them.
+
+- **Queued automatically, once checks pass.** A `pull_request_rules` rule in `.mergify.yml` adds the `queue` label to a pull request on `main` whose author is the lattice App (`alexnodeland-lattice[bot]`), whose branch starts `release-please--branches--main` and whose title starts `chore: release` or `chore(main): release`, once its own `CI` and `Title` succeed and it is not a draft. Renovate is the same App ([ADR-0004](0004-one-github-app-for-release-please-and-renovate.md)); the branch and the title tell them apart.
+- **First in the queue.** The default queue's `priority_rules` give it `high` priority, so it goes into the next batch checked. It is still batched and must pass `CI` on its batch (`merge_conditions`); no required check or ruleset rule is bypassed.
+- **Merging a release is then not a person's step;** publishing still is: the release run never publishes, and PyPI waits for the approval [ADR-0023](0023-publishing-to-pypi-from-the-release-workflow.md) and its successors require.
+- **Meant for one release pull request** ([ADR-0023's 2026-10-30 amendment](0023-publishing-to-pypi-from-the-release-workflow.md)). With one a package, several would be queued and batched together, and a batch of release pull requests builds nothing (ADR-0023's 2026-10-29 amendment), so this lands after that change.
+- **To turn it off,** delete the rule; a `queue` label already added stays.

@@ -15,7 +15,7 @@ tasks:
 
   schema:
     description: "Regenerate the OpenAPI document of relayr's routes, which portalr's client is typed from"
-    script: 'uv run python -m relayr.fastapi.openapi > schemas/relayr.openapi.json'
+    script: 'uv run python $workspaceRoot/scripts/generate.py schemas/relayr.openapi.json relayr.fastapi.openapi'
     options:
       cache: false
       runInCI: false

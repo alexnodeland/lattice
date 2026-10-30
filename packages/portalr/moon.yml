@@ -176,8 +176,8 @@ tasks:
   schema:
     description: "Regenerate the router's OpenAPI document, and lattice's integrations, in schemas/"
     script: >-
-      uv run python -m portalr.fastapi.openapi > schemas/portalr.openapi.json &&
-      uv run python -m portalr.integrations > schemas/integrations.json
+      uv run python $workspaceRoot/scripts/generate.py schemas/portalr.openapi.json portalr.fastapi.openapi &&
+      uv run python $workspaceRoot/scripts/generate.py schemas/integrations.json portalr.integrations
     options:
       cache: false
       runInCI: false

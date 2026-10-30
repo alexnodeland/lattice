@@ -11,6 +11,7 @@ The root [AGENTS.md](../AGENTS.md) applies; this adds what is specific to the re
 | `release_plan.py`, `release_pr_diff.py` | Plan a release's builds; recognise a release-only pull request |
 | `pypi.py`, `attach-assets`, `verify-attestation` | Release workflow: what PyPI serves, release assets, attestations |
 | `standalone.py`, `lowest_direct.py` | Install a wheel outside the workspace, at built or floor versions, and import it |
+| `generate.py` | Writes a generator module's output, and only its output, to a file (the `schema` tasks) |
 | `check_site.py` | Finds lists in the built site that rendered as text (`lattice:docs`) |
 | `check_spec.py` | Holds each formal spec in `docs/<package>/spec/` to its README, code and tests |
 | `griffe_sphinx_roles.py` | Griffe extension: Sphinx roles in docstrings become mkdocstrings links |

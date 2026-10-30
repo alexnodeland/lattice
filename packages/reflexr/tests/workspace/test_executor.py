@@ -361,7 +361,7 @@ async def test_cancelling_a_run_stops_its_action(build: Build) -> None:
 
 
 async def test_losing_the_lease_stops_the_action(
-    build: Build, storage: Storage, clock: FakeClock
+    build: Build, storage: Storage, clock: FakeClock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspaces = build([rule(then=run("blocked"))])
     deps = Deps()
@@ -372,9 +372,22 @@ async def test_losing_the_lease_stops_the_action(
     attempt = asyncio.create_task(executor.execute())
     await deps.started.wait()
     [running] = await workspace.runs()
+    # Hold the executor's renewals back while the lease expires and the thief takes it: a
+    # renewal between the two would extend the lease from the fake clock's new time.
+    acquire = storage.acquire_lease
+    stolen = asyncio.Event()
+
+    async def renew_after_the_theft(
+        workspace: WorkspaceRef, key: str, holder: str, ttl: timedelta
+    ) -> bool:
+        await stolen.wait()
+        return await acquire(workspace, key, holder, ttl)
+
+    monkeypatch.setattr(storage, "acquire_lease", renew_after_the_theft)
     clock.advance(60)
-    assert await storage.acquire_lease(ACME, run_lease(running.id), "thief", timedelta(minutes=1))
-    assert await asyncio.wait_for(attempt, timeout=1) == 0
+    assert await acquire(ACME, run_lease(running.id), "thief", timedelta(minutes=1))
+    stolen.set()
+    assert await attempt == 0  # the next renewal finds the lease lost
     assert (await workspace.runs())[0].status == "running"  # for the new holder to recover
 
 

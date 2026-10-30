@@ -4,7 +4,7 @@
 #
 # - Up to two checks run at once (`max_parallel_checks`), and a batch holds one to five pull
 #   requests (`batch_size`), waiting at most three minutes for a batch to fill
-#   (`batch_max_wait_time`). A `CI` run is 39 jobs and the runners are 20 at once, so three
+#   (`batch_max_wait_time`). A `CI` run is up to 41 jobs and the runners are 20 at once, so three
 #   drafts of one pull request each starve one another. Mergify keeps batches at the minimum
 #   while the parallel checks can drain the queue, and grows them toward the maximum when it
 #   backs up, which is when sharing a draft saves the most. A lone pull request meets the minimum

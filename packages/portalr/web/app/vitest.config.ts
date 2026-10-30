@@ -2,6 +2,7 @@ import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { playwright } from "@vitest/browser-playwright";
 import { configDefaults, defineConfig } from "vitest/config";
+import type { BrowserCommand } from "vitest/node";
 import { excalidraw } from "./excalidraw";
 
 // The app's logic and its route tree run without a browser; its own components, such as a
@@ -22,6 +23,11 @@ const phone = (colorScheme: "light" | "dark") => ({
     },
   }),
 });
+
+/** Ask for forced colours, as a high-contrast mode does, or stop asking. */
+const forcedColors: BrowserCommand<[active: boolean]> = async ({ page }, active) => {
+  await page.emulateMedia({ forcedColors: active ? "active" : "none" });
+};
 
 export default defineConfig({
   plugins: [excalidraw("/"), react(), tailwindcss()],
@@ -46,6 +52,7 @@ export default defineConfig({
             headless: true,
             provider: playwright({ contextOptions: { reducedMotion: "reduce" } }),
             instances: [{ browser: "chromium" }],
+            commands: { forcedColors },
           },
         },
       },
@@ -56,7 +63,7 @@ export default defineConfig({
         test: {
           name: `phone-${scheme}`,
           include: ["src/**/*.touch.test.tsx"],
-          setupFiles: ["./src/test/setup.ts"],
+          setupFiles: ["./src/test/setup.ts", "./src/test/phone.ts"],
           api: { host: "127.0.0.1" },
           browser: {
             enabled: true,

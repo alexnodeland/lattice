@@ -10,6 +10,6 @@ proto trust .prototools
 proto install
 uv python install 3.12 3.13 3.14
 uv sync --all-packages --all-groups --all-extras
-bun install
+scripts/bun-install
 (cd packages/portalr/web/ui && bun x --bun --no-install playwright install --with-deps --only-shell chromium)
 uv run prek install

@@ -33,7 +33,7 @@ Every web package has these, each run by Bun from `bun.lock`:
 |---|---|
 | `lint` | Check formatting and lint rules with Biome |
 | `typecheck` | Type-check with TypeScript 7, strict |
-| `test` | Run the tests with Vitest (`client`'s unit tests, and `ui`'s in Chromium, light and dark). `ui`'s screenshots run only where `CI` is set, against Linux baselines: to make or update one, take the `ui-screenshots` artifact from a failed Check job, review it, and commit its `-reference` (a new one) or `-actual` (a changed one) files under `packages/portalr/web/ui/src/__screenshots__/`, without that suffix |
+| `test` | Run the tests with Vitest (`client`'s unit tests, and `ui`'s in Chromium, light and dark). `ui`'s screenshots run only where `CI` is set, against Linux baselines: to make or update one, take the `ui-screenshots` artifact from a failed Check (web) job, review it, and commit its `-reference` (a new one) or `-actual` (a changed one) files under `packages/portalr/web/ui/src/__screenshots__/`, without that suffix |
 | `build` | Build the app with Vite (`app` and `admin`) |
 | `format` | Format the code and apply safe lint fixes with Biome |
 | `check` | Everything CI runs for the project |
@@ -73,10 +73,12 @@ stackr keeps its Makefile for the stack: run `make` in `packages/stackr` to list
 artifactr's, reflexr's and grantr's storage tests, and relayr's ledger tests, run against in-memory storage, SQLite and PostgreSQL. SQLite needs nothing extra, and it alone reaches the coverage gate. The PostgreSQL tests run only when `ARTIFACTR_TEST_POSTGRES_URL`, `REFLEXR_TEST_POSTGRES_URL`, `GRANTR_TEST_POSTGRES_URL` or `RELAYR_TEST_POSTGRES_URL` is set (otherwise pytest reports them as deselected), and CI always runs them.
 
 ```bash
-moon run artifactr:pg-up        # postgres:17 on localhost:54329 (reflexr's is on 54330, grantr's on 54331, relayr's on 54332)
+moon run artifactr:pg-up        # postgres:17, as a compose project of its own on a port the system picks
 moon run artifactr:test-pg      # the whole suite, with the PostgreSQL tests included
 moon run artifactr:pg-down
 ```
+
+`pg-up` names the compose project with a random token (`artifactr-pg-3f9a1c0e`) and records it in the package's `.pg-project`, so each worktree has a stack of its own; `test-pg` reads the URL from it (`scripts/pg url`), and `pg-down` removes only that project, with its volumes. `app-up` and relayr's `vikunja-up` join the same project.
 
 To use another database, set the variable yourself, for example `postgresql+asyncpg://user:password@host:5432/db`, and run `moon run artifactr:test`. Each test creates its own schema there and drops it afterwards. Give each library its own database.
 
@@ -131,6 +133,15 @@ Each package's `CHANGELOG.md` is written from these messages by release-please, 
 Each Python package's `pyproject.toml` states the **oldest** versions it supports, as wide as correctness allows, so applications can resolve it alongside their own dependencies. A package names a sibling with a normal range in `[project]`, and `[tool.uv.sources]` takes the sibling from the workspace, which only development sees. `uv.lock` pins what CI and contributors run, one resolution for every package, and Renovate keeps the lockfile (not the ranges) current. Raise a lower bound only when the code needs a newer feature or fix, in the same pull request as that code.
 
 The web packages are private and pin exact versions, which `bun.lock` records and Renovate moves. A web package names a sibling as `"@portalr/ui": "workspace:*"`, and its `moon.yml` names it in `dependsOn`, which the root's tests check.
+
+`make install` installs the web packages with `scripts/bun-install`: `bun install --frozen-lockfile`, as CI runs it, with the Bun `.prototools` pins. It fails, and says why, when the Bun on `PATH` is another version or when the install would change `bun.lock`, which it never changes itself. The one way to add, remove or move a JS dependency, and so change `bun.lock`, is Bun's own command run in the web package, with the pinned Bun on `PATH` (`proto use`):
+
+```bash
+cd packages/portalr/web/<package>   # or the root, for the shared tools (Biome, knip, TypeScript)
+bun add --exact <name>@<version>    # or `bun add --exact --dev`, or `bun remove <name>`
+```
+
+Commit `bun.lock` with the `package.json` it belongs to, and nothing else in it.
 
 ## Design: RFCs, ADRs and evergreen docs
 

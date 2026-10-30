@@ -38,6 +38,23 @@ test("the current area sits on the wash in the working colour, where the rest ar
   expect(other.color).toBe(token("fg"));
   expect(other.backgroundColor).toBe("rgba(0, 0, 0, 0)");
   expect(contrast(style.color, style.backgroundColor)).toBeGreaterThanOrEqual(4.5);
+  // And in the heavier weight, a cue beside the colour (portalr ADR-0081); a page inside it too.
+  expect(style.fontWeight).toBe("600");
+  expect(other.fontWeight).toBe("500");
+});
+
+test("the area a page inside belongs to is marked as the page's own is: wash, colour and weight", async () => {
+  const screen = await render(
+    <SideNav label="Workspace">
+      <NavLink href="#threads" aria-current="true">
+        Threads
+      </NavLink>
+    </SideNav>,
+  );
+  const style = getComputedStyle(screen.getByRole("link", { name: "Threads" }).element());
+  expect(style.fontWeight).toBe("600");
+  expect(style.color).toBe(token("accent"));
+  expect(style.backgroundColor).toBe(token("wash"));
 });
 
 test("a link renders as the element it is given, such as the router's", async () => {

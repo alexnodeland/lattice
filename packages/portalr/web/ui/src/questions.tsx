@@ -552,7 +552,7 @@ function OptionRow({
   );
   return multiple ? (
     <Checkbox.Root {...named} value={option.value} className={ROW}>
-      <span className={cn(MARK, "rounded group-data-checked:bg-accent")}>
+      <span className={cn(MARK, "rounded-(--checkbox-radius) group-data-checked:bg-accent")}>
         <Checkbox.Indicator className="text-on-accent">
           <Icon icon={glyphs.check} className="size-3" />
         </Checkbox.Indicator>

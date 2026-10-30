@@ -1043,6 +1043,44 @@ test("a long message is folded past its first lines, and opens whole; Copy copie
   expect(getComputedStyle(body).overflow).not.toBe("hidden");
 });
 
+test("a message is folded by its height, not its lines: a few long paragraphs fold, many short lines that fit don't", async () => {
+  const paragraph = "A long paragraph of the agent's words, wrapped over many lines. ".repeat(40);
+  const few = [paragraph, paragraph, paragraph].join("\n\n");
+  const screen = await render(
+    <div className="w-80">
+      <Messages>
+        <Message message={message({ content: few })} author="Assistant" />
+      </Messages>
+    </div>,
+  );
+  // Three lines of source, far taller than the fold.
+  await expect
+    .element(screen.getByRole("button", { name: "Show the whole message" }))
+    .toBeVisible();
+  await screen.unmount();
+  // Forty-five lines of source, which Markdown joins into one short paragraph.
+  const short = Array.from({ length: 45 }, (_, at) => `${at}`).join("\n");
+  const fits = await render(<Message message={message({ content: short })} author="Assistant" />);
+  await expect.element(fits.getByText(/^0\s+1\s+2/)).toBeVisible();
+  expect(fits.getByRole("button", { name: "Show the whole message" }).elements()).toHaveLength(0);
+});
+
+test("what a folded message hides is out of the tab order, and back in it once the message is whole", async () => {
+  const lines = Array.from({ length: 60 }, (_, at) => `line ${at + 1}`).join("\n\n");
+  const content = `[first](https://example.com/first)\n\n${lines}\n\n[last](https://example.com/last)`;
+  const screen = await render(<Message message={message({ content })} author="Assistant" />);
+  const whole = screen.getByRole("button", { name: "Show the whole message" });
+  await expect.element(whole).toBeVisible();
+  const first = screen.getByRole("link", { name: /^first/ }).element() as HTMLElement;
+  const last = screen.getByRole("link", { name: /^last/ }).element() as HTMLElement;
+  // Seen, it is reached; folded away, it isn't.
+  expect(first.tabIndex).toBe(0);
+  await expect.poll(() => last.tabIndex).toBe(-1);
+  await whole.click();
+  await expect.poll(() => last.tabIndex).toBe(0);
+  expect(last.hasAttribute("tabindex")).toBe(false);
+});
+
 test("the composer holds a way to attach at the start of its row, and hands dropped files to the page", async () => {
   const onFiles = vi.fn();
   const screen = await render(
@@ -1312,6 +1350,43 @@ test("the strip over a turn says how it goes, for how long, and offers Stop whil
   await strip.getByRole("button", { name: "Stop" }).click();
   expect(onStop).toHaveBeenCalledOnce();
   expect(strip.getByRole("button", { name: "Go to the question" }).elements()).toHaveLength(0);
+});
+
+test("the strip's clock counts minutes and seconds, then hours, then days, and says nothing it can't read", async () => {
+  const started = Date.parse("2026-10-20T00:00:00Z");
+  const at = (seconds: number) => new Date(started + seconds * 1000);
+  const clock = async (now: Date, change: Partial<Artifactr.Run> = {}) => {
+    const screen = await render(
+      <RunStrip run={{ ...run("running"), ...change }} onStop={sent()} now={now} />,
+    );
+    const group = screen.getByRole("group", { name: "This turn" }).element();
+    const text = group.querySelector(".ms-auto")?.textContent ?? null;
+    await screen.unmount();
+    return text;
+  };
+  expect(await clock(at(65))).toBe("for 1:05");
+  expect(await clock(at(2 * 3600 + 3 * 60 + 40))).toBe("for 2:03:40");
+  expect(await clock(at(3 * 86_400 + 2 * 3600 + 59))).toBe("for 3 d 2 h");
+  // A clock behind the start says no time at all, never a negative one.
+  expect(await clock(at(-30))).toBe("for 0:00");
+  // A start it can't read, or none, and there is no clock.
+  expect(await clock(at(65), { startedAt: "not a time" })).toBeNull();
+  expect(
+    await clock(at(65), { startedAt: undefined } as unknown as Partial<Artifactr.Run>),
+  ).toBeNull();
+});
+
+test("a paused turn's clock says it waits, in words beside the time", async () => {
+  const screen = await render(
+    <RunStrip
+      run={run("paused")}
+      onQuestion={() => {}}
+      now={new Date(Date.parse("2026-10-20T00:00:00Z") + 125_000)}
+    />,
+  );
+  await expect
+    .element(screen.getByRole("group", { name: "This turn" }).getByText("waiting 2:05"))
+    .toBeVisible();
 });
 
 test("the strip over a paused turn offers the way to its question, and no Stop", async () => {

@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# Sourced by the scripts that run a compose project of their own (scripts/api, scripts/image,
+# Sourced by the scripts that run a compose project of their own (scripts/api, scripts/image, scripts/pg,
 # portalr's and the client's `api`, and the web packages' `bdd`), so each run names it the same
 # way.
 #

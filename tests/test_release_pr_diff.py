@@ -308,18 +308,50 @@ UNGATED = {"release-pr", "dependency-review", "osv", "ci", "release-images-publi
 """The jobs that don't need the gate: itself, the two that run on a release too, the aggregate,
 and two that need a gated job, and so skip with it."""
 
+HEAVY = {
+    "images",
+    "specs",
+    "floors",
+    "thin-images",
+    "files",
+    "umami-retention",
+    "release-images",
+    "acceptance",
+    "aws",
+    "template",
+    "smoke",
+}
+"""The jobs that also need Affected, and skip when no project but lattice is affected."""
+
+LIGHT = "${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}"
+PACKAGES = (
+    "${{ !cancelled() && needs.release-pr.outputs.light != 'true'"
+    " && needs.affected.outputs.packages == 'true' }}"
+)
+
+
+def skipped(skips: str, condition: str) -> set[str]:
+    """The jobs `allowed-skips` lists after `condition &&`."""
+    found = re.search(re.escape(condition) + r"\s*&& '([^']*)'", skips)
+    assert found is not None, condition
+    return {each.strip() for each in found.group(1).split(",")}
+
 
 def test_every_other_job_is_gated_and_may_skip_only_when_light() -> None:
     jobs = yaml.safe_load((ROOT / ".github/workflows/ci.yml").read_text())["jobs"]
     gated = set(jobs) - UNGATED
-    for name in gated:
+    for name in gated - HEAVY:
         assert jobs[name]["needs"] == "release-pr", name
-        assert jobs[name]["if"] == "${{ !cancelled() && needs.release-pr.outputs.light != 'true' }}"
+        assert jobs[name]["if"] == LIGHT, name
+    for name in HEAVY:
+        assert jobs[name]["needs"] == ["release-pr", "affected"], name
+        assert jobs[name]["if"] == PACKAGES, name
     assert set(jobs["ci"]["needs"]) == set(jobs) - {"ci"}
     skips = jobs["ci"]["steps"][0]["with"]["allowed-skips"]
-    light = re.search(r"needs\.release-pr\.outputs\.light == 'true'\s*&& '([^']*)'", skips)
-    assert light is not None
-    assert {each.strip() for each in light.group(1).split(",")} == gated | {
-        "release-images-publish",
-        "aws-tier2",
-    }
+    light = skipped(skips, "needs.release-pr.outputs.light == 'true'")
+    assert light == gated | {"release-images-publish", "aws-tier2"}
+    always = {"release-pr", "release-images-publish", "aws-tier2", "dependency-review", "osv"}
+    assert skipped(skips, "needs.affected.outputs.packages != 'true'") == always | HEAVY
+    otherwise = re.search(r"\|\| '([^']*)' \}\}\s*$", skips)
+    assert otherwise is not None
+    assert {each.strip() for each in otherwise.group(1).split(",")} == always

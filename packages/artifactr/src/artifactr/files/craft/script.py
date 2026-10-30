@@ -17,7 +17,7 @@ import tempfile
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Final
+from typing import Final, TextIO
 
 import anyio
 from pydantic import BaseModel, JsonValue, ValidationError
@@ -30,6 +30,13 @@ SOURCE: Final = "document"
 
 ENVIRONMENT: Final = {"LANG": "C.UTF-8", "PATH": "/usr/bin:/bin", "QT_QPA_PLATFORM": "offscreen"}
 """All the CLI is given of an environment, but its `HOME`, which is the call's directory."""
+
+KEPT: Final = 4000
+"""The most characters of what the CLI printed that a crash's message keeps: its start and end.
+
+Blender prints its own lines first and the cause of its end last, such as a library it couldn't
+load before it rendered (#783): a tail alone, or a head alone, can miss either.
+"""
 
 
 class _Result(BaseModel):
@@ -123,17 +130,18 @@ class Script:
             with (root / "printed").open("w+", errors="replace") as printed:
                 try:
                     with anyio.fail_after(deadline):
-                        await self._process(root, printed.fileno())
+                        status = await self._process(root, printed.fileno())
                 except TimeoutError:
                     raise AppFailed("timeout", f"{cli} took more than {deadline:.3g}s") from None
                 try:
                     ran = _Result.model_validate_json((root / "result.json").read_bytes())
                 except (OSError, ValidationError):
-                    # A script that ended before writing its result: what it printed says why.
-                    printed.seek(max(0, printed.seek(0, 2) - 2000))
-                    said = printed.read()[-500:].strip()
+                    # A script that ended before writing its result: how it ended, and what it
+                    # printed, say why.
                     raise AppFailed(
-                        "crashed", f"{cli} wrote no result; it printed: {said}"
+                        "crashed",
+                        f"{cli} wrote no result, and ended with {_ended(status)}; "
+                        f"it printed: {_printed(printed)}",
                     ) from None
             if ran.version != self.version:
                 raise AppFailed("refused", f"{cli} is {ran.version}, not {self.version}")
@@ -141,8 +149,8 @@ class Script:
                 raise AppFailed("refused", ran.refused)
             return Ran(ran.result, self._written(root / "out", wanted))
 
-    async def _process(self, root: Path, printed: int) -> None:
-        """The CLI, run to its end, or killed with the call when its deadline passes.
+    async def _process(self, root: Path, printed: int) -> int:
+        """The CLI's exit status, run to its end, or killed with the call when its deadline passes.
 
         It runs in a session of its own, and whatever of its group is left when the call ends,
         however it ends, is killed with it: nothing it started outlives the call in its group.
@@ -157,7 +165,7 @@ class Script:
             start_new_session=True,
         )
         try:
-            await process.wait()
+            return await process.wait()
         finally:
             # The group is gone already, or only its leader is left, unreaped.
             with contextlib.suppress(ProcessLookupError, PermissionError):
@@ -175,3 +183,22 @@ class Script:
                 raise AppFailed("too_large", f"{path.name} is larger than {self._limit} bytes")
             written[path.name] = path.read_bytes()
         return written
+
+
+def _ended(status: int) -> str:
+    """How the CLI ended, by its exit status: negative, the signal that killed it."""
+    if status < 0:
+        return f"signal {-status} ({signal.Signals(-status).name})"
+    return f"exit status {status}"
+
+
+def _printed(printed: TextIO) -> str:
+    """What the CLI printed, whole up to KEPT characters, or its start and its end past it."""
+    size = printed.seek(0, 2)
+    printed.seek(0)
+    if size <= KEPT:
+        return printed.read().strip()
+    head = printed.read(KEPT // 4)
+    printed.seek(size - (KEPT - KEPT // 4))
+    tail = printed.read()
+    return f"{head.strip()}\n[...]\n{tail.strip()}"

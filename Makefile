@@ -14,7 +14,7 @@ help: ## List the available commands
 
 install: ## Install every package, group and extra, the web packages and their test browser, and the hooks
 	$(UV) sync --all-packages --all-groups --all-extras
-	$(BUN) install
+	BUN=$(BUN) scripts/bun-install
 	cd packages/portalr/web/ui && $(BUN) x --bun --no-install playwright install --only-shell chromium
 	$(UV) run prek install
 	git config blame.ignoreRevsFile .git-blame-ignore-revs

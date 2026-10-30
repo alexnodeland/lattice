@@ -134,6 +134,14 @@ jobs:
           persist-credentials: false
       - uses: ./.github/actions/toolchain # zizmor: ignore[self-repository] actionlint rejects `$/`
       - run: uv sync --locked --all-packages --all-groups --all-extras
+      # The X11 and GL libraries Blender's tarball links, as its worker's image installs them
+      # (stackr's copier.yml): without libEGL it starts, reads a scene and dies drawing it (#783).
+      - name: Blender's libraries
+        if: matrix.app == 'blender'
+        run: >-
+          sudo apt-get update && sudo apt-get install --yes --no-install-recommends
+          libx11-6 libxi6 libxxf86vm1 libxfixes3 libxrender1 libxkbcommon0 libsm6 libice6
+          libgl1 libegl1 libegl-mesa0 libgl1-mesa-dri
       - run: moon run artifactr:fidelity
         env:
           CRAFT: ${{ matrix.app }}

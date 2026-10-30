@@ -15,8 +15,10 @@ The root [AGENTS.md](../AGENTS.md) applies; this adds what is specific to the re
 | `check_spec.py` | Holds each formal spec in `docs/<package>/spec/` to its README, code and tests |
 | `griffe_sphinx_roles.py` | Griffe extension: Sphinx roles in docstrings become mkdocstrings links |
 | `api`, `image` | A package's acceptance tests; an example's image, each as its own compose project |
+| `pg` | A library's contributor stack (`pg-up`, `test-pg`, `pg-down`), as its own compose project |
 | `compose-project.sh` | Sourced by those: names a compose project with a random token |
 | `dev`, `check-dev` | `make dev`'s stack and application; `check-dev` checks `dev` against fakes |
+| `bun-install` | `make install`'s web packages: the pinned Bun, `--frozen-lockfile`, `bun.lock` unchanged |
 | `tlc`, `tlc.sha256` | Model-check a TLA+ spec with the pinned, checksummed `tla2tools.jar` |
 | `craft`, `crafts/*.sha256` | Fetch a crafting app at its pinned release and checksum |
 

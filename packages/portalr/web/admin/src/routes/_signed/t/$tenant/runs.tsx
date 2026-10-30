@@ -8,6 +8,8 @@ import {
   Moment,
   PageHeader,
   Reading,
+  Row,
+  Rows,
   RuleRunStatus,
   RunList,
   type RunParts,
@@ -256,14 +258,20 @@ function Title({ run, filed }: { run: Reflexr.Run; filed: readonly TrackerItem[]
           name={`History of run ${run.id}, ${run.history.length}`}
           className="text-xs"
         >
-          <ul className="flex flex-col gap-1">
+          {/* The kit's rows: who did what and when, and why beneath, where they said. */}
+          <Rows label={`History of run ${run.id}`}>
             {run.history.map((step) => (
-              <li key={step.seq}>
-                {actorName(step.actor)} {DONE[step.kind]} <Moment at={step.at} />
-                {step.reason ? <span className="text-muted">: {step.reason}</span> : null}
-              </li>
+              <Row
+                key={step.seq}
+                name={
+                  <>
+                    {actorName(step.actor)} {DONE[step.kind]} <Moment at={step.at} />
+                  </>
+                }
+                meta={step.reason}
+              />
             ))}
-          </ul>
+          </Rows>
         </Disclosure>
       )}
     </div>

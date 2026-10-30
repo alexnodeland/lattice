@@ -4,8 +4,8 @@
  * as `not_enabled` (portalr ADR-0045).
  */
 
-import { afterEach, expect, test, vi } from "vitest";
-import { page, userEvent } from "vitest/browser";
+import { afterEach, expect, onTestFinished, test, vi } from "vitest";
+import { commands, page, userEvent } from "vitest/browser";
 import { open } from "./test/app";
 
 const FLAGS = "/grantr/v1/tenants/acme/workspaces/notes/enabled-integrations";
@@ -188,6 +188,17 @@ test("the threads are filtered by state, the view kept in the URL, found from th
   await expect
     .element(invoices.getByRole("img", { name: "Moved since you read it" }))
     .toBeVisible();
+  // Under forced colours the mark keeps a colour of its own, the system's text, not the working
+  // colour the system would take away (portalr ADR-0081).
+  const mark = invoices.getByRole("img", { name: "Moved since you read it" }).element();
+  const accent = getComputedStyle(mark).backgroundColor;
+  onTestFinished(() => commands.forcedColors(false));
+  await commands.forcedColors(true);
+  await expect.poll(() => matchMedia("(forced-colors: active)").matches).toBe(true);
+  expect(getComputedStyle(mark).forcedColorAdjust).toBe("none");
+  expect(getComputedStyle(mark).backgroundColor).not.toBe(accent);
+  expect(getComputedStyle(mark).backgroundColor).toBe(systemColour("CanvasText"));
+  await commands.forcedColors(false);
   expect(
     threads
       .getByRole("listitem")
@@ -405,3 +416,13 @@ test("before grantr answers, or where it can't, no connected app is listed, not 
   await expect.element(screen.getByRole("group", { name: "Go to" })).toBeVisible();
   expect(screen.getByRole("group", { name: "Connected apps" }).elements()).toHaveLength(0);
 });
+
+/** A system colour as the browser resolves it now, read off a probe that keeps its own. */
+function systemColour(name: string): string {
+  const probe = document.createElement("span");
+  probe.style.cssText = `background: ${name}; forced-color-adjust: none`;
+  document.body.append(probe);
+  const colour = getComputedStyle(probe).backgroundColor;
+  probe.remove();
+  return colour;
+}

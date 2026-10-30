@@ -458,6 +458,12 @@
       "bg": "subtle",
       "min": 3,
       "why": "the quiet wash: the reader's words, a table's head row, a review strip"
+    },
+    {
+      "fg": "outline",
+      "bg": "paper",
+      "min": 1.5,
+      "why": "a labelled button's outline, lighter than a field's edge: its words are its cue (ADR-0081)"
     }
   ]
 }

@@ -3,12 +3,14 @@
 Run as `python -I fake_script_cli.py [ARGUMENTS...] SCRIPT --pass CALL`. It writes its result
 beside the call, as a script does: `echo`, the call, its arguments and its environment; `write`,
 a file in `out/` of `size` bytes; `linger`, a process left behind in its group, its id in
-`out/lingering`; `refuse`; `other`, a result from another version; `crash`, no result; `hang`,
-never ending.
+`out/lingering`; `refuse`; `other`, a result from another version; `crash`, no result; `flood`,
+no result after printing more than the adapter keeps, and exit status 3; `segfault`, no result,
+killed by SIGSEGV; `hang`, never ending.
 """
 
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -41,6 +43,13 @@ def main() -> None:
         case "crash":
             sys.stderr.write("it ended\n")
             return
+        case "flood":
+            sys.stdout.write("the first line\n" + "noise\n" * 2000)
+            sys.stdout.flush()
+            sys.stderr.write("the cause, last\n")
+            sys.exit(3)
+        case "segfault":
+            os.kill(os.getpid(), signal.SIGSEGV)
         case _:
             time.sleep(60)
     (here / "result.json").write_text(json.dumps(result))

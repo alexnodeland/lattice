@@ -343,7 +343,9 @@ async def runners(gate: Gate, _no_task_left: None) -> AsyncIterator[MakeRunner]:
     """Make runners that are closed as the test ends, so one that is stuck fails the test.
 
     They are closed before `_no_task_left` cancels what is left: a runner still open would
-    start a turn for each it cancels.
+    start a turn for each it cancels. Each is first let finish handing its threads over, since
+    a hand-over cancelled mid-query would leave a SQL connection checked out. `drain()` waits
+    for the hand-overs, not for the turns they start, which `aclose()` still cancels.
     """
     made: list[Runner[Gate]] = []
 
@@ -354,6 +356,7 @@ async def runners(gate: Gate, _no_task_left: None) -> AsyncIterator[MakeRunner]:
 
     yield make
     for runner in made:
+        await runner.drain()
         await runner.aclose()
 
 

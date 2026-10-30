@@ -108,7 +108,9 @@ test("its links, code, quotes and tables take portalr's colours", async () => {
   const quote = screen.container.querySelector("blockquote");
   expect(quote && style(quote).color).toBe(token("muted"));
   const table = screen.getByRole("region", { name: "Table" }).element();
-  expect(style(table).borderTopColor).toBe(token("line"));
+  // The kit's table frame: the strong rule along its top, the hairline round the rest.
+  expect(style(table).borderTopColor).toBe(token("edge"));
+  expect(style(table).borderBottomColor).toBe(token("line"));
 });
 
 test("a caller's classes merge with the text's", async () => {

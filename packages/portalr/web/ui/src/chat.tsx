@@ -14,6 +14,7 @@ import {
   type ReactNode,
   useEffect,
   useId,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -226,8 +227,8 @@ type MessageProps = {
 /** The room of a message's row of actions, where the pointer hovers and the row is always there. */
 const ACTIONS_ROW = "min-h-7";
 
-/** The lines of a message past which it is folded, with a way to the whole. */
-const FOLDED_AFTER = 40;
+/** What the reader can reach inside a message, which its fold takes out of the tab order. */
+const REACHABLE = "a[href], button, input, select, textarea, [tabindex]";
 
 /**
  * The message grammar (portalr ADR-0081): the reader's words sit on the quiet wash at the end of
@@ -256,9 +257,47 @@ export function Message({
 }: MessageProps) {
   const name = useId();
   const notice = message.kind === "notice";
-  // A long message is folded past its first lines, with a way to the whole (portalr ADR-0080).
-  const long = message.content.split("\n").length > FOLDED_AFTER;
+  // A long message is folded past the code block's height, measured as it is drawn, with a way to
+  // the whole (portalr ADR-0080): a few long lines fold as many short ones do. What the fold hides
+  // is out of the tab order, so the keyboard never lands on what can't be seen.
+  const body = useRef<HTMLDivElement>(null);
+  const [long, setLong] = useState(false);
   const [whole, setWhole] = useState(false);
+  useLayoutEffect(() => {
+    const box = body.current;
+    if (!box || whole) {
+      return;
+    }
+    const measure = () => {
+      const folded = box.scrollHeight > box.clientHeight;
+      setLong(folded);
+      const bottom = box.getBoundingClientRect().bottom;
+      for (const each of box.querySelectorAll<HTMLElement>(REACHABLE)) {
+        const away = folded && each.getBoundingClientRect().top >= bottom;
+        if (away && each.dataset.folded === undefined) {
+          each.dataset.folded = each.getAttribute("tabindex") ?? "";
+          each.tabIndex = -1;
+        } else if (!away && each.dataset.folded !== undefined) {
+          const was = each.dataset.folded;
+          delete each.dataset.folded;
+          was ? each.setAttribute("tabindex", was) : each.removeAttribute("tabindex");
+        }
+      }
+    };
+    measure();
+    const resized = new ResizeObserver(measure);
+    resized.observe(box);
+    resized.observe(box.firstElementChild ?? box);
+    return () => {
+      resized.disconnect();
+      // Whole, everything in it is reachable again.
+      for (const each of box.querySelectorAll<HTMLElement>("[data-folded]")) {
+        const was = each.dataset.folded;
+        delete each.dataset.folded;
+        was ? each.setAttribute("tabindex", was) : each.removeAttribute("tabindex");
+      }
+    };
+  }, [whole]);
   // Where the pointer can't hover, the actions are a menu (portalr ADR-0080), opened by its button
   // or by a long press on the message; what it copied is said for a screen reader.
   const fingers = useCoarsePointer();
@@ -312,8 +351,10 @@ export function Message({
           })}
       >
         <div
+          ref={body}
           className={cn(
-            long && !whole && "relative max-h-(--code-block-max-height) overflow-hidden",
+            !whole && "relative max-h-(--code-block-max-height)",
+            long && !whole && "overflow-hidden",
           )}
         >
           <Markdown>{message.content}</Markdown>

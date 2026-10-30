@@ -17,6 +17,7 @@ import { AnsiText } from "./ansi";
 import { Button } from "./button";
 import { cn } from "./cn";
 import { Heading } from "./heading";
+import { SCROLL_BOX } from "./scroll-region";
 import { Reading } from "./skeleton";
 import { StatusBadge, type Tone } from "./status-badge";
 import type { Standing } from "./trace-view";
@@ -156,7 +157,7 @@ export function LogList({
             }
           }}
           onKeyDown={walk}
-          className="max-h-[30rem] min-h-24 overflow-auto rounded-(--card-radius) border border-line bg-surface"
+          className={SCROLL_BOX}
         >
           <div style={{ height: virtual.getTotalSize() }} className="relative w-full">
             {items.map((item) => {

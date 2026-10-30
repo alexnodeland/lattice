@@ -38,7 +38,7 @@ export function Plain({
       "aria-label": name,
       title: kit ? name : undefined,
       className: cn(
-        "inline-flex rounded-md outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
+        "inline-flex rounded-(--radius-3) outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus",
         kit && "min-w-0 max-w-full",
       ),
       children: <Lockup ui={ui} />,

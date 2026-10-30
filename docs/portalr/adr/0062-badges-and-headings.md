@@ -1,6 +1,6 @@
 # ADR-0062: Badges and headings
 
-**Status:** Accepted, amended by [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the badge's shape)
+**Status:** Accepted, amended by [ADR-0080](0080-ink-on-paper-the-products-visual-language.md) (the badge's shape) and [ADR-0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md) (the nav's count without a pill or its token)
 **Date:** 2026-10-21
 **Deciders:** Alex Nodeland
 
@@ -20,3 +20,7 @@ The UI audit of 2026-10-20 ([lattice RFC-0007](../../rfcs/0007-portalr-brand-kit
 - Easier: a kit restyles every heading below the page's through the type scale, and every label pill through the badge's tokens.
 - Easier: a raw `h2` to `h6` outside the kit is refused by Biome (`noRestrictedElements`), so every heading below the page's stays a `Heading`; Markdown's own headings are on its exception list already.
 - The style census's heading count, 3, doesn't move: the converted headings that are in its galleries (a stat card's title, a section's title) keep their looks. It was not re-run after the change.
+
+## Amendment, 2026-10-30: the nav's count has no token of its own
+
+[ADR-0081](0081-plain-a-bright-page-one-colour-and-a-mark-for-what-waits.md) (#779) set the rail's count as a figure, with no pill: `--nav-count-radius` was removed from the tokens, the brand inventory and the kits, and is superseded here. The nav's count is still not a badge, for the reason above. A question's answer chip keeps `--question-chip-radius`.

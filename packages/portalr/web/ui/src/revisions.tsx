@@ -222,7 +222,7 @@ export type More = (revision: RevisionShown, before: number | null) => ReactNode
 
 /** Each open revision's tab panel: its focus ring drawn inside, as a tab's is. */
 const PANEL =
-  "rounded-sm pt-3 -outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus";
+  "rounded-(--radius-2) pt-3 -outline-offset-(--focus-offset) focus-visible:outline-(length:--focus-width) focus-visible:outline-focus";
 
 /** A revision's preview: its content through its kind's renderer, read-only. */
 function Preview({ id, revision, renderer, runs }: Previewed & { runs: boolean }) {

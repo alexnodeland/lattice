@@ -1,0 +1,25 @@
+name: Disk
+description: >-
+  Frees the runner's disk for a job that pulls and builds many images: removes the preinstalled
+  toolchains no lattice job uses, and the images the runner comes with, and prints `df -h` before
+  and after, so a job's log shows how much room it had.
+runs:
+  using: composite
+  steps:
+    # A hosted runner's root has about 14 GB free; the stack with Langfuse, local Supabase and an
+    # application filled it to 99% (Loki throttled, MinIO refused Langfuse's uploads, run
+    # 41120932524). Android, .NET, GHC, Swift, CodeQL's bundles and the rest are ~30 GB that no job
+    # here reads: Java, Python and the toolchain's tools stay. The removals run at once.
+    - name: Free the disk
+      shell: bash
+      run: |
+        df -h / /mnt 2>/dev/null || df -h /
+        for path in /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
+          /usr/share/swift /opt/hostedtoolcache/CodeQL /usr/local/share/powershell \
+          /usr/local/share/chromium /opt/microsoft \
+          /usr/lib/google-cloud-sdk /usr/local/julia* /opt/az /usr/share/miniconda; do
+          sudo rm -rf "$path" &
+        done
+        wait
+        docker image prune --all --force >/dev/null
+        df -h /

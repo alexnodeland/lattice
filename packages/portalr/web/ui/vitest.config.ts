@@ -115,7 +115,7 @@ export default defineConfig({
         test: {
           name: "touch",
           include: ["src/**/*.touch.test.tsx"],
-          setupFiles: ["./src/test/setup.ts"],
+          setupFiles: ["./src/test/setup.ts", "./src/test/phone.ts"],
           browser: {
             enabled: true,
             headless: true,

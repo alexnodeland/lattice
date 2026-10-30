@@ -17,7 +17,14 @@ export GIT_COMMITTER_NAME=check-dev GIT_COMMITTER_EMAIL=check-dev@localhost
 check() {
   local what=$1
   shift
-  if "$@"; then echo "ok: $what"; else echo "FAIL: $what"; status=1; fi
+  if "$@"; then
+    echo "ok: $what"
+  else
+    echo "FAIL: $what"
+    status=1
+    # What the last run said, before the trap deletes it.
+    [[ ! -s $scratch/out ]] || sed 's/^/  | /' "$scratch/out"
+  fi
 }
 refused() { ! "$@" >"$scratch/out" 2>&1; }
 said() { grep -qF "$1" "$scratch/out"; }
@@ -136,20 +143,21 @@ check "and removed what the failed run left" test ! -e "$scratch/app.rendering"
 check "with stackr's stack on postgres" grep -qE \
   "^make -s -C $scratch/stackr up PROFILES=observability langfuse gateway auth analytics umami STACKR_DATABASE=postgres$" "$scratch/calls"
 check "its keys and choices in its .env, mode 0600" test \
-  "$(key LITELLM_API_KEY) $(key PORTAL_LITELLM_KEY) $(key DIAGRAMS) $(uv run python -c 'import os, sys; print(oct(os.stat(sys.argv[1]).st_mode & 0o777))' "$scratch/app/.env")" = \
-  "sk-tenant-made-up sk-portal-made-up on 0o600"
+  "$(key LITELLM_API_KEY) $(key PORTAL_LITELLM_KEY) $(key DIAGRAMS) $(perl -e 'printf "%o", (stat $ARGV[0])[2] & 0777' "$scratch/app/.env")" = \
+  "sk-tenant-made-up sk-portal-made-up on 600"
 check "every crafting app but Blender" test "$(key FILES_CRAFTS | tr , '\n' | grep -c .) $(key FILES_CRAFTS | grep -c blender)" = "13 0"
 check "and db-roles before the start" grep -q "run --rm --no-deps -T app portal-admin db-roles" "$scratch/calls"
 check "never printing a key" refused grep -q made-up "$scratch/out"
 check "nor passing one as an argument" refused grep -q made-up "$scratch/calls"
 check "and says nothing of a stale application" refused said "was generated from"
 
-up
-check "up again generates nothing and makes no key" refused grep -qE "copier|create-tenant|create-portal-key" "$scratch/calls"
+check "up again succeeds" up
+check "and generates nothing and makes no key" refused grep -qE "copier|create-tenant|create-portal-key" "$scratch/calls"
 check "and says nothing of a stale application" refused said "was generated from"
-up env DEV_DIAGRAMS=off
+check "up with DEV_DIAGRAMS=off" up env DEV_DIAGRAMS=off
 check "and sets DIAGRAMS from DEV_DIAGRAMS" test "$(sed -n 's/^DIAGRAMS=//p' "$scratch/app/.env" | tail -n 1)" = off
-up env DEV_REF=HEAD~1
+# A commit made here, not HEAD~1, which a shallow checkout (Nightly's Check) hasn't.
+check "up from another commit" up env DEV_REF="$unpushed"
 check "an application from another commit is said, with copier update" said "copier update"
 
 fresh
@@ -217,8 +225,9 @@ check "and doesn't blame the password" test "$(grep -c "could not translate host
 check "up stops when PostgreSQL doesn't start" refused volume_up env FAKE_PG_UP=fail
 check "and says so" said "PostgreSQL didn't start"
 
-fresh && up
-dev postgres scripts/dev down >/dev/null 2>&1
+fresh
+check "up, before down" up
+check "down" dev postgres scripts/dev down >"$scratch/out" 2>&1
 check "down stops the application, then the stack, keeping their data" test \
   "$(grep -c -e --volumes -e ' -v' "$scratch/calls") $(sed -n 1p "$scratch/calls")" = "0 make -s -C $scratch/app down"
 
@@ -227,21 +236,21 @@ check "and calls no docker" test ! -s "$scratch/calls"
 # A terminal, which pty gives it, and an answer.
 in_terminal() {
   printf '%s\n' "$1" | dev postgres env COMPOSE_PROJECT_NAME=elsewhere \
-    uv run python -c 'import pty, sys; sys.exit(pty.spawn(["scripts/dev", "reset"]) >> 8)'
+    uv run --no-sync python -c 'import pty, sys; sys.exit(pty.spawn(["scripts/dev", "reset"]) >> 8)'
 }
 in_terminal no >"$scratch/out" 2>&1 || true
 check "reset deletes nothing unless told yes" refused grep -q down "$scratch/calls"
-in_terminal yes >"$scratch/out" 2>&1
-check "reset deletes the application's project, then the stack's, by name" test \
+check "reset, told yes" in_terminal yes >"$scratch/out" 2>&1
+check "it deletes the application's project, then the stack's, by name" test \
   "$(grep '^docker compose -p' "$scratch/calls" | tr '\n' '|')" = \
   "docker compose -p portal down --volumes|docker compose -p stackr down --volumes|"
 check "and takes the gateway's keys out of the application's .env" test -z "$(key LITELLM_API_KEY)$(key PORTAL_LITELLM_KEY)"
-up
+check "up after reset" up
 check "so the next up makes new ones" test "$(grep -cE "create-tenant|create-portal-key" "$scratch/calls")" = 2
 mv "$scratch/app/.env" "$scratch/env-elsewhere" && ln -s "$scratch/env-elsewhere" "$scratch/app/.env"
-in_terminal yes >"$scratch/out" 2>&1
-check "reset writes a linked .env where it points, and leaves the link" test -L "$scratch/app/.env" -a -z "$(sed -n 's/^LITELLM_API_KEY=//p' "$scratch/env-elsewhere")"
-up
+check "reset, again" in_terminal yes >"$scratch/out" 2>&1
+check "it writes a linked .env where it points, and leaves the link" test -L "$scratch/app/.env" -a -z "$(sed -n 's/^LITELLM_API_KEY=//p' "$scratch/env-elsewhere")"
+check "up, before a stack-named application" up
 printf 'name: stackr\n' >"$scratch/app/compose.yaml"
 in_terminal yes >"$scratch/out" 2>&1 || true
 check "reset refuses an application named as the stack" said "which isn't an application's"

@@ -103,17 +103,68 @@ def test_a_release_run_never_publishes_whatever_the_pypi_switch(root: Path) -> N
         assert (made.write, made.publish) == (True, False)
 
 
-def test_a_release_run_lists_the_dispatches_that_publish_in_dependency_order(root: Path) -> None:
+def test_a_release_run_lists_one_dispatch_that_publishes_in_dependency_order(root: Path) -> None:
     run = push("packages/portalr", "packages/evalr", "packages/lattice-core", "packages/stackr")
     made = rp.plan(run, root)
-    command = "gh workflow run release.yml --ref {0}-v0.1.0 -f tag={0}-v0.1.0 -f mode=publish"
     assert rp.next_steps(made, run) == [
-        command.format("lattice-core"),
-        command.format("evalr"),
-        command.format("portalr"),
-    ], "stackr's images were pushed by the release run: nothing is left to publish"
+        "gh workflow run release.yml --ref lattice-core-v0.1.0 "
+        '-f tag="lattice-core-v0.1.0 evalr-v0.1.0 portalr-v0.1.0" -f mode=publish'
+    ], "one dispatch, one approval; stackr's images were pushed by the release run"
     tag = on_tag("evalr-v0.1.0")
     assert rp.next_steps(rp.plan(tag, root), tag) == []
+    stackr = push("packages/stackr")
+    assert rp.next_steps(rp.plan(stackr, root), stackr) == [], "no wheel, nothing to publish"
+
+
+def on_tags(*tags: str, mode: str = "publish", at: str = SHA) -> rp.Run:
+    """A dispatch on the first of several tags, the others at ``at``."""
+    return rp.Run(
+        event="workflow_dispatch",
+        sha=SHA,
+        ref_type="tag",
+        ref_name=tags[0],
+        tag=" ".join(tags),
+        mode=mode,
+        publishing=True,
+        tagged=dict.fromkeys(tags[1:], at),
+    )
+
+
+def test_one_dispatch_publishes_every_tag_of_a_release_in_dependency_order(root: Path) -> None:
+    made = rp.plan(on_tags("portalr-v0.1.0", "stackr-v0.1.0", "lattice-core-v0.1.0"), root)
+    assert made.packages == ["packages/lattice-core", "packages/portalr"]
+    assert made.ordered == ["packages/lattice-core", "packages/portalr"]
+    assert made.stackr, "stackr's tag in the list builds and pushes its images"
+    assert (made.write, made.publish) == (True, True)
+    assert made.releases == {
+        "packages/lattice-core--tag_name": "lattice-core-v0.1.0",
+        "packages/lattice-core--sha": SHA,
+        "packages/portalr--tag_name": "portalr-v0.1.0",
+        "packages/portalr--sha": SHA,
+        "packages/stackr--tag_name": "stackr-v0.1.0",
+        "packages/stackr--sha": SHA,
+    }
+
+
+def test_a_tag_at_another_commit_than_the_first_is_refused(root: Path) -> None:
+    with pytest.raises(
+        rp.Refused, match=r"evalr-v0\.1\.0 is not at lattice-core-v0\.1\.0's commit"
+    ):
+        rp.plan(on_tags("lattice-core-v0.1.0", "evalr-v0.1.0", at=LATER), root)
+    unknown = rp.Run(**{**on_tags("lattice-core-v0.1.0", "evalr-v0.1.0").__dict__, "tagged": {}})
+    with pytest.raises(rp.Refused, match="not at"):
+        rp.plan(unknown, root)
+
+
+def test_two_tags_of_one_package_are_refused(root: Path) -> None:
+    with pytest.raises(rp.Refused, match="one tag a package"):
+        rp.plan(on_tags("evalr-v0.1.0", "evalr-v0.1.0"), root)
+
+
+def test_a_tag_of_blanks_is_a_branch_rehearsal(root: Path) -> None:
+    made = rp.plan(rp.Run(event="workflow_dispatch", sha=SHA, tag="  "), root)
+    assert made.packages == list(rp.WHEELS)
+    assert not made.write
 
 
 def test_a_release_whose_tag_is_another_commit_is_refused_with_how_to_run_it_on_the_tag(
@@ -333,8 +384,10 @@ def test_the_environment_describes_the_run() -> None:
         "PATHS_RELEASED": json.dumps(["packages/evalr"]),
         "RELEASES": json.dumps(releases("packages/evalr")),
         "PYPI_PUBLISH": "true",
+        "TAGGED": json.dumps({"evalr-v0.1.0": SHA}),
     }
     run = rp.environment(env)
+    assert run.tagged == {"evalr-v0.1.0": SHA}
     assert run.event == "push"
     assert run.publishing
     assert run.released == ["packages/evalr"]
@@ -398,6 +451,7 @@ def test_only_the_jobs_that_attest_or_publish_may_ask_for_an_identity_token() ->
         ("attach", "needs.plan.outputs.write == 'true'"),
         ("publish-images", "needs.plan.outputs.write == 'true'"),
         ("release-notes", "needs.plan.outputs.write == 'true'"),
+        ("pypi-approve", "needs.plan.outputs.publish == 'true'"),
         ("pypi-publish", "needs.plan.outputs.publish == 'true'"),
     ],
 )
@@ -436,6 +490,15 @@ def test_pypi_publishes_one_package_at_a_time_and_stops_at_the_first_failure() -
     assert job["strategy"]["fail-fast"] is True
     assert job["environment"] == "pypi-${{ matrix.package.name }}", "one environment a package"
     assert "needs.plan.outputs.ordered" in job["strategy"]["matrix"]["package"]
+
+
+def test_one_approval_comes_before_every_package_is_published() -> None:
+    gate = JOBS["pypi-approve"]
+    assert gate["environment"] == "pypi-approval", "one environment, whose reviewers approve"
+    assert gate["permissions"] == {}, "the approval holds no permission and no identity token"
+    assert "pypi-check" in direct_needs("pypi-approve"), "approved after what PyPI is given"
+    assert "pypi-approve" in direct_needs("pypi-publish")
+    assert "needs.pypi-approve.result == 'success'" in JOBS["pypi-publish"]["if"]
 
 
 def test_each_pypi_leg_verifies_then_requires_then_publishes_then_waits() -> None:
@@ -505,7 +568,8 @@ def test_main_lists_the_dispatches_in_a_release_runs_summary(
     assert rp.main() == 0
     text = summary.read_text()
     assert "published nothing" in text
-    assert f"gh workflow run release.yml --ref evalr-v{version} -f tag=evalr-v{version}" in text
+    assert f'gh workflow run release.yml --ref evalr-v{version} -f tag="evalr-v{version}"' in text
+    assert "`pypi-approval`" in text
 
 
 def test_every_plan_output_a_job_reads_is_declared_by_the_plan_job() -> None:

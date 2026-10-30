@@ -21,7 +21,9 @@ rules below are in one place and are tested (tests/test_release_plan.py):
   pushes no image, rewrites no release notes and publishes nothing, on a branch (the whole release
   at its head) and on a tag alike. Attaching, attesting and pushing images happen in a release
   run, or in ``mode=publish`` on a tag. **Publishing to PyPI happens only in ``mode=publish`` on
-  a tag, one package a dispatch**: a release run never publishes. It lists the dispatches to run.
+  a tag**: a release run never publishes. It lists the one dispatch to run, which names every tag
+  the release made, all at one commit, and publishes them all after one approval (ADR-0031). A
+  dispatch may name one tag alone.
 """
 
 import json
@@ -62,12 +64,15 @@ class Run:
         sha: The commit the workflow runs at, which an attestation names.
         ref_type: ``branch`` or ``tag``, of the ref a dispatch was run on.
         ref_name: That ref's name.
-        tag: A dispatch's ``tag`` input: the release to build again; empty to rehearse.
+        tag: A dispatch's ``tag`` input: the releases to build again, one tag or several
+            separated by spaces, all at the commit of the first, which the run is on; empty to
+            rehearse.
         mode: A dispatch's ``mode`` input: ``rehearse`` or ``publish``.
         released: The packages release-please released on this push.
         releases: All of release-please's outputs, such as ``packages/x--sha``.
         publishing: Whether the repository has turned publishing to PyPI on (the
             ``PYPI_PUBLISH`` variable).
+        tagged: The commit each tag a dispatch names is at, as the repository says.
     """
 
     event: str
@@ -79,6 +84,7 @@ class Run:
     released: Sequence[str] = ()
     releases: Mapping[str, str] = field(default_factory=dict[str, str])
     publishing: bool = False
+    tagged: Mapping[str, str] = field(default_factory=dict[str, str])
 
 
 @dataclass(frozen=True)
@@ -160,7 +166,7 @@ def again(tag: str, path: str) -> str:
     return (
         f"  {command}\n    (it attaches and attests the wheels; it publishes to PyPI as well "
         "only if the PYPI_PUBLISH variable is true, and then after the approval of the "
-        "package's `pypi-<distribution>` environment)"
+        "`pypi-approval` environment)"
     )
 
 
@@ -215,7 +221,6 @@ def plan(run: Run, root: Path = ROOT) -> Plan:
         packages = [path for path in WHEELS if path in released]
         refuse_wrong_version(packages, run.releases, root)
         return built(
-            run,
             packages,
             run.releases,
             STACKR in released,
@@ -227,11 +232,10 @@ def plan(run: Run, root: Path = ROOT) -> Plan:
         raise Refused(f"the workflow doesn't run on {run.event}")
     if run.mode not in {"rehearse", "publish"}:
         raise Refused(f"mode is rehearse or publish, not {run.mode!r}")
-    if not run.tag:
+    if not run.tag.split():
         if run.mode == "publish":
             raise Refused("only a release is published: name its tag, and run on the tag")
         return built(
-            run,
             list(WHEELS),
             {
                 f"{path}--{field}": value
@@ -246,24 +250,37 @@ def plan(run: Run, root: Path = ROOT) -> Plan:
                 "attached, attested, pushed or published"
             ],
         )
-    if run.ref_type != "tag" or run.ref_name != run.tag:
-        raise Refused(f"run the workflow on the tag, not on {run.ref_name}: --ref {run.tag}")
-    path = tag_path(run.tag, root)
-    releases = {f"{path}--tag_name": run.tag, f"{path}--sha": run.sha}
-    packages = [] if path == STACKR else [path]
+    tags = run.tag.split()
+    if run.ref_type != "tag" or run.ref_name != tags[0]:
+        raise Refused(f"run the workflow on the tag, not on {run.ref_name}: --ref {tags[0]}")
+    paths = [tag_path(tag, root) for tag in tags]
+    if len(set(paths)) != len(paths):
+        raise Refused(f"one tag a package, not {run.tag}")
+    elsewhere = [tag for tag in tags[1:] if run.tagged.get(tag) != run.sha]
+    if elsewhere:
+        raise Refused(
+            f"{', '.join(elsewhere)} is not at {tags[0]}'s commit, {run.sha[:12]}: a run builds "
+            "and attests one commit, so name only the tags of one release, or run each alone"
+        )
+    releases = {
+        f"{path}--{field}": value
+        for path, tag in zip(paths, tags, strict=True)
+        for field, value in (("tag_name", tag), ("sha", run.sha))
+    }
+    packages = [path for path in WHEELS if path in paths]
     refuse_wrong_version(packages, releases, root)
     writes = run.mode == "publish"
     if not writes:
         note = f"{run.tag} rebuilt and checked, writing nothing (mode rehearse)"
-    elif path == STACKR:
-        note = f"{run.tag} again: its images are built, pushed and added to the release's notes"
     else:
-        note = f"{run.tag} again: its wheels replace the release's, and go to PyPI if that is on"
+        note = (
+            f"{run.tag} again: wheels replace the release's and go to PyPI if that is on; "
+            "stackr's images are built, pushed and added to its release's notes"
+        )
     return built(
-        run,
         packages,
         releases,
-        path == STACKR,
+        STACKR in paths,
         writes,
         writes and run.publishing and bool(packages),
         [note],
@@ -271,7 +288,6 @@ def plan(run: Run, root: Path = ROOT) -> Plan:
 
 
 def built(
-    run: Run,
     packages: list[str],
     releases: Mapping[str, str],
     stackr: bool,
@@ -284,8 +300,6 @@ def built(
     ordered = [path for stage in STAGES for path in stage if path in wheels]
     released = [*packages, *([STACKR] if stackr else [])]
     keys = [f"{path}--{field}" for path in released for field in ("tag_name", "sha")]
-    if stackr and run.event != "push":
-        releases = {**releases, f"{STACKR}--tag_name": run.tag, f"{STACKR}--sha": run.sha}
     return Plan(
         packages=packages,
         releases={key: releases[key] for key in keys},
@@ -306,8 +320,8 @@ def requires(path: str, root: Path = ROOT) -> list[str]:
     """The ``name==version`` of every other package of the repository that a package requires.
 
     PyPI must serve these before the package is published, whether or not they are in this
-    release: a dispatch on one tag publishes one package, and its requirements were published by
-    the dispatches before it. The version is the one the repository's package has at this commit.
+    release: those in it are published before it, in the same run, and the others were published
+    by the releases before. The version is the one the repository's package has at this commit.
     """
     names = {distribution(other, root): other for other in WHEELS}
     found = requirement_names(path, root) & names.keys() - {distribution(path, root)}
@@ -345,16 +359,16 @@ def outputs(made: Plan, root: Path = ROOT) -> dict[str, str]:
 
 
 def next_steps(made: Plan, run: Run) -> list[str]:
-    """What the owner runs after a release run, in order.
+    """What the owner runs after a release run: one dispatch that publishes every wheel it made.
 
-    One dispatch for each package to publish; for stackr, nothing (its images were pushed).
+    The dispatch runs on the first tag, in the order the packages are published, and names them
+    all; they are all at the release's commit. For stackr, nothing (its images were pushed).
     """
-    if run.event != "push":
+    if run.event != "push" or not made.ordered:
         return []
+    tags = [made.releases[f"{path}--tag_name"] for path in made.ordered]
     return [
-        f"gh workflow run release.yml --ref {made.releases[f'{path}--tag_name']} "
-        f"-f tag={made.releases[f'{path}--tag_name']} -f mode=publish"
-        for path in made.ordered
+        f'gh workflow run release.yml --ref {tags[0]} -f tag="{" ".join(tags)}" -f mode=publish'
     ]
 
 
@@ -370,6 +384,7 @@ def environment(env: Mapping[str, str]) -> Run:
         released=json.loads(env.get("PATHS_RELEASED") or "[]"),
         releases=json.loads(env.get("RELEASES") or "{}"),
         publishing=env.get("PYPI_PUBLISH") == "true",
+        tagged=json.loads(env.get("TAGGED") or "{}"),
     )
 
 
@@ -393,9 +408,10 @@ def main() -> int:
         with Path(summary).open("a") as handle:
             handle.write(
                 "### Publish to PyPI\n\nThis run attached and attested the wheels. It published "
-                "nothing. Publish each package by dispatch on its tag, in this order, approving "
-                "each package's `pypi-<distribution>` environment (one approval a package, one "
-                "at a time):\n\n" + "".join(f"1. `{step}`\n" for step in steps)
+                "nothing. Publish them all with one dispatch, and approve its `pypi-approval` "
+                "environment once: it then publishes each package in dependency order, each "
+                "after PyPI serves the ones it requires:\n\n"
+                + "".join(f"1. `{step}`\n" for step in steps)
             )
     return 0
 

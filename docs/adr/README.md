@@ -28,7 +28,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0020](0020-the-telemetry-contract-needs-no-extra.md) | The telemetry contract needs no extra | Accepted |
 | [0021](0021-the-refusal-schema-needs-no-extra.md) | The refusal schema needs no extra | Accepted |
 | [0022](0022-litellm-requests-carry-the-propagated-trace-tags.md) | LiteLLM requests carry the propagated trace tags | Accepted |
-| [0023](0023-publishing-to-pypi-from-the-release-workflow.md) | Publishing to PyPI from the release workflow | Accepted, amended by [0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md) |
+| [0023](0023-publishing-to-pypi-from-the-release-workflow.md) | Publishing to PyPI from the release workflow | Accepted, amended by [0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md); approval rule superseded by [0031](0031-one-approval-publishes-every-package-a-release-made.md) |
 | [0024](0024-a-parallel-batched-merge-queue.md) | A parallel, batched merge queue | Accepted, amended 2026-10-30 |
 | [0025](0025-formal-specs-in-tla-and-lean.md) | Formal specs in TLA+ and Lean | Accepted |
 | [0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md) | A distribution needs a reason; integrations are extras | Accepted |
@@ -36,5 +36,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0028](0028-a-stuck-test-fails-by-a-signal-and-its-worker-carries-on.md) | A stuck test fails by a signal, and its worker carries on | Accepted |
 | [0029](0029-each-wheel-checked-at-its-floors.md) | Each wheel checked at its floors | Accepted |
 | [0030](0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md) | Settings: typed, declared in lattice-core, and only narrowed below the operator | Accepted |
+| [0031](0031-one-approval-publishes-every-package-a-release-made.md) | One approval publishes every package a release made | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

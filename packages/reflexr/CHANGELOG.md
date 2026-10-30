@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1](https://github.com/alexnodeland/lattice/compare/reflexr-v0.2.0...reflexr-v0.2.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **stack:** name each pg-up's compose project with a random token ([#1163](https://github.com/alexnodeland/lattice/issues/1163)) ([585b868](https://github.com/alexnodeland/lattice/commit/585b8689a4cdc68475c994b32b9e3bc57a91c64e))
+
 ## [0.2.0](https://github.com/alexnodeland/lattice/compare/reflexr-v0.1.1...reflexr-v0.2.0) (2026-10-29)
 
 

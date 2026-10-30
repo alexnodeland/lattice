@@ -5,14 +5,14 @@
  * open and given back to the button that opened it (portalr ADR-0072, ADR-0068).
  */
 
-import { type Browser, chromium, type Page } from "playwright";
+import type { Browser, Page } from "playwright";
 import { afterAll, beforeAll, expect, test } from "vitest";
-import { open } from "./harness";
+import { connected, open } from "./harness";
 
 let browser: Browser;
 
 beforeAll(async () => {
-  browser = await chromium.launch();
+  browser = await connected();
 });
 
 afterAll(() => browser.close());

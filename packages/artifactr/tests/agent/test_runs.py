@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import time
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from typing import override
 
 import pytest
@@ -322,31 +322,51 @@ async def test_recover_abandons_a_run_a_dead_process_left_running(
     assert types(await ws.read()).count("run_ended") == 1, "ended once"
 
 
-async def test_recover_sweeps_again_once_a_dead_claim_could_have_lapsed(
-    storage: InMemoryStorage, ws: Workspace, thread: Thread, gate: Gate
-) -> None:
-    """A restart finds the dead process's claim still there, for up to claim_ttl."""
+class _Clock:
+    """The storage's clock, which stands still until a test moves it on."""
+
+    def __init__(self) -> None:
+        self.now = datetime(2026, 10, 30, tzinfo=UTC)
+
+    def __call__(self) -> datetime:
+        return self.now
+
+
+async def _left_by_a_holder(
+    holder: str, ttl: timedelta
+) -> tuple[_Clock, InMemoryStorage, Workspace, Thread]:
+    """A thread whose run is left ``running``, claimed by ``holder`` for ``ttl``.
+
+    The claim lapses only when the test moves the storage's clock on: on the system clock, a
+    test held up past the claim's TTL, as under load, found the thread free.
+    """
+    clock = _Clock()
+    storage = InMemoryStorage(clock=clock)
+    ws = await Workspaces(storage).open("tenant", "ws", actor=ALICE)
+    thread = await ws.create_thread("Launch")
     left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
     await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
     scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
-    dead = timedelta(milliseconds=150)
-    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "dead-process", dead)
-    runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(milliseconds=200))
+    assert await storage.acquire_lease(scope, f"thread:{thread.id}", holder, ttl)
+    return clock, storage, ws, thread
+
+
+async def test_recover_sweeps_again_once_a_dead_claim_could_have_lapsed(gate: Gate) -> None:
+    """A restart finds the dead process's claim still there, for up to claim_ttl."""
+    clock, _, ws, _ = await _left_by_a_holder("dead-process", timedelta(milliseconds=150))
+    wait = timedelta(milliseconds=200)
+    runner = Runner(make_agent(Script()), app=gate, look_again_after=wait)
     assert await runner.recover(ws) == []
-    assert (await ws.run("run_left")).status == "running", "its claim hasn't lapsed yet"
+    assert runner._looks, "its claim hasn't lapsed yet, so it looks again"
+    clock.now += wait  # before the look, as nothing has awaited since recover returned
     await asyncio.gather(*runner._looks)  # the look again, once the dead claim could lapse
     assert (await ws.run("run_left")).status == "failed", "swept again once it could have"
     await runner.aclose()
 
 
-async def test_a_sweep_that_finds_the_thread_still_held_looks_no_more(
-    storage: InMemoryStorage, ws: Workspace, thread: Thread, gate: Gate
-) -> None:
+async def test_a_sweep_that_finds_the_thread_still_held_looks_no_more(gate: Gate) -> None:
     """A live holder's run is left to it: it records its own run's end."""
-    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
-    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
-    scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
-    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "live", timedelta(seconds=5))
+    _, _, ws, _ = await _left_by_a_holder("live", timedelta(seconds=5))
     runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(0))
     await runner.recover(ws)
     await asyncio.gather(*runner._looks)
@@ -356,17 +376,9 @@ async def test_a_sweep_that_finds_the_thread_still_held_looks_no_more(
 
 
 async def test_a_sweep_again_that_fails_is_logged(
-    storage: InMemoryStorage,
-    ws: Workspace,
-    thread: Thread,
-    gate: Gate,
-    monkeypatch: pytest.MonkeyPatch,
-    caplog: pytest.LogCaptureFixture,
+    gate: Gate, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
-    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
-    scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
-    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "dead", timedelta(seconds=5))
+    _, storage, ws, thread = await _left_by_a_holder("dead", timedelta(seconds=5))
     runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(0))
     await runner.recover(ws)
 
@@ -380,12 +392,9 @@ async def test_a_sweep_again_that_fails_is_logged(
 
 
 async def test_a_sweep_waiting_to_look_again_is_cancelled_as_the_runner_closes(
-    storage: InMemoryStorage, ws: Workspace, thread: Thread, gate: Gate
+    gate: Gate,
 ) -> None:
-    left = ws.as_actor(AgentActor(thread_id=thread.id, run_id="run_left"))
-    await left.record(RunStarted(run_id="run_left", thread_id=thread.id))
-    scope = Scope(tenant_id=ws.tenant_id, workspace_id=ws.workspace_id)
-    assert await storage.acquire_lease(scope, f"thread:{thread.id}", "dead", timedelta(seconds=5))
+    _, _, ws, _ = await _left_by_a_holder("dead", timedelta(seconds=5))
     runner = Runner(make_agent(Script()), app=gate, look_again_after=timedelta(seconds=5))
     await runner.recover(ws)
     await runner.aclose()

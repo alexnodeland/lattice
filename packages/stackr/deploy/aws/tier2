@@ -329,6 +329,31 @@ done < <({
 } | sort -u)
 [[ $status -eq 0 ]] && echo "ok: published on 127.0.0.1 alone"
 
+step "The listener's rules"
+# The HTTPS listener routes each host by a rule of its own: auth's admin API (10), app (20) and auth
+# (30), as modules/edge/main.tf makes them. A rule Floci lost (#810) would show in the smoke below
+# only as 150 s of the listener's default 404; this names it, once Floci answers with all three.
+alb=$(tofu -chdir=envs/floci output -no-color -state="$state" -raw alb_dns_name)
+rules() {
+  local balancer listener
+  balancer=$(aws elbv2 describe-load-balancers \
+    --query "LoadBalancers[?DNSName=='$alb'].LoadBalancerArn | [0]" --output text)
+  listener=$(aws elbv2 describe-listeners --load-balancer-arn "$balancer" \
+    --query "Listeners[?Protocol=='HTTPS'].ListenerArn | [0]" --output text)
+  aws elbv2 describe-rules --listener-arn "$listener" \
+    --query 'Rules[?!IsDefault].Priority' --output text | tr -s '\t ' '\n' | sort -n | paste -sd ' ' -
+}
+for _ in $(seq 12); do
+  priorities=$(rules 2>/dev/null || true)
+  [[ $priorities == "10 20 30" ]] && break
+  sleep 5
+done
+if [[ $priorities == "10 20 30" ]]; then
+  echo "ok: the listener's rules, 10, 20 and 30"
+else
+  fail "the listener's rules: priorities '${priorities:-none}' after 12 tries over 60 s, expected '10 20 30'"
+fi
+
 step "Every service running"
 cluster=$(tofu -chdir=envs/floci output -no-color -state="$state" -raw cluster_arn)
 # Each service's name, running and desired tasks, ten at a time, as ECS answers.

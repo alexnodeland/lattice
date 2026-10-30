@@ -18,6 +18,7 @@ import { Heading } from "./heading";
 import { Icon } from "./icon";
 import { type Glyph, glyphs } from "./icons";
 import { Num } from "./num";
+import { SCROLL_BOX } from "./scroll-region";
 import { Reading } from "./skeleton";
 import { StatusBadge } from "./status-badge";
 
@@ -224,7 +225,7 @@ export function TraceView({ outline, reveal }: { outline: Outline; reveal: Revea
             }
           }}
           onKeyDown={walk}
-          className="@container max-h-[28rem] min-h-24 overflow-auto rounded-(--card-radius) border border-line bg-surface"
+          className={`@container ${SCROLL_BOX}`}
         >
           <div style={{ height: virtual.getTotalSize() }} className="relative w-full">
             {items.map((item) => {
@@ -314,7 +315,7 @@ function Bar({ row, total }: { row: Row; total: number }) {
       <div
         style={{ left: `${Math.min(left, 99.4)}%`, width: `${Math.min(width, 100 - left)}%` }}
         className={cn(
-          "absolute top-0.5 h-3 min-w-0.5 rounded-sm",
+          "absolute top-0.5 h-3 min-w-0.5 rounded-(--radius-2)",
           // A failed span is hatched as well as dark, so it isn't told by its tone alone.
           row.error
             ? "bg-[repeating-linear-gradient(45deg,var(--fg)_0_3px,var(--surface)_3px_6px)] ring-1 ring-fg"

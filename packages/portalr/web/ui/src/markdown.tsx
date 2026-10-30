@@ -239,7 +239,7 @@ const COMPONENTS: Components = {
     return shown === null ? (
       <span className="text-muted italic">Image blocked: {alt || "from another site"}</span>
     ) : (
-      <img src={shown} alt={alt ?? ""} className="max-w-full rounded-md" />
+      <img src={shown} alt={alt ?? ""} className="max-w-full rounded-(--radius-3)" />
     );
   },
   // A task's box can't be ticked here: it is a drawing, and its state is said in words.
@@ -257,10 +257,16 @@ const COMPONENTS: Components = {
     <InlineCode className={className}>{children}</InlineCode>
   ),
   table: ({ children }) => (
-    <ScrollRegion aria-label="Table" className="rounded-md border border-line">
+    // In the kit's table frame (portalr ADR-0080): its corners, its hairline and the strong rule
+    // along its top.
+    <ScrollRegion
+      aria-label="Table"
+      className="rounded-(--table-radius) border border-line border-t-edge"
+    >
       <table className="w-full border-collapse text-sm">{children}</table>
     </ScrollRegion>
   ),
+  // Streamdown's head row sets its own wash, whose muted words fall short of 4.5:1; the paper keeps them.
   thead: ({ children }) => <thead className="bg-paper">{children}</thead>,
   aside: ({ node, children }: ExtraProps & { children?: ReactNode }) => {
     // The sanitizer lets an aside through with a callout's kind alone.

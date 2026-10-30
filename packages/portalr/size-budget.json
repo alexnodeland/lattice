@@ -1,7 +1,7 @@
 {
   "app": {
     "initial": 203500,
-    "total": 491000,
+    "total": 500000,
     "largest": 100000,
     "addons": {
       "highlight": { "total": 177000, "largest": 53000 },

@@ -1,9 +1,11 @@
 """Run a task in every project a change affects, and in every project that depends on one.
 
-Usage: scripts/affected.py TASK [--language LANGUAGE]   (MOON_BASE and MOON_HEAD name the change)
+Usage: scripts/affected.py TASK [--language LANGUAGE] [--all]
+       (MOON_BASE and MOON_HEAD name the change)
 
 With --language, only the projects of that language run the task, as their moon.yml declares it:
 the jobs that repeat one language's tests, such as `python`, leave the others to those that don't.
+With --all, every project runs the task, whatever changed, batched as a change's are: Nightly's.
 
 `moon ci --downstream deep` follows the task graph, so it reaches a dependent's task only
 through that task's own dependencies: a change to evalr alone would run evalr's checks and no
@@ -91,6 +93,7 @@ def main() -> int:
     arguments = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
     arguments.add_argument("task")
     arguments.add_argument("--language")
+    arguments.add_argument("--all", action="store_true")
     given = arguments.parse_args()
     task: str = given.task
     projects = {project["id"]: project for project in query("projects")["projects"]}
@@ -99,10 +102,13 @@ def main() -> int:
         for dependency in project.get("dependencies", []):
             dependents[dependency["id"]].add(name)
 
-    files = json.dumps(without_inert(query("changed-files")))
-    touched = query("projects", "--affected", given=files)["projects"]
-    changed = {project["id"] for project in touched}
-    changed |= set(query("tasks", "--affected", given=files)["tasks"])
+    if given.all:
+        changed = set(projects)
+    else:
+        files = json.dumps(without_inert(query("changed-files")))
+        touched = query("projects", "--affected", given=files)["projects"]
+        changed = {project["id"] for project in touched}
+        changed |= set(query("tasks", "--affected", given=files)["tasks"])
     affected, pending = set(changed), list(changed)
     while pending:
         for dependent in dependents[pending.pop()] - affected:

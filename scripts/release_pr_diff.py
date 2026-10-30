@@ -2,15 +2,15 @@
 
 Usage: python3 -I release_pr_diff.py BASE REPOSITORY   (the diff is BASE...HEAD, in REPOSITORY)
 
-release-please's pull request for a package changes its CHANGELOG.md, the version in its
-pyproject.toml and in uv.lock, and its line in .release-please-manifest.json. CI runs the base's
-copy of this on those pull requests (ci.yml), and skips its other jobs only if it exits 0: their
-code is main's, which passed CI, and a release queued with Mergify runs all of CI on its batch
-(the ruleset doesn't require the queue, so one merged directly ships on this check alone).
-Anything else exits 1, and all of CI runs, so a refusal costs time, not a check.
+release-please's pull request changes, for each package it releases, its CHANGELOG.md, the version
+in its pyproject.toml and in uv.lock, and its line in .release-please-manifest.json. CI runs the
+base's copy of this on those pull requests (ci.yml), and skips its other jobs only if it exits 0:
+their code is main's, which passed CI, and a release queued with Mergify runs all of CI on its batch
+(the ruleset doesn't require the queue, so one merged directly ships on this check alone). Anything
+else exits 1, and all of CI runs, so a refusal costs time, not a check.
 
 It refuses another file, a file added, deleted or renamed, a mode or a binary, and in those files
-anything but: one package's version, the same in all three, a release, and higher than before; and
+anything but: each package's version, the same in all three, a release, and higher than before; and
 changelog lines of release-please's own shapes. Each file is compared whole, at the merge base and
 at HEAD, not by parsing the patch.
 """
@@ -168,20 +168,26 @@ def changelog(before: str, after: str) -> list[str]:
 
 
 def agreement(bumps: dict[str, Bumps]) -> list[str]:
-    """One package's version, the same in all three files, a release, and higher than before."""
-    packages = {p for each in bumps.values() for p in each}
-    if len(packages) != 1:
-        return [f"not one package's version: {sorted(packages)}"]
-    found = [
-        f"no version changed in {f}" for f in (MANIFEST, LOCK, "pyproject.toml") if f not in bumps
-    ]
-    pairs = {pair for each in bumps.values() for pair in each.values()}
-    if len(pairs) != 1:
-        return [*found, f"the versions don't agree: {sorted(map(str, pairs))}"]
-    old, new = next(iter(pairs))
-    old_release, new_release = release(old), release(new)
-    if old_release is None or new_release is None or new_release <= old_release:
-        found.append(f"not a release higher than before: {old} to {new}")
+    """Each package's version the same in all three files, a release, and higher than before.
+
+    One release pull request may release several packages, each at its own version.
+    """
+    packages = sorted({p for each in bumps.values() for p in each})
+    if not packages:
+        return ["no package's version changed"]
+    found: list[str] = []
+    for package in packages:
+        files = (MANIFEST, LOCK, "pyproject.toml")
+        missing = [f for f in files if package not in bumps.get(f, {})]
+        found += [f"no version of {package} changed in {f}" for f in missing]
+        pairs = {each[package] for each in bumps.values() if package in each}
+        if len(pairs) != 1:
+            found.append(f"{package}'s versions don't agree: {sorted(map(str, pairs))}")
+            continue
+        old, new = next(iter(pairs))
+        old_release, new_release = release(old), release(new)
+        if old_release is None or new_release is None or new_release <= old_release:
+            found.append(f"{package}: not a release higher than before: {old} to {new}")
     return found
 
 
@@ -223,7 +229,7 @@ def check(base: str, repository: Path) -> list[str]:
             problems = [f"unreadable: {error}"]
         found += [f"{path}: {each}" for each in problems]
         if bumped:
-            bumps["pyproject.toml" if pyproject_of else path] = bumped
+            bumps.setdefault("pyproject.toml" if pyproject_of else path, {}).update(bumped)
     return found or agreement(bumps)
 
 

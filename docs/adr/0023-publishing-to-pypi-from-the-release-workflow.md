@@ -1,6 +1,6 @@
 # ADR-0023: Publishing to PyPI from the release workflow
 
-**Status:** Accepted, amended 2026-10-16 and four times on 2026-10-17 (see the amendments), and by [ADR-0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md)
+**Status:** Accepted, amended 2026-10-16, four times on 2026-10-17, 2026-10-29 and 2026-10-30 (see the amendments), and by [ADR-0026](0026-a-distribution-needs-a-reason-integrations-are-extras.md)
 **Date:** 2026-10-16
 **Deciders:** Alex Nodeland
 
@@ -141,3 +141,14 @@ Found in the 0.2 release; a lesson for the next, not a change of decision.
 - **So read the next release pull request's merge state before queueing it,** and rebase it if it conflicts; merging one per stage at a time keeps that to one rebase each.
 
 Merging the pull requests, dispatching the publishes and releasing in dependency order by hand is the [release train's](https://github.com/alexnodeland/lattice/issues/1133) subject.
+
+## Amendment (2026-10-30): one release pull request again
+
+The owner decided to go back to one release pull request: `"separate-pull-requests": false` in `release-please-config.json`. This replaces the [2026-10-17 amendment](#amendment-2026-10-17-one-release-pull-request-a-package)'s one pull request a package. The order of the packages and how they reach PyPI are unchanged.
+
+- **One pull request, every package still versioned on its own.** release-please computes each package's release as before: its own version from its own commits, its own `CHANGELOG.md`, its own tag `<package-name>-v<version>` and GitHub release. It then merges them into one pull request on `release-please--branches--main`, titled `chore: release main` (as #19 was). Merging it releases every package it lists, all tagged at one commit, so the release run builds them all and none is refused for another tag's commit (#206), unlike the [batches of 2026-10-29](#amendment-2026-10-29-merging-release-pull-requests-in-turn). A package that never had its own release pull request, or one with nothing releasable, is not in it.
+- **No manifest conflicts between release pull requests:** there is only one, and it changes every released package's line in `.release-please-manifest.json` at once.
+- **CI's light path takes several packages.** `scripts/release_pr_diff.py` asked for exactly one package's version, so a grouped pull request ran all of CI. It now holds each released package's version to agree across `pyproject.toml`, `uv.lock` and the manifest, as a release higher than before. `tests/test_release_pr_diff.py` has a release of two packages.
+- **The release run's plan needs no change.** It already plans every path in `paths_released` (`tests/test_release_plan.py` plans pushes of several packages).
+- **The separate pull requests open when this merges are left behind,** as #19 was in the 2026-10-17 amendment: release-please finds its pull request by branch, and no longer tends the per-component branches. The owner merges or closes them before this merges, or closes them unmerged afterwards.
+- **What is still possible:** releasing one package alone needs a release pull request edited down by hand, as #19 was in the [2026-10-16 amendment](#amendment-2026-10-16). Every release so far has gone out together.

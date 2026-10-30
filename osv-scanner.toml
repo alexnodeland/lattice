@@ -86,3 +86,13 @@ name = "oncall"
 ecosystem = "PyPI"
 ignore = true
 reason = "lattice's oncall is its reference implementation, installed from examples/oncall, not PyPI's oncall."
+
+[[IgnoredVulns]]
+id = "GHSA-g5ff-637f-6q2m"
+ignoreUntil = 2026-12-31
+reason = "Arbitrary local file read through the vertex_ai_credentials alias of /utils/transform_request, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."
+
+[[IgnoredVulns]]
+id = "GHSA-hhww-mrg2-969h"
+ignoreUntil = 2026-12-31
+reason = "Reflected XSS in the /sso/debug/callback endpoint, in litellm's proxy server, which lattice never runs: it installs litellm 1.83.0 only as DSPy's SDK. Every litellm after 1.83.0 pins openai<3, which pydantic-ai-slim[openai] (openai>=3.19) can't share."

@@ -5,6 +5,19 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.3.0...artifactr-v0.4.0) (2026-10-30)
+
+
+### Features
+
+* **mcp:** let post_message name the model of the turn it starts ([#1153](https://github.com/alexnodeland/lattice/issues/1153)) ([52ebbd7](https://github.com/alexnodeland/lattice/commit/52ebbd7076f3dfcdf9dedae47798315c09c98fc6)), closes [#824](https://github.com/alexnodeland/lattice/issues/824)
+
+
+### Bug Fixes
+
+* **files:** install Blender's libraries in Nightly, and keep how a script ended ([#1158](https://github.com/alexnodeland/lattice/issues/1158)) ([5fa9f7d](https://github.com/alexnodeland/lattice/commit/5fa9f7d0cbb45c16ee312ba1d138d21fd413038d)), closes [#783](https://github.com/alexnodeland/lattice/issues/783)
+* **stack:** name each pg-up's compose project with a random token ([#1163](https://github.com/alexnodeland/lattice/issues/1163)) ([585b868](https://github.com/alexnodeland/lattice/commit/585b8689a4cdc68475c994b32b9e3bc57a91c64e))
+
 ## [0.3.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.2.1...artifactr-v0.3.0) (2026-10-29)
 
 

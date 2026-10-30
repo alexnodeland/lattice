@@ -9,8 +9,9 @@
 import { createSocket } from "node:dgram";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
-import { type Browser, chromium, type Page } from "playwright";
+import type { Browser, Page } from "playwright";
 import { afterAll, beforeAll, expect, inject, test, vi } from "vitest";
+import { connected } from "./harness";
 
 let browser: Browser;
 
@@ -32,7 +33,7 @@ let sink: string;
 let stun: string;
 
 beforeAll(async () => {
-  browser = await chromium.launch();
+  browser = await connected();
   await new Promise<void>((listening) => http.listen(0, "127.0.0.1", listening));
   await new Promise<void>((bound) => udp.bind(0, "127.0.0.1", bound));
   sink = `http://127.0.0.1:${(http.address() as AddressInfo).port}`;

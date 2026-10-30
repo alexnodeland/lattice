@@ -7,15 +7,15 @@
  * would be refused (ADR-0047).
  */
 
-import { type Browser, chromium, type Page } from "playwright";
+import type { Browser, Page } from "playwright";
 import { afterAll, beforeAll, expect, test } from "vitest";
 import { GALLERY, HOSTILE } from "../src/test/markdown";
-import { open } from "./harness";
+import { connected, open } from "./harness";
 
 let browser: Browser;
 
 beforeAll(async () => {
-  browser = await chromium.launch();
+  browser = await connected();
 });
 
 afterAll(() => browser.close());
@@ -78,7 +78,7 @@ test("the harness sees a violation: an inline style, and a style element, each r
     sheet.textContent = "p { color: red }";
     document.head.append(sheet);
   });
-  const seen = await reported();
+  const seen = await reported(2);
   expect(seen.some((line) => line.startsWith("style-src-attr:"))).toBe(true);
   expect(seen.some((line) => line.startsWith("style-src-elem:"))).toBe(true);
   await page.context().close();
@@ -98,7 +98,7 @@ test("the harness sees WebAssembly: a module is refused under the policy, and th
   });
   expect(refused).toBe("CompileError");
   // The call, as the harness wraps it, and the policy's own report of the refusal.
-  expect(await reported()).toEqual(["WebAssembly.compile", "script-src: wasm-eval at "]);
+  expect(await reported(2)).toEqual(["WebAssembly.compile", "script-src: wasm-eval at "]);
   await page.context().close();
 });
 

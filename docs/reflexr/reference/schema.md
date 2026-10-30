@@ -7,11 +7,11 @@ reflexr publishes two JSON Schemas, generated from its Pydantic models, which ar
 | [`reflexr.rules.v1.json`](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/schemas/reflexr.rules.v1.json) | A [rule](../guides/rules.md): its condition, scope, action and policies | Validate rules written as JSON, by people or by agents |
 | [`reflexr.v1.json`](https://github.com/alexnodeland/lattice/blob/main/packages/reflexr/schemas/reflexr.v1.json) | Every frame of the [stream protocol](../protocol.md): `client` is any frame a client sends, and `server` any frame a server sends; `$defs` holds every frame, command, outcome and envelope they refer to | Generate a client's types |
 
-A test fails if either checked-in file drifts from the models. Regenerate both with `moon run reflexr:schema`, which runs, in `packages/reflexr/`:
+A test fails if either checked-in file drifts from the models. Regenerate both with `moon run reflexr:schema`, which runs, in `packages/reflexr/`, the module `reflexr.core.schema` for each and writes only what it prints to the file:
 
 ```bash
-uv run python -m reflexr.core.schema rules > schemas/reflexr.rules.v1.json
-uv run python -m reflexr.core.schema protocol > schemas/reflexr.v1.json
+uv run python ../../scripts/generate.py schemas/reflexr.rules.v1.json reflexr.core.schema rules
+uv run python ../../scripts/generate.py schemas/reflexr.v1.json reflexr.core.schema protocol
 ```
 
 ## Validating rules

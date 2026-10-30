@@ -12,7 +12,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from mcp.server.subscriptions import InMemorySubscriptionBus, ResourceUpdated, SubscriptionBus
 from mcp.shared.exceptions import MCPError
 from mcp.types import INVALID_PARAMS, SubscriptionsListenRequestParams
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ValidationError
 from starlette.applications import Starlette
 from starlette.requests import Request
 
@@ -438,13 +438,19 @@ class ArtifactrMcp:
             ctx: Context,
             kind: MessageKind = "message",
             command_id: _CommandId = None,
+            model: str | None = None,
         ) -> str:
             """Post a message in a thread. The thread's agent reads it and may reply.
 
-            A ``notice`` is for the people in the thread instead, and starts no run.
+            A ``notice`` is for the people in the thread instead, and starts no run. ``model``
+            names the model to answer with, if this message starts a new turn (ADR-0097); a
+            notice names none.
             """
             workspace = await self._workspace(ctx, workspace_id)
-            command = PostMessage(thread_id=thread_id, content=content, kind=kind)
+            try:
+                command = PostMessage(thread_id=thread_id, content=content, kind=kind, model=model)
+            except ValidationError as invalid:
+                raise ToolError("; ".join(e["msg"] for e in invalid.errors())) from invalid
             outcome = await self._outcome(workspace, command, command_id)
             run_id = outcome.run_id if isinstance(outcome, Recorded) else None
             if kind == "notice":

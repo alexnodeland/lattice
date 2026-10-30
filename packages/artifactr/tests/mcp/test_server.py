@@ -216,6 +216,36 @@ async def test_a_notice_starts_no_run(mcp: ArtifactrMcp, ws: Workspace) -> None:
     assert await ws.runs() == []
 
 
+async def test_a_message_names_the_model_of_its_turn_and_a_notice_names_none(
+    mcp: ArtifactrMcp, ws: Workspace
+) -> None:
+    thread = await ws.create_thread("Launch")
+    async with Client(mcp.server) as client:
+        refused = await _call(
+            client,
+            "post_message",
+            thread_id=thread.id,
+            content="Deployed",
+            kind="notice",
+            model="m",
+        )
+        posted = await _call(
+            client, "post_message", thread_id=thread.id, content="Plan it", model="fast-1"
+        )
+        unnamed = await _call(
+            client, "post_message", thread_id=thread.id, content="Plan it", model="no spaces"
+        )
+        _, line = await _call(client, "read_events", after_seq=1, limit=1)
+    assert refused[0] is True
+    assert "a notice starts no turn, so it names no model" in refused[1]
+    assert unnamed[0] is True
+    assert "String should match pattern" in unnamed[1]
+    assert posted[1].startswith("Posted; the agent started run run_")
+    event = json.loads(line)["event"]
+    assert (event["type"], event["model"]) == ("message_posted", "fast-1")
+    await _wait_for_run(ws, posted[1].removeprefix("Posted; the agent started run ").rstrip("."))
+
+
 async def test_a_retried_command_is_carried_out_once(mcp: ArtifactrMcp, ws: Workspace) -> None:
     async with Client(mcp.server) as client:
         create = {"kind": "note", "data": {"text": "Ship Friday"}, "command_id": "c1"}

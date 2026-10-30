@@ -55,6 +55,9 @@ tasks:
       - 'scripts/tlc.sha256'
       - 'scripts/craft'
       - 'scripts/crafts/*'
+      # Nightly's fidelity job, held to the packages each app's worker image installs.
+      - '.github/workflows/nightly.yml'
+      - 'packages/stackr/copier.yml'
 
   docs:
     description: 'Build the documentation site in strict mode, and check that its lists rendered'

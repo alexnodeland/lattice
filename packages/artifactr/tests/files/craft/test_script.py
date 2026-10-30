@@ -85,7 +85,12 @@ async def test_the_files_it_writes_come_back_and_one_past_the_limit_is_too_large
     [
         ("refuse", "refused", "no such command"),
         ("other", "refused", "scripted-cli is 0.9.0, not 1.0.0"),
-        ("crash", "crashed", "scripted-cli wrote no result; it printed: it ended"),
+        (
+            "crash",
+            "crashed",
+            "scripted-cli wrote no result, and ended with exit status 0; it printed: it ended",
+        ),
+        ("segfault", "crashed", r"ended with signal 11 \(SIGSEGV\)"),
     ],
 )
 async def test_what_the_script_says_and_what_it_doesnt_are_typed_failures(
@@ -94,6 +99,19 @@ async def test_what_the_script_says_and_what_it_doesnt_are_typed_failures(
     with pytest.raises(AppFailed, match=message) as failed:
         await script(cli).run(10, {"do": do}, None, ".txt")
     assert failed.value.failure == failure
+
+
+async def test_a_crash_keeps_how_it_ended_and_the_start_and_end_of_what_it_printed(
+    cli: Path,
+) -> None:
+    with pytest.raises(AppFailed) as failed:
+        await script(cli).run(10, {"do": "flood"}, None, ".txt")
+    message = str(failed.value)
+    assert "ended with exit status 3" in message
+    assert "it printed: the first line\nnoise" in message
+    assert message.endswith("noise\nthe cause, last")
+    assert "\n[...]\n" in message
+    assert len(message) < 4200, "what it printed is kept up to a bound"
 
 
 async def test_a_script_past_its_deadline_is_killed_with_the_call(cli: Path) -> None:

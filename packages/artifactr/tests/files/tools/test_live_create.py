@@ -8,6 +8,7 @@ the native type it keeps there. Each runs only where `ARTIFACTR_TEST_CRAFT` name
 image runs, made from the environment as the image's is, called over HTTP in process.
 """
 
+import json
 import os
 import secrets
 from collections.abc import Callable
@@ -82,14 +83,20 @@ def test_nightly_runs_each_app_the_template_wires() -> None:
 
 
 def _worker(app: str) -> Worker:
-    """The app's worker, made from the environment as its image makes it, over its pinned CLI."""
+    """The app's worker, made from the environment as its image makes it, over its pinned CLI.
+
+    An app that needs more address space than the limits' default has its limits raised to it, as
+    the template's compose file raises them (Blender's 4 GiB).
+    """
     token = secrets.token_hex(32)
+    memory = CRAFTS[app].memory
     served = worker_from_environment(
         {
             "WORKER_APP": app,
             "WORKER_CLI": os.environ["ARTIFACTR_TEST_CRAFT_CLI"],
             "WORKER_VERSION": pinned(app),
             "WORKER_TOKEN": token,
+            "WORKER_LIMITS": json.dumps({"memory": memory}) if memory else "",
         }
     )
     return Worker.at("http://worker", token=token, transport=httpx.ASGITransport(app=served))

@@ -105,7 +105,7 @@ export function PageViewer({
               )}
             />
           ) : shown.state === "reading" ? (
-            <Skeleton className="aspect-[1/1.414] h-[min(70dvh,32rem)] max-w-full rounded-sm" />
+            <Skeleton className="aspect-[1/1.414] h-[min(70dvh,32rem)] max-w-full rounded-(--radius-2)" />
           ) : (
             <p className="p-6 text-center text-muted text-sm">
               This page couldn't be shown. The file can still be downloaded.
@@ -222,7 +222,7 @@ export function SheetTable({ sheet }: { sheet: Sheet }) {
     <div className="flex flex-col gap-2">
       <ScrollRegion
         aria-labelledby={caption}
-        className="max-h-[70dvh] overflow-auto rounded-md border border-line"
+        className="max-h-[70dvh] overflow-auto rounded-(--radius-3) border border-line"
       >
         <table className="border-collapse text-sm">
           <caption id={caption} className="sr-only">

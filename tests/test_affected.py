@@ -76,6 +76,23 @@ def test_a_language_narrows_the_projects_that_run_a_task() -> None:
     assert targets_of("test", {"ui", "stackr"}, projects, "python") == []
 
 
+def test_a_language_left_out_leaves_every_other_project_to_run_a_task() -> None:
+    targets_of = AFFECTED["targets_of"]
+    projects = {
+        "evalr": {"id": "evalr", "language": "python", "tasks": {"check": {}}},
+        "ui": {"id": "ui", "language": "typescript", "tasks": {"check": {}}},
+        "stackr": {"id": "stackr", "language": "bash", "tasks": {"check": {}}},
+        "odd": {"id": "odd", "tasks": {"check": {}}},
+    }
+    everyone = {"evalr", "ui", "stackr", "odd"}
+    # CI's two Check jobs: between them, every project's check, and none twice.
+    rest = targets_of("check", everyone, projects, except_language="typescript")
+    web = targets_of("check", everyone, projects, "typescript")
+    assert rest == ["evalr:check", "odd:check", "stackr:check"]
+    assert web == ["ui:check"]
+    assert sorted(rest + web) == targets_of("check", everyone, projects)
+
+
 def test_a_project_without_a_language_is_matched_by_no_language_but_still_runs_unfiltered() -> None:
     targets_of = AFFECTED["targets_of"]
     projects = {"odd": {"tasks": {"test": {}}}}

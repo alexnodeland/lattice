@@ -202,7 +202,7 @@ export function Diff({
             return (
               <ins
                 key={key}
-                className="rounded-sm bg-wash px-0.5 text-fg underline decoration-2 decoration-accent underline-offset-3"
+                className="rounded-(--radius-2) bg-wash px-0.5 text-fg underline decoration-2 decoration-accent underline-offset-3"
               >
                 <span className="sr-only">added: </span>
                 {change.text}

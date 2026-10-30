@@ -1,10 +1,14 @@
 """Run a task in every project a change affects, and in every project that depends on one.
 
-Usage: scripts/affected.py TASK [--language LANGUAGE] [--all]
-       (MOON_BASE and MOON_HEAD name the change)
+Usage: scripts/affected.py TASK [--language LANGUAGE | --except-language LANGUAGE] [--all]
+       scripts/affected.py --projects        (MOON_BASE and MOON_HEAD name the change)
 
 With --language, only the projects of that language run the task, as their moon.yml declares it:
 the jobs that repeat one language's tests, such as `python`, leave the others to those that don't.
+With --except-language, every project but those of that language does: CI's Check job runs the
+web packages' checks (`typescript`) in a job of its own, and the rest in another.
+With --projects, it runs nothing, and prints the affected projects, dependents included, as a JSON
+list: CI starts its heavy jobs only when a project other than the root, `lattice`, is in it.
 With --all, every project runs the task, whatever changed, batched as a change's are: Nightly's.
 
 `moon ci --downstream deep` follows the task graph, so it reaches a dependent's task only
@@ -72,14 +76,22 @@ def batches(task: str, targets: list[str], browser: Collection[str] = ()) -> lis
 
 
 def targets_of(
-    task: str, affected: Collection[str], projects: dict[str, Any], language: str | None = None
+    task: str,
+    affected: Collection[str],
+    projects: dict[str, Any],
+    language: str | None = None,
+    except_language: str | None = None,
 ) -> list[str]:
-    """The tasks to run, in the affected projects that have one, of `language` if it is given."""
+    """The tasks to run, in the affected projects that have one.
+
+    Only those of `language` if it is given, and none of `except_language` if that is.
+    """
     return [
         f"{name}:{task}"
         for name in sorted(affected)
         if task in projects[name]["tasks"]
         and (language is None or projects[name].get("language") == language)
+        and (except_language is None or projects[name].get("language") != except_language)
     ]
 
 
@@ -88,34 +100,44 @@ def without_inert(changed: dict[str, Any]) -> dict[str, Any]:
     return {**changed, "files": [file for file in changed["files"] if not INERT.search(file)]}
 
 
-def main() -> int:
-    """Run the task in the affected projects and their dependents; nothing if there are none."""
-    arguments = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
-    arguments.add_argument("task")
-    arguments.add_argument("--language")
-    arguments.add_argument("--all", action="store_true")
-    given = arguments.parse_args()
-    task: str = given.task
-    projects = {project["id"]: project for project in query("projects")["projects"]}
+def affected_projects(projects: dict[str, Any]) -> set[str]:
+    """The projects the change touches, by their files or their tasks' inputs, and dependents."""
     dependents: dict[str, set[str]] = {name: set() for name in projects}
     for name, project in projects.items():
         for dependency in project.get("dependencies", []):
             dependents[dependency["id"]].add(name)
 
-    if given.all:
-        changed = set(projects)
-    else:
-        files = json.dumps(without_inert(query("changed-files")))
-        touched = query("projects", "--affected", given=files)["projects"]
-        changed = {project["id"] for project in touched}
-        changed |= set(query("tasks", "--affected", given=files)["tasks"])
+    files = json.dumps(without_inert(query("changed-files")))
+    touched = query("projects", "--affected", given=files)["projects"]
+    changed = {project["id"] for project in touched}
+    changed |= set(query("tasks", "--affected", given=files)["tasks"])
     affected, pending = set(changed), list(changed)
     while pending:
         for dependent in dependents[pending.pop()] - affected:
             affected.add(dependent)
             pending.append(dependent)
+    return affected
 
-    targets = targets_of(task, affected, projects, given.language)
+
+def main() -> int:
+    """Run the task in the affected projects and their dependents; nothing if there are none."""
+    arguments = argparse.ArgumentParser(description=(__doc__ or "").split("\n\n")[0])
+    arguments.add_argument("task", nargs="?")
+    languages = arguments.add_mutually_exclusive_group()
+    languages.add_argument("--language")
+    languages.add_argument("--except-language")
+    arguments.add_argument("--projects", action="store_true")
+    arguments.add_argument("--all", action="store_true")
+    given = arguments.parse_args()
+    if given.projects == (given.task is not None):
+        arguments.error("give a task, or --projects")
+    projects = {project["id"]: project for project in query("projects")["projects"]}
+    affected = set(projects) if given.all else affected_projects(projects)
+    if given.projects:
+        sys.stdout.write(json.dumps(sorted(affected)) + "\n")
+        return 0
+    task: str = given.task
+    targets = targets_of(task, affected, projects, given.language, given.except_language)
     if not targets:
         sys.stdout.write(f"affected: no affected project has a {task} task\n")
         return 0

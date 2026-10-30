@@ -19,7 +19,7 @@ const count = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : 
 function Value({ value, depth }: { value: unknown; depth: number }) {
   if (typeof value === "string") {
     return value.includes("\n") || value.length > LONG_STRING ? (
-      <pre className="m-0 mt-1 whitespace-pre-wrap break-words rounded-sm border border-line bg-surface px-2 py-1 font-mono text-fg text-xs">
+      <pre className="m-0 mt-1 whitespace-pre-wrap break-words rounded-(--code-inline-radius) border border-line bg-surface px-2 py-1 font-mono text-fg text-xs">
         {value}
       </pre>
     ) : (

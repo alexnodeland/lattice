@@ -50,7 +50,7 @@ export default defineConfig({
         test: {
           name: "phone",
           include: ["src/**/*.touch.test.tsx"],
-          setupFiles: ["./src/test/setup.ts"],
+          setupFiles: ["./src/test/setup.ts", "../ui/src/test/phone.ts"],
           api: { host: "127.0.0.1" },
           browser: {
             enabled: true,

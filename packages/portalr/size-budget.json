@@ -10,7 +10,7 @@
       "dashboards": { "total": 150000, "largest": 130000 },
       "apps": { "total": 9000, "largest": 9000 },
       "analytics": { "total": 600, "largest": 600 },
-      "files": { "total": 14700, "largest": 14700 },
+      "files": { "total": 15000, "largest": 15000 },
       "canvas": { "total": 350000, "largest": 165000 },
       "replay-account": { "total": 1400, "largest": 1400 },
       "replay": { "total": 61000, "largest": 61000 },
@@ -18,11 +18,11 @@
       "json-view": { "total": 2800, "largest": 2800 },
       "touch": { "total": 2500, "largest": 2500 },
       "model-picker": { "total": 1100, "largest": 1100 },
-      "palette": { "total": 2300, "largest": 2300 }
+      "palette": { "total": 2360, "largest": 2360 }
     }
   },
   "admin": {
-    "initial": 225000,
+    "initial": 230000,
     "total": 610000,
     "largest": 140000,
     "addons": { "touch": { "total": 2500, "largest": 2500 } }

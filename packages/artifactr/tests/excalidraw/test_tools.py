@@ -75,9 +75,16 @@ async def thread(ws: Workspace) -> Thread:
 
 @pytest.fixture
 async def runners(_no_task_left: None) -> AsyncIterator[list[Runner[None]]]:
+    """The runners a test makes, each let finish handing its threads over, then closed.
+
+    A hand-over queries the storage; cancelled mid-query by `_no_task_left`, it would leave a
+    SQL connection checked out. So the hand-overs end first, and the runners are closed before
+    `_no_task_left` (which they request) and before the storage they use.
+    """
     made: list[Runner[None]] = []
     yield made
     for runner in made:
+        await runner.drain()
         await runner.aclose()
 
 

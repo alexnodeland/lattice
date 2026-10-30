@@ -9,7 +9,7 @@
  */
 
 import type { Artifactr, ArtifactrV1 } from "@portalr/client";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { proposalTitle } from "./chat";
 import { Disclosure } from "./disclosure";
 import { readQuestions } from "./questions";
@@ -99,20 +99,27 @@ export function Tray({
       focusAt(reached.id);
     }
   }, [reached]);
+  // The hash the page was opened at, read once: a stale one must not take the focus each time
+  // something waits again. It is spent once the tray has had something to reach.
+  const openedAt = useRef(location.hash.slice(1));
   useEffect(() => {
     openTray = (id) => {
       setOpened(true);
       setReached({ id });
     };
-    // A link to what is already the hash fires no change: its click does.
+    // A link to what is already the hash fires no change: its click does. A router's link to this
+    // page with a hash (`/t/…/threads/x#request-q1`) is one too, as much as `#request-q1`.
     const click = (event: MouseEvent) => {
-      const link = (event.target as Element).closest<HTMLAnchorElement>("a[href^='#']");
-      if (link) {
+      const link = (event.target as Element).closest<HTMLAnchorElement>("a[href*='#']");
+      if (link && link.origin === location.origin && link.pathname === location.pathname) {
         reach(link.hash.slice(1));
       }
     };
     // Where the page was opened at one of them, or one has arrived, once it is in.
-    reach(arrived ? `request-${arrived}` : location.hash.slice(1));
+    reach(arrived ? `request-${arrived}` : openedAt.current);
+    if (present) {
+      openedAt.current = "";
+    }
     document.addEventListener("click", click);
     return () => {
       openTray = undefined;

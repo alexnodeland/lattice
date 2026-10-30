@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/alexnodeland/lattice/compare/portalr-v0.2.1...portalr-v0.2.2) (2026-10-30)
+
+
+### Bug Fixes
+
+* **portalr:** give the size budgets near their ceiling 2 to 3% of headroom ([#1187](https://github.com/alexnodeland/lattice/issues/1187)) ([8c85ec7](https://github.com/alexnodeland/lattice/commit/8c85ec7e9fcbb2b98dc90a63adf46c2824e9f368))
+
 ## [0.2.1](https://github.com/alexnodeland/lattice/compare/portalr-v0.2.0...portalr-v0.2.1) (2026-10-30)
 
 

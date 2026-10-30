@@ -11,13 +11,20 @@ import asyncio
 import base64
 import io
 import json
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any
 
-from mcp.server.mcpserver import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
-from mcp.types import CallToolResult, ImageContent, TextContent
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # `python -I` leaves it off
+
+from tests.files.craft.stdio_mcp import (
+    CallToolResult,
+    ImageContent,
+    MCPServer,
+    TextContent,
+    ToolError,
+)
 
 LISTED = """\
 3 commands (id — label [menu] (shortcut) params; * = undoable):

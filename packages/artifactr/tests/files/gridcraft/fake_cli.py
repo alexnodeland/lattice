@@ -10,12 +10,14 @@ Run as `python -I fake_cli.py mcp`, with `FAKE_SAVES` naming a file it adds each
 import asyncio
 import json
 import os
+import sys
 import zipfile
 from pathlib import Path
 from typing import Any
 
-from mcp.server.mcpserver import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # `python -I` leaves it off
+
+from tests.files.craft.stdio_mcp import MCPServer, ToolError
 
 TYPES = (
     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'

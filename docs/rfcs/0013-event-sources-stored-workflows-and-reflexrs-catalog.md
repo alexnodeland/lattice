@@ -1,6 +1,6 @@
 # RFC-0013: Event sources, stored workflows and reflexr's catalog
 
-**Status:** Discussion
+**Status:** Accepted
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file
@@ -285,19 +285,19 @@ class AlertResolved(AlertEvent, name="resolved"):    # alert:resolved, the same 
 - **Trust `untrusted`, `max_trust` `untrusted` in 0.3.0** (Decision R9). Titles, bodies, comments, branch names and, on a fork's change request, even check names are written by whoever can open one; one level per envelope makes every forge event `untrusted`. A private repository's case for `authenticated` is revisited with connections (#926).
 - **Bindings by repository** (`select={"repository": "acme/api"}`), and the binding's quota holds a busy organization.
 
-The template rules of #890 (an issue labelled, CI red on a session's change request, a review comment, a conflict) run on these types, each with `.trusted(at_least="untrusted")` and a throttle, and each runs a workflow that accepts `untrusted`.
+The template rules of #890 (an issue labelled, CI red on a session's change request, a review comment, a conflict) run on these types, each with `.trusted(at_least="untrusted")` and a throttle, and each runs an agent that accepts `untrusted`.
 
 ### How a source's events start a workflow run
 
-Workflows are [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s (draft): their spec, steps, versions, scopes, budgets and grantr actions. Automations pin them (#972), and runs are decoupled from rules (#968). This RFC fixes only what crosses from the source to the run:
+Workflows are [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s: their spec, steps, versions, scopes, budgets and grantr actions. Automations pin them (#972), and runs are decoupled from rules (#968). This RFC fixes only what crosses from the source to the run:
 
 1. **A rule's `then` names a workflow** and a version, with a mapping from the event's fields to its inputs (#972); code actions stay as one-step workflows. The run's cause is the firing (#968).
 2. **The run carries a trust level,** the lowest among the firing's matched envelopes, and passes it on: the run's events are no more trusted than it (the causation rule), its taint starts as [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) describes, and a code action's `Reaction` gains `trust`.
-3. **A workflow declares the lowest level it accepts.** This RFC asks [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md) for the field, with `authenticated` as its default. A firing below it starts no run: the run is dead-lettered at once with the reason `trust_refused`, so the refusal is visible, and drafting (`check_draft`) says so when a rule's types come only from sources below it.
+3. **The agent declares the levels it accepts,** as [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md#automations-and-stored-workflows-what-rfc-0013-defers-here) defines it: the agent (#947) carries them, an `agent_task` whose trigger is below them fails with `untrusted_trigger` before it runs, and the workflow itself declares no trust levels. Drafting (`check_draft`) says so when a rule's types come only from sources below the levels its agent accepts.
 4. **Untrusted content reaches an agent only as data.** An input mapped from an `untrusted` envelope may be passed as a typed input and read through a tool's result (`read_events` today), never interpolated into an `agent_task`'s instructions or task text. This RFC asks [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s static checks to refuse the interpolation.
 5. **The tools a run may call** are [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s capabilities, narrowed by the run's taint; this RFC adds no registry.
 
-For the flagship: `alert:firing` (`internal`) fires a rule whose one-step `agent_task` triages; `forge:check.completed` with `state="failed"` (`untrusted`) fires #890's rule, whose workflow accepts `untrusted`, and the session it steers is tainted, so marking the change request ready asks a person (#898 step 7, [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s approvals).
+For the flagship: `alert:firing` (`internal`) fires a rule whose one-step `agent_task` triages; `forge:check.completed` with `state="failed"` (`untrusted`) fires #890's rule, whose agent accepts `untrusted`, and the session it steers is tainted, so marking the change request ready asks a person (#898 step 7, [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s approvals).
 
 ### The catalog
 
@@ -414,9 +414,9 @@ Decided by the owner:
 | D7 | The webhook, email, polls and rows | 0.3.x: #842 and #848 are `v0.3`, not `v0.3-core` | their labels; the v0.3 plan, §2 |
 | D8 | Where bindings are stored (this RFC's R4) | A `lattice_core.bindings` port, stored and audited by grantr under `grantr:manage_bindings`, held by a tenant's owners and admins | [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md), Decision O13 (2026-10-31) |
 
-Recommended, for the owner to confirm:
+Decided by the owner on 2026-10-31, on accepting this RFC:
 
-| # | Question | Recommended | Instead of |
+| # | Question | Decided | Instead of |
 |---|---|---|---|
 | R1 | Trust's shape | Three ordered levels, one per envelope, lowered and never raised by binding, occurrence and causation; non-source actors by the table | A level per field (#847's question), which the payload would carry |
 | R2 | Filtering on trust | `trust` and `origin` filter kinds in core | A reserved event field `trust`, which the payload would then hold |
@@ -429,17 +429,17 @@ Recommended, for the owner to confirm:
 | R10 | Where the sources live | `reflexr.sources` in reflexr's base; Alertmanager and the stack's signals as reflexr extras; the forge source in relayr | Every adapter in relayr now, #926's proposal, which would make reflexr's own alerts need artifactr installed |
 | R11 | Catalog actions | Four: `reflexr:read_catalog`, `read_sources`, `retry_source_dead_letter`, `backfill_source` | Reusing `read_rules`, which says nothing of what the read shows |
 | R12 | Stored event types | Not in 0.3.0; with #842, by an ADR: types as JSON Schema under a tenant's namespace, versioned by addition only | Deciding now, with no source that needs one |
-| R13 | What [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md) is asked for | A workflow's lowest accepted level, `authenticated` by default; refusing untrusted fields in instructions | A workflow that accepts whatever fires it |
+| R13 | What a run started by a source's events is checked against | [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md#automations-and-stored-workflows-what-rfc-0013-defers-here)'s model: the agent carries the trust levels it accepts, a step below them fails with `untrusted_trigger`, and the workflow declares none; untrusted fields are never interpolated into instructions (RFC-0012's W7) | A workflow's own lowest accepted level, `authenticated` by default, refused as `trust_refused`; a workflow that accepts whatever fires it |
 | R14 | #846's other signals | Budgets, scores and evaluations in M5, after the flagship's path; #846 stays core | All four in M3 |
 
 ## Drawbacks
 
 - **Every envelope grows two fields,** and core two filter kinds that the conformance fixtures, the rules' JSON Schema and the renderer must carry.
-- **One level per envelope is coarse:** a forge event with one outsider's word in it is as untrusted as a stranger's webhook, and workflows over forge events must accept `untrusted`, so most of #890's runs are tainted. That is the price of a level no payload can shape.
+- **One level per envelope is coarse:** a forge event with one outsider's word in it is as untrusted as a stranger's webhook, and the agents run on forge events must accept `untrusted`, so most of #890's runs are tainted. That is the price of a level no payload can shape.
 - **A hot workspace stays serialized** (reflexr's open question): a busy organization's events to one workspace queue behind one lock. Quotas are 0.3.0's answer; partitioning a log is not.
 - **Sources live in two packages** in 0.3.0, reflexr's extras and relayr's, until #926 decides; the protocol is one.
 - **Alertmanager is one more service** in stackr's observability profile, and its webhook a route without a session, which must give nothing away.
-- **`untrusted` as the default for unregistered sources** lowers events that applications publish today as made-up sources; their rules still fire, but a workflow that accepts only `authenticated` refuses them.
+- **`untrusted` as the default for unregistered sources** lowers events that applications publish today as made-up sources; their rules still fire, but an agent that accepts only `authenticated` fails their steps with `untrusted_trigger`.
 
 ## Alternatives
 
@@ -453,7 +453,6 @@ Recommended, for the owner to confirm:
 
 ## Unresolved questions
 
-- **[RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s field names** for the accepted level and the input mapping, settled when both RFCs are in Discussion.
 - **Whether evaluator verdicts on untrusted runs** should be `untrusted` too, by the causation rule, or `internal`, as judgements of lattice's own models.
 - **Paused intervals in preview:** 0.3.0 reports `bound_at`; reporting the gaps a pause left is 0.3.x.
 - **The neutral `alert:` fields** may grow when #926's registry lands; additions only.
@@ -484,7 +483,14 @@ Each is settled in phase 5 or 6, and recorded as a fixture.
 - [ ] stackr and reflexr: #890's template rules, with trust carried to the run (#890, #968, #972)
 - [ ] reflexr: the catalog and status reads on REST and MCP, the four actions, grantr's roles and `access.md` (#840, #841)
 - [ ] reflexr: budgets, scores and evaluations (#846)
-- [ ] Decisions R1 to R3 and R5 to R14, each recorded in an ADR as it is built
+- [ ] reflexr ADR: trust levels and origin on envelopes, set by reflexr and never by the payload, with the `trust` and `origin` filters; rules skip non-live envelopes unless they opt in (D2, R1, R2, R3)
+- [ ] reflexr ADR: the intake: bindings select by declared selectors only, a paused binding refused and counted, a registered source's actor publishes only through it (R5, R6, R7)
+- [ ] reflexr ADR: where sources live: the `Source` protocol in reflexr's base, Alertmanager and the stack's signals as reflexr extras, the forge source in relayr (D1, R10)
+- [ ] reflexr and stackr ADRs: Alertmanager in stackr's observability profile, nudged and followed, keyed by fingerprint and `startsAt`, tenants by `tenant_id`, `internal`; #846's other signals in M5 (R8, R14)
+- [ ] relayr ADR: the forge source, `relayr.forge`, its events `untrusted` with no raise in 0.3.0 (R9; RFC-0015's C13)
+- [ ] reflexr ADR: the catalog's four actions (R11)
+- [ ] reflexr ADR: what a run started by a source carries: its trust checked against the levels its agent accepts, `untrusted_trigger` below them, untrusted fields kept out of instructions (R13)
+- [ ] reflexr ADR (0.3.x, with #842): stored event types, as JSON Schema under a tenant's namespace, versioned by addition only (R12)
 - [ ] Docs: reflexr's and relayr's architecture and protocol, the sources guide, stackr's Alertmanager guide, the upgrade note (#946)
 
 ### Where each item of #839 is settled

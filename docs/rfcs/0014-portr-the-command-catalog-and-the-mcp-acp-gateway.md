@@ -1,6 +1,6 @@
 # RFC-0014: portr, the command catalog and the MCP/ACP gateway
 
-**Status:** Discussion
+**Status:** Accepted
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file
@@ -163,7 +163,7 @@ The plan left this open (§6 Q4, §7.7); the owner decided it on 2026-10-31 (O7)
 4. Supabase sends the browser to the consent page, which the application hosts: portalr's `/portalr/app/connect`, signed in as usual. It names the client, asks for the tenant the connection is for and the toolsets it may use, shows each toolset's tiers, and on Allow records the **connection** in grantr before calling Supabase's approval endpoint.
 5. Authorization code with PKCE, then access and refresh tokens. portr verifies each access token's signature against Supabase's JWKS, its issuer and expiry, its audience, and its `client_id` against a live connection.
 
-**Audience.** MCP requires a resource server to accept only tokens issued for it; Supabase Auth is not known to honour RFC 8707's `resource` parameter (a FastMCP guide says so; Unverified). Two defences, both recommended (Decision P6): a Supabase custom access token hook that sets `aud` to the gateway's canonical URI for tokens issued to OAuth clients, which portr requires; and the connection check, which refuses any token whose `client_id` and `sub` name no live connection, so a portalr session's token, which has no OAuth client, is never accepted at the gateway.
+**Audience.** MCP requires a resource server to accept only tokens issued for it; Supabase Auth is not known to honour RFC 8707's `resource` parameter (a FastMCP guide says so; Unverified). Two defences, both decided (Decision P6): a Supabase custom access token hook that sets `aud` to the gateway's canonical URI for tokens issued to OAuth clients, which portr requires; and the connection check, which refuses any token whose `client_id` and `sub` name no live connection, so a portalr session's token, which has no OAuth client, is never accepted at the gateway.
 
 **Keys.** A service principal sends its grantr key, `Authorization: Bearer grantr_sk_...`, as the template's `auth.py` already accepts keys in place of tokens. It is a second scheme, told apart by its prefix, never confused with an OAuth token, and never sent anywhere else. A key's connection is the key itself: it is listed, limited and revoked as keys are (portalr ADR-0024), and its toolsets are granted to it in admin.
 
@@ -233,7 +233,7 @@ An **approval** asks whether something may happen; a **confirmation** asks the c
 - **The risk class is [RFC-0011][rfc-0011]'s `risk_class`;** this RFC fills its vocabulary with one value in 0.3.0, `admin_high`. Reversibility stays [RFC-0011][rfc-0011]'s `reversibility`, which portr also maps onto MCP's tool annotations (`readOnlyHint` for `read`, `destructiveHint` for `irreversible`, `idempotentHint` where a `command_id` makes a retry safe).
 - **`admin_high` commands:** `grantr.delete_tenant`, `grantr.revoke_key`, `grantr.grant` and `grantr.define_role` when the role holds `owner` or `admin`'s actions, `grantr.grant_operator`, `grantr.revoke_connection` of someone else's, and portalr's `create_tenant`. Deleting a workspace and "stop everything" have no command today; each is `admin_high` when it is added. A test holds the list to the catalogs.
 - **A confirmation is out of band, never in the client.** It is answered on portalr's confirm page, `/portalr/admin/confirm/{id}`, alone, which the person opens signed in, as [RFC-0011][rfc-0011] decides (O15: never by the client that made the call, by elicitation, or by a push action). A URL-mode elicitation only carries the page's address to the client; the page names the action and its target and asks them to type the target's name. Form-mode elicitation is answered by the client's software, which may be set to accept on its own; a URL-mode elicitation opens a page the client can't read or fill (MCP's elicitation rules), and portalr checks that the person who opens it is the caller, as MCP requires. Where the client has no URL mode, the tool returns the same link as a pending status.
-- **A person confirms for service principals.** A key has no person to confirm its `admin_high` call, and a service principal never answers an `admin_high` approval ([RFC-0011][rfc-0011], O15), so the call is never run on the key's word: it becomes a request that a person confirms on portalr's confirm page or by web push (O13). #918's exception, a key "granted the action specifically", is dropped.
+- **A person confirms for service principals.** A key has no person to confirm its `admin_high` call, and a service principal never answers an `admin_high` approval ([RFC-0011][rfc-0011], O15), so the call is never run on the key's word: it becomes a request that a person confirms only on portalr's signed-in confirm page; a web push may notify them and link to that page, but never answers it (O13). #918's exception, a key "granted the action specifically", is dropped.
 - **Audited** as from the client: "Alex via Claude revoked key ci-bot", with the confirmation's id.
 - **How it is built on [RFC-0011][rfc-0011]:** a confirmation is an `Approval` whose `answerers` name exactly the caller, offered on the URL surface alone. That gives it expiry, first answer wins and audit, and puts it in portalr's approvals list, with no second mechanism (Decision O8, which [RFC-0011][rfc-0011] records as O15).
 - **A different approver, where asked.** An `admin_high` command needs a second person only where its gate's `different_approver` says so, or where `admin-high:different-approver` lists it: an ADR-0030 `Subset` over the registered `admin_high` capabilities, declared in lattice-core's `KNOWN_SETTINGS`, set by the operator, which a tenant may add to but never take from ([RFC-0011][rfc-0011], O15). Such an approval never reaches the caller's surfaces.
@@ -325,11 +325,11 @@ Decided by the owner (#914, the v0.3 plan's decisions of 2026-10-30, and O7 and 
 | O10 | ACP in 0.3.0 ([RFC-0011][rfc-0011], 2026-10-31) | A coding agent's permission request is a source of asks, answered by a person on the portalr card or by web push; editors' ACP surface in 0.3.x | An ACP approval surface in 0.3.0 |
 | O11 | Limits per connection ([RFC-0011][rfc-0011], 2026-10-31) | [RFC-0011][rfc-0011]'s `Counter` may count per `CallContext.via` connection | Counting per tenant and workspace only |
 | O12 | Tenants (2026-10-31) | One tenant per connection, chosen at consent; a second tenant is a second connection, from the tenant-named URL `/portr/t/{tenant}/mcp` | A `tenant` argument on every tool, which makes one connection's reach every tenant the person is in |
-| O13 | A key's `admin_high` call (2026-10-31) | No exception: a key never runs an `admin_high` action on its own word. Automation may request it, and a person confirms it on portalr's confirm page or by web push | #918's exception for a key granted the action specifically |
+| O13 | A key's `admin_high` call (2026-10-31) | No exception: a key never runs an `admin_high` action on its own word. Automation may request it, and a person confirms it only on portalr's signed-in confirm page; a web push may notify them and link to that page, but never answers it | #918's exception for a key granted the action specifically |
 
-Recommended, for the owner to confirm:
+Decided by the owner on 2026-10-31, on accepting this RFC:
 
-| # | Question | Recommended | Instead of |
+| # | Question | Decided | Instead of |
 |---|---|---|---|
 | P2 | The command's shape | `Command` in lattice-core: a [RFC-0011][rfc-0011] `Capability` plus toolset, exposure, route, resource and surfaces | A second tool type beside capabilities; metadata held by portr |
 | P3 | Declaration and binding | A static catalog per package, through [RFC-0011][rfc-0011]'s entry point; a provider bound at the composition root | Catalogs built only at runtime, which the parity test and schemas couldn't read |
@@ -361,7 +361,8 @@ Recommended, for the owner to confirm:
 
 ## Unresolved questions
 
-- **P2 to P7, P9 and P11 to P13,** for the owner.
+As of 2026-10-31, P2 to P7, P9 and P11 to P13 are decided ([Decisions](#decisions)).
+
 - **Per-client-app limits across a tenant,** and the operator naming known client apps, in 0.3.x.
 - **What 0.3.0's search reads,** if a text match over threads and artifacts is too slow at a large workspace's size.
 
@@ -379,8 +380,13 @@ Each is settled in phase 3 or 4, or carried as an exit criterion; items marked "
 
 ## Tracking
 
-- [ ] Sign-off on P2 to P9 and P11 to P13
-- [ ] ADRs: the command declaration (P2, P3, P4); portr's home (O7); connections (P7, O12); confirmations (O8, O13)
+- [ ] lattice-core ADR: the command declaration: `Command` as an RFC-0011 `Capability` plus toolset, exposure, route, resource and surfaces; a static catalog per package, bound at the composition root; tool names `<package>_<name>`, a breaking change a new command (P2, P3, P4)
+- [ ] lattice ADR: portr, a new package on lattice-core and grantr, reaching commands only through RFC-0011's registry (O7)
+- [ ] lattice ADR: parity's mechanism: `x-lattice-command` on every operation, command frames' `type`, the client's `CommandName` and manifest, root `tests/test_parity.py` (P13)
+- [ ] portr ADR, with the package: the gateway's transport and tokens: MCP 2026-07-28 first and stateless, the access token hook's `aud` and a live connection on every call, Dynamic Client Registration first (P5, P6, P9)
+- [ ] grantr ADR: connections as grantr objects, one tenant each, listed, limited, audited and revoked like keys (P7, O12)
+- [ ] portr ADR, with the package: approvals by form elicitation and never a tool that answers; the ACP client picks only `*_once`; confirmations out of band on portalr's confirm page, and no `admin_high` on a key's word (P11, O8, O13)
+- [ ] portr ADR, with the package: limits per connection, four settings; per client app in 0.3.x (P12)
 - [ ] lattice-core: `commands` and its schema (#916)
 - [ ] artifactr, grantr, reflexr, relayr, portalr: their catalogs, providers, `x-lattice-command` and schemas (#916)
 - [ ] portalr's client: `CommandName` and `commands.used.json`; root `tests/test_parity.py` and its fixtures (#916)

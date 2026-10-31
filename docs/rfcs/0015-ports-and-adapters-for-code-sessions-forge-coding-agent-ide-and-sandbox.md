@@ -1,6 +1,6 @@
 # RFC-0015: Ports and adapters for code sessions: forge, coding agent, IDE and sandbox
 
-**Status:** Discussion
+**Status:** Accepted
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file
@@ -386,7 +386,7 @@ The package registers one [RFC-0011][rfc-0011] provider, `ProviderKind = "code_s
 - **A permission ask is an [RFC-0011][rfc-0011] approval.** When `pending_permissions` returns a request, the session core calls `Approvals.ask` for `code.agent_action`, a capability registered for this and offered to no agent, with a rendering of the command or paths and their `patterns`, bound to the request by its digest. It reaches the thread's card and a phone by web push as any approval does, and only a person answers: the answerers hold `code:start_session` on the session's workspace, and no service principal is granted it. Approved is `once`, denied is `reject`; a withdrawn or expired approval is `reject`.
 - **"Always" is not offered in 0.3.0** (Decision C6). `always` is kept on the model; in 0.3.x it becomes an answer that widens the session's translated policy by those patterns, never past the workspace's, as an audited change of its own, through [RFC-0011][rfc-0011]'s `AnswerScope` (O12, decided 2026-10-31): the permission request offers its `always` patterns as `scopes_offered`, `within="session"`. In 0.3.0 nothing offers a scope and grantr refuses an answer that carries one (`ScopeNotOffered`).
 - **`code.push` is `write` with `sends_out`,** where [RFC-0011][rfc-0011]'s T1 pairs `sends_out` with `outbound`. That is deliberate: the push reaches only lattice's own branch, at a sha the gateway checks, and is compensable; what a person must see leave, the change request and its readiness, is `outbound`.
-- **Pushes in the flagship's CI loop.** A session steered by a failing check's log has read untrusted text, so each later `code.push` meets [RFC-0011][rfc-0011]'s taint step. Recommended: the workspace's taint policy maps `code.push` to `narrow`, which the gateway already enforces (the session's branch, the approved sha, fast-forward only), and keeps the person's gate where #898 puts it, at `code.mark_ready` (Decision C12). Otherwise every push of the loop asks a person.
+- **Pushes in the flagship's CI loop.** A session steered by a failing check's log has read untrusted text, so each later `code.push` meets [RFC-0011][rfc-0011]'s taint step. Decided: the workspace's taint policy maps `code.push` to `narrow`, which the gateway already enforces (the session's branch, the approved sha, fast-forward only), and keeps the person's gate where #898 puts it, at `code.mark_ready` (Decision C12). Otherwise every push of the loop asks a person.
 
 ### Where it lives
 
@@ -416,7 +416,7 @@ ADR-0018 keeps lattice-core to what the libraries share word for word, with no d
 
 - **Each adapter is an [RFC-0011][rfc-0011] adapter,** `AdapterSpec` with kind `forge`, `coding_agent`, `ide` or `sandbox`, found through the `lattice.adapters` entry point and passing its suite in [RFC-0011][rfc-0011]'s harness. Each forge and agent is an ADR-0027 integration, off by default: `code:sessions`, `forge:<name>` (`forge:github`, `forge:forgejo`) and `agent:<name>` (`agent:opencode`, `agent:claude-code`). lattice-core's `KEY` allows a name or `family:name` only, so #895's and #896's `code:agent:<name>` and `code:ide:<name>` become `agent:<name>` and `ide:<name>`.
 - **Who imports `codr`:** the application's composition root (stackr's template, `examples/oncall`), and relayr's `forge` extra, which is the forge source. Nothing else: artifactr and reflexr reach it through the registry, portalr through the routes the application mounts, evalr through `forge:*` events.
-- **The forge source is relayr's** (`relayr.forge`, as [RFC-0013][rfc-0013]'s R10 recommends), because the Source protocol is reflexr's ([#841](https://github.com/alexnodeland/lattice/issues/841)) and `codr` imports no reflexr, and because a follower that leases and polls is what relayr's trackers already are (RFC-0004). [RFC-0013][rfc-0013] keeps it there until the connector RFC (#926) settles where connector adapters live.
+- **The forge source is relayr's** (`relayr.forge`, as [RFC-0013][rfc-0013]'s R10 decides), because the Source protocol is reflexr's ([#841](https://github.com/alexnodeland/lattice/issues/841)) and `codr` imports no reflexr, and because a follower that leases and polls is what relayr's trackers already are (RFC-0004). [RFC-0013][rfc-0013] keeps it there until the connector RFC (#926) settles where connector adapters live.
 
 ### How this answers the spike
 
@@ -432,7 +432,7 @@ ADR-0018 keeps lattice-core to what the libraries share word for word, with no d
 | gVisor's traps | A pinned release, helpers beside `runsc`, the platform in `ImageRef`, `make validate` |
 | Exec through OpenSandbox unproven | Phase 2's exit criterion, on a Linux runner |
 | A scripted stub model through LiteLLM for conformance | [Testing](#testing-at-100-branch-coverage) |
-| Finish #899's first criterion on GitHub before Discussion ends | Tracking, and Decision C10 |
+| Finish #899's first criterion on GitHub | Tracking, and Decision C10: before the GitHub nightly run ships |
 | Draft and checks as forge capabilities | [Capability flags](#the-forge-port) |
 
 ### Testing at 100% branch coverage
@@ -496,18 +496,18 @@ Decided by the owner, here or in [RFC-0011][rfc-0011]:
 | C3 | Force-pushes (2026-10-31) | The gateway receives into a per-session mirror and checks `--is-ancestor` in quarantine before it pushes upstream; forge branch protection on `lattice/*` as the second line | Ref names alone (the spike's hole); forge protection alone (not every forge, and too late) |
 | C4 | Who may push (2026-10-31) | Only an open push grant for the approved sha, opened by `code.push` | Any push from the sandbox to the session's branch, which the agent could make itself |
 
-Recommended, for the owner to confirm:
+Decided by the owner on 2026-10-31, on accepting this RFC:
 
-| # | Question | Recommended | Instead of |
+| # | Question | Decided | Instead of |
 |---|---|---|---|
 | C5 | The agent port's contract | ACP's session shape; events are hints, `status` and `pending_permissions` the truth | opencode's model; trusting the stream |
 | C6 | Permission answers | An [RFC-0011][rfc-0011] approval, `once` or `reject`; "always" in 0.3.x through `AnswerScope`, whose shape is decided by [RFC-0011][rfc-0011] (O12, 2026-10-31) | Offering "always" now, beside an approval bound to one request |
 | C7 | The diff | Lattice's `git diff`, untracked files included; no ACP `fs/*` | opencode's `/diff`; serving `fs/*` from the sandbox (#895) |
 | C9 | Forge credentials | Read by the gateway and the forge client only, through `Forge.credential`, tunnelled through the egress proxy | Injected by Envoy from `X-Lattice-Secret`, which can't mint GitHub's installation tokens without the authorizer learning each forge |
-| C10 | The flagship's forge in CI | Forgejo in a container on every run; GitHub nightly; #899's GitHub half done before this leaves Discussion | GitHub in CI, which needs an App's secrets |
+| C10 | The flagship's forge in CI | Forgejo in a container on every run; GitHub nightly; #899's GitHub half done before the GitHub nightly run ships, in phase 4 (M3) | GitHub in CI, which needs an App's secrets |
 | C11 | grantr actions | #893's `code:start_session`, `code:push`, `code:open_change_request` and `code:manage_forges`, plus `code:read_session` and `code:read_repository`; bindings under [RFC-0011][rfc-0011]'s `grantr:manage_bindings` (O13) | Reading under `code:start_session` |
 | C12 | Pushes in a tainted session | `code.push` mapped to `narrow`, which the gateway enforces; the person's gate at `code.mark_ready` | Every push of a CI loop asking a person |
-| C13 | The forge source | relayr's `forge` extra, `relayr.forge`, as [RFC-0013][rfc-0013] recommends (its R10) | In `codr`, which would import reflexr |
+| C13 | The forge source | relayr's `forge` extra, `relayr.forge`, as [RFC-0013][rfc-0013] decides (its R10) | In `codr`, which would import reflexr |
 
 ## Drawbacks
 
@@ -532,7 +532,6 @@ Recommended, for the owner to confirm:
 
 - **Asked of [RFC-0011][rfc-0011], now its O10:** forges and LiteLLM on private addresses, answered by internal destinations per purpose (O7 here).
 - **Asked of [RFC-0011][rfc-0011], now its O12:** an approval answer that carries a scope, for "always" in 0.3.x (C6, O8 here). What remains is 0.3.x's: which of an ask's `always` patterns a session offers.
-- **For [RFC-0013][rfc-0013]:** its R10, still a recommendation there, settles C13.
 - **Mirrors for large repositories:** a shared object store per repository and tenant, with alternates, may replace the per-session mirror's full copy. Measured in phase 3.
 - **Which opencode surface:** `/api/session/...` if, at the pinned release, it covers status, pending asks and replies; the spike's otherwise.
 
@@ -551,7 +550,7 @@ Each is settled in its phase, or carried as an exit criterion.
 
 ## Tracking
 
-- [ ] #899's GitHub half, before this leaves Discussion (C10)
+- [ ] #899's GitHub half, before the GitHub nightly run ships in phase 4 (M3) (C10)
 - [ ] ADR: `codr`, a new library for code sessions, under ADR-0018 and ADR-0026 (C1)
 - [ ] codr: the four ports, models, fakes and suites (#893)
 - [ ] codr and stackr: the sandbox port's adapters, the `code` profile and gVisor pinned (#885)
@@ -566,7 +565,12 @@ Each is settled in its phase, or carried as an exit criterion.
 - [ ] reflexr and stackr: the forge-event rules, "CI red" first (#890)
 - [ ] evalr: the first session scores (#906)
 - [ ] #898's code-session steps in CI on Forgejo
-- [ ] Decisions C1 to C13, each recorded in an ADR as it is built (C1's in the ADR above)
+- [ ] codr ADR, with the package: the coding agent port: ACP's session shape, events as hints with `status` and `pending_permissions` the truth, lattice's `git diff` with no ACP `fs/*`; Claude Code as the first ACP agent, on its terms (C2, C5, C7)
+- [ ] codr ADR, with the package: the git gateway: a per-session mirror checked with `--is-ancestor` in quarantine, pushes only for an open push grant, forge credentials read only by the gateway and the forge client (C3, C4, C9)
+- [ ] codr ADR, with the package: permission asks as RFC-0011 approvals, `once` or `reject`, "always" through `AnswerScope` in 0.3.x; `code.push` narrowed in a tainted session, the person's gate at `code.mark_ready` (C6, C12)
+- [ ] codr ADR, with the package: grantr's `code:*` actions, with bindings under `grantr:manage_bindings` (C11)
+- [ ] codr ADR, with the package: the flagship's forge in CI, Forgejo on every run and GitHub nightly (C10)
+- [ ] relayr ADR: the forge source in `relayr.forge` (C13), the same ADR as RFC-0013's R9 and R10
 - [ ] Docs: `docs/codr/`, its architecture, the forge and agent guides, the host requirements
 
 ## Evidence

@@ -1,0 +1,152 @@
+{
+  "$defs": {
+    "InternalUpstream": {
+      "description": "A private destination the operator declares for a purpose, such as a self-hosted forge.\n\nIt is reached only under its purpose, on its port, and only where every address its host\nresolves to is inside its range, still pinned against rebinding and narrowed by taint.\n\nRaises:\n    ValueError: If the host isn't a lowercase name, or is a metadata endpoint's, or the\n        range holds a metadata endpoint's address.",
+      "properties": {
+        "host": {
+          "description": "Its host, exactly: ``forgejo.internal``.",
+          "title": "Host",
+          "type": "string"
+        },
+        "network": {
+          "description": "The range its host must resolve into, such as ``10.0.4.0/24``.",
+          "format": "ipvanynetwork",
+          "title": "Network",
+          "type": "string"
+        },
+        "port": {
+          "description": "Its port.",
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "port",
+        "network"
+      ],
+      "title": "InternalUpstream",
+      "type": "object"
+    },
+    "JsonObject": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+    },
+    "JsonValue": {},
+    "Purpose": {
+      "description": "Why something calls out, and where the operator lets it reach.\n\nRaises:\n    ValueError: If the key isn't of :data:`PURPOSE`'s form, a host pattern isn't a host or\n        ``*.`` and one, or two internal destinations share a host and port.",
+      "properties": {
+        "hosts": {
+          "default": [],
+          "description": "The hosts it may reach, the operator's universe for it, which tenants and workspaces only\nnarrow: names, or ``*.`` and a name for any name below it.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Hosts",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "internal": {
+          "default": [],
+          "description": "The private destinations the operator declares for it.",
+          "items": {
+            "$ref": "#/$defs/InternalUpstream"
+          },
+          "title": "Internal",
+          "type": "array"
+        },
+        "key": {
+          "description": "Its key: ``litellm``, ``reader``, ``sandbox:registries``, ``connector:github``.",
+          "title": "Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "Purpose",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "lattice's adapter contract: what an installed adapter declares, as an operator sees it, without the factory that builds it.",
+  "properties": {
+    "config_schema": {
+      "$ref": "#/$defs/JsonObject",
+      "description": "The JSON Schema of its configuration, which startup validates."
+    },
+    "egress": {
+      "description": "The egress purposes it needs.",
+      "items": {
+        "$ref": "#/$defs/Purpose"
+      },
+      "title": "Egress",
+      "type": "array"
+    },
+    "implements": {
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Each port it implements, by name, and the port versions it supports: ``>=1,<2``.",
+      "title": "Implements",
+      "type": "object"
+    },
+    "integrations": {
+      "description": "The keys of the integrations it adds (lattice ADR-0027).",
+      "items": {
+        "type": "string"
+      },
+      "title": "Integrations",
+      "type": "array"
+    },
+    "kind": {
+      "description": "The kind of port it answers.",
+      "enum": [
+        "secrets",
+        "sandbox",
+        "forge",
+        "coding_agent",
+        "ide",
+        "connector",
+        "search",
+        "mcp_server"
+      ],
+      "title": "Kind",
+      "type": "string"
+    },
+    "name": {
+      "description": "Its name, such as ``supabase-vault``.",
+      "title": "Name",
+      "type": "string"
+    },
+    "settings": {
+      "description": "The keys of the settings it adds (lattice ADR-0030).",
+      "items": {
+        "type": "string"
+      },
+      "title": "Settings",
+      "type": "array"
+    },
+    "version": {
+      "description": "Its distribution's version.",
+      "title": "Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "kind",
+    "name",
+    "version",
+    "implements",
+    "integrations",
+    "settings",
+    "config_schema",
+    "egress"
+  ],
+  "title": "lattice.adapters 1.0.0",
+  "type": "object"
+}

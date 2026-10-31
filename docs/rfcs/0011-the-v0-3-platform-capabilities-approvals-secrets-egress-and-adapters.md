@@ -1,6 +1,6 @@
 # RFC-0011: The v0.3 platform: capabilities, approvals, secrets, egress and adapters
 
-**Status:** Discussion
+**Status:** Accepted
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file
@@ -97,6 +97,7 @@ class Provider(Protocol):
 - **One tier, not two.** The tier is what decides who may offer a tool; `effects` are what taint reads. artifactr's `Risk` maps onto them: `read` and `edit` are `read` and `write`; `code` is `run_code`; `network` is `outbound` with `sends_out`; `host` is never registered, as today. `artifactr.connect` keeps `Risk` as its vetting vocabulary and maps it when it registers (Decision T1).
 - **`Scope` is a tenant and a workspace;** `capabilities(scope)` is asked per scope because a tenant's remote MCP servers (#921) and connections (#926) differ. A static provider ignores it.
 - **`CallContext`** carries the caller (a person, an agent's run, a code session), the run's taint, its correlation id and the surface it came from. It is the same type the approval and egress parts read.
+- **`CallContext.via: Via | None`** names the outside client a call came through, for lattice RFC-0014 ([#1224](https://github.com/alexnodeland/lattice/pull/1224)): the connection's id, the client's name and the surface (`mcp`, `acp`). A provider builds its actor from it, such as artifactr's and reflexr's `ExternalAgentActor(client_id=..., name=..., on_behalf_of=<the person>)`, so grantr checks the person's grants, audit names the client ("Alex via Claude"), and every event is attributed to the client acting for the person. `None` is a call from lattice's own surfaces (Decision O14).
 - **The registry** is `Registry(*providers)`. It refuses two capabilities of one name in a scope, lists by scope, finds by name, and searches by text for portr's tool search ([#919](https://github.com/alexnodeland/lattice/issues/919)). Agents and stored workflows name capabilities; the chat agent's tools and portr's MCP tools are views of it.
 
 **One enforcement path.** `Enforcer.call(name, arguments, context)` is the only way a capability is called. Its steps are #940's, in order, each a port the application injects:
@@ -106,7 +107,7 @@ class Provider(Protocol):
 3. **Tier allowed for this agent?** The agent's or workflow's tier ceiling, a `Subset` setting `tiers:<agent>` narrowed per workspace (ADR-0030).
 4. **Limits:** each key in `limits`, read through `Settings` and counted by a `Counter` port; a store that can't be read refuses (fails closed, as ADR-0030 does).
 5. **Taint:** `TaintPolicy.decide(capability, context.taint, scope)` answers `allow`, `ask`, `narrow` or `deny` (#903).
-6. **Approval needed?** `ApprovalPolicy` (below); if so, the call is deferred until the approval resolves.
+6. **Approval needed?** `ApprovalPolicy` (below); if so, the enforcer first asks the `Coverage` port whether an approved plan already covers this call, and otherwise defers the call until a new approval resolves.
 7. **Call** the provider.
 8. **Mark taint** from `effects`: `reads_untrusted` taints the turn, run or session, with the capability's name as the cause.
 9. **Audit:** one `capability_called` entry, with the outcome of each step, through an `Audit` port grantr answers.
@@ -150,7 +151,8 @@ class Approval(BaseModel, frozen=True):
     answerers: Answerers              # a grantr action, named subjects or groups, and different_approver
     deadline: datetime
     state: State
-    answer: Answer | None             # who, on which surface, when, approved or not, a reason
+    answer: Answer | None             # who, on which surface, when, approved or not, a reason, and a scope (below)
+    covers: tuple[ListedAction, ...] = ()  # the listed actions a plan approval pre-approves; empty for any other
 
 class Approvals(Protocol):
     async def ask(self, request: ApprovalRequest, /) -> Approval: ...
@@ -160,13 +162,39 @@ class Approvals(Protocol):
     def watch(self, id: ApprovalId) -> AsyncIterator[Approval]: ...
 ```
 
-- **One policy.** `ApprovalPolicy.needed(capability, context, scope) -> Answerers | None` decides from the tier, the taint step's `ask`, the capability's `risk_class`, and settings: `approve:<tier>` is a `Subset` of tiers that need a person, whose floor the operator sets. A tenant or workspace may require approval on more tiers, never on fewer (Decision O5): asking more is the narrower direction ADR-0030 allows, so the setting is resolved as a union down the layers, where other `Subset` settings intersect. `different_approver` comes from the gate, or from a tainted outbound call, and is always set for `risk_class="admin_high"`.
+- **One policy.** `ApprovalPolicy.needed(capability, context, scope) -> Answerers | None` decides from the tier, the taint step's `ask`, the capability's `risk_class`, and settings: `approve:<tier>` is a `Subset` of tiers that need a person, whose floor the operator sets. A tenant or workspace may require approval on more tiers, never on fewer (Decision O5): asking more is the narrower direction ADR-0030 allows, so the setting is resolved as a union down the layers, where other `Subset` settings intersect. `different_approver` comes from the gate, or from a tainted outbound call.
+- **`admin_high` asks the caller's own confirmation** by default, not a second person (Decision O15). The approval's `answerers` name exactly the caller, and it is offered on one surface alone, portalr's confirm page: the caller, signed in, confirms there, fresh, for this action and its target. It is never answered by the client that made the call, by elicitation, or by a push action. A different approver is required for an `admin_high` action only where its gate's `different_approver` says so, or where the setting `admin-high:different-approver` lists it: a `Subset` over the registered `admin_high` capabilities, set by the operator, which a tenant may add to but never take from (resolved as a union, as O5's is). A service principal never answers an `admin_high` approval.
 - **First answer wins.** `answer` is a compare-and-set on `state = 'pending'` in grantr's store, in one transaction with its audit entry. The second answer gets `AlreadyAnswered` with the first's answer, surface and time, which every surface shows. A test runs answers from many tasks at once against SQLite and PostgreSQL and finds exactly one.
 - **Bound to what was shown.** An answer carries the `arguments_digest` it saw; one for other arguments is refused. A replanned call is a new approval.
 - **Delegation.** `answerers` names a grantr action, so anyone who holds it may answer, and grantr's grants are how a person delegates. A named delegation, "Sam answers mine this week", is a grant with an expiry, not a field of the approval (Decision T3). A service principal may answer only if granted the action specifically, and never an `admin_high` one (#918).
 - **Expiry and reminders.** A sweep moves a pending approval past its deadline to `expired`, with a reason, and the waiting step fails with it. Reminders are notifications at fractions of the deadline (#952). The default deadline is a setting, `approve-within`, an `IntRange` in minutes.
 - **Withdrawn** when its run is stopped, its session ends or its capability's arguments change.
 - **On artifactr's deferred tools.** artifactr keeps `requires_approval` and `answer_deferred`. A deferred call that the enforcer asked for has an `Approval`; `answer_deferred` from the chat becomes `Approvals.answer(surface="portalr")`, and the approval's resolution resumes the run through the same `deferred_answered` fact relayr already bridges. A run paused on one approval resumes whichever surface answered.
+
+**Scoped answers.** An answer may carry a scope, the shape "always allow" needs ([lattice RFC-0015](https://github.com/alexnodeland/lattice/pull/1227)'s C6), so that an approval answered once can stand for later calls like it (Decision O12):
+
+```python
+class AnswerScope(BaseModel, frozen=True):
+    within: Literal["session", "run"]  # how long it stands: the code session's or the run's life
+    patterns: tuple[str, ...]          # what it allows, from those the request offered, such as a command's prefix
+    expires_at: datetime | None = None
+```
+
+An `ApprovalRequest` offers the patterns a scope may name (`scopes_offered`, empty by default); an answer's `scope` must be among them, and may only narrow what the workspace's policy allows, never widen it. Granting a scope is an audited change of its own. In 0.3.0 the shape exists and nothing offers a scope, so the store refuses any answer that carries one (`ScopeNotOffered`); the code sessions' "always" uses it in 0.3.x.
+
+**Plan pre-approval.** A plan approval, lattice RFC-0012's W6 ([#1225](https://github.com/alexnodeland/lattice/pull/1225)), pre-approves the actions a run's plan lists (Decision O11). Two additions to `lattice_core.approvals`, both minor under [Versioning](#versioning-946):
+
+- **`covers: tuple[ListedAction, ...] = ()`** on `ApprovalRequest` and `Approval`. A `ListedAction` is a step's id, the capability's name and major version, its tier, a `target` over the call's arguments (RFC-0012's condition, held here as its JSON, since lattice-core imports no reflexr), `max_calls` per run, and a digest of all of these with the capability's definition. reflexr produces it; grantr stores it with the approval.
+- **A `Coverage` port** the enforcer asks at step 6, before asking a new approval: `async def cover(context: CallContext, capability: Capability, arguments: JsonObject) -> ApprovalId | None`. reflexr answers it, inside the run's transaction: an approved plan approval of the run whose `covers` holds the current step's entry, with its digest unchanged, the arguments within `target`, calls left, and the budget and window not passed. It records the use and returns the approval's id, which the `capability_called` entry names. `None` means ask, as without it. The application's default `Coverage` answers `None` always.
+
+What a pre-approval never covers, so the step asks:
+
+- anything not listed, a call whose arguments fall outside its `target`, or one past its `max_calls`;
+- a call after the run's budget or time window is exceeded;
+- an action whose capability changed (another major, tier or effects), since the digest includes its definition;
+- anything changed or added by replanning;
+- an ask that comes from taint (step 5 answering `ask`): the person approved before the untrusted content was read;
+- an action that needs a different approver than the one who approved the plan (`different_approver`, `admin_high`).
 
 **Surfaces.** A surface implements `ApprovalSurface`: `offer(approval, to=subjects)`, `resolved(approval)`. The approvals store fans each new approval out to the surfaces of the subjects who may answer, and each resolution to every surface it was offered on.
 
@@ -216,11 +244,14 @@ class Secrets(Protocol):
 class Purpose(BaseModel, frozen=True):
     key: str                           # "sandbox:registries", "connector:github", "mcp:<server>", "litellm", "reader"
     hosts: frozenset[HostPattern]      # the operator's universe for this purpose
+    internal: tuple[InternalUpstream, ...] = ()  # operator-declared private destinations: host, port, the range it resolves into
 
 def decide(request: Destination, purpose: Purpose, allowed: frozenset[HostPattern], taint: Taint, /) -> Verdict: ...
 ```
 
-- **Always refused,** whatever the purpose: private, loopback, link-local, CGNAT and tailnet ranges, and metadata endpoints, checked on every resolved address, again after each redirect, and pinned for the connection so DNS rebinding can't swap it.
+- **Refused unless the operator declares them:** private, loopback, link-local, CGNAT and tailnet ranges, checked on every resolved address, again after each redirect, and pinned for the connection so DNS rebinding can't swap it.
+- **Internal destinations, declared per purpose by the operator alone** (Decision O10, for lattice RFC-0015 ([#1227](https://github.com/alexnodeland/lattice/pull/1227))): a self-hosted Forgejo for `forge:<connection>`, the stack's LiteLLM for `litellm`, or another service of the stack. Each is a `Purpose.internal` entry, an exact host and port with the private range it must resolve into, in the deployment's configuration; no setting, tenant or workspace can add one (as O6). A request for it is allowed only under that purpose, only to an address inside the declared range, still pinned against rebinding, and still narrowed by taint. Envoy reaches them through static clusters rendered from the declaration.
+- **Always refused,** whatever the purpose or declaration: metadata endpoints (`169.254.169.254`, `fd00:ec2::254` and their names), which no `internal` entry may name.
 - **Allowlists per purpose.** The operator's configuration holds each purpose's hosts. A tenant or workspace narrows them as an ADR-0030 `Subset` setting, `egress:<purpose>`, over that universe; never wider. In 0.3.0 only the operator adds hosts (Decision O6): a remote MCP server a tenant adds (#921) is reachable only where its host is in the operator's catalog. Hosts a connection declares are revisited with the connector RFC (#926).
 - **Narrowed by taint.** For a tainted turn, run or session, `decide` allows only hosts that appeared in what was read (the taint's recorded `seen_hosts`) and are also allowlisted, and refuses a URL with a query or path built from private data, which the caller marks as such (#903's "narrow").
 - **Limits** on size, time and rate per purpose, as settings.
@@ -245,7 +276,7 @@ Two candidates were compared against what this design needs:
 
 **How the shared policy becomes Envoy's configuration,** in two layers:
 
-- **Static, rendered:** `lattice_core.egress.envoy(policy) -> dict` renders the operator's purposes, their host universes, limits and the always-refused ranges into Envoy's listeners, routes, RBAC filters and clusters, as plain data, with no Envoy dependency. stackr's `scripts/egress-config` writes it to `deploy/egress/` when the stack starts, and Envoy reads it as file-based xDS, so a change of the operator's configuration is picked up without a restart. A drift test holds the committed example to the renderer. This layer holds even if the authorizer errs: nothing outside the operator's universe is ever reachable.
+- **Static, rendered:** `lattice_core.egress.envoy(policy) -> dict` renders the operator's purposes, their host universes, limits, internal destinations and the refused ranges into Envoy's listeners, routes, RBAC filters and clusters, as plain data, with no Envoy dependency. stackr's `scripts/egress-config` writes it to `deploy/egress/` when the stack starts, and Envoy reads it as file-based xDS, so a change of the operator's configuration is picked up without a restart. A drift test holds the committed example to the renderer. This layer holds even if the authorizer errs: nothing outside the operator's universe is ever reachable.
 - **Dynamic, asked:** `ext_authz` calls `lattice_core.egress.fastapi`'s authorizer, a router behind the `fastapi` extra that the application mounts, not a service of its own. It identifies the caller, applies the tenant's and workspace's narrowing, taint and `decide`, reads any credential through `Secrets`, and answers allow with headers and metadata, or deny with a reason. Envoy is configured with `failure_mode_allow: false`, so an authorizer that can't answer refuses.
 
 ### A sandbox with its own vault and egress
@@ -261,6 +292,14 @@ How the credential proxy polices git is the ports RFC's: lattice RFC-0015 (#893)
 ### Taint, as these parts read it (#903)
 
 #903 is its own piece of work; this RFC fixes only its contract, because three parts read it. `lattice_core.taint.Taint` is `clean`, or `tainted` with its causes (capability, event, time) and `seen_hosts`. It is carried on `CallContext`, set by the enforcer's step 8, carried to runs and sessions started from a tainted one, and cleared only by a person, audited. `TaintPolicy` is per workspace, may tighten but never loosen the operator's, and maps each `Tier` and `Effect` to `allow`, `ask`, `narrow` or `deny`.
+
+### Bindings
+
+A binding says which of a source's events reach which workspace. lattice RFC-0013 ([#1226](https://github.com/alexnodeland/lattice/pull/1226)) defines it and needs it in lattice-core, because reflexr's intake, relayr's trackers and the code sessions' repositories all read it and import none of one another (its R4; Decision O13 here):
+
+- **`lattice_core.bindings`** declares `Binding` (tenant, workspace, source, connection, `select`, `types`, `trust`, `options`, `bound_at`, `by`) and the `Bindings` port, `for_connection(source, connection)` and `for_workspace(tenant_id, workspace_id)`. It imports only the standard library and pydantic.
+- **grantr stores it,** in `grantr_bindings` with row-level security by tenant, beside the operator's layer in the deployment's configuration, as it stores integrations and settings. Each change is a grantr command, audited in its transaction, under a new action, `grantr:manage_bindings`, held by a tenant's owners and admins.
+- Its fields, layers and behaviour are RFC-0013's; this RFC adds only where it lives.
 
 ### Adapters (#944)
 
@@ -297,6 +336,7 @@ ADR-0018 moves code into lattice-core "when two or more packages have it word fo
 | Secrets | `secrets` | none | `secrets.supabase` (`sql`), the fake | the credential and egress proxies, connectors, the MCP client |
 | Egress policy | `egress`; its authorizer in `egress.fastapi` | `fastapi` for the authorizer | stackr's Envoy, with the static layer rendered from it and the dynamic one asked of the authorizer | the application, stackr's config script, the reader, the sandbox's proxy |
 | Taint | `taint` | none | | everything above |
+| Bindings | `bindings` | none | grantr's `grantr_bindings` | reflexr's intake, relayr's trackers, the code sessions package (RFC-0013) |
 | Adapters, conformance | `adapters`, `conformance` | `conformance` (pytest) for the plugin | each adapter's entry point | the application, `make validate`, portalr's endpoint |
 
 - **Each top-level module imports only the standard library and pydantic,** as `test_layering.py` requires; `agents` and `secrets.supabase` are extra subpackages, added to its `EXTRAS`.
@@ -324,13 +364,13 @@ ADR-0018 moves code into lattice-core "when two or more packages have it word fo
 
 | Package | Changes | Breaking |
 |---|---|---|
-| lattice-core | `capabilities`, `approvals`, `secrets`, `egress`, `taint`, `adapters`, `conformance`; the `agents` and `conformance` extras; `secrets.supabase` under `sql`; schemas and their drift tests | No: additions |
-| grantr | The approvals store and its commands (`grantr:answer_approval`, `grantr:read_approvals`), the secrets metadata table and its RLS, `Authorize` and `Audit` for the enforcer, `capability_called` and `secret_read` audit events | No |
+| lattice-core | `capabilities` (with `CallContext.via`), `approvals` (with `covers`, `Coverage` and `AnswerScope`), `secrets`, `egress` (with internal destinations), `taint`, `bindings`, `adapters`, `conformance`; the `agents` and `conformance` extras; `secrets.supabase` under `sql`; schemas and their drift tests | No: additions |
+| grantr | The approvals store and its commands (`grantr:answer_approval`, `grantr:read_approvals`), storing `covers` and refusing scoped answers in 0.3.0; `grantr_bindings` and `grantr:manage_bindings`; the `admin-high:different-approver` setting; the secrets metadata table and its RLS, `Authorize` and `Audit` for the enforcer, `capability_called` and `secret_read` audit events | No |
 | artifactr | A provider for its commands and connected apps; `Risk` mapped to tiers; deferred approvals backed by `Approval` | Only if `requires_approval` tools must now be capabilities (T5) |
-| reflexr | A provider for its commands and stored workflows; workflows' tool lists name capabilities | No: stored workflows are new (#843) |
+| reflexr | A provider for its commands and stored workflows; workflows' tool lists name capabilities; the `Coverage` answer for plan approvals (RFC-0012) | No: stored workflows are new (#843) |
 | relayr | `deferred_answered` carries the approval's id and surface | No: an optional field |
-| portalr | Approvals list and page, web push actions, the Adapters and Egress admin views | No |
-| stackr | The `egress` service (Envoy) with its rendered configuration and internal networks, Vault enabled, the template composing registries | Callers without the proxy lose the internet: an upgrade note (#946) |
+| portalr | Approvals list and page, the confirm page for `admin_high`, web push actions, the Adapters and Egress admin views | No |
+| stackr | The `egress` service (Envoy) with its rendered configuration, the operator's internal destinations and internal networks, Vault enabled, the template composing registries | Callers without the proxy lose the internet: an upgrade note (#946) |
 
 ### Phases
 
@@ -338,14 +378,14 @@ M2 in the v0.3 plan builds these, in this order, each a pull request or two:
 
 | Phase | Deliverable | Exit criteria |
 |---|---|---|
-| 1. Contracts | `capabilities`, `taint`, `approvals`, `secrets`, `egress`, `adapters` as types, ports and fakes; versions and schemas | 100% coverage; schemas checked by `lattice:breaks` |
-| 2. Enforcer | The nine steps and the `agents` bridge; one provider from artifactr | The enforcement suite passes on a fake and on artifactr's provider |
-| 3. Stores | grantr's approvals (first answer wins, expiry, audit) and secrets metadata; Supabase Vault adapter | The race test finds one answer on both databases; the secrets contract suite passes on Vault with RLS isolation tested across two tenants |
-| 4. Egress | Envoy in stackr, its rendered configuration, the authorizer and internal networks; the secrets copy command | The SSRF suite passes at Envoy; a tainted session reaches only hosts it has seen; an injected credential never reaches the caller; a caller off the proxy reaches nothing; the authorizer down refuses everything |
+| 1. Contracts | `capabilities` with `via`, `taint`, `approvals` with `covers`, `Coverage` and `AnswerScope`, `secrets`, `egress` with internal destinations, `adapters` as types, ports and fakes; versions and schemas | 100% coverage; schemas checked by `lattice:breaks` |
+| 2. Enforcer | The nine steps, with `Coverage` asked at step 6, and the `agents` bridge; one provider from artifactr | The enforcement suite passes on a fake and on artifactr's provider; a covered call asks nothing, and each case a pre-approval never covers asks |
+| 3. Stores | grantr's approvals (first answer wins, expiry, audit, `covers`), `admin_high` confirmation and its setting, and secrets metadata; Supabase Vault adapter | The race test finds one answer on both databases; an `admin_high` approval is answered only by its caller on the confirm page unless the setting or gate asks a different approver; a scoped answer is refused; the secrets contract suite passes on Vault with RLS isolation tested across two tenants |
+| 4. Egress | Envoy in stackr, its rendered configuration, the authorizer and internal networks; the secrets copy command | The SSRF suite passes at Envoy; an internal destination is reached only under its purpose and inside its range, and a metadata endpoint never; a tainted session reaches only hosts it has seen; an injected credential never reaches the caller; a caller off the proxy reaches nothing; the authorizer down refuses everything |
 | 5. Adapters | Entry-point discovery, the harness and its pytest plugin, `make validate` running it | Supabase Vault and the fake pass through the harness; installing an extra adds its integrations |
 | 6. One provider per library | reflexr's and grantr's providers; the bypass test | M2's exit: one provider registered from each library, and nothing bypasses the enforcer |
 
-The portalr views and the surfaces beyond portalr's card come with M3 and M4 (#902, #952, #918).
+The portalr views and the surfaces beyond portalr's card come with M3 and M4 (#902, #952, #918). `lattice_core.bindings` and grantr's store are built in M3 with RFC-0013's sources (its phase 3), scoped answers in 0.3.x with the code sessions' "always", and reflexr's `Coverage` answer with RFC-0012's plans.
 
 ## Decisions
 
@@ -369,6 +409,17 @@ Decided by the owner on 2026-10-30:
 | O8 | The egress proxy | An established proxy (T4 rejected) | A small Python proxy of lattice's own on `lattice_core.egress`, as T4 recommended |
 | O9 | Which established proxy | Envoy: its configuration rendered from the shared policy, and `ext_authz` to an authorizer the application mounts for taint, tenants' narrowing and credentials ([The proxy](#egress-one-policy-and-one-proxy-943)). Two conditions: a purpose that carries credentials is called as a plain-HTTP forward-proxy request, so Envoy originates TLS and can inject them; and pinning the checked address against DNS rebinding is verified in M2, with smokescreen behind Envoy as the fallback if it can't be | smokescreen: SSRF checks built in, but static per-role ACLs can't narrow by taint, and it can't inject credentials without a second proxy; Squid: could, through helpers, but suits stackr less well |
 
+Decided by the owner on 2026-10-31, folded in while in Discussion:
+
+| # | Question | Decided | Instead of |
+|---|---|---|---|
+| O10 | Egress to private addresses (lattice RFC-0015 ([#1227](https://github.com/alexnodeland/lattice/pull/1227))) | Internal destinations, declared per purpose by the operator alone; metadata endpoints always refused; rebinding pinning kept | Private ranges refused whatever the purpose, which blocks a self-hosted Forgejo and the stack's own services; a path past the proxy |
+| O11 | Plan pre-approval (lattice RFC-0012 ([#1225](https://github.com/alexnodeland/lattice/pull/1225)), W6) | `covers` on approvals and a `Coverage` port asked at step 6, with the list of what a pre-approval never covers | An approval per listed action at each step |
+| O12 | Scoped answers, for "always allow" (lattice RFC-0015 ([#1227](https://github.com/alexnodeland/lattice/pull/1227)), C6) | `AnswerScope` defined now; nothing offers a scope in 0.3.0, and it is built in 0.3.x | Defining it when 0.3.x needs it, after the store's schema is fixed |
+| O13 | Bindings (lattice RFC-0013 ([#1226](https://github.com/alexnodeland/lattice/pull/1226)), R4) | `lattice_core.bindings`, stored and audited by grantr under `grantr:manage_bindings` | reflexr's storage, which relayr's trackers and code sessions couldn't share |
+| O14 | The client a call came through (lattice RFC-0014 ([#1224](https://github.com/alexnodeland/lattice/pull/1224))) | `CallContext.via`: the connection, the client's name and the surface | No attribution of outside clients, so "via <client>" can't be audited |
+| O15 | `admin_high` | The caller's own fresh confirmation on portalr's signed-in confirm page by default; a different approver where the gate says so, or where `admin-high:different-approver` lists the action, set by the operator and tightened, never loosened, by a tenant; never a service principal | A different approver always, so revoking a leaked key or a sole owner deleting their tenant would need a second person |
+
 ## Drawbacks
 
 - **lattice-core grows a great deal,** from shared helpers to most of the platform's contracts, and every library takes a higher floor of it.
@@ -389,7 +440,7 @@ Decided by the owner on 2026-10-30:
 
 ## Unresolved questions
 
-As of 2026-10-30, approval policy's direction (O5), egress hosts (O6), switching secrets stores (O7) and the egress proxy (O8, O9) are decided.
+As of 2026-10-31, approval policy's direction (O5), egress hosts (O6), switching secrets stores (O7), the egress proxy (O8, O9) and the other RFCs' requests (O10 to O15) are decided.
 
 - **Hosts a connection declares,** revisited with the connector RFC (#926), after O6.
 - **Force-pushes through the credential proxy,** and refusals in `report-status`: for lattice RFC-0015 (#893), after the spike (#1222).
@@ -425,7 +476,20 @@ Each is settled in phase 3, 4 or 5, or carried as an exit criterion.
 - [ ] Taint's first cut on these contracts (#903)
 - [ ] portalr: approvals list and page, web push, the Adapters and Egress views (#902, #952, #944)
 - [ ] portr: elicitation and ACP permission surfaces (#918)
-- [ ] Decisions T1 to T3, T5 to T7 and O5 to O9, each recorded in an ADR as it is built
+- [ ] lattice-core and grantr: `lattice_core.bindings`, `grantr_bindings` and `grantr:manage_bindings` (O13; RFC-0013's phase 3, #841)
+- [ ] lattice-core and reflexr: `covers` and the `Coverage` port, and reflexr's answer for plans (O11; RFC-0012)
+- [ ] grantr and portalr: `admin_high` confirmation on the confirm page, and `admin-high:different-approver` (O15; #918)
+- [ ] Scoped answers built, for the code sessions' "always" (O12; 0.3.x, RFC-0015)
+- [ ] ADR: tiers and effects, with `Risk` mapped (T1)
+- [ ] ADR: approvals stored in grantr; delegation as a grant with an expiry (T2, T3)
+- [ ] ADR: `requires_approval` set by the policy (T5)
+- [ ] ADR: registration through entry points (T6)
+- [ ] ADR: approval policy's direction, and `admin_high`'s confirmation and setting (O5, O15)
+- [ ] ADR: egress hosts the operator's alone, and internal destinations (O6, O10)
+- [ ] ADR: switching secrets stores by a copy command; the second adapter in 0.3.x (O7, T7)
+- [ ] ADR: Envoy as the egress proxy, with its two conditions (O8, O9)
+- [ ] ADR: plan pre-approval, scoped answers and `CallContext.via` in the approval and capability contracts (O11, O12, O14)
+- [ ] ADR: bindings in lattice-core, stored by grantr (O13)
 - [ ] Docs: each part's guide, `docs/lattice-core/`, and the architecture docs it changes
 
 ## Evidence
@@ -443,4 +507,5 @@ Gathered on 2026-10-30, with lattice read at `origin/main` (`3b5fad8e`).
 | `Integrations.is_enabled` and `KNOWN`; `Settings` with `IntRange` and `Subset` | `lattice_core/integrations.py`, ADR-0030 | Verified |
 | stackr's compose already has an `internal: true` network | `packages/stackr/compose.yaml` | Verified |
 | OpenSandbox 1.2 has a `credential-vault` (by host, path and method) and a `networkPolicy`; the spike's proxy let a force-push through and had to strip `x-api-key` | `spikes/0899-code-session/README.md`, [#1222](https://github.com/alexnodeland/lattice/pull/1222) | Read, as the spike reports it |
+| RFC-0012's W6, RFC-0013's R4, RFC-0014's requests and RFC-0015's asks of this RFC | each on its branch: `docs/rfc-0012-workflows`, `docs/rfc-0013-event-sources`, `docs/rfc-0014-portr`, `docs/rfc-0015-code-sessions`, read 2026-10-31 | Read |
 | Supabase Vault's API and isolation | Supabase's documentation, not read here | Unverified |

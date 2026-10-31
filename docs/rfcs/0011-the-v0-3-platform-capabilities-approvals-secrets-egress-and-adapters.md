@@ -1,6 +1,6 @@
 # RFC-0011: The v0.3 platform: capabilities, approvals, secrets, egress and adapters
 
-**Status:** Accepted
+**Status:** Accepted, amended by [lattice ADR-0033](../adr/0033-egress-pinned-by-an-original-dst-cluster-that-the-authorizer-addresses.md) and [lattice ADR-0034](../adr/0034-two-secrets-stores-in-0-3-0-supabase-vault-where-postgres-can-hold-it-aws-secrets-manager-on-aws.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file
@@ -469,6 +469,7 @@ Each is settled in phase 3, 4 or 5, or carried as an exit criterion.
 - [ ] artifactr: its provider, `Risk` mapped to tiers, deferred approvals backed by `Approval` (#940, #941)
 - [ ] grantr: the approvals store, first answer wins, expiry and audit (#941)
 - [ ] lattice-core and grantr: the Supabase Vault adapter and secrets metadata with RLS (#942)
+- [ ] stackr: AWS Secrets Manager adapter and Vault in the host recipe's image ([ADR-0034](../adr/0034-two-secrets-stores-in-0-3-0-supabase-vault-where-postgres-can-hold-it-aws-secrets-manager-on-aws.md))
 - [ ] stackr and lattice-core: Envoy as the egress proxy, its rendered configuration, the authorizer and internal networks (#943, O9), with DNS-rebinding pinning verified, or smokescreen behind Envoy
 - [ ] lattice-core and grantr: the secrets copy command (#942, O7)
 - [ ] lattice-core and stackr: adapter discovery, the harness and `make validate` (#944)

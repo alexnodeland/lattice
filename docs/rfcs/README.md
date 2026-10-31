@@ -14,7 +14,7 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 | [0006](0006-excalidraw-diagrams-drawn-live.md) | Excalidraw diagrams, drawn live by people and agents | Implemented, amended by lattice ADR-0026 |
 | [0007](0007-portalr-brand-kits.md) | portalr brand kits | Accepted |
 | [0008](0008-portalr-product-analytics.md) | portalr product analytics | Draft |
-| [0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) | The v0.3 platform: capabilities, approvals, secrets, egress and adapters | Accepted |
+| [0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) | The v0.3 platform: capabilities, approvals, secrets, egress and adapters | Accepted, amended by lattice ADR-0033 and ADR-0034 |
 | [0012](0012-the-six-primitives-and-the-workflow-spec.md) | The six primitives and the workflow spec | Accepted |
 | [0013](0013-event-sources-stored-workflows-and-reflexrs-catalog.md) | Event sources, stored workflows and reflexr's catalog | Accepted |
 | [0014](0014-portr-the-command-catalog-and-the-mcp-acp-gateway.md) | portr, the command catalog and the MCP/ACP gateway | Accepted |

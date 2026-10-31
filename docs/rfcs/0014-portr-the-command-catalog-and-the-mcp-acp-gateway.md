@@ -6,28 +6,28 @@
 **Discussion:** the pull request that adds this file
 **Siblings:**
 
-- [lattice RFC-0011](https://github.com/alexnodeland/lattice/pull/1217), in Discussion, is the platform this builds on: the capability registry and its enforcer, the approval object and its surfaces. This RFC defines none of them again; it cites RFC-0011's sections by name.
+- [lattice RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md), Accepted, is the platform this builds on: the capability registry and its enforcer, the approval object and its surfaces. This RFC defines none of them again; it cites [RFC-0011][rfc-0011]'s sections by name.
 - [lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md) is the boundary portr keeps: artifactr, reflexr and grantr import none of one another, and lattice-core imports no lattice package.
 - [lattice ADR-0030](../adr/0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md) is how portr's limits are set, and [ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md) how its toolsets are switched.
 - [artifactr ADR-0048](../artifactr/adr/0048-surfaces-over-the-runner.md) and [ADR-0056](../artifactr/adr/0056-access-asked-in-every-workspace-method.md) are why a new surface is safe: every surface hands commands to the runner, and every `Workspace` method asks `authorize`.
 
 ## Summary
 
-portr serves all of lattice to outside clients through one gateway per deployment ([#914](https://github.com/alexnodeland/lattice/issues/914)). Every action a person can take in portalr is a **command**, declared once by the package that owns it in a shape lattice-core holds, `lattice_core.commands.Command`, which is a RFC-0011 `Capability` of provider kind `command` plus what only surfaces need: its toolset, its portalr route, whether it is a tool or a resource, and why it isn't exposed if it isn't. The gateway generates MCP tools and resources from the composed registry and calls every one through RFC-0011's `Enforcer.call`, so it imports no library. A **parity test** in CI fails when a portalr action has no command, a command has no tool, a tool has no grantr action, or a grantr action has no command ([#916](https://github.com/alexnodeland/lattice/issues/916)). People connect over Streamable HTTP with MCP's OAuth, Supabase Auth as the authorization server, and service principals with grantr keys ([#917](https://github.com/alexnodeland/lattice/issues/917)); a **connection** is a grantr object, consented per tenant and toolset, limited and revocable. Approvals reach the client as MCP elicitations and ACP permission requests, as surfaces of RFC-0011's approval object, and high-risk admin actions need the caller's own **confirmation** out of band, in portalr ([#918](https://github.com/alexnodeland/lattice/issues/918)). A client's conversation is a real thread, attributed "via <client>". 0.3.0 ships the catalog, the parity test, the core toolset and approvals (#916 to #918); the other toolsets, UI resources, the MCP client, ACP as an agent and WebMCP follow in 0.3.x (#919 to #924, [#990](https://github.com/alexnodeland/lattice/issues/990)). Tracked by [#915](https://github.com/alexnodeland/lattice/issues/915).
+portr serves all of lattice to outside clients through one gateway per deployment ([#914](https://github.com/alexnodeland/lattice/issues/914)). Every action a person can take in portalr is a **command**, declared once by the package that owns it in a shape lattice-core holds, `lattice_core.commands.Command`, which is a [RFC-0011][rfc-0011] `Capability` of provider kind `command` plus what only surfaces need: its toolset, its portalr route, whether it is a tool or a resource, and why it isn't exposed if it isn't. The gateway generates MCP tools and resources from the composed registry and calls every one through [RFC-0011][rfc-0011]'s `Enforcer.call`, so it imports no library. A **parity test** in CI fails when a portalr action has no command, a command has no tool, a tool has no grantr action, or a grantr action has no command ([#916](https://github.com/alexnodeland/lattice/issues/916)). People connect over Streamable HTTP with MCP's OAuth, Supabase Auth as the authorization server, and service principals with grantr keys ([#917](https://github.com/alexnodeland/lattice/issues/917)); a **connection** is a grantr object, consented per tenant and toolset, limited and revocable. Approvals reach the client as MCP elicitations, a surface of [RFC-0011][rfc-0011]'s approval object; in 0.3.0 a coding agent's ACP permission request is where an ask comes from, and editors' ACP permission requests follow in 0.3.x; and high-risk admin actions need the caller's own **confirmation** out of band, in portalr ([#918](https://github.com/alexnodeland/lattice/issues/918)). A client's conversation is a real thread, attributed "via <client>". 0.3.0 ships the catalog, the parity test, the core toolset and approvals (#916 to #918); the other toolsets, UI resources, the MCP client, ACP as an agent and WebMCP follow in 0.3.x (#919 to #924, [#990](https://github.com/alexnodeland/lattice/issues/990)). Tracked by [#915](https://github.com/alexnodeland/lattice/issues/915).
 
 ## Motivation
 
 - **People work outside portalr.** Claude Desktop, claude.ai, ChatGPT, Cursor, Zed and terminals. Today artifactr and reflexr each serve an MCP server of their own, with no shared auth, approvals or toolsets, and grantr, evalr, relayr and portalr have none (#914).
 - **Parity has to hold for features not yet written.** A checklist is missed; a test over declared commands is not (#916).
 - **The catalog's shape touches every package,** so it is settled before #916 declares hundreds of commands (#915's Alternatives).
-- **Why now:** RFC-0011's registry is in Discussion and leaves commands' shape to this RFC ("this RFC requires only that a command is a `Capability`", its provider table). The v0.3 plan puts this RFC in Wave 1 and its build in M4: "Claude Desktop or Cursor connects over OAuth, runs the core toolset, and answers a #898 approval by elicitation; the parity test passes in CI".
+- **Why now:** [RFC-0011][rfc-0011], now Accepted, leaves commands' shape to this RFC ("this RFC requires only that a command is a `Capability`", its provider table). The v0.3 plan puts this RFC in Wave 1 and its build in M4: "Claude Desktop or Cursor connects over OAuth, runs the core toolset, and answers a #898 approval by elicitation; the parity test passes in CI".
 
 ## Non-goals
 
-- **Redefining RFC-0011.** Tiers, effects, gates, the enforcer's nine steps, the `Approval` object, first answer wins and the surface port are RFC-0011's. Where this RFC needs more of them, it says so as a request to RFC-0011 ([Requests to RFC-0011](#requests-to-rfc-0011)).
+- **Redefining [RFC-0011][rfc-0011].** Tiers, effects, gates, the enforcer's nine steps, the `Approval` object, first answer wins and the surface port are [RFC-0011][rfc-0011]'s. What this RFC asked of them, [RFC-0011][rfc-0011] has since decided ([Requests to RFC-0011](#requests-to-rfc-0011)).
 - **Listing in the MCP and ACP registries, and Agent2Agent** (#914's "Not now").
 - **Slack** as an approval surface, out of 0.3.0 by the owner's decision (2026-10-30).
-- **Code sessions' own tools** (#888, #907): they register as RFC-0011's `code_session` capabilities and reach clients through portr's `code` toolset in 0.3.x.
+- **Code sessions' own tools** (#888, #907): they register as [RFC-0011][rfc-0011]'s `code_session` capabilities and reach clients through portr's `code` toolset in 0.3.x.
 
 ## Design
 
@@ -54,8 +54,8 @@ graph LR
     parity -.-> grantrcat["grantr Catalog.of(...)"]
 ```
 
-- **A library declares its commands** next to the code that carries them out, and registers them through RFC-0011's `lattice.capabilities` entry point. It imports nothing new: `Command` is in lattice-core.
-- **portr reads the composed registry,** never a library. It knows a command only as a capability with surface metadata, and calls it only through the enforcer, so grantr, integrations, tiers, limits, taint, approval and audit apply exactly as for an agent's call (RFC-0011, "One enforcement path").
+- **A library declares its commands** next to the code that carries them out, and registers them through [RFC-0011][rfc-0011]'s `lattice.capabilities` entry point. It imports nothing new: `Command` is in lattice-core.
+- **portr reads the composed registry,** never a library. It knows a command only as a capability with surface metadata, and calls it only through the enforcer, so grantr, integrations, tiers, limits, taint, approval and audit apply exactly as for an agent's call ([RFC-0011][rfc-0011], "One enforcement path").
 - **portalr's client is generated from the same catalog,** so its actions name commands that exist, and the parity test can see both sides.
 
 ### The command declaration (#916)
@@ -89,7 +89,7 @@ class Watch(Protocol):                # answered by a bound provider, never by t
 ```
 
 - **A command is a capability, not beside one.** `Command.capability.provider` is `"command"`; its `gate.action` is the grantr action the library's `Workspace` already asks (`artifactr:post_message`, `reflexr:retry_run`, `grantr:issue_key`). Several commands may share an action: `artifactr.list_artifacts` and `artifactr.read_artifact` both need `artifactr:read_artifacts`.
-- **What a surface needs and RFC-0011 doesn't** is the rest: the toolset (#919's grouping), the portalr route that every result links to, whether a read is also a resource, and the surfaces it is offered on. `surfaces` lets a command be portalr's alone, such as the consent page's own approval of a connection, with the parity test asking for a reason.
+- **What a surface needs and [RFC-0011][rfc-0011] doesn't** is the rest: the toolset (#919's grouping), the portalr route that every result links to, whether a read is also a resource, and the surfaces it is offered on. `surfaces` lets a command be portalr's alone, such as the consent page's own approval of a connection, with the parity test asking for a reason.
 - **The description is for models.** `Capability.description` is written to be read by a model choosing a tool: what it does, what it returns, and when not to use it. Reviewers read it as they read a docstring.
 - **The input schema is the library's command model's,** generated from the pydantic models the REST and WebSocket surfaces already validate (`artifactr.core.commands`, reflexr's command union, grantr's request models), less the fields a surface fills in: `command_id` is optional, and ids of what a command creates are minted by the provider when absent, as artifactr's MCP server does today.
 
@@ -99,22 +99,22 @@ class Watch(Protocol):                # answered by a bound provider, never by t
 |---|---|---|---|
 | artifactr | `artifactr.commands` | workspaces, threads, messages, artifacts, revisions, proposals, runs, feedback, questions and deferred answers; `artifactr.files`'s list and read | forms, connected apps, native files' check-out (#924) |
 | grantr | `grantr.commands` | members, groups, keys, roles, grants, integrations, settings, audit, approvals' reads, connections | |
-| reflexr | `reflexr.commands` | events, rules, runs (retry, skip, cancel), schedules, dead letters | sources and workflows, as #839 and #966 add them |
+| reflexr | `reflexr.commands` | events, rules, runs (retry, skip, cancel), schedules, dead letters | sources (#839) and workflows, as lattice [RFC-0012][rfc-0012] adds them |
 | evalr | none: evalr has no service of its own; feedback is artifactr's and reflexr's `give_feedback`, and scores are portalr's reads | | experiments, if they gain a surface |
 | relayr | `relayr.commands` | chat rules, trackers' reads | |
 | portalr | `portalr.commands` | its reads (telemetry, spend, usage, deployment), invites, tenants | |
 
-**Binding.** A catalog is static, so the parity test, the schemas and the docs read it without a database. The application binds it to its runtime at its composition root, as stackr's template composes routers today: `artifactr.commands.provider(workspaces, runner)` returns the RFC-0011 `Provider` whose `call` opens the workspace for the caller and hands the command to `Runner.execute`, and which also answers `Commands`. The entry point names the unbound catalog; the application passes bound providers to `Registry(...)`, which RFC-0011's Decision T6 allows ("explicit composition always allowed").
+**Binding.** A catalog is static, so the parity test, the schemas and the docs read it without a database. The application binds it to its runtime at its composition root, as stackr's template composes routers today: `artifactr.commands.provider(workspaces, runner)` returns the [RFC-0011][rfc-0011] `Provider` whose `call` opens the workspace for the caller and hands the command to `Runner.execute`, and which also answers `Commands`. The entry point names the unbound catalog; the application passes bound providers to `Registry(...)`, which [RFC-0011][rfc-0011]'s Decision T6 allows ("explicit composition always allowed").
 
 **Names and versions.**
 
-- **A command's name is its capability's,** `<package>.<name>`, one dot (RFC-0011). Its MCP tool name is `<package>_<name>`, such as `artifactr_post_message`, since some clients refuse a dot in a tool's name (from memory, Unverified); the registry refuses two commands whose tool names collide.
-- **A command's `version` is semver** (RFC-0011). An added optional field is minor. A breaking change is a new command, `artifactr.post_message_v2`, beside the old one, which is marked deprecated in its description and kept for a release, as lattice-core changes only by addition and deprecation (ADR-0018). A client that cached a tool keeps working.
+- **A command's name is its capability's,** `<package>.<name>`, one dot ([RFC-0011][rfc-0011]). Its MCP tool name is `<package>_<name>`, such as `artifactr_post_message`, since some clients refuse a dot in a tool's name (from memory, Unverified); the registry refuses two commands whose tool names collide.
+- **A command's `version` is semver** ([RFC-0011][rfc-0011]). An added optional field is minor. A breaking change is a new command, `artifactr.post_message_v2`, beside the old one, which is marked deprecated in its description and kept for a release, as lattice-core changes only by addition and deprecation (ADR-0018). A client that cached a tool keeps working.
 - **Each package publishes its catalog** as `schemas/<package>.commands.json`, regenerated by `<project>:schema`, drift-tested like its protocol schema, and checked for breaks by `lattice:breaks` ([lattice ADR-0012](../adr/0012-title-checks-the-breaks-in-the-public-apis.md)): a removed command or a narrowed input is a break.
 
 ### The parity test (#916)
 
-`tests/test_parity.py`, in lattice's root `tests/`, since it spans packages, as RFC-0011's bypass test does. It composes every catalog through the entry points, grantr's `Catalog.of(...)` over every library's `ACTIONS`, portalr's client manifest and portr's generated tool list, and fails on each gap #916 names:
+`tests/test_parity.py`, in lattice's root `tests/`, since it spans packages, as [RFC-0011][rfc-0011]'s bypass test does. It composes every catalog through the entry points, grantr's `Catalog.of(...)` over every library's `ACTIONS`, portalr's client manifest and portr's generated tool list, and fails on each gap #916 names:
 
 | Gap | How it is found |
 |---|---|
@@ -135,9 +135,9 @@ The plan left this open (§6 Q4, §7.7); the owner decided it on 2026-10-31 (O7)
 
 | Option | For | Against |
 |---|---|---|
-| **A. A new package, `portr`, on lattice-core and grantr (decided, O7)** | Imports no library: commands come through RFC-0011's registry, so it sits where portalr does in moon's graph. The MCP SDK, OAuth and ACP stay out of portalr and lattice-core (#914's Alternatives). Releases on its own | One more package to release and document |
+| **A. A new package, `portr`, on lattice-core and grantr (decided, O7)** | Imports no library: commands come through [RFC-0011][rfc-0011]'s registry, so it sits where portalr does in moon's graph. The MCP SDK, OAuth and ACP stay out of portalr and lattice-core (#914's Alternatives). Releases on its own | One more package to release and document |
 | B. Part of portalr, behind a `gateway` extra | No new package; portalr already depends on grantr and serves admin, where connections are shown | portalr is the UI and its readers; the gateway's dependencies and its security surface would ship in portalr's wheel, and a deployment without the UIs couldn't run the gateway without portalr |
-| C. A new package that imports each library, behind extras (`portr[artifactr]`), as relayr imports artifactr and reflexr | Each adapter is written once, in one place | portr would pin every library's API and release with each; the libraries' own commands would live in portr, not beside their code; RFC-0011's registry would be bypassed for commands |
+| C. A new package that imports each library, behind extras (`portr[artifactr]`), as relayr imports artifactr and reflexr | Each adapter is written once, in one place | portr would pin every library's API and release with each; the libraries' own commands would live in portr, not beside their code; [RFC-0011][rfc-0011]'s registry would be bypassed for commands |
 | D. In stackr's template | No package at all | Each application would own a copy; nothing to test once |
 
 **Decided: A** (Decision O7, by the owner on 2026-10-31, as this RFC recommended). portr depends on `lattice-core-ai` (`capabilities`, `approvals`, `commands`) and on grantr, for connections, keys and audit, exactly as portalr depends on grantr. It never imports artifactr, reflexr, evalr or relayr, which its layering test asserts, and deptry and `standalone` check. Its distribution name: `portr` and `portr-ai` were both free on PyPI on 2026-10-30.
@@ -185,9 +185,9 @@ class Connection(BaseModel, frozen=True):
 - **New grantr actions:** `grantr:read_connections` and `grantr:revoke_connection`, a person holding both for their own; a tenant's admins for every connection in it.
 - **Toolsets live on the connection,** not in OAuth scopes, since Supabase lists only `openid`, `email`, `profile` and `phone` as scopes (Unverified for custom scopes). portr still names toolsets in `scopes_supported` and in an `insufficient_scope` challenge, so a client that steps up is sent back to the consent page, which adds the toolset to the connection.
 
-**From a connection to each package's actor.** portr builds RFC-0011's `CallContext` for every call: the caller is the person (or service principal), acting through the client, from surface `mcp`. Each provider turns that into its own actor, and both artifactr and reflexr already have the type for it: `ExternalAgentActor(client_id=<connection id>, name=<client name>, on_behalf_of=UserActor(<person>))`, which artifactr documents as "checked as them". So grantr checks the person's grants, every event is attributed to the client acting for the person, and portalr can name it "Alex via Claude". This needs `CallContext` to carry the client ([Requests to RFC-0011](#requests-to-rfc-0011)).
+**From a connection to each package's actor.** portr builds [RFC-0011][rfc-0011]'s `CallContext` for every call: the caller is the person (or service principal), acting through the client, from surface `mcp`. Each provider turns that into its own actor, and both artifactr and reflexr already have the type for it: `ExternalAgentActor(client_id=<connection id>, name=<client name>, on_behalf_of=UserActor(<person>))`, which artifactr documents as "checked as them". So grantr checks the person's grants, every event is attributed to the client acting for the person, and portalr can name it "Alex via Claude". [RFC-0011][rfc-0011] carries the client as `CallContext.via`, the connection's id, the client's name and the surface (its Decision O14).
 
-**The tier ceiling** for anything called through portr is RFC-0011's `tiers:<agent>` setting, as `tiers:portr`, a `Subset` of tiers whose default is `read` and `write`: the core toolset needs no more, and `run_code` and `outbound` open with the toolsets that need them (#924).
+**The tier ceiling** for anything called through portr is [RFC-0011][rfc-0011]'s `tiers:<agent>` setting, as `tiers:portr`, a `Subset` of tiers whose default is `read` and `write`: the core toolset needs no more, and `run_code` and `outbound` open with the toolsets that need them (#924).
 
 ### The core toolset (#917)
 
@@ -201,7 +201,7 @@ Always on for every connection. Each tool is a command; its result is text and s
 | Artifacts | `artifactr_list_artifacts`, `artifactr_read_artifact`, `artifactr_list_revisions` | `artifactr:read_artifacts`, `artifactr:read_history` |
 | Proposals | `artifactr_list_proposals`, `artifactr_respond_to_proposal` | `artifactr:read_proposals`, `artifactr:respond_to_proposal` |
 | Files | `artifactr_list_files`, `artifactr_read_file` (a page at a time) | `artifactr:read_artifacts` |
-| Approvals | `grantr_list_approvals` (the caller's pending ones, to find and open them) | `grantr:read_approvals` (RFC-0011) |
+| Approvals | `grantr_list_approvals` (the caller's pending ones, to find and open them) | `grantr:read_approvals` ([RFC-0011][rfc-0011]) |
 | Search | `artifactr_search`, over the workspace's threads and artifacts | `artifactr:read_threads` and `artifactr:read_artifacts` |
 
 - **Search is new:** artifactr has no search read today. 0.3.0's is a text match over titles and text the workspace already holds, behind the same `Hidden` filter as every read; global search (#992) replaces it later.
@@ -217,30 +217,30 @@ Always on for every connection. Each tool is a command; its result is text and s
 
 ### Approvals over elicitation and permission requests (#918)
 
-portr implements RFC-0011's `ApprovalSurface` twice: MCP elicitation and ACP permission requests ("Surfaces", RFC-0011). It decides nothing RFC-0011's policy decides; it only asks and answers.
+portr implements [RFC-0011][rfc-0011]'s `ApprovalSurface` for MCP elicitation in 0.3.0, and for editors' ACP permission requests in 0.3.x (#922). In 0.3.0 a coding agent's ACP permission request is where an ask comes from, not a surface ("Surfaces", [RFC-0011][rfc-0011]). It decides nothing [RFC-0011][rfc-0011]'s policy decides; it only asks and answers.
 
-- **Offered only to the client that made the call,** and only where the caller is among the approval's `answerers` and it isn't `different_approver`. Otherwise RFC-0011's fan-out leaves the caller's surfaces out, and the tool returns a pending status: the approval's id, who may answer, its deadline, and the portalr link (RFC-0011, "Different-approver approvals never reach the caller's surfaces").
+- **Offered only to the client that made the call,** and only where the caller is among the approval's `answerers` and it isn't `different_approver`. Otherwise [RFC-0011][rfc-0011]'s fan-out leaves the caller's surfaces out, and the tool returns a pending status: the approval's id, who may answer, its deadline, and the portalr link ([RFC-0011][rfc-0011], "Different-approver approvals never reach the caller's surfaces").
 - **Under multi round-trip requests** the call that hits a deferred capability returns `InputRequiredResult` with a form elicitation: the approval's rendering as its message (text, with the full diff behind the link), an Approve-or-Deny enum and an optional reason; and `requestState` naming the approval's id, signed by portr. The client's retry carries the answer, and portr calls `Approvals.answer(..., surface="mcp")`.
 - **First answer wins, unchanged.** If portalr or a phone answered between the two requests, the retry finds the approval resolved, ignores the elicited answer, and returns the outcome: "approved in portalr by Sam at 10:02". The answer is bound server side: the approval the `requestState` names carries its `arguments_digest`, which the client never sees or sends.
 - **Clients without elicitation,** or whose capabilities on the request don't declare it, get the pending status and the link, and the ask stays in portalr.
-- **Timeouts are the approval's,** RFC-0011's `approve-within`. A client that gives up on a retry loses nothing: the approval stays pending, the run stays paused without holding memory, and the answer, from anywhere, resumes it.
-- **ACP, in 0.3.0, is lattice as the client** of one coding agent (#895). The agent's `session/request_permission` becomes a `CallDeferred` on its code session's capability, so an `Approval` with its policy, and lattice answers the agent with the option of kind `allow_once` or `reject_once`. It never selects an `*_always` option: what is remembered is lattice's policy, not the agent's. A `cancelled` outcome is not a denial; it withdraws the approval. In 0.3.x, as an ACP agent to editors (#922), lattice offers only `allow_once` and `reject_once`.
+- **Timeouts are the approval's,** [RFC-0011][rfc-0011]'s `approve-within`. A client that gives up on a retry loses nothing: the approval stays pending, the run stays paused without holding memory, and the answer, from anywhere, resumes it.
+- **ACP, in 0.3.0, is lattice as the client** of one coding agent (#895). The agent's `session/request_permission` becomes a `CallDeferred` on its code session's capability, so an `Approval` with its policy, which a person answers on the portalr card or by web push ([RFC-0011][rfc-0011]'s surface table); lattice then answers the agent with the option of kind `allow_once` or `reject_once`. It never selects an `*_always` option: what is remembered is lattice's policy, not the agent's. A `cancelled` outcome is not a denial; it withdraws the approval. In 0.3.x, as an ACP agent to editors (#922), lattice offers only `allow_once` and `reject_once`.
 
 ### Confirmations and risk classes (#918)
 
 An **approval** asks whether something may happen; a **confirmation** asks the caller whether they meant it. #918 asks for the second for high-risk admin actions: "an elicited confirmation that names the action and its target, never automatic".
 
-- **The risk class is RFC-0011's `risk_class`;** this RFC fills its vocabulary with one value in 0.3.0, `admin_high`. Reversibility stays RFC-0011's `reversibility`, which portr also maps onto MCP's tool annotations (`readOnlyHint` for `read`, `destructiveHint` for `irreversible`, `idempotentHint` where a `command_id` makes a retry safe).
+- **The risk class is [RFC-0011][rfc-0011]'s `risk_class`;** this RFC fills its vocabulary with one value in 0.3.0, `admin_high`. Reversibility stays [RFC-0011][rfc-0011]'s `reversibility`, which portr also maps onto MCP's tool annotations (`readOnlyHint` for `read`, `destructiveHint` for `irreversible`, `idempotentHint` where a `command_id` makes a retry safe).
 - **`admin_high` commands:** `grantr.delete_tenant`, `grantr.revoke_key`, `grantr.grant` and `grantr.define_role` when the role holds `owner` or `admin`'s actions, `grantr.grant_operator`, `grantr.revoke_connection` of someone else's, and portalr's `create_tenant`. Deleting a workspace and "stop everything" have no command today; each is `admin_high` when it is added. A test holds the list to the catalogs.
-- **A confirmation is out of band, never in the client.** It is a URL-mode elicitation to portalr's confirm page, `/portalr/admin/confirm/{id}`, which the person opens signed in; it names the action and its target and asks them to type the target's name. Form-mode elicitation is answered by the client's software, which may be set to accept on its own; a URL-mode elicitation opens a page the client can't read or fill (MCP's elicitation rules), and portalr checks that the person who opens it is the caller, as MCP requires. Where the client has no URL mode, the tool returns the same link as a pending status.
-- **Refused to service principals by default.** grantr grants roles, never bare actions, so a key may call an `admin_high` command only if it holds the action through a custom role granted to it, never through a built-in one such as `owner` or `admin`; each grant names its role, so the check can tell. Its call then needs no confirmation, since no person is there, and is audited as such.
+- **A confirmation is out of band, never in the client.** It is answered on portalr's confirm page, `/portalr/admin/confirm/{id}`, alone, which the person opens signed in, as [RFC-0011][rfc-0011] decides (O15: never by the client that made the call, by elicitation, or by a push action). A URL-mode elicitation only carries the page's address to the client; the page names the action and its target and asks them to type the target's name. Form-mode elicitation is answered by the client's software, which may be set to accept on its own; a URL-mode elicitation opens a page the client can't read or fill (MCP's elicitation rules), and portalr checks that the person who opens it is the caller, as MCP requires. Where the client has no URL mode, the tool returns the same link as a pending status.
+- **Refused to service principals.** A key's `admin_high` call asks its caller's confirmation, and a service principal never answers an `admin_high` approval ([RFC-0011][rfc-0011], O15), so the call is refused, which is #918's default. #918's exception, a key "granted the action specifically", has no path in 0.3.0 ([Unresolved questions](#unresolved-questions)).
 - **Audited** as from the client: "Alex via Claude revoked key ci-bot", with the confirmation's id.
-- **How it is built on RFC-0011:** a confirmation is an `Approval` whose `answerers` name exactly the caller, offered on the URL surface alone. That gives it expiry, first answer wins and audit, and puts it in portalr's approvals list, with no second mechanism (Decision O8).
-- **A different approver, where asked.** For particular `admin_high` commands, the operator may require a second person through an ADR-0030 `Subset` setting over those commands, which a tenant may only widen to more of them, never fewer; such a command then needs the caller's confirmation and an approval with `different_approver`, which never reaches the caller's surfaces. RFC-0011's follow-up records this rule and names the setting.
+- **How it is built on [RFC-0011][rfc-0011]:** a confirmation is an `Approval` whose `answerers` name exactly the caller, offered on the URL surface alone. That gives it expiry, first answer wins and audit, and puts it in portalr's approvals list, with no second mechanism (Decision O8, which [RFC-0011][rfc-0011] records as O15).
+- **A different approver, where asked.** An `admin_high` command needs a second person only where its gate's `different_approver` says so, or where `admin-high:different-approver` lists it: an ADR-0030 `Subset` over the registered `admin_high` capabilities, declared in lattice-core's `KNOWN_SETTINGS`, set by the operator, which a tenant may add to but never take from ([RFC-0011][rfc-0011], O15). Such an approval never reaches the caller's surfaces.
 
 ### Limits per client (#917)
 
-Each is an ADR-0030 setting, set by the operator and only lowered by a tenant, and counted by RFC-0011's `Counter` port per connection: a connection is one person and one client app in one tenant, so a limit per connection is a limit per person per client app.
+Each is an ADR-0030 setting, set by the operator and only lowered by a tenant, and counted by [RFC-0011][rfc-0011]'s `Counter` port per connection, which [RFC-0011][rfc-0011] lets count per `CallContext.via` (its enforcer's step 4): a connection is one person and one client app in one tenant, so a limit per connection is a limit per person per client app.
 
 | Setting | Kind | Default | Counts |
 |---|---|---|---|
@@ -253,11 +253,12 @@ A limit reached answers a tool error that names it, the setting's layer and when
 
 ### Requests to RFC-0011
 
-RFC-0011 is in Discussion, so these are raised there, not decided here. How `admin_high` relates to `different_approver` is no longer among them: the owner decided it (Decision O8), and RFC-0011's follow-up records it.
+[RFC-0011][rfc-0011], now Accepted, settled each request this RFC raised in its Discussion, on 2026-10-31:
 
-1. **`CallContext` carries the client:** an optional `via` with the connection's id, the client's name and the surface, so providers can build `ExternalAgentActor(on_behalf_of=...)` and audit can name the client. Without it, "via <client>" can't be attributed.
-2. **ACP's surface in 0.3.0** is the coding agent's permission requests (#895, #888), not editors', which RFC-0011's surface table may want to say.
-3. **The `Counter` port keys by the connection:** RFC-0011 says what a limit counts, not by whom; [Limits per client](#limits-per-client-917) needs a count per `CallContext.via`.
+1. **`CallContext` carries the client:** `CallContext.via`, the connection's id, the client's name and the surface (`mcp`, `acp`), from which providers build `ExternalAgentActor(on_behalf_of=...)` ([RFC-0011][rfc-0011], O14). Decision O9 here.
+2. **`admin_high` and `different_approver`:** the caller's own confirmation on portalr's confirm page by default, and a different approver where the gate or `admin-high:different-approver` says so ([RFC-0011][rfc-0011], O15). Decision O8 here.
+3. **ACP's surface in 0.3.0:** a coding agent's permission request is where an ask comes from, not a surface, and a person answers it on the portalr card or by web push; editors' ACP surface (#922) is 0.3.x ([RFC-0011][rfc-0011]'s surface table). Decision O10 here.
+4. **The `Counter` port keys by the connection:** a limit's `Counter` may count per `CallContext.via` connection ([RFC-0011][rfc-0011]'s enforcer, step 4). Decision O11 here.
 
 ### The rest of #914, in 0.3.x
 
@@ -265,10 +266,10 @@ Each builds on a section above, which its issue links:
 
 | Issue | Builds | On |
 |---|---|---|
-| [#919](https://github.com/alexnodeland/lattice/issues/919) | Toolsets beyond `core`, enabled per connection; `portr_search_tools` over RFC-0011's registry search; lists filtered by grants and integrations, with `toolsListChanged` | [The command declaration](#the-command-declaration-916), [The gateway](#the-gateway-917) |
+| [#919](https://github.com/alexnodeland/lattice/issues/919) | Toolsets beyond `core`, enabled per connection; `portr_search_tools` over [RFC-0011][rfc-0011]'s registry search; lists filtered by grants and integrations, with `toolsListChanged` | [The command declaration](#the-command-declaration-916), [The gateway](#the-gateway-917) |
 | [#924](https://github.com/alexnodeland/lattice/issues/924) | Every remaining command, each toolset done when the parity test shows no gap; the generated tool reference in the docs | [The parity test](#the-parity-test-916) |
 | [#920](https://github.com/alexnodeland/lattice/issues/920) | portalr's renderers as MCP Apps resources, on the mini apps' sandboxed origin (portalr ADR-0051), their actions as tool calls | [The core toolset](#the-core-toolset-917) |
-| [#921](https://github.com/alexnodeland/lattice/issues/921) | Lattice as an MCP client: RFC-0011's `mcp_tool` provider, every result `reads_untrusted` | RFC-0011 |
+| [#921](https://github.com/alexnodeland/lattice/issues/921) | Lattice as an MCP client: [RFC-0011][rfc-0011]'s `mcp_tool` provider, every result `reads_untrusted` | [RFC-0011][rfc-0011] |
 | [#922](https://github.com/alexnodeland/lattice/issues/922) | The workspace agent over ACP, by WebSocket and `lattice acp`; `lattice login` by device flow, `lattice mcp` | [Continuity](#continuity-of-threads-across-surfaces), [Approvals](#approvals-over-elicitation-and-permission-requests-918) |
 | [#923](https://github.com/alexnodeland/lattice/issues/923) | Lattice as an ACP client beyond code, on #895's one ACP client | [Approvals](#approvals-over-elicitation-and-permission-requests-918) |
 | [#990](https://github.com/alexnodeland/lattice/issues/990) | WebMCP in portalr: tools per route from the client's command names, under the person's session; approvals and confirmations stay the person's | [The parity test](#the-parity-test-916), [Confirmations](#confirmations-and-risk-classes-918) |
@@ -289,26 +290,26 @@ Each builds on a section above, which its issue links:
 
 | Phase | Milestone | Deliverable | Exit criteria |
 |---|---|---|---|
-| 1. Catalog | M2, after RFC-0011's phase 1 | `lattice_core.commands`; artifactr's and grantr's catalogs; schemas | Both catalogs' schemas drift-tested; every action of both is a command or listed |
+| 1. Catalog | M2, after [RFC-0011][rfc-0011]'s phase 1 | `lattice_core.commands`; artifactr's and grantr's catalogs; schemas | Both catalogs' schemas drift-tested; every action of both is a command or listed |
 | 2. Parity | M2 to M3 | Every 0.3.0 package's catalog; `x-lattice-command`; the client's `CommandName` and manifest; `tests/test_parity.py` with its failing fixtures | The parity test passes, and fails on each fixture |
 | 3. Gateway | M4 | portr's MCP server, protected resource metadata, token and connection checks, keys, the consent page, connections, limits, the core toolset, continuity | Claude Desktop, claude.ai, ChatGPT and Cursor connect and use the core toolset, each verified by hand and written up; a thread from a client shows live in portalr "via" it and continues in either; revoking a connection refuses its next call |
-| 4. Approvals | M4 | The elicitation and ACP permission surfaces; confirmations; the confirm page | A #898 approval answered by elicitation; first answer wins between a client and portalr; a different-approver ask never reaches the caller's client; `admin_high` refused to a key without a custom role that holds it |
+| 4. Approvals | M4 | The elicitation surface; coding agents' permission requests as asks; confirmations; the confirm page | A #898 approval answered by elicitation; first answer wins between a client and portalr; a different-approver ask never reaches the caller's client; `admin_high` refused to a key |
 | 5. Toolsets and directions | 0.3.x | #919, #924, #920, #921, #922, #923, #990 | Each issue's acceptance |
 
 ### Testing at 100% branch coverage
 
 - **The generator** against fake catalogs: names, collisions, schemas, toolsets, annotations, resource templates, and a deprecated command beside its successor.
-- **Every tool call goes through the enforcer:** portr's tests use RFC-0011's fake providers and assert each call reaches `Enforcer.call` with the connection's context; a provider that refuses yields the tool error the client sees.
+- **Every tool call goes through the enforcer:** portr's tests use [RFC-0011][rfc-0011]'s fake providers and assert each call reaches `Enforcer.call` with the connection's context; a provider that refuses yields the tool error the client sees.
 - **Tokens and connections:** a fake JWKS and issuer; expired, wrong audience, wrong issuer, unknown or revoked connection, a portalr session's token, a key, a malformed key; each refused, with the right status and challenge.
 - **Approvals under multi round-trip requests:** asked, answered by the retry; answered in portalr first, then the retry; expired; a forged or replayed `requestState`; a client without elicitation; a different-approver approval never elicited. Expiry by a fake clock, never by waiting.
-- **Confirmations:** the confirm page refuses a person who isn't the caller; a key holding the action only through a built-in role is refused; the audit entry names the client.
+- **Confirmations:** the confirm page refuses a person who isn't the caller; a key's call is refused; the audit entry names the client.
 - **Limits** by a fake counter and clock; fails closed on an unreadable setting.
 - **The parity test's fixtures,** one per gap, in root `tests/`.
 - **End to end,** in portr's acceptance tests on the template's test application: an MCP client from the SDK connects with a token from GoTrue in compose, posts a message, reads the reply, answers an elicited approval, and sees its thread in the app's `bdd` scenario.
 
 ## Decisions
 
-Decided by the owner (#914, the v0.3 plan's decisions of 2026-10-30, and O7 and O8 on 2026-10-31):
+Decided by the owner (#914, the v0.3 plan's decisions of 2026-10-30, and O7 and O8 on 2026-10-31), and by [RFC-0011][rfc-0011] (O9 to O11, 2026-10-31):
 
 | # | Question | Decided | Instead of |
 |---|---|---|---|
@@ -318,15 +319,18 @@ Decided by the owner (#914, the v0.3 plan's decisions of 2026-10-30, and O7 and 
 | O4 | Slack | Not in 0.3.0; phone approvals by web push | Slack as the phone's surface |
 | O5 | The 0.3.0 slice | #916, #917 and #918; the rest of #914 in 0.3.x | The whole epic in 0.3.0 |
 | O6 | Not now | Registry listings and Agent2Agent | |
-| O7 | Where portr lives (2026-10-31) | A new package, `portr`, depending only on lattice-core and grantr, reaching commands only through RFC-0011's registry ([Where portr lives](#where-portr-lives)) | Inside portalr; importing each library; in the template |
-| O8 | `admin_high` (2026-10-31) | By default, the caller's own fresh confirmation on a signed-in portalr confirm page, not a second person, built as an `Approval` answered by the caller. A different approver may be required for particular `admin_high` actions, through an ADR-0030 setting the operator sets and a tenant may tighten ([Confirmations](#confirmations-and-risk-classes-918)) | A second person for every one, as RFC-0011 first said, which blocks revoking a leaked key; a confirmation mechanism of portr's own beside approvals |
+| O7 | Where portr lives (2026-10-31) | A new package, `portr`, depending only on lattice-core and grantr, reaching commands only through [RFC-0011][rfc-0011]'s registry ([Where portr lives](#where-portr-lives)) | Inside portalr; importing each library; in the template |
+| O8 | `admin_high` (2026-10-31) | By default, the caller's own fresh confirmation on a signed-in portalr confirm page, not a second person, built as an `Approval` answered by the caller. A different approver may be required for particular `admin_high` actions, through an ADR-0030 setting the operator sets and a tenant may tighten ([Confirmations](#confirmations-and-risk-classes-918)) | A second person for every one, as [RFC-0011][rfc-0011] first said, before its O15 recorded this, which blocks revoking a leaked key; a confirmation mechanism of portr's own beside approvals |
+| O9 | The client a call came through ([RFC-0011][rfc-0011], 2026-10-31) | `CallContext.via`, [RFC-0011][rfc-0011]'s O14 | No attribution of outside clients |
+| O10 | ACP in 0.3.0 ([RFC-0011][rfc-0011], 2026-10-31) | A coding agent's permission request is a source of asks, answered by a person on the portalr card or by web push; editors' ACP surface in 0.3.x | An ACP approval surface in 0.3.0 |
+| O11 | Limits per connection ([RFC-0011][rfc-0011], 2026-10-31) | [RFC-0011][rfc-0011]'s `Counter` may count per `CallContext.via` connection | Counting per tenant and workspace only |
 
 Recommended, for the owner to confirm:
 
 | # | Question | Recommended | Instead of |
 |---|---|---|---|
-| P2 | The command's shape | `Command` in lattice-core: a RFC-0011 `Capability` plus toolset, exposure, route, resource and surfaces | A second tool type beside capabilities; metadata held by portr |
-| P3 | Declaration and binding | A static catalog per package, through RFC-0011's entry point; a provider bound at the composition root | Catalogs built only at runtime, which the parity test and schemas couldn't read |
+| P2 | The command's shape | `Command` in lattice-core: a [RFC-0011][rfc-0011] `Capability` plus toolset, exposure, route, resource and surfaces | A second tool type beside capabilities; metadata held by portr |
+| P3 | Declaration and binding | A static catalog per package, through [RFC-0011][rfc-0011]'s entry point; a provider bound at the composition root | Catalogs built only at runtime, which the parity test and schemas couldn't read |
 | P4 | Tool names | `<package>_<name>`, collisions refused; a breaking change is a new command | Dots in names; versions in a tool's arguments |
 | P5 | MCP revision | 2026-07-28 first, stateless, with state in handles; 2025-11-25 where the SDK serves it | 2025-11-25's sessions and server requests as the design's base |
 | P6 | Token audience | Supabase's access token hook sets `aud`, and every call checks a live connection | Trusting Supabase's tokens without an audience |
@@ -357,7 +361,7 @@ Recommended, for the owner to confirm:
 ## Unresolved questions
 
 - **P2 to P9 and P11 to P13,** for the owner.
-- **RFC-0011's three requests** ([Requests to RFC-0011](#requests-to-rfc-0011)), settled in its Discussion.
+- **#918's exception for a key granted an `admin_high` action specifically:** [RFC-0011][rfc-0011]'s O15 lets no service principal answer one, so a key's call is refused in 0.3.0; whether a key may ever act alone is for 0.3.x.
 - **Per-client-app limits across a tenant,** and the operator naming known client apps, in 0.3.x.
 - **What 0.3.0's search reads,** if a text match over threads and artifacts is too slow at a large workspace's size.
 
@@ -375,7 +379,7 @@ Each is settled in phase 3 or 4, or carried as an exit criterion; items marked "
 
 ## Tracking
 
-- [ ] Sign-off on P2 to P9 and P11 to P13, and RFC-0011's three requests
+- [ ] Sign-off on P2 to P9 and P11 to P13
 - [ ] ADRs: the command declaration (P2, P3, P4); portr's home (O7); connections (P7, P8); confirmations (O8)
 - [ ] lattice-core: `commands` and its schema (#916)
 - [ ] artifactr, grantr, reflexr, relayr, portalr: their catalogs, providers, `x-lattice-command` and schemas (#916)
@@ -384,14 +388,14 @@ Each is settled in phase 3 or 4, or carried as an exit criterion; items marked "
 - [ ] grantr: connections, their actions and audit (#917)
 - [ ] portalr: the consent page, connections under the account and in admin (#917)
 - [ ] stackr: the template mounts portr; the OAuth server and its hook in the stack (#917)
-- [ ] portr: the elicitation and ACP permission surfaces; confirmations and the confirm page (#918)
+- [ ] portr: the elicitation surface, coding agents' permission requests as asks, confirmations and the confirm page (#918)
 - [ ] Guides: one per client, and the generated tool reference (#917, #924)
 - [ ] 0.3.x: #919, #924, #920, #921, #922, #923, #990
 - [ ] Each sub-issue of #914 links the section it builds (#915's acceptance)
 
 ## Evidence
 
-Gathered on 2026-10-30, with lattice read at `origin/main` (`a52c5f81`) and RFC-0011 at PR #1217's head.
+Gathered on 2026-10-30, with lattice read at `origin/main` (`a52c5f81`) and [RFC-0011][rfc-0011] at PR #1217's head; [RFC-0011][rfc-0011]'s settled requests read again on 2026-10-31, as its fold-in (#1230) makes it Accepted.
 
 | Claim | Where | |
 |---|---|---|
@@ -411,3 +415,6 @@ Gathered on 2026-10-30, with lattice read at `origin/main` (`a52c5f81`) and RFC-
 | Supabase doesn't honour RFC 8707 resource indicators | gofastmcp.com's Supabase guide, a search result | Unverified |
 | ACP's `session/request_permission`: options of kind `allow_once`, `allow_always`, `reject_once`, `reject_always`; `selected` or `cancelled` | agentclientprotocol.com, Tool calls | Verified |
 | `portr` and `portr-ai` are free on PyPI | pypi.org's JSON API, 404 for both | Verified, 2026-10-30 |
+
+[rfc-0011]: 0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md
+[rfc-0012]: 0012-the-six-primitives-and-the-workflow-spec.md

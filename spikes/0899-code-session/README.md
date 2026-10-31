@@ -1,9 +1,12 @@
 # Spike #899: one code session end to end, before the ports RFC
 
-**Throwaway.** Nothing in this folder is imported, tested or shipped. It is here so the
-ports RFC ([#893](https://github.com/alexnodeland/lattice/issues/893)) can answer it point by
-point, and it is deleted once the RFC is accepted. Spike code is not to be copied into a
-package's `src/`.
+The findings of a throwaway spike, kept so the ports RFC
+([#893](https://github.com/alexnodeland/lattice/issues/893)) can answer them point by point.
+This folder can be deleted once the RFC is accepted.
+
+The spike's code is on the branch
+[`spike/0899-code-session-code`](https://github.com/alexnodeland/lattice/tree/spike/0899-code-session-code/spikes/0899-code-session). That code is not maintained: it isn't imported, tested
+or shipped, and nothing from it should be copied into a package's `src/`.
 
 Run on 2026-10-30, on macOS (Apple silicon) with Docker Desktop, time-boxed to one sitting.
 Versions: opencode 1.19.5, `@agentclientprotocol/claude-agent-acp` 0.99.1, Forgejo 11,
@@ -26,16 +29,18 @@ lattice (host)  ── opencode serve's API ────────────
    └─ Forgejo API (server side): open the pull request, read the commit status
 ```
 
+The files, all on the spike's branch:
+
 | File | What it is |
 |---|---|
-| [`proxies.py`](proxies.py) | The credential proxy (git smart-HTTP, reads `receive-pack`'s ref updates) and the egress proxy (adds the model key) |
-| [`stub_model.py`](stub_model.py) | A scripted OpenAI-compatible model: `write` a file, then `bash ls` (an `ask`), then a final answer |
-| [`litellm.yaml`](litellm.yaml) | The throwaway LiteLLM config, two routes to the stub |
-| [`opencode.json`](opencode.json) | The per-session opencode config lattice would generate |
-| [`drive_opencode.py`](drive_opencode.py) | Lattice's side of an opencode session, over `opencode serve` |
-| [`drive_acp.py`](drive_acp.py) | Lattice's side of an ACP agent, over the sandbox's exec stream |
-| [`opensandbox.toml`](opensandbox.toml) | OpenSandbox's server config, Docker runtime with gVisor |
-| [`Dockerfile.sandbox`](Dockerfile.sandbox) | The sandbox image |
+| [`proxies.py`](https://github.com/alexnodeland/lattice/blob/spike/0899-code-session-code/spikes/0899-code-session/proxies.py) | The credential proxy (git smart-HTTP, reads `receive-pack`'s ref updates) and the egress proxy (adds the model key) |
+| [`stub_model.py`](https://github.com/alexnodeland/lattice/blob/spike/0899-code-session-code/spikes/0899-code-session/stub_model.py) | A scripted OpenAI-compatible model: `write` a file, then `bash ls` (an `ask`), then a final answer |
+| [`litellm.yaml`](https://github.com/alexnodeland/lattice/blob/spike/0899-code-session-code/spikes/0899-code-session/litellm.yaml) | The throwaway LiteLLM config, two routes to the stub |
+| [`opencode.json`](https://github.com/alexnodeland/lattice/blob/spike/0899-code-session-code/spikes/0899-code-session/opencode.json) | The per-session opencode config lattice would generate |
+| [`drive_opencode.py`](https://github.com/alexnodeland/lattice/blob/spike/0899-code-session-code/spikes/0899-code-session/drive_opencode.py) | Lattice's side of an opencode session, over `opencode serve` |
+| [`drive_acp.py`](https://github.com/alexnodeland/lattice/blob/spike/0899-code-session-code/spikes/0899-code-session/drive_acp.py) | Lattice's side of an ACP agent, over the sandbox's exec stream |
+| [`opensandbox.toml`](https://github.com/alexnodeland/lattice/blob/spike/0899-code-session-code/spikes/0899-code-session/opensandbox.toml) | OpenSandbox's server config, Docker runtime with gVisor |
+| [`Dockerfile.sandbox`](https://github.com/alexnodeland/lattice/blob/spike/0899-code-session-code/spikes/0899-code-session/Dockerfile.sandbox) | The sandbox image |
 
 ## What worked
 
@@ -129,7 +134,7 @@ magnitude, not what a Linux host will do.
 
 ## What was stubbed and why
 
-- **The model**: a scripted stub ([`stub_model.py`](stub_model.py)) behind LiteLLM, because no
+- **The model**: a scripted stub ([`stub_model.py`](https://github.com/alexnodeland/lattice/blob/spike/0899-code-session-code/spikes/0899-code-session/stub_model.py)) behind LiteLLM, because no
   model key was available without reading secrets. It proves the routing, the key injection and
   the tool loop, not the agents' quality or real streaming lengths.
 - **CI**: the check was a commit status posted through Forgejo's API, because there was no
@@ -251,7 +256,7 @@ For the platform RFC's **vault (#942)** and **egress (#943)** parts:
 
 ## How to run it again
 
-On a Linux host with Docker and `runsc` (or Docker-in-Docker as here), with a random token `T`
+From a checkout of the spike's branch, on a Linux host with Docker and `runsc` (or Docker-in-Docker as here), with a random token `T`
 in every name: create an internal network and an external one; start Forgejo on the external
 one and create a user, a token and a repository with its CLI and API; start `stub_model.py` and
 LiteLLM with `litellm.yaml`; start `proxies.py` on both networks with the variables its

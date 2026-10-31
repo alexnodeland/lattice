@@ -463,10 +463,10 @@ Each is settled in phase 3, 4 or 5, or carried as an exit criterion.
 
 ## Tracking
 
-- [ ] ADR: lattice-core holds the platform's contracts, reading ADR-0018 with ADR-0027 and ADR-0030
-- [ ] lattice-core: the contracts, fakes, versions and schemas (#940, #941, #942, #943, #944, #946)
-- [ ] lattice-core: the enforcer and the `agents` bridge (#940)
-- [ ] artifactr: its provider, `Risk` mapped to tiers, deferred approvals backed by `Approval` (#940, #941)
+- [x] ADR: lattice-core holds the platform's contracts, reading ADR-0018 with ADR-0027 and ADR-0030 ([ADR-0032](../adr/0032-the-capability-registry-in-lattice-core-four-tiers-three-effects-and-entry-points.md))
+- [x] lattice-core: the contracts, fakes, versions and schemas (#940, #941, #942, #943, #944, #946) ([#1241](https://github.com/alexnodeland/lattice/pull/1241), [#1258](https://github.com/alexnodeland/lattice/pull/1258), [#1259](https://github.com/alexnodeland/lattice/pull/1259))
+- [x] lattice-core: the enforcer and the `agents` bridge (#940) ([#1267](https://github.com/alexnodeland/lattice/pull/1267), [ADR-0037](../adr/0037-the-enforcement-path-in-lattice-core-refusals-by-step-approvals-resumed-by-id.md))
+- [ ] artifactr: its provider, `Risk` mapped to tiers, deferred approvals backed by `Approval` (#940, #941). The provider and the mapping landed in [#1269](https://github.com/alexnodeland/lattice/pull/1269); deferred approvals backed by `Approval` wait for grantr's store
 - [ ] grantr: the approvals store, first answer wins, expiry and audit (#941)
 - [ ] lattice-core and grantr: the Supabase Vault adapter and secrets metadata with RLS (#942)
 - [ ] stackr: AWS Secrets Manager adapter and Vault in the host recipe's image ([ADR-0034](../adr/0034-two-secrets-stores-in-0-3-0-supabase-vault-where-postgres-can-hold-it-aws-secrets-manager-on-aws.md))
@@ -481,15 +481,15 @@ Each is settled in phase 3, 4 or 5, or carried as an exit criterion.
 - [ ] lattice-core and reflexr: `covers` and the `Coverage` port, and reflexr's answer for plans (O11; RFC-0012)
 - [ ] grantr and portalr: `admin_high` confirmation on the confirm page, and `admin-high:different-approver` (O15; #918)
 - [ ] Scoped answers built, for the code sessions' "always" (O12; 0.3.x, RFC-0015)
-- [ ] ADR: tiers and effects, with `Risk` mapped (T1)
-- [ ] ADR: approvals stored in grantr; delegation as a grant with an expiry (T2, T3)
-- [ ] ADR: `requires_approval` set by the policy (T5)
-- [ ] ADR: registration through entry points (T6)
+- [x] ADR: tiers and effects, with `Risk` mapped (T1) ([ADR-0032](../adr/0032-the-capability-registry-in-lattice-core-four-tiers-three-effects-and-entry-points.md), [artifactr ADR-0099](../artifactr/adr/0099-artifactrs-tools-as-capabilities-called-through-the-enforcer-whose-policy-asks-approval.md))
+- [x] ADR: approvals stored in grantr; delegation as a grant with an expiry (T2, T3) ([ADR-0035](../adr/0035-one-approval-per-call-bound-to-its-arguments-declared-in-lattice-core-and-stored-by-grantr.md))
+- [x] ADR: `requires_approval` set by the policy (T5) ([artifactr ADR-0099](../artifactr/adr/0099-artifactrs-tools-as-capabilities-called-through-the-enforcer-whose-policy-asks-approval.md))
+- [x] ADR: registration through entry points (T6) ([ADR-0032](../adr/0032-the-capability-registry-in-lattice-core-four-tiers-three-effects-and-entry-points.md))
 - [ ] ADR: approval policy's direction, and `admin_high`'s confirmation and setting (O5, O15)
-- [ ] ADR: egress hosts the operator's alone, and internal destinations (O6, O10)
+- [x] ADR: egress hosts the operator's alone, and internal destinations (O6, O10) ([ADR-0036](../adr/0036-egress-decided-by-one-pure-function-hosts-the-operators-and-internal-destinations-declared-per-purpose.md))
 - [ ] ADR: switching secrets stores by a copy command; the second adapter in 0.3.x (O7, T7)
 - [ ] ADR: Envoy as the egress proxy, with its two conditions (O8, O9)
-- [ ] ADR: plan pre-approval, scoped answers and `CallContext.via` in the approval and capability contracts (O11, O12, O14)
+- [x] ADR: plan pre-approval, scoped answers and `CallContext.via` in the approval and capability contracts (O11, O12, O14) ([ADR-0035](../adr/0035-one-approval-per-call-bound-to-its-arguments-declared-in-lattice-core-and-stored-by-grantr.md), [ADR-0032](../adr/0032-the-capability-registry-in-lattice-core-four-tiers-three-effects-and-entry-points.md))
 - [ ] ADR: bindings in lattice-core, stored by grantr (O13)
 - [ ] Docs: each part's guide, `docs/lattice-core/`, and the architecture docs it changes
 

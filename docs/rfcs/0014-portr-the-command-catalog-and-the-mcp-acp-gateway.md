@@ -172,7 +172,7 @@ The plan left this open (§6 Q4, §7.7); the owner decided it on 2026-10-31 (O7)
 ```python
 class Connection(BaseModel, frozen=True):
     id: ConnectionId                  # "con_" and 16 hex digits
-    tenant_id: str                    # one tenant per connection (Decision P8)
+    tenant_id: str                    # one tenant per connection (Decision O12)
     subject: Subject                  # the person, or the service principal for a key
     client: ClientInfo                # OAuth client_id, its registered name ("Claude"), its URI where it has one
     toolsets: frozenset[Toolset]      # consented; "core" always
@@ -233,7 +233,7 @@ An **approval** asks whether something may happen; a **confirmation** asks the c
 - **The risk class is [RFC-0011][rfc-0011]'s `risk_class`;** this RFC fills its vocabulary with one value in 0.3.0, `admin_high`. Reversibility stays [RFC-0011][rfc-0011]'s `reversibility`, which portr also maps onto MCP's tool annotations (`readOnlyHint` for `read`, `destructiveHint` for `irreversible`, `idempotentHint` where a `command_id` makes a retry safe).
 - **`admin_high` commands:** `grantr.delete_tenant`, `grantr.revoke_key`, `grantr.grant` and `grantr.define_role` when the role holds `owner` or `admin`'s actions, `grantr.grant_operator`, `grantr.revoke_connection` of someone else's, and portalr's `create_tenant`. Deleting a workspace and "stop everything" have no command today; each is `admin_high` when it is added. A test holds the list to the catalogs.
 - **A confirmation is out of band, never in the client.** It is answered on portalr's confirm page, `/portalr/admin/confirm/{id}`, alone, which the person opens signed in, as [RFC-0011][rfc-0011] decides (O15: never by the client that made the call, by elicitation, or by a push action). A URL-mode elicitation only carries the page's address to the client; the page names the action and its target and asks them to type the target's name. Form-mode elicitation is answered by the client's software, which may be set to accept on its own; a URL-mode elicitation opens a page the client can't read or fill (MCP's elicitation rules), and portalr checks that the person who opens it is the caller, as MCP requires. Where the client has no URL mode, the tool returns the same link as a pending status.
-- **Refused to service principals.** A key's `admin_high` call asks its caller's confirmation, and a service principal never answers an `admin_high` approval ([RFC-0011][rfc-0011], O15), so the call is refused, which is #918's default. #918's exception, a key "granted the action specifically", has no path in 0.3.0 ([Unresolved questions](#unresolved-questions)).
+- **A person confirms for service principals.** A key has no person to confirm its `admin_high` call, and a service principal never answers an `admin_high` approval ([RFC-0011][rfc-0011], O15), so the call is never run on the key's word: it becomes a request that a person confirms on portalr's confirm page or by web push (O13). #918's exception, a key "granted the action specifically", is dropped.
 - **Audited** as from the client: "Alex via Claude revoked key ci-bot", with the confirmation's id.
 - **How it is built on [RFC-0011][rfc-0011]:** a confirmation is an `Approval` whose `answerers` name exactly the caller, offered on the URL surface alone. That gives it expiry, first answer wins and audit, and puts it in portalr's approvals list, with no second mechanism (Decision O8, which [RFC-0011][rfc-0011] records as O15).
 - **A different approver, where asked.** An `admin_high` command needs a second person only where its gate's `different_approver` says so, or where `admin-high:different-approver` lists it: an ADR-0030 `Subset` over the registered `admin_high` capabilities, declared in lattice-core's `KNOWN_SETTINGS`, set by the operator, which a tenant may add to but never take from ([RFC-0011][rfc-0011], O15). Such an approval never reaches the caller's surfaces.
@@ -324,6 +324,8 @@ Decided by the owner (#914, the v0.3 plan's decisions of 2026-10-30, and O7 and 
 | O9 | The client a call came through ([RFC-0011][rfc-0011], 2026-10-31) | `CallContext.via`, [RFC-0011][rfc-0011]'s O14 | No attribution of outside clients |
 | O10 | ACP in 0.3.0 ([RFC-0011][rfc-0011], 2026-10-31) | A coding agent's permission request is a source of asks, answered by a person on the portalr card or by web push; editors' ACP surface in 0.3.x | An ACP approval surface in 0.3.0 |
 | O11 | Limits per connection ([RFC-0011][rfc-0011], 2026-10-31) | [RFC-0011][rfc-0011]'s `Counter` may count per `CallContext.via` connection | Counting per tenant and workspace only |
+| O12 | Tenants (2026-10-31) | One tenant per connection, chosen at consent; a second tenant is a second connection, from the tenant-named URL `/portr/t/{tenant}/mcp` | A `tenant` argument on every tool, which makes one connection's reach every tenant the person is in |
+| O13 | A key's `admin_high` call (2026-10-31) | No exception: a key never runs an `admin_high` action on its own word. Automation may request it, and a person confirms it on portalr's confirm page or by web push | #918's exception for a key granted the action specifically |
 
 Recommended, for the owner to confirm:
 
@@ -335,7 +337,6 @@ Recommended, for the owner to confirm:
 | P5 | MCP revision | 2026-07-28 first, stateless, with state in handles; 2025-11-25 where the SDK serves it | 2025-11-25's sessions and server requests as the design's base |
 | P6 | Token audience | Supabase's access token hook sets `aud`, and every call checks a live connection | Trusting Supabase's tokens without an audience |
 | P7 | Connections | A grantr object, listed, limited, audited and revoked like keys | portr's own table; Supabase's grants alone, which can't be revoked at once |
-| P8 | Tenants | One tenant per connection, chosen at consent. Its cost: most clients keep one connector per server URL (from memory), so a person in two tenants reaches one at a time from one client, unless the URL names the tenant, `/portr/t/{tenant}/mcp`, with RFC 9728's metadata per path (from memory), which is the fallback if the owner finds the cost too high | A `tenant` argument on every tool; a tenant in the URL from the start |
 | P9 | Client registration | Dynamic Client Registration first, as Supabase offers it; Client ID Metadata Documents when Supabase supports them | Pre-registered clients only |
 | P11 | Approvals in clients | Form elicitation for approvals the caller may answer; never a tool that answers; the ACP client picks only `*_once` | Approvals in portalr alone (#918's Alternatives) |
 | P12 | Limits | Four settings, counted per connection; per client app across a tenant in 0.3.x | Keys per client app in ADR-0030's registry |
@@ -360,8 +361,7 @@ Recommended, for the owner to confirm:
 
 ## Unresolved questions
 
-- **P2 to P9 and P11 to P13,** for the owner.
-- **#918's exception for a key granted an `admin_high` action specifically:** [RFC-0011][rfc-0011]'s O15 lets no service principal answer one, so a key's call is refused in 0.3.0; whether a key may ever act alone is for 0.3.x.
+- **P2 to P7, P9 and P11 to P13,** for the owner.
 - **Per-client-app limits across a tenant,** and the operator naming known client apps, in 0.3.x.
 - **What 0.3.0's search reads,** if a text match over threads and artifacts is too slow at a large workspace's size.
 
@@ -380,7 +380,7 @@ Each is settled in phase 3 or 4, or carried as an exit criterion; items marked "
 ## Tracking
 
 - [ ] Sign-off on P2 to P9 and P11 to P13
-- [ ] ADRs: the command declaration (P2, P3, P4); portr's home (O7); connections (P7, P8); confirmations (O8)
+- [ ] ADRs: the command declaration (P2, P3, P4); portr's home (O7); connections (P7, O12); confirmations (O8, O13)
 - [ ] lattice-core: `commands` and its schema (#916)
 - [ ] artifactr, grantr, reflexr, relayr, portalr: their catalogs, providers, `x-lattice-command` and schemas (#916)
 - [ ] portalr's client: `CommandName` and `commands.used.json`; root `tests/test_parity.py` and its fixtures (#916)

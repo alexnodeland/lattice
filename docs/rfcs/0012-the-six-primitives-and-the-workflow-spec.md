@@ -1,6 +1,6 @@
 # RFC-0012: The six primitives and the workflow spec
 
-**Status:** Discussion
+**Status:** Accepted
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** [#1225](https://github.com/alexnodeland/lattice/pull/1225)
@@ -253,7 +253,7 @@ class Run(BaseModel):                    # fields added beside today's
 - **Checkpointed after every step,** through `Reaction.checkpoint` and `reflexr:run_progressed`, which gains the step's id and status. A retry or another executor resumes after the last finished step, fenced by the run's epoch ([reflexr ADR-0043](../reflexr/adr/0043-graph-checkpoints.md), [ADR-0066](../reflexr/adr/0066-an-epoch-fences-each-attempt.md)).
 - **Each step attempt has an idempotency key,** derived from the run, the step's id, the map index or loop iteration, and the step's digest, and passed to every capability it calls on RFC-0011's `CallContext`. Effects happen at least once, never twice beyond what the key deduplicates.
 - **Retries are per step,** under the step's or the workflow's policy; a step that exhausts them fails the run, which is dead-lettered as runs are today.
-- **Inside a fork,** reflexr today resumes from before the fork (its architecture's open question). `parallel` and `map` need each finished branch's output kept across a crash; until that is proven, a crash inside one re-runs its unfinished branches only if finished branches' outputs were checkpointed (Unresolved).
+- **Inside a fork,** reflexr today resumes from before the fork (its architecture's open question). `parallel` and `map` need each finished branch's output kept across a crash, so each branch runs as a sub-run with a parent cause, which reuses runs' durability and gives each branch its own view (Decision Q2); it is modelled in #967 before it is built.
 - **Steps call through the enforcer,** with a `CallContext` whose caller is the run and step, and whose taint is the run's. An `agent_task`'s agent gets `lattice_core.agents.toolset(...)`, narrowed by `may`; a capability that needs approval raises `CallDeferred`, the agent's messages are checkpointed, the run waits on the approval, and resumes the agent with the answer as `DeferredToolResults`, as artifactr's runner does for chat.
 
 ### Budgets
@@ -331,7 +331,7 @@ What a pre-approval never covers, so it asks at the step:
 - **The record and the running definition** follow relayr ADR-0005: the `workflow` artifact is the reviewed record; reflexr's stored workflows, installed, updated and archived as stored rules are ([reflexr ADR-0054](../reflexr/adr/0054-installing-updating-and-archiving-stored-rules.md)), with versions, provenance, optimistic concurrency and a limit per workspace, hold what runs. relayr's installer acts on accepted proposals only, and only a person puts one live.
 - **Pinning:** a reference is `name@<version>` or `name@latest`. A run resolves `@latest` when it is created and records the exact version and digest; an automation pinned to a version runs it until changed, with shadow mode and rollback on the pinned version (#949, #972).
 - **grantr's actions** are reflexr's, in its `ACTIONS` naming: `reflexr:start_run`, `reflexr:resume_run`, `reflexr:install_workflow`, `reflexr:update_workflow`, `reflexr:archive_workflow` and `reflexr:read_workflows`, rather than #970's `workflows:*` (Decision W9).
-- **Where personal and tenant workflows are stored** is open: artifactr's artifacts belong to a workspace, and there is no personal or tenant scope today (Unresolved, Q1).
+- **Personal and tenant workflows are stored** in a per-person and a per-tenant library workspace that relayr installs from, since artifactr's artifacts belong to a workspace and there is no personal or tenant scope today; artifacts, proposals and versions are reused unchanged (Decision Q1, built with #970).
 
 ### Automations and stored workflows: what RFC-0013 defers here
 
@@ -464,7 +464,7 @@ reflexr still never imports artifactr, and artifactr never sees a workflow excep
 
 | Milestone | Phase | Deliverable | Exit criteria |
 |---|---|---|---|
-| M1 | 0. Design | This RFC accepted | The owner's sign-off on W1 to W5 and W7 to W11 |
+| M1 | 0. Design | This RFC accepted | The owner's sign-off on W1 to W11 and Q1 to Q4, given on 2026-10-31 |
 | M2 | 1. Spec | `core.workflows` (0.3.0 subset), `holds`, `to_field`, `check_workflow`, the schema | Fixtures pass; schema checked by `lattice:breaks` |
 | M2 | 2. Runs | Causes, the migration, `start_run`, `waiting`, `resume_run`, facts, REST and MCP | The behaviour suite on three storages |
 | M3 | 3. Executor | One-node graph, `agent_task` on RFC-0011's toolset, deferred approvals, budgets, `then` | oncall's triage runs as a workflow and resumes after an approval |
@@ -495,9 +495,9 @@ Decided by the owner on 2026-10-31:
 |---|---|---|---|
 | W3 | Runs | One `Run` with a `cause` union; the firing's fields optional; the break taken once in 0.3.0, with `!` in the title and an upgrade note, and no deprecated aliases | A separate `WorkflowRun` beside `Run`: no break, but two durability models, which #968 rules out; or the old fields kept as aliases through 0.3.x |
 
-Recommended, for the owner to confirm:
+Decided by the owner on 2026-10-31, on accepting this RFC:
 
-| # | Question | Recommended | Instead of |
+| # | Question | Decided | Instead of |
 |---|---|---|---|
 | W1 | Where the spec lives | `reflexr.core.workflows`; the artifact in relayr, as `rule` is | lattice-core `workflows`: every library could read it, but it is one package's domain, which ADR-0018 keeps out |
 | W2 | The condition language | reflexr's `where`, `all`, `any`, `not` over the run document, one comparison for both; `to_field` added; no `on` or `predicate`, no `matches` when stored | A second expression language (CEL, JSONLogic), which rules and workflows would read differently |
@@ -508,6 +508,10 @@ Recommended, for the owner to confirm:
 | W9 | grantr's actions | `reflexr:start_run` and the others, in reflexr's naming | #970's `workflows:*`, a namespace no package owns |
 | W10 | Budgets over the cap | 0.3.0 stops with `budget_exceeded`; 0.3.x asks through an approval | The ask in 0.3.0, before plan approval exists to render it |
 | W11 | Rust code steps' targets | Both: `wasm32-wasip2` by default for steps with no grants, run by Wasmtime inside the sandbox, so lattice's processes run no workflow code; native in the sandbox for crates that need std's I/O | Native only (slower start, no isolation beyond the sandbox), or Wasmtime in lattice's own process (fast, but untrusted code beside lattice's) |
+| Q1 | Personal and tenant workflows' storage | A per-person and a per-tenant library workspace that relayr installs from, so artifacts, proposals and versions are reused unchanged; built with #970 | grantr holding personal and tenant workflows; reflexr's store gaining tenant-level rows |
+| Q2 | Resuming inside `parallel` and `map` | Each branch a sub-run with a parent cause, which reuses runs' durability and gives each branch its own view; modelled in #967 before it is built | Checkpointing each branch's output as it finishes |
+| Q3 | Where `lattice workflows check` runs (#970) | In the `lattice` command #948 introduces, calling `check_workflow` against a catalog read from the deployment | A console script of reflexr's |
+| Q4 | Step-level facts for the live view (#971) | Decided with #971 in 0.3.x, between `run_progressed` carrying the step and `step_started` and `step_finished` facts; 0.3.0's one step needs neither | Choosing between them now, before the live view needs either |
 
 ## Drawbacks
 
@@ -526,23 +530,19 @@ Recommended, for the owner to confirm:
 
 ## Unresolved questions
 
-- **Q1. Personal and tenant workflows' storage.** artifactr's artifacts belong to a workspace. Options: a per-person and a per-tenant library workspace that relayr installs from; grantr holding personal and tenant workflows; or reflexr's store gaining tenant-level rows. Recommended: library workspaces, since they reuse artifacts, proposals and versions unchanged; settled with #970.
-- **Q2. Resuming inside `parallel` and `map`.** reflexr resumes from before a fork today. Options: checkpoint each branch's output as it finishes; or run each branch as a sub-run with a parent cause. Recommended: sub-runs, which reuse runs' durability and give each branch its own view; modelled in #967 before either is built.
-- **Q3. Where `lattice workflows check` runs** for workflows as code (#970): a console script of reflexr's, or the `lattice` command #948 introduces. Recommended: #948's, calling `check_workflow` against a catalog read from the deployment.
-- **Q4. Step-level facts** for the live view (#971): `run_progressed` carrying the step, or `step_started` and `step_finished` facts. Recommended: decide with #971 in 0.3.x; 0.3.0's one step needs neither.
+As of 2026-10-31, W1 to W11 and Q1 to Q4 are decided ([Decisions](#decisions)); Q4 is decided with #971.
 
 ### Unverified
 
 - LiteLLM reports each response's cost so the gateway can sum it per run, in the version stackr pins (memory).
 - pydantic-ai resumes an agent in another process from checkpointed messages and `DeferredToolResults`, as artifactr's runner does in its own; and RFC-0011's `CallDeferred` from a `FunctionToolset` works inside reflexr's `AgentAction`.
-- pydantic-graph's forks can be checkpointed per branch (bears on Q2).
+- pydantic-graph's forks can be checkpointed per branch.
 - The JSON Schema subset Pydantic generates covers RFC-0011's capability schemas and connectors' (#926).
 - Wasmtime's `wasm32-wasip2` support, and running it inside OpenSandbox with its start time (memory, from #966's comment).
 - reflexr has no TLA+ spec yet, though #966 says "as reflexr's core is": the only spec under ADR-0025 is artifactr's thread claim, so #967 is reflexr's first.
 
 ## Tracking
 
-- [ ] Sign-off on W1 to W5 and W7 to W11, and Q1 to Q4 settled, each recorded in an ADR as it is built
 - [ ] lattice-core and grantr: `covers` and the `Coverage` port, built under RFC-0011's O11 (#941); reflexr's `Coverage` answer with plan approval (#969)
 - [ ] reflexr: `core.workflows` with `agent_task`, `holds`, `to_field`, `check_workflow`, `reflexr.workflows.v1.json` (#966's JSON Schema)
 - [ ] reflexr: run causes, the migration, `start_run`, `waiting`, `resume_run` and their facts, REST, MCP and WebSocket (#968)
@@ -553,6 +553,15 @@ Recommended, for the owner to confirm:
 - [ ] TLA+ run semantics, model-checked, with conformance fixtures, before 0.3.x's multi-step executor (#967)
 - [ ] 0.3.x: stored workflows, the `workflow` artifact and scopes (#970); the other step kinds (#968, #953, #900); plan approval and replanning (#969); pinning and shadow mode (#972); the renderer and run view (#971)
 - [ ] The scenario bundles as gallery workflows, tested end to end (#957)
+- [ ] reflexr ADR: the workflow spec in `reflexr.core.workflows`, the artifact in relayr; conditions shared with rules, with `to_field`; 0.3.0's schema `agent_task` alone, each later kind a minor version (W1, W2, W4)
+- [ ] reflexr ADR: runs decoupled from rules, one `Run` with a `cause` union and the break taken once; `waiting` released from its lease and resumed by `resume_run` with a backstop (W3, W5)
+- [ ] reflexr ADR: data only through `with`, `{"ref": ...}` references in value fields, and `may` narrowing an agent step's toolset (W7, W8)
+- [ ] reflexr ADR: workflows' grantr actions in reflexr's naming (W9)
+- [ ] reflexr ADR: budgets that stop in 0.3.0 and ask in 0.3.x (W10)
+- [ ] reflexr ADR (0.3.x): code steps on OpenSandbox with gVisor, and Rust's two targets (W11, O3)
+- [ ] reflexr ADR (0.3.x): `parallel` and `map` branches as sub-runs, after #967's model; step-level facts, with #971 (Q2, Q4)
+- [ ] relayr ADR (0.3.x): personal and tenant workflows in library workspaces (Q1, #970)
+- [ ] lattice ADR (0.3.x): `lattice workflows check` in #948's `lattice` command (Q3, #970)
 - [ ] Docs: reflexr's architecture and a workflows guide; relayr's architecture for the artifact
 
 ## Evidence

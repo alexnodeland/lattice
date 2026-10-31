@@ -3,3 +3,12 @@ language: 'python'
 layer: 'library'
 tags: ['distribution']
 dependsOn: []
+
+tasks:
+  schema:
+    description: "Regenerate the platform contracts' JSON Schemas (lattice RFC-0011)"
+    script: >-
+      uv run python $workspaceRoot/scripts/generate.py schemas/capabilities.v1.json lattice_core.contracts capabilities
+    options:
+      cache: false
+      runInCI: false

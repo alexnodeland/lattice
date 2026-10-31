@@ -131,16 +131,16 @@ class Watch(Protocol):                # answered by a bound provider, never by t
 
 ### Where portr lives
 
-The plan left this open (§6 Q4, §7.7). portr must reach every package's commands, carry MCP's SDK, OAuth and ACP, and keep ADR-0018's independence.
+The plan left this open (§6 Q4, §7.7); the owner decided it on 2026-10-31 (O7). portr must reach every package's commands, carry MCP's SDK, OAuth and ACP, and keep ADR-0018's independence.
 
 | Option | For | Against |
 |---|---|---|
-| **A. A new package, `portr`, on lattice-core and grantr (recommended)** | Imports no library: commands come through RFC-0011's registry, so it sits where portalr does in moon's graph. The MCP SDK, OAuth and ACP stay out of portalr and lattice-core (#914's Alternatives). Releases on its own | One more package to release and document |
+| **A. A new package, `portr`, on lattice-core and grantr (decided, O7)** | Imports no library: commands come through RFC-0011's registry, so it sits where portalr does in moon's graph. The MCP SDK, OAuth and ACP stay out of portalr and lattice-core (#914's Alternatives). Releases on its own | One more package to release and document |
 | B. Part of portalr, behind a `gateway` extra | No new package; portalr already depends on grantr and serves admin, where connections are shown | portalr is the UI and its readers; the gateway's dependencies and its security surface would ship in portalr's wheel, and a deployment without the UIs couldn't run the gateway without portalr |
 | C. A new package that imports each library, behind extras (`portr[artifactr]`), as relayr imports artifactr and reflexr | Each adapter is written once, in one place | portr would pin every library's API and release with each; the libraries' own commands would live in portr, not beside their code; RFC-0011's registry would be bypassed for commands |
 | D. In stackr's template | No package at all | Each application would own a copy; nothing to test once |
 
-**Recommended: A** (Decision P1). portr depends on `lattice-core-ai` (`capabilities`, `approvals`, `commands`) and on grantr, for connections, keys and audit, exactly as portalr depends on grantr. It never imports artifactr, reflexr, evalr or relayr, which its layering test asserts, and deptry and `standalone` check. Its distribution name: `portr` and `portr-ai` were both free on PyPI on 2026-10-30.
+**Decided: A** (Decision O7, by the owner on 2026-10-31, as this RFC recommended). portr depends on `lattice-core-ai` (`capabilities`, `approvals`, `commands`) and on grantr, for connections, keys and audit, exactly as portalr depends on grantr. It never imports artifactr, reflexr, evalr or relayr, which its layering test asserts, and deptry and `standalone` check. Its distribution name: `portr` and `portr-ai` were both free on PyPI on 2026-10-30.
 
 | Module | Holds | Extra |
 |---|---|---|
@@ -255,7 +255,7 @@ A limit reached answers a tool error that names it, the setting's layer and when
 RFC-0011 is in Discussion, so these are raised there, not decided here:
 
 1. **`CallContext` carries the client:** an optional `via` with the connection's id, the client's name and the surface, so providers can build `ExternalAgentActor(on_behalf_of=...)` and audit can name the client. Without it, "via <client>" can't be attributed.
-2. **`admin_high` and `different_approver`.** RFC-0011 says `different_approver` "is always set for `risk_class="admin_high"`". Read literally, revoking a leaked key, or a sole owner deleting their tenant, would need a second person. This RFC recommends instead that `admin_high` asks the caller's own confirmation, out of band, and a different approver only where the gate or a tenant's approval policy says so (Decision P10). The alternatives are in the decision's row.
+2. **`admin_high` and `different_approver`.** RFC-0011's "One policy" bullet, under "The approval object", says `different_approver` "is always set for `risk_class="admin_high"`". Read literally, revoking a leaked key, or a sole owner deleting their tenant, would need a second person. This RFC recommends instead that `admin_high` asks the caller's own confirmation, out of band, and a different approver only where the gate or a tenant's approval policy says so (Decision P10). The alternatives are in the decision's row.
 3. **ACP's surface in 0.3.0** is the coding agent's permission requests (#895, #888), not editors', which RFC-0011's surface table may want to say.
 4. **The `Counter` port keys by the connection:** RFC-0011 says what a limit counts, not by whom; [Limits per client](#limits-per-client-917) needs a count per `CallContext.via`.
 
@@ -308,7 +308,7 @@ Each builds on a section above, which its issue links:
 
 ## Decisions
 
-Decided by the owner (#914, and the v0.3 plan's decisions of 2026-10-30):
+Decided by the owner (#914, the v0.3 plan's decisions of 2026-10-30, and O7 on 2026-10-31):
 
 | # | Question | Decided | Instead of |
 |---|---|---|---|
@@ -318,12 +318,12 @@ Decided by the owner (#914, and the v0.3 plan's decisions of 2026-10-30):
 | O4 | Slack | Not in 0.3.0; phone approvals by web push | Slack as the phone's surface |
 | O5 | The 0.3.0 slice | #916, #917 and #918; the rest of #914 in 0.3.x | The whole epic in 0.3.0 |
 | O6 | Not now | Registry listings and Agent2Agent | |
+| O7 | Where portr lives (2026-10-31) | A new package, `portr`, depending only on lattice-core and grantr, reaching commands only through RFC-0011's registry ([Where portr lives](#where-portr-lives)) | Inside portalr; importing each library; in the template |
 
 Recommended, for the owner to confirm:
 
 | # | Question | Recommended | Instead of |
 |---|---|---|---|
-| P1 | Where portr lives | A new package, `portr`, on lattice-core and grantr, reaching commands only through RFC-0011's registry ([Where portr lives](#where-portr-lives)) | Inside portalr; importing each library; in the template |
 | P2 | The command's shape | `Command` in lattice-core: a RFC-0011 `Capability` plus toolset, exposure, route, resource and surfaces | A second tool type beside capabilities; metadata held by portr |
 | P3 | Declaration and binding | A static catalog per package, through RFC-0011's entry point; a provider bound at the composition root | Catalogs built only at runtime, which the parity test and schemas couldn't read |
 | P4 | Tool names | `<package>_<name>`, collisions refused; a breaking change is a new command | Dots in names; versions in a tool's arguments |
@@ -356,7 +356,7 @@ Recommended, for the owner to confirm:
 
 ## Unresolved questions
 
-- **P1 to P13,** for the owner.
+- **P2 to P13,** for the owner.
 - **RFC-0011's four requests** ([Requests to RFC-0011](#requests-to-rfc-0011)), settled in its Discussion.
 - **Per-client-app limits across a tenant,** and the operator naming known client apps, in 0.3.x.
 - **What 0.3.0's search reads,** if a text match over threads and artifacts is too slow at a large workspace's size.
@@ -375,8 +375,8 @@ Each is settled in phase 3 or 4, or carried as an exit criterion; items marked "
 
 ## Tracking
 
-- [ ] Sign-off on P1 to P13, and RFC-0011's four requests
-- [ ] ADRs: the command declaration (P2, P3, P4); portr's home (P1); connections (P7, P8); confirmations (P10)
+- [ ] Sign-off on P2 to P13, and RFC-0011's four requests
+- [ ] ADRs: the command declaration (P2, P3, P4); portr's home (O7); connections (P7, P8); confirmations (P10)
 - [ ] lattice-core: `commands` and its schema (#916)
 - [ ] artifactr, grantr, reflexr, relayr, portalr: their catalogs, providers, `x-lattice-command` and schemas (#916)
 - [ ] portalr's client: `CommandName` and `commands.used.json`; root `tests/test_parity.py` and its fixtures (#916)

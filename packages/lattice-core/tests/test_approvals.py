@@ -28,6 +28,7 @@ from lattice_core.approvals import (
     ListedAction,
     NoCoverage,
     NotAnAnswerer,
+    NotApproved,
     NotPending,
     Rendering,
     ScopeNotOffered,
@@ -262,6 +263,7 @@ def answered(*, approved: bool = True) -> Answered:
         {"state": "denied", "answer": answered(approved=False)},
         {"state": "expired", "reason": "past its deadline unanswered"},
         {"state": "withdrawn", "reason": "the run stopped"},
+        {"state": "approved", "answer": answered(), "taken_at": NOW},
     ],
 )
 def test_an_approvals_answer_and_reason_fit_its_state(changes: dict[str, Any]) -> None:
@@ -277,6 +279,7 @@ def test_an_approvals_answer_and_reason_fit_its_state(changes: dict[str, Any]) -
         ({"state": "denied", "answer": answered()}, "can't carry that answer"),
         ({"state": "expired"}, "reason exactly when it closed"),
         ({"reason": "why not"}, "reason exactly when it closed"),
+        ({"taken_at": NOW}, "an approval pending lets no call through"),
     ],
 )
 def test_an_approval_whose_answer_or_reason_doesnt_fit_its_state_is_refused(
@@ -479,6 +482,33 @@ async def test_a_service_principal_answers_only_where_named() -> None:
     store = FakeApprovals()
     named = await store.ask(request(answerers=Answerers(subjects=frozenset({"ci-bot"}))))
     assert (await store.answer(named.id, answer(), subject=BOT)).state == "approved"
+
+
+async def test_an_approved_approval_is_taken_once_for_the_one_call_it_lets_through() -> None:
+    clock = Clock()
+    store = FakeApprovals(clock=clock)
+    asked = await store.ask(request())
+    with pytest.raises(NotApproved, match="apr_1 is pending"):
+        await store.take(asked.id)
+    await store.answer(asked.id, answer(), subject=SAM)
+    clock.now = NOW + timedelta(minutes=5)
+    calls = await asyncio.gather(*(_taking(store, asked.id) for _ in range(20)))
+    [taken] = [call for call in calls if isinstance(call, Approval)]
+    assert (taken.state, taken.taken_at) == ("approved", clock.now)
+    assert await store.get(asked.id) == taken
+    refused = [call for call in calls if isinstance(call, NotApproved)]
+    assert len(refused) == 19
+    assert str(refused[0]) == f"approval apr_1 let its one call through at {clock.now.isoformat()}"
+    assert refused[0].approval == taken
+    with pytest.raises(UnknownApproval):
+        await store.take("apr_9")
+
+
+async def _taking(store: FakeApprovals, id: str) -> Approval | NotApproved:
+    try:
+        return await store.take(id)
+    except NotApproved as refused:
+        return refused
 
 
 async def test_withdrawn_once_and_only_while_pending() -> None:

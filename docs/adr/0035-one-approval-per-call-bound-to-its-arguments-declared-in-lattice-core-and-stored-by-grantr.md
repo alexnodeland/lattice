@@ -1,6 +1,6 @@
 # ADR-0035: One approval per call, bound to its arguments, declared in lattice-core and stored by grantr
 
-**Status:** Accepted
+**Status:** Accepted, amended 2026-10-31 (see Amendment)
 **Date:** 2026-10-31
 **Deciders:** Alex Nodeland
 **Records:** [lattice RFC-0011](../rfcs/0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s Decisions T2, T3, O11, O12 and, for approvals, O14, as the approval contract `lattice_core.approvals` declares them
@@ -43,3 +43,10 @@ v0.3 asks people to approve calls on several surfaces: portalr's card, a phone's
 - Harder: an application without grantr has only the in-memory store.
 - Harder: the readings this contract takes of RFC-0011's sketch are part of version 1 (the pull request that adds it lists them): a removed field or changed meaning is a major version.
 - Follow-ups, in RFC-0011's phases: the enforcer's step 6 asking `Coverage` and then the store (phase 2); grantr's store, its race test on SQLite and PostgreSQL, expiry and audit, and the `admin_high` policy with `admin-high:different-approver` (phase 3); reflexr's `Coverage` for plans (RFC-0012); the surfaces beyond portalr's card (M3 and M4).
+
+## Amendment (2026-10-31)
+
+The enforcement path ([ADR-0037](0037-the-enforcement-path-in-lattice-core-refusals-by-step-approvals-resumed-by-id.md)) resumes a deferred call by its approval's id, which needs two more things of the store. Both are additions to the unreleased version 1.
+
+- **`Approvals.get(id)`** returns an approval as it stands, so the enforcer can read the one a resumed call names.
+- **An approval lets one call through.** `Approvals.take(id)` is a compare-and-set on an approved approval not yet taken, and it records when (`Approval.taken_at`). The enforcer takes the approval as the call goes ahead. A second call on it, or one made at the same moment, gets `NotApproved` from the store and is refused. Without this, an approved id could be replayed for any number of calls, each uncounted by a limit that counted the call once, when it asked. Scoped answers, which stand for later calls, are matched by `Coverage`, never by replaying an id.

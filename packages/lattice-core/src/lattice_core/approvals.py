@@ -72,6 +72,7 @@ __all__ = [
     "ListedAction",
     "NoCoverage",
     "NotAnAnswerer",
+    "NotApproved",
     "NotPending",
     "Rendering",
     "ScopeNotOffered",
@@ -386,7 +387,7 @@ class Approval(ApprovalRequest):
     Raises:
         ValueError: If its answer or reason doesn't fit its state: an answer exactly when it is
             approved or denied, agreeing with it, and a reason exactly when it expired or was
-            withdrawn.
+            withdrawn; or it was taken without being approved.
     """
 
     id: ApprovalId
@@ -399,6 +400,8 @@ class Approval(ApprovalRequest):
     """The answer that settled it, if one did."""
     reason: str | None = None
     """Why it expired or was withdrawn."""
+    taken_at: AwareDatetime | None = None
+    """When the one call it lets through went ahead, if one has: an approval is for one call."""
 
     @model_validator(mode="after")
     def _consistent(self) -> Self:
@@ -409,6 +412,8 @@ class Approval(ApprovalRequest):
             raise ValueError(f"an approval {self.state} can't carry that answer")
         if (self.state in ("expired", "withdrawn")) != (self.reason is not None):
             raise ValueError(f"an approval {self.state} has a reason exactly when it closed")
+        if self.taken_at is not None and self.state != "approved":
+            raise ValueError(f"an approval {self.state} lets no call through")
         return self
 
 
@@ -457,6 +462,23 @@ class AlreadyAnswered(NotPending):
         self.first = first
 
 
+class NotApproved(ApprovalError):
+    """The approval lets no call through: it isn't approved, or its one call went ahead already.
+
+    Args:
+        approval: The approval as it stands.
+    """
+
+    def __init__(self, approval: Approval) -> None:
+        taken = approval.taken_at
+        super().__init__(
+            f"approval {approval.id} let its one call through at {taken.isoformat()}"
+            if taken is not None
+            else f"approval {approval.id} is {approval.state}"
+        )
+        self.approval = approval
+
+
 class DigestMismatch(ApprovalError):
     """The answer was given to other arguments than those the approval asks about."""
 
@@ -474,7 +496,8 @@ class Approvals(Protocol):
     """Where approvals are asked, answered, withdrawn and watched: grantr's store, or a fake.
 
     ``answer`` is a compare-and-set on a pending approval, in one transaction with its audit
-    entry: the first answer wins, and the others get :class:`AlreadyAnswered` with it.
+    entry: the first answer wins, and the others get :class:`AlreadyAnswered` with it. ``take``
+    is one on an approved approval not yet taken: an approval lets one call through.
     """
 
     async def ask(self, request: ApprovalRequest, /) -> Approval:
@@ -499,6 +522,17 @@ class Approvals(Protocol):
             NotAnAnswerer: If the subject may not answer it, or not on that surface.
             DigestMismatch: If the answer was given to other arguments.
             ScopeNotOffered: If the answer's scope names a pattern the request didn't offer.
+        """
+        ...
+
+    async def take(self, id: ApprovalId, /) -> Approval:
+        """Take an approved approval for the one call it lets through, and return it, taken.
+
+        Of calls that go ahead on it at once, exactly one takes it.
+
+        Raises:
+            UnknownApproval: If there is no approval of the id.
+            NotApproved: If it isn't approved, or was taken already.
         """
         ...
 
@@ -592,9 +626,10 @@ class FakeApprovals:
     """An in-memory store of approvals for tests, with the semantics grantr's store keeps.
 
     The first answer wins; an answer must carry the digest it was shown and a scope from those
-    offered. A subject answers when named, in a group named, or holding the action, which
-    ``holds`` decides; a different approver is never the person who asked; a confirmation is
-    answered only by its subject, on :data:`CONFIRM_SURFACE`, and never by a service principal.
+    offered; an approved approval is taken once. A subject answers when named, in a group named,
+    or holding the action, which ``holds`` decides; a different approver is never the person who
+    asked; a confirmation is answered only by its subject, on :data:`CONFIRM_SURFACE`, and never
+    by a service principal.
     Nothing expires on its own: :meth:`expire_due` is the sweep, by the clock given.
 
     Args:
@@ -694,6 +729,21 @@ class FakeApprovals:
             return await self._settle(
                 approval.model_copy(update={"state": state, "answer": answered})
             )
+
+    async def take(self, id: ApprovalId, /) -> Approval:
+        """Take an approved approval for the one call it lets through, and return it, taken.
+
+        Raises:
+            UnknownApproval: If there is no approval of the id.
+            NotApproved: If it isn't approved, or was taken already.
+        """
+        async with self._lock:
+            approval = self._get(id)
+            if approval.state != "approved" or approval.taken_at is not None:
+                raise NotApproved(approval)
+            taken = approval.model_copy(update={"taken_at": self._clock()})
+            self._approvals[id] = taken
+            return taken
 
     async def withdraw(self, id: ApprovalId, reason: str, /) -> Approval:
         """Withdraw a pending approval, because its run stopped or its arguments changed.

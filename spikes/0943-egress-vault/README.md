@@ -29,7 +29,7 @@ It was removed by its exact name afterwards. Versions:
 |---|---|---|
 | 1 | Can Envoy connect only to the address the authorizer checked? | **Holds**, with an `ORIGINAL_DST` cluster addressed by the authorizer's answer, or with the dynamic forward proxy fed that answer through filter state. The plain dynamic forward proxy **doesn't**: it resolves again and connected to `127.0.0.1` on every try. smokescreen isn't needed, but refuses the same rebinding. |
 | 2 | Does `ext_authz`'s allow response set upstream headers when Envoy originates TLS, and does its metadata reach the access log? | **Holds**, for a plain-HTTP forward-proxy request: the credential is set, every caller credential header is stripped, SNI and SAN come from the host, and tenant, workspace, purpose and the checked address are in the JSON access log. |
-| 3 | Supabase Vault: its API, a tenant-checking security-definer function, the key outside `pg_dump` | **Partly.** The API is as 0011 assumes, the function works, and the key stays out of the dump. But `postgres` and `service_role` can read the view as shipped, and only a superuser can take `service_role` off. Above all, **stackr's production recipes run no Vault**: the single-host recipe uses `postgres:17.11-alpine` and the AWS recipe RDS 17, and neither has `supabase_vault`. |
+| 3 | Supabase Vault: its API, a tenant-checking security-definer function, the key outside `pg_dump` | **Partly.** The API is as 0011 assumes, the function works, and the key stays out of the dump. But `postgres` and `service_role` can read the view as shipped, and only a superuser can take `service_role` off. Above all, **stackr's production recipes run no Vault**: the single-host recipe uses `postgres:17.11-alpine`, which has no `supabase_vault` (checked), and the AWS recipe RDS 17, which doesn't list it (not tested). |
 
 ## What was built
 
@@ -273,8 +273,9 @@ With the first database's key file copied in and the server restarted, the same 
 
 So:
 
-- **Backups need the key, kept apart from them.** A dump is useless without it. Recreating a bare
-  container without the key file makes a new key, and every existing secret becomes unreadable.
+- **Backups need the key, kept apart from them.** A dump is useless without it. A bare container
+  recreated without its key file would generate a new one on start (`pgsodium_getkey.sh`), and,
+  as the restore test shows, every existing secret would then be unreadable.
 - **Vault's name and description are stored in clear.** The spike put the ref and the purpose
   there. Nothing secret may go in them.
 - **Local Supabase's key is public.** Supabase CLI 2.118.0 mounts the key file from its own
@@ -282,8 +283,9 @@ So:
   (`d4dc5b6d…`), the same on every machine, and stackr's `supabase/config.toml` sets none. That
   is fine for development, and means nothing in local Supabase's Vault is secret.
 - **Production has no Vault.** The single-host recipe runs `postgres:17.11-alpine` with
-  pgBackRest, whose image has no `supabase_vault` or `pgsodium` control files (checked), and the
-  AWS recipe runs RDS PostgreSQL 17, which doesn't offer `supabase_vault`. Vault exists in
+  pgBackRest, whose image has no `supabase_vault` or `pgsodium` control files (checked). The
+  AWS recipe runs RDS PostgreSQL 17, which by its published extension list doesn't offer
+  `supabase_vault` (not tested here). Vault exists in
   stackr only behind local Supabase, or on hosted Supabase.
 
 ## What it means for RFC-0011
@@ -318,11 +320,15 @@ So:
    for credential-free purposes such as registries. So either the authorizer gets a gRPC
    endpoint (grpcio, beside or instead of the FastAPI router), or registries don't tunnel.
 3. **Strip the routing header in the cluster's upstream filters,** not on the route. Turn on
-   `suppress_envoy_headers`.
+   `suppress_envoy_headers`. Also strip `x-lattice-upstream*` from the caller's request *before*
+   `ext_authz` (a `header_mutation` filter first in the chain). Then an authorizer that allows but
+   omits the header, through a bug, can't let a caller's value through: the cluster finds none and
+   answers 503, as shown. Not tried.
 4. **Internal destinations (O10)** fit the same shape: the authorizer checks the address against
    the declared range and answers it. A static cluster per declaration may then be unnecessary
    (not tried).
 5. **The exit criteria shown here, in miniature:**
+
    - Done: an injected credential never reaches the caller; the authorizer down refuses
      everything; the caller's credential headers are all stripped; dynamic metadata reaches the
      access log.

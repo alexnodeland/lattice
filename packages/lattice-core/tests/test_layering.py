@@ -18,6 +18,7 @@ EXTRAS = {
     "otel": {"opentelemetry", "pydantic_ai"},
     "langfuse": {"langfuse", "opentelemetry"},
     "litellm": {"pydantic_ai", "httpx2", "opentelemetry"},
+    "agents": {"pydantic_ai"},
 }
 """What each extra's module or subpackage may import beyond the standard library and pydantic."""
 
@@ -39,6 +40,8 @@ INSTALLS = {
     # Langfuse brings the SDK and the OTLP exporter.
     "langfuse": {"langfuse", "opentelemetry.sdk", "opentelemetry.exporter"},
     "litellm": {"openai"},
+    # pydantic-ai, which otel and litellm install too.
+    "agents": set(),
 }
 """What each extra installs that another may not: blocked while the others' modules import.
 pydantic-ai brings httpx2 and OpenTelemetry's API, so those are never blocked for an extra."""
@@ -94,6 +97,7 @@ def test_the_modules_that_need_no_extra_are_found() -> None:
         "lattice_core.approvals",
         "lattice_core.capabilities",
         "lattice_core.egress",
+        "lattice_core.enforcement",
         "lattice_core.logs",
         "lattice_core.otel.contribution",
         "lattice_core.schema",

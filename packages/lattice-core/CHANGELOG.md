@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.5.0...lattice-core-v0.6.0) (2026-10-31)
+
+
+### Features
+
+* **core:** add the enforcement path and the agents bridge (RFC-0011 phase 2) ([#1267](https://github.com/alexnodeland/lattice/issues/1267)) ([727b27f](https://github.com/alexnodeland/lattice/commit/727b27fd7e7ee9527e1bd306507f8be6fc78303c))
+
 ## [0.5.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.4.0...lattice-core-v0.5.0) (2026-10-31)
 
 

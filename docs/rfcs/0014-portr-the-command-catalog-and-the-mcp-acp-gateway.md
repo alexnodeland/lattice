@@ -1,6 +1,6 @@
 # RFC-0014: portr, the command catalog and the MCP/ACP gateway
 
-**Status:** Draft
+**Status:** Discussion
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file

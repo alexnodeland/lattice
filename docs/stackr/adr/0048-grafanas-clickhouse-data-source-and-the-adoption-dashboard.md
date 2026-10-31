@@ -1,6 +1,6 @@
 # ADR-0048: Grafana's ClickHouse data source and the adoption dashboard
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0051](0051-build-time-fetches-bounded-and-tried-again.md), and 2026-10-31 (see [Amendment](#amendment-2026-10-31-renovate-reports-the-plugins-drift))
 **Date:** 2026-10-23
 **Deciders:** Alex Nodeland
 

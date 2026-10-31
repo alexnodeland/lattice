@@ -1,6 +1,6 @@
 # RFC-0015: Ports and adapters for code sessions: forge, coding agent, IDE and sandbox
 
-**Status:** Draft
+**Status:** Discussion
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file

@@ -51,7 +51,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0045](0045-local-supabase-only-where-docker-keeps-it-on-the-loopback.md) | Local Supabase only where Docker keeps it on the loopback | Accepted |
 | [0046](0046-native-files-a-relay-a-slimmer-worker-blender-and-the-editors-at-the-edge.md) | Native files: a relay, a slimmer worker, Blender, and the editors at the edge | Accepted |
 | [0047](0047-an-upstream-gateway-for-the-model-groups.md) | An upstream gateway for the model groups | Accepted, amended by [0054](0054-prompt-cache-breakpoints-at-the-gateway.md) |
-| [0048](0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md) | Grafana's ClickHouse data source and the adoption dashboard | Accepted, amended by [0051](0051-build-time-fetches-bounded-and-tried-again.md) |
+| [0048](0048-grafanas-clickhouse-data-source-and-the-adoption-dashboard.md) | Grafana's ClickHouse data source and the adoption dashboard | Accepted, amended by [0051](0051-build-time-fetches-bounded-and-tried-again.md) and 2026-10-31 |
 | [0049](0049-the-diagrams-worker-excalidraw-in-headless-chromium-behind-a-relay.md) | The diagrams worker: Excalidraw in headless Chromium, behind a relay | Accepted |
 | [0050](0050-umami-a-profile-for-operators-journeys-on-the-postgres-adapter.md) | Umami, a profile for operators' journeys, on the postgres adapter | Accepted |
 | [0051](0051-build-time-fetches-bounded-and-tried-again.md) | Build-time fetches, bounded and tried again | Accepted |

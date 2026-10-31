@@ -6,7 +6,7 @@
 **Discussion:** [#1225](https://github.com/alexnodeland/lattice/pull/1225)
 **Siblings:**
 
-- [lattice RFC-0011](https://github.com/alexnodeland/lattice/pull/1217), the v0.3 platform (in Discussion), owns capabilities, approvals, secrets, egress, taint and adapters. This RFC uses them and redefines none; where it needs more of one, it says so as an addition for RFC-0011 to agree.
+- [lattice RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md), the v0.3 platform, owns capabilities, approvals, secrets, egress, taint and adapters. This RFC uses them and redefines none; the one addition plan approval needs, `covers` and the `Coverage` port, RFC-0011 has taken in as its Decision O11.
 - [reflexr RFC-0003](../reflexr/rfcs/0003-managing-rules-at-runtime.md) and [relayr ADR-0028](../relayr/adr/0028-rules-from-chat.md) are the shape stored workflows follow: typed data checked by core, installed through a workspace handle, drafted in chat as an artifact a person accepts.
 - [relayr ADR-0003](../relayr/adr/0003-a-thread-is-never-a-chain.md): a thread is never a chain, so a run started from chat begins a chain of its own.
 - lattice RFC-0013, event sources (#839), is written beside this one and cites it for what runs when a rule fires.
@@ -25,7 +25,7 @@ lattice has six primitives, one job each: a **capability** is one governed actio
 ## Non-goals
 
 - **Run semantics in TLA+** (#967). The spec is a Tracking item, written before 0.3.x's multi-step executor; this RFC states the properties it must check.
-- **The capability, approval, secrets, egress and taint contracts** (RFC-0011). Plan approval needs one optional field and one port added to RFC-0011's approvals; nothing else there changes.
+- **The capability, approval, secrets, egress and taint contracts** (RFC-0011). Plan approval's optional field and port are RFC-0011's own, as its [Decision O11](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md#decisions); nothing else there changes.
 - **Sources, trust levels, bindings and quotas** (RFC-0013, #839). This RFC says only how a run receives what a source and a rule give it.
 - **The agent object** (#947) and **skills** (#959), beyond where their boundaries meet workflows'.
 - **Knowledge, data spaces and quantr,** which ship in a 0.3.x knowledge release. Slack, out of 0.3.0: approvals reach a phone by web push (RFC-0011).
@@ -280,7 +280,7 @@ class ListedAction(BaseModel, frozen=True):
     step: StepId                   # the step that may call it; a map's body step stands for each item
     capability: str                # "forge.mark_ready@1": name and major version
     tier: Tier                     # RFC-0011's, at save: write, run_code or outbound
-    target: Condition | None       # over the call's `arguments` and references; None: any arguments
+    target: JsonObject | None      # a Condition's JSON, over the call's `arguments` and references; None: any arguments
     max_calls: int                 # per run; a map's body is counted per item, up to max_items
     digest: str                    # SHA-256 of all the above, and the capability's definition
 ```
@@ -300,9 +300,9 @@ class ListedAction(BaseModel, frozen=True):
 | `deadline` | When the plan's offer lapses; the covers last until the run's time window ends |
 | **`covers`** (new) | The listed actions this approval pre-approves, each by its `digest` |
 
-Two additions to RFC-0011's `lattice_core.approvals`, both minor under its versioning rules (Decision W6):
+RFC-0011 holds both of these in `lattice_core.approvals`, minor additions under its versioning rules ([its Decision O11](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md#decisions), 2026-10-31; W6 here):
 
-- **`covers: tuple[ListedAction, ...] = ()`** on `ApprovalRequest` and `Approval`, with `ListedAction` declared there. `reflexr.core.workflows` produces it; grantr stores it as part of the approval.
+- **`covers: tuple[ListedAction, ...] = ()`** on `ApprovalRequest` and `Approval`, with `ListedAction` declared there. Since lattice-core imports no reflexr, `target` is held as the condition's JSON; reflexr parses it into its `Condition` when it answers `Coverage`, and a target that no longer parses covers nothing. `reflexr.core.workflows` produces it; grantr stores it as part of the approval.
 - **A `Coverage` port** the enforcer asks at its step 6, before asking a new approval: `async def cover(context: CallContext, capability: Capability, arguments: JsonObject) -> ApprovalId | None`. reflexr answers it, inside the run's transaction: it finds the run's current version and step, the approved plan approvals of the run whose `covers` hold an entry for that step with the current digest, checks the arguments against `target`, the calls left, the budget and the window, records the use, and returns the approval's id, which the `capability_called` audit entry names. No answer means ask, as today.
 
 What a pre-approval never covers, so it asks at the step:
@@ -454,7 +454,7 @@ reflexr still never imports artifactr, and artifactr never sees a workflow excep
 | Package | Changes | Breaking |
 |---|---|---|
 | reflexr | `core.workflows`; `Run.cause`, `workflow`, `inputs`, `waiting_on`, `spent`; `waiting`; `Rule.then` a union; `WhereFilter.to_field`; `start_run`, `resume_run`; three facts; a migration; the executor; its provider | Yes: `Run.rule` and the firing fields become optional, `Rule.then` a union, `RunStatus` gains a value. `!` and an upgrade note (#946) |
-| lattice-core | Settings keys; with RFC-0011, `covers` and `Coverage` (0.3.x) | No: additions |
+| lattice-core | Settings keys; `covers` and `Coverage` are RFC-0011's (O11) | No: additions |
 | relayr | 0.3.x: the `workflow` artifact, its drafting tool, installer and notices; chat-started runs | No |
 | grantr | `reflexr:start_run`, `resume_run`, `read_workflows` in the built-in roles and the template's `access.md`; `covers` stored (0.3.x) | No |
 | portalr | A run's workflow and cause on the run page; the renderer later (#971) | No |
@@ -464,7 +464,7 @@ reflexr still never imports artifactr, and artifactr never sees a workflow excep
 
 | Milestone | Phase | Deliverable | Exit criteria |
 |---|---|---|---|
-| M1 | 0. Design | This RFC accepted; `covers` agreed with RFC-0011 | The owner's sign-off on W1 to W11 |
+| M1 | 0. Design | This RFC accepted | The owner's sign-off on W1 to W5 and W7 to W11 |
 | M2 | 1. Spec | `core.workflows` (0.3.0 subset), `holds`, `to_field`, `check_workflow`, the schema | Fixtures pass; schema checked by `lattice:breaks` |
 | M2 | 2. Runs | Causes, the migration, `start_run`, `waiting`, `resume_run`, facts, REST and MCP | The behaviour suite on three storages |
 | M3 | 3. Executor | One-node graph, `agent_task` on RFC-0011's toolset, deferred approvals, budgets, `then` | oncall's triage runs as a workflow and resumes after an approval |
@@ -483,6 +483,12 @@ Decided by the owner on 2026-10-30:
 | O3 | The sandbox | OpenSandbox on gVisor, for code steps as for code sessions | Another sandbox |
 | O4 | Knowledge | A 0.3.x knowledge release; no step kind here depends on it | Knowledge steps in the vocabulary now |
 
+Decided by [RFC-0011's Decision O11](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md#decisions) on 2026-10-31:
+
+| # | Question | Decided | Instead of |
+|---|---|---|---|
+| W6 | Recording pre-approval | One `Approval` per plan version, with `covers` (each `ListedAction`'s `target` held as the condition's JSON) and a `Coverage` port the enforcer asks at step 6, both in RFC-0011's `lattice_core.approvals` | One approval per listed action, asked as a batch: no change to RFC-0011, but N records to answer as one, and no single answer bound to the plan |
+
 Recommended, for the owner to confirm:
 
 | # | Question | Recommended | Instead of |
@@ -492,7 +498,6 @@ Recommended, for the owner to confirm:
 | W3 | Runs | One `Run` with a `cause` union; the firing's fields optional; a break, taken once in 0.3.0 | A separate `WorkflowRun` beside `Run`: no break, but two durability models, which #968 rules out |
 | W4 | 0.3.0's schema | Only `agent_task`; each later kind a minor version as its runner ships | The whole vocabulary in v1, refused at check until built: fixes untried fields as a contract |
 | W5 | Pausing a run | `waiting` without a lease, resumed by `resume_run` with a backstop, in 0.3.0 | A second rule continuing on the answer, the architecture's workaround, which loses the agent's turn |
-| W6 | Recording pre-approval | One `Approval` per plan version, with `covers` and a `Coverage` port the enforcer asks, both added to RFC-0011 | One approval per listed action, asked as a batch: no change to RFC-0011, but N records to answer as one, and no single answer bound to the plan |
 | W7 | Data in prompts, and references | Data only through `with`, never interpolated; a reference in a value field is `{"ref": ...}`, so it never collides with a literal | Templates in `task`, which put untrusted text in instructions; bare strings as references everywhere, which can't be told from values |
 | W8 | An agent step's reach | `may` narrows the toolset to declared outbound capabilities | The agent's whole list, which no plan could enumerate |
 | W9 | grantr's actions | `reflexr:start_run` and the others, in reflexr's naming | #970's `workflows:*`, a namespace no package owns |
@@ -532,8 +537,8 @@ Recommended, for the owner to confirm:
 
 ## Tracking
 
-- [ ] Sign-off on W1 to W11, and Q1 to Q4 settled, each recorded in an ADR as it is built
-- [ ] RFC-0011: `covers` and the `Coverage` port agreed, as an amendment or a follow-up (#941)
+- [ ] Sign-off on W1 to W5 and W7 to W11, and Q1 to Q4 settled, each recorded in an ADR as it is built
+- [ ] lattice-core and grantr: `covers` and the `Coverage` port, built under RFC-0011's O11 (#941); reflexr's `Coverage` answer with plan approval (#969)
 - [ ] reflexr: `core.workflows` with `agent_task`, `holds`, `to_field`, `check_workflow`, `reflexr.workflows.v1.json` (#966's JSON Schema)
 - [ ] reflexr: run causes, the migration, `start_run`, `waiting`, `resume_run` and their facts, REST, MCP and WebSocket (#968)
 - [ ] reflexr: the executor for `agent_task`, deferred approvals, budgets, `then` as a workflow or the shorthand (#968)
@@ -547,7 +552,7 @@ Recommended, for the owner to confirm:
 
 ## Evidence
 
-Gathered on 2026-10-30, with lattice read at `origin/main` (`a52c5f81`) and RFC-0011 at its pull request's head.
+Gathered on 2026-10-30, with lattice read at `origin/main` (`a52c5f81`) and RFC-0011 as merged, with its fold-in (#1230).
 
 | Claim | Where | |
 |---|---|---|
@@ -564,5 +569,5 @@ Gathered on 2026-10-30, with lattice read at `origin/main` (`a52c5f81`) and RFC-
 | A chat-started chain carries the thread's id and a `thread:` tag | relayr ADR-0003 | Verified |
 | The only TLA+ spec is artifactr's thread claim | `docs/artifactr/spec/` | Verified |
 | Settings are `IntRange` or `Subset`, narrowed below the operator | lattice ADR-0030 | Verified |
-| RFC-0011's `Approval` binds an answer to `arguments_digest`; stored workflows are `workflow` capabilities; enforcer step 6 asks `ApprovalPolicy` | RFC-0011, PR #1217 | Verified |
+| RFC-0011's `Approval` binds an answer to `arguments_digest`; stored workflows are `workflow` capabilities; enforcer step 6 asks `ApprovalPolicy` | [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) | Verified |
 | #843 re-scoped to agents; #947 re-scoped so automations run workflows | Owner's comments on #843 and #947 | Verified |

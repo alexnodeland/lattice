@@ -13,6 +13,7 @@ nav:
       - rfcs/0006-excalidraw-diagrams-drawn-live.md
       - rfcs/0007-portalr-brand-kits.md
       - rfcs/0008-portalr-product-analytics.md
+      - rfcs/0014-portr-the-command-catalog-and-the-mcp-acp-gateway.md
       - Template: rfcs/template.md
   - Decisions:
       - adr/README.md

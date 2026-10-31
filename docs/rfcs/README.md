@@ -15,5 +15,6 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 | [0007](0007-portalr-brand-kits.md) | portalr brand kits | Accepted |
 | [0008](0008-portalr-product-analytics.md) | portalr product analytics | Draft |
 | [0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) | The v0.3 platform: capabilities, approvals, secrets, egress and adapters | Accepted |
+| [0012](0012-the-six-primitives-and-the-workflow-spec.md) | The six primitives and the workflow spec | Discussion |
 
 To propose one, copy [`template.md`](template.md) to the next number. Each package's series uses the same template.

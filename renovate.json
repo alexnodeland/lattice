@@ -5,7 +5,24 @@
   "pre-commit": {
     "enabled": true
   },
+  "customDatasources": {
+    "grafana-plugins": {
+      "description": "A Grafana plugin's versions, from grafana.com's list of them.",
+      "defaultRegistryUrlTemplate": "https://grafana.com/api/plugins/{{packageName}}/versions",
+      "format": "json",
+      "transformTemplates": [
+        "{ \"releases\": [items.{ \"version\": version, \"releaseTimestamp\": createdAt }] }"
+      ]
+    }
+  },
   "customManagers": [
+    {
+      "description": "The Grafana plugins stackr-grafana fetches as it is built, by version in the download's URL and by each architecture's sha256 (stackr ADR-0048).",
+      "customType": "regex",
+      "managerFilePatterns": ["/^packages/stackr/deploy/grafana/Dockerfile$/"],
+      "matchStrings": ["grafana\\.com/api/plugins/(?<depName>[a-z0-9-]+)/versions/(?<currentValue>\\d[^/\\s]*)/download"],
+      "datasourceTemplate": "custom.grafana-plugins"
+    },
     {
       "description": "OpenTofu and TFLint in .prototools, whose plugins are lattice's own, so Renovate's proto manager doesn't know them (stackr ADR-0029).",
       "customType": "regex",
@@ -96,6 +113,11 @@
       "matchDatasources": ["docker"],
       "matchPackageNames": ["langfuse/langfuse", "langfuse/langfuse-worker"],
       "groupName": "Langfuse"
+    },
+    {
+      "description": "A Grafana plugin's new version is listed on the Dependency Dashboard and waits there: a pull request only when it is ticked, and then it moves the version alone, so it fails the sha256 check until both architectures' digests are moved by hand, from grafana.com's list and checked against the downloads (stackr ADR-0048).",
+      "matchDatasources": ["custom.grafana-plugins"],
+      "dependencyDashboardApproval": true
     },
     {
       "description": "Chainguard rebuilds MinIO's only free tag, latest, every day; its digest moves once a month (stackr ADR-0008).",

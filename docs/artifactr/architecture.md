@@ -15,6 +15,7 @@
 | `artifactr.evals` | Implemented: datasets from the log, experiments, online evaluation and the end-to-end measures, over evalr |
 | `artifactr.files` | Phase 1 of [lattice RFC-0003](../rfcs/0003-native-files-as-artifacts.md): native files' types, blobs, check-outs and the app port, unreleased ([its section](files/index.md)) |
 | `artifactr.connect` | Implemented: connected apps, an operator's own FreeCAD or Blender through a vetted MCP server, off by default ([ADR-0085](adr/0085-connected-apps-an-operators-own-freecad-or-blender-through-a-vetted-mcp-server.md)) |
+| `artifactr.capabilities` | Implemented, unreleased: the artifact tools as capabilities, called through lattice-core's enforcer ([ADR-0099](adr/0099-artifactrs-tools-as-capabilities-called-through-the-enforcer-whose-policy-asks-approval.md)) |
 | `examples/docplan` | Implemented: server, terminal client and tests; observed, rated and routed when configured |
 
 ## What artifactr is
@@ -93,7 +94,8 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.fastapi` (extra) | agent, FastAPI | Driving adapter | The thread protocol over WebSocket, and REST commands. |
 | `artifactr.mcp` (extra) | agent, mcp, lattice-core's `logs` | Driving adapter | Artifacts as MCP resources, commands and reads as MCP tools. |
 | `artifactr.files` (extra) | the public API of core and workspace; its `sql` layer SQLAlchemy 2 async, Alembic and lattice-core's `sql` | A domain built on artifactr, with ports of its own: `Blobs`, `Checkouts` and `App` | Native files as artifacts: manifests over a blob store, check-outs and agents' edits under one lease, and its own tables and migrations ([its architecture](files/architecture.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)). |
-| `artifactr.connect` (extra `connect`) | the public API of core, workspace and agent; the MCP SDK's client and anyio | A toolset, with lattice-core's switches and the workspace's `authorize` as its gates | Connected apps: a vetted server's tools, filtered by risk, code and network calls approved by a person every call ([the guide](guides/connected-apps.md)) |
+| `artifactr.connect` (extra `connect`) | the public API of core, workspace and agent; the MCP SDK's client and anyio | A toolset, with lattice-core's switches and the workspace's `authorize` as its gates | Connected apps: a vetted server's tools, filtered by risk, code and network calls approved by a person every call ([the guide](guides/connected-apps.md)); each risk's capability tier (`TIERS`) |
+| `artifactr.capabilities` | the public API of core, workspace and agent; lattice-core's `capabilities` | A provider for lattice-core's capability registry | The artifact tools as capabilities, for callers outside artifactr's threads, each opening the call's workspace as its actor ([Capabilities](#capabilities)) |
 | `artifactr.ui` (extra `forms`) | the public API of core, workspace and agent | A domain built on artifactr, filling its check hook | Forms, dashboards and mini apps in the chat: the schema subset, its types, checks and agent toolset ([Forms and dashboards](#forms-and-dashboards)) |
 
 ### `artifactr.core`: sans-IO
@@ -398,6 +400,15 @@ The WebSocket session reads with a single task and runs each command as its own 
 The protocol's frames are Pydantic models in `artifactr.core.protocol`. `schemas/artifactr.v1.json` is generated from them (`moon run artifactr:schema`) for clients to generate types from, and a test fails if it drifts.
 
 pydantic-ai's AG-UI and Vercel AI adapters may be added later as compatibility surfaces for simple frontends. They are request-scoped with client-supplied state, so they sit beside the thread protocol rather than replacing it.
+
+## Capabilities
+
+`artifactr.capabilities.ArtifactrProvider` offers the agent's artifact tools to lattice-core's capability registry, for callers outside artifactr's own threads: another library's agent, a code session or a person's outside client ([ADR-0099](adr/0099-artifactrs-tools-as-capabilities-called-through-the-enforcer-whose-policy-asks-approval.md), [lattice RFC-0011](../rfcs/0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)). It offers six `command` capabilities: `artifactr.list_artifacts` and `artifactr.read_artifact` (tier `read`), and `artifactr.create_artifact`, `artifactr.edit_text`, `artifactr.propose_text` and `artifactr.archive_artifact` (tier `write`), each gated by the workspace action its command asks.
+
+- **Every call comes through lattice-core's `Enforcer`,** which checks the gate, the tier, the limits, taint and approval, and audits the call, before the provider hears of it.
+- **The provider opens the call's workspace as the call's actor** (`actor_for`). That's the outside client's `ExternalAgentActor`, for the person; a person's own `UserActor`; or an `ExternalAgentActor` for an agent's run (`agent:<agent>`) or a code session (`session:<id>`). It commits as the agent's tools do, in no thread, so the workspace's `authorize`, gate and checks hear each command again. A capability call is a tool call, like the agent's own, not a surface's command: it doesn't go through `Runner.execute`, and the enforcer's audit, not a `command_id`, records it.
+- **No capability declares an approval.** The application's `ApprovalPolicy` decides at the enforcer's step 6, and a call it defers pauses an agent's run through lattice-core's agents bridge, as `requires_approval` would (RFC-0011's T5).
+- **The thread agent keeps its own toolset.** Moving it onto the bridge waits for the runner to carry an approval's id back as it resumes, and for `answer_deferred` to answer the approvals store.
 
 ## Storage protocols
 

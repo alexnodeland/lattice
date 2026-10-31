@@ -2,8 +2,8 @@
 
 Every public ``Workspace`` and ``Workspaces`` method is listed with what it asks for, and every
 REST route, WebSocket command, MCP tool and resource, and capability with the actions its caller
-is asked for, which are those of the methods it calls. Each is called with a hook that records what it
-is asked. A method or surface missing from the tables fails, as does one that asks for an
+is asked for, which are those of the methods it calls. Each is called with a hook that records
+what it is asked. A method or surface missing from the tables fails, as does one that asks for an
 action outside :data:`~artifactr.workspace.ACTIONS`, or one that asks for nothing. A surface
 that is open on purpose is listed with its reason, and asks nothing.
 """

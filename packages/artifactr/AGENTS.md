@@ -14,6 +14,7 @@ artifactr is a library for chat applications in which people and agents edit the
 | `src/artifactr/{fastapi,mcp,otel,langfuse,litellm,evals,scores}/` | Adapters behind extras |
 | `src/artifactr/files/` | Native files, a domain built on artifactr with its own rules ([its AGENTS.md](src/artifactr/files/AGENTS.md)) |
 | `src/artifactr/{ui,excalidraw,connect}/` | Forms and dashboards, diagrams, connected apps |
+| `src/artifactr/capabilities/` | The artifact tools as capabilities for lattice-core's registry, each called through its enforcer ([ADR-0099](../../docs/artifactr/adr/0099-artifactrs-tools-as-capabilities-called-through-the-enforcer-whose-policy-asks-approval.md)) |
 | `tests/` | Mirrors `src/`; `conformance/` holds the protocol fixtures |
 | `schemas/` | Generated JSON Schemas and OpenAPI documents |
 | `deploy/grafana/dashboards/` | Generated Grafana dashboards (`scripts/grafana_dashboards.py`) |

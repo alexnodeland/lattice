@@ -295,7 +295,8 @@ async def _run(workspace: Workspace, given: _Given) -> str:
         case _List():
             return await list_artifacts_text(workspace, given.kind)
         case _Read():
-            return artifact_text(await workspace.artifact(given.artifact_id))
+            artifact = await workspace.artifact(given.artifact_id)
+            return artifact_text(artifact, as_tool_result=True)
         case _Create():
             command = CreateArtifact(kind=given.kind, data=given.data)
             return describe_outcome(await workspace.commit(command))

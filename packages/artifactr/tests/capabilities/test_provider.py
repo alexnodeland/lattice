@@ -13,6 +13,7 @@ from artifactr.core import (
     UserActor,
     WorkspaceId,
 )
+from artifactr.ui import App
 from artifactr.workspace import Access, InMemoryStorage, Workspaces
 from lattice_core.capabilities import (
     CallContext,
@@ -148,6 +149,20 @@ async def test_each_capability_does_what_its_tool_does_as_the_callers_actor(
     assert (await ws.artifact(artifact.id)).archived
 
 
+async def test_an_artifact_is_read_as_a_tool_result_renders_it() -> None:
+    """A mini app's HTML isn't a tool result the gateway's prompt-injection guardrail reads
+    (ADR-0098)."""
+    workspaces = Workspaces(InMemoryStorage(), types=[App])
+    ws = await workspaces.open("acme", "docs", actor=ALEX)
+    app = App(title="Dice", summary="Rolls a die", html="<button>Roll</button>")
+    await ws.create(app, artifact_id="app_1")
+    provider = ArtifactrProvider(workspaces, types=[App])
+    read = await call(provider, "artifactr.read_artifact", {"artifact_id": "app_1"})
+    assert read == f"app_1 (app, v1)\n\n{app.render_for_tool()}"
+    assert isinstance(read, str)
+    assert "<button>" not in read
+
+
 @pytest.mark.parametrize(
     ("caller", "via", "actor"),
     [
@@ -231,5 +246,5 @@ async def test_arguments_that_arent_the_capabilitys_are_refused_before_the_works
 async def test_another_providers_capability_is_refused(workspaces: Workspaces) -> None:
     provider = ArtifactrProvider(workspaces, types=[Note])
     foreign = provider.capabilities(HERE)[0].model_copy(update={"name": "notes.list"})
-    with pytest.raises(ValueError, match="notes.list isn't one of artifactr's capabilities"):
+    with pytest.raises(ValueError, match=r"notes\.list isn't one of artifactr's capabilities"):
         await provider.call(foreign, {}, context())

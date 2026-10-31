@@ -361,6 +361,9 @@ def test_taint_that_denies_refuses_and_taint_that_asks_asks_the_person(subject: 
 
 @subjects
 def test_an_approval_holds_a_write_until_it_is_approved_for_its_arguments(subject: str) -> None:
+    """Approved, it lets one call through, uncounted again by a limit it was counted against as
+    it asked: a fake's write may be called once an hour."""
+
     async def case() -> None:
         sam = Answerers(subjects=frozenset({"sam"}))
         world = World(SUBJECTS[subject](), answerers=sam)
@@ -368,18 +371,27 @@ def test_an_approval_holds_a_write_until_it_is_approved_for_its_arguments(subjec
         await refused(ApprovalPending, world.write(approval=pending.approval))
         assert await world.under.writes() == 0
         await world.answer(pending.approval, "sam")
-        called = await world.write(approval=pending.approval)
-        assert called.approval == pending.approval
-        assert await world.under.writes() == 1
         under = world.under
         other = world.enforcer().call(
             under.write, under.other_arguments, context(), approval=pending.approval
         )
         await refused(WrongApproval, other)
-        denied = await refused(ApprovalPending, world.write())
-        await world.answer(denied.approval, "sam", approved=False)
-        await refused(ApprovalClosed, world.write(approval=denied.approval))
+        called = await world.write(approval=pending.approval)
+        assert called.approval == pending.approval
+        await refused(ApprovalClosed, world.write(approval=pending.approval))
         assert await world.under.writes() == 1
+
+    run(case())
+
+
+@subjects
+def test_a_denied_approval_refuses_its_call(subject: str) -> None:
+    async def case() -> None:
+        world = World(SUBJECTS[subject](), answerers=Answerers(subjects=frozenset({"sam"})))
+        pending = await refused(ApprovalPending, world.write())
+        await world.answer(pending.approval, "sam", approved=False)
+        await refused(ApprovalClosed, world.write(approval=pending.approval))
+        assert await world.under.writes() == 0
 
     run(case())
 

@@ -225,6 +225,7 @@ def decide(request: Destination, purpose: Purpose, allowed: frozenset[HostPatter
 - **Narrowed by taint.** For a tainted turn, run or session, `decide` allows only hosts that appeared in what was read (the taint's recorded `seen_hosts`) and are also allowlisted, and refuses a URL with a query or path built from private data, which the caller marks as such (#903's "narrow").
 - **Limits** on size, time and rate per purpose, as settings.
 - **Credentials injected at the proxy.** A caller sends `X-Lattice-Secret: <ref>`; the authorizer reads the value through the `Secrets` port, the proxy sets the header the purpose names, and the reference is stripped. Callers, sandboxes and models never hold model keys or forge tokens. Injection needs the proxy to originate TLS, so a purpose with credentials is called as a plain-HTTP forward-proxy request to the proxy, which opens TLS upstream; a purpose without them, such as package registries, may tunnel with CONNECT.
+- **Every credential header the caller sends is stripped,** not only the one replaced: `Authorization`, `x-api-key` and the forge's own. The #899 spike's egress proxy had to strip `x-api-key` as well as `Authorization` ([#1222](https://github.com/alexnodeland/lattice/pull/1222)).
 - **Logged:** each request's tenant, workspace, purpose, caller, destination host, verdict, size and duration; never bodies or headers. Operators see egress by purpose and destination, and refusals, in portalr's admin.
 
 **The proxy is an established one, not lattice's own** (Decision O8). It runs as a stackr service, `egress`, on the network every outbound caller sits on, and is the only service on that network with a route out. Compose marks the callers' networks `internal: true`, as stackr already does for its databases, so nothing else can reach the internet, which `make validate` and a smoke test check. Each caller is identified by a token the stack issues per purpose (a sandbox's per session), sent as `Proxy-Authorization`. The reader and the sandbox's proxy become clients of it, and keep their own guards as defence in depth.
@@ -246,6 +247,16 @@ Two candidates were compared against what this design needs:
 
 - **Static, rendered:** `lattice_core.egress.envoy(policy) -> dict` renders the operator's purposes, their host universes, limits and the always-refused ranges into Envoy's listeners, routes, RBAC filters and clusters, as plain data, with no Envoy dependency. stackr's `scripts/egress-config` writes it to `deploy/egress/` when the stack starts, and Envoy reads it as file-based xDS, so a change of the operator's configuration is picked up without a restart. A drift test holds the committed example to the renderer. This layer holds even if the authorizer errs: nothing outside the operator's universe is ever reachable.
 - **Dynamic, asked:** `ext_authz` calls `lattice_core.egress.fastapi`'s authorizer, a router behind the `fastapi` extra that the application mounts, not a service of its own. It identifies the caller, applies the tenant's and workspace's narrowing, taint and `decide`, reads any credential through `Secrets`, and answers allow with headers and metadata, or deny with a reason. Envoy is configured with `failure_mode_allow: false`, so an authorizer that can't answer refuses.
+
+### A sandbox with its own vault and egress
+
+The #899 spike ([#1222](https://github.com/alexnodeland/lattice/pull/1222)) found that OpenSandbox 1.2, the confirmed sandbox, has both: a `credential-vault`, which injects credentials into requests matched by host, path and method, and a `networkPolicy`, ordered egress rules enforced by a sidecar and chainable to an upstream proxy. They overlap #942 and #943. As the spike recommends:
+
+- **lattice keeps the policy and the audit.** The egress policy and every decision about it stay in `lattice_core.egress` and its proxy, whatever the sandbox offers.
+- **Egress rules are translated** into OpenSandbox's `networkPolicy` by the sandbox adapter, where it has one, as an inner layer, with lattice's proxy as its upstream. A sandbox without one relies on the proxy alone.
+- **Credentials stay in lattice's proxies,** never in OpenSandbox's vault: matching by host and path can't say "only this branch", which git's credential proxy must.
+
+How the credential proxy polices git is the ports RFC's: lattice RFC-0015 (#893), being drafted. That covers force-pushes, which the spike's proxy let through, since refusing a history rewrite needs a mirror in the proxy or the forge's branch protection. It also covers refusals answered in git's `report-status` format, since a plain 403 confuses git.
 
 ### Taint, as these parts read it (#903)
 
@@ -387,6 +398,7 @@ As of 2026-10-30, approval policy's direction (O5), egress hosts (O6) and switch
 
 - **Which established proxy** (P1): Envoy is recommended, for the owner to confirm.
 - **Hosts a connection declares,** revisited with the connector RFC (#926), after O6.
+- **Force-pushes through the credential proxy,** and refusals in `report-status`: for lattice RFC-0015 (#893), after the spike (#1222).
 - **The bypass check's strength:** an AST rule over `src/` catches the obvious; a runtime assertion in the bridge catches the rest only where tests run the agent.
 - **Where portr and the code sessions package live** (#915, #893): this RFC requires only that they read the composed registry.
 
@@ -436,4 +448,5 @@ Gathered on 2026-10-30, with lattice read at `origin/main` (`3b5fad8e`).
 | Runs pause on `DeferredToolRequests` and resume on `answer_deferred`; relayr bridges `deferred_answered` | `docs/artifactr/architecture.md`, `docs/relayr/architecture.md` | Verified |
 | `Integrations.is_enabled` and `KNOWN`; `Settings` with `IntRange` and `Subset` | `lattice_core/integrations.py`, ADR-0030 | Verified |
 | stackr's compose already has an `internal: true` network | `packages/stackr/compose.yaml` | Verified |
+| OpenSandbox 1.2 has a `credential-vault` (by host, path and method) and a `networkPolicy`; the spike's proxy let a force-push through and had to strip `x-api-key` | `spikes/0899-code-session/README.md`, [#1222](https://github.com/alexnodeland/lattice/pull/1222) | Read, as the spike reports it |
 | Supabase Vault's API and isolation | Supabase's documentation, not read here | Unverified |

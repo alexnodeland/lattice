@@ -6,6 +6,7 @@ nav:
   - Roles and grants: guides/roles-and-grants.md
   - Restricted threads and artifacts: guides/restricted-items.md
   - Integrations, switched per workspace: guides/integrations.md
+  - Approvals, answered by the people grantr names: guides/approvals.md
   - Service principals and keys: guides/keys.md
   - Row-level security: guides/row-level-security.md
   - The permission matrix: guides/matrix.md
@@ -50,6 +51,7 @@ nav:
   - adr/0035-settings-narrowed-per-tenant-and-workspace-in-grantrs-table-versioned-audited.md
   - adr/0036-a-hook-on-a-members-removal.md
   - adr/0037-the-deployments-own-tools-read-a-tenants-audit-log.md
+  - adr/0038-approvals-stored-per-tenant-answered-by-grantrs-subjects-groups-and-grants.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

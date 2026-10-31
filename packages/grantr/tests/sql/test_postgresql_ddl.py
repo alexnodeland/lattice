@@ -20,6 +20,7 @@ MIGRATION = VERSIONS / "0003_row_level_security.py"
 CREATION = VERSIONS / "0005_tenant_creation_in_the_deployment_log.py"
 INTEGRATIONS = VERSIONS / "0006_integrations.py"
 SETTINGS = VERSIONS / "0007_settings.py"
+APPROVALS = VERSIONS / "0008_approvals.py"
 
 POLICIES = 10
 """How many policies the migration creates: one per table it names, frozen in it."""
@@ -45,6 +46,9 @@ class Recorder:
     def drop_table(self, name: str) -> None:
         self.calls.append((f"DROP TABLE {name}", None))
 
+    def create_index(self, name: str, table: str, columns: list[str]) -> None:
+        self.calls.append((f"CREATE INDEX {name} ON {table} ({', '.join(columns)})", None))
+
 
 def _migration(
     recorder: Recorder, monkeypatch: pytest.MonkeyPatch, path: Path = MIGRATION
@@ -59,6 +63,7 @@ def _migration(
         execute=recorder.execute,
         create_table=recorder.create_table,
         drop_table=recorder.drop_table,
+        create_index=recorder.create_index,
         f=str,
     )
     monkeypatch.setattr(module, "op", op)
@@ -69,11 +74,12 @@ def test_create_schema_creates_the_policies_the_migration_does(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     migrated = Recorder()
-    for path in (MIGRATION, CREATION, INTEGRATIONS, SETTINGS):
+    for path in (MIGRATION, CREATION, INTEGRATIONS, SETTINGS, APPROVALS):
         _migration(migrated, monkeypatch, path).upgrade()
     created = Recorder()
     _row_level_security(cast("Connection", created))
-    policies = [s for s in migrated.statements if not s.startswith("CREATE TABLE")]
+    made = ("CREATE TABLE", "CREATE INDEX")
+    policies = [s for s in migrated.statements if not s.startswith(made)]
     assert sorted(created.statements) == sorted(policies)
 
 
@@ -165,3 +171,28 @@ def test_the_settings_migration_keeps_its_table_to_its_tenant(
     recorder = Recorder(SimpleNamespace(name="sqlite"))
     _migration(recorder, monkeypatch, SETTINGS).upgrade()
     assert recorder.statements == ["CREATE TABLE grantr_settings"]
+
+
+def test_the_approvals_migration_keeps_its_table_to_its_tenant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorder = Recorder()
+    migration = _migration(recorder, monkeypatch, APPROVALS)
+    migration.upgrade()
+    assert recorder.statements == [
+        "CREATE TABLE grantr_approvals",
+        "CREATE INDEX ix_grantr_approvals_state ON grantr_approvals (tenant_id, state, workspace)",
+        "ALTER TABLE grantr_approvals ENABLE ROW LEVEL SECURITY",
+        "CREATE POLICY grantr_approvals_tenant ON grantr_approvals"
+        " USING (tenant_id = current_setting('lattice.tenant_id', true))"
+        " WITH CHECK (tenant_id = current_setting('lattice.tenant_id', true))",
+    ]
+    recorder.calls.clear()
+    migration.downgrade()
+    assert recorder.statements == ["DROP TABLE grantr_approvals"], "its policy goes with it"
+    recorder = Recorder(SimpleNamespace(name="sqlite"))
+    _migration(recorder, monkeypatch, APPROVALS).upgrade()
+    assert recorder.statements == [
+        "CREATE TABLE grantr_approvals",
+        "CREATE INDEX ix_grantr_approvals_state ON grantr_approvals (tenant_id, state, workspace)",
+    ]

@@ -3,7 +3,7 @@
 **Status:** Draft
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
-**Discussion:** the pull request that adds this file
+**Discussion:** [#1225](https://github.com/alexnodeland/lattice/pull/1225)
 **Siblings:**
 
 - [lattice RFC-0011](https://github.com/alexnodeland/lattice/pull/1217), the v0.3 platform (in Discussion), owns capabilities, approvals, secrets, egress, taint and adapters. This RFC uses them and redefines none; where it needs more of one, it says so as an addition for RFC-0011 to agree.
@@ -126,6 +126,7 @@ A reference is a dotted path into the **run document**, a JSON object the execut
 | `iteration` | Inside a `loop`: the count from 0 | Fixed |
 | `run.id`, `run.started_at` | The run | Fixed |
 
+- **A reference is never mistaken for a literal.** Fields that take only references (`with`, `inputs`, `fields`, `outputs`, `over`, and a rule's input mapping) hold a path as a plain string. Fields that take values (`capability.arguments`, `code_session.repository`, `wait.until`, `approval.rendering`) hold a literal, unless the value is exactly `{"ref": "<path>"}`, which is a reference; any other string, `"steps.fix.output.change_request"` included, is that string. A capability whose argument is itself an object with one `ref` key is passed it as `{"literal": {...}}`. The checker types every field by this rule (Decision W7).
 - **Paths use reflexr's syntax,** `_FIELD_PATH` in `reflexr/core/conditions.py`, which already admits `steps.triage.output.service`: identifiers joined by dots, with no indexing. A step that needs one element of an array is a `map`, or a `code` step.
 - **References are checked against schemas on save** (below): the producer's schema at the path must be assignable to the consumer's, conservatively. A check that can't prove it refuses, with `type_unproven`, and the author narrows a schema or adds a `code` step.
 - **A reference to a step that may not have run** (behind `when`, a branch, or `on_failure: continue`) is typed as nullable, and the consumer must accept null.
@@ -154,7 +155,7 @@ Each kind's fields beyond `StepBase`, its output, and how it fails. Every failur
 | Kind | Fields | Output | Fails with |
 |---|---|---|---|
 | **`agent_task`** | `agent` (a handle), `task` (literal text), `with` (name to reference), `may` (the outbound capabilities it may call, each with a target and bounds), `skill` (0.3.x), `output` (a JSON Schema, default `{summary: string}`) | The agent's typed output | `agent_unavailable`, `invalid_output`, `usage_exceeded`, `guardrail_blocked`, `approval_denied`, `approval_expired` |
-| **`capability`** | `capability` (`name@major`), `arguments` (literals and references, per field) | The capability's output schema | RFC-0011's refusals (`not_enabled`, `forbidden`, `limited`, `tainted`, `denied`), and the provider's error |
+| **`capability`** | `capability` (`name@major`), `arguments` (per field, a literal or `{"ref": ...}`) | The capability's output schema | RFC-0011's refusals (`not_enabled`, `forbidden`, `limited`, `tainted`, `denied`), and the provider's error |
 | **`code_session`** | `repository`, `task`, `agent` (the coding agent), `may` (push, change request), `until` (`done`, `change_request_open`) | The session's result: branch, change request, checks | The session's failure; `timed_out` |
 | **`research`** | `question`, `depth` (`quick`, `deep`), `with` | A report artifact's reference and its citations | The research run's failure |
 | **`workflow`** | `workflow` (`name@version` or `@latest`), `inputs` (name to reference) | The child's `outputs` | The child's failure; `depth_exceeded` |
@@ -406,11 +407,11 @@ steps:
   - id: fix
     kind: code_session
     when: {kind: where, field: steps.triage.output.fixable, op: eq, value: true}
-    repository: steps.triage.output.repository
+    repository: {ref: steps.triage.output.repository}
     task: Fix the cause triage found.
     until: change_request_open
-  - {id: ready, kind: approval, rendering: {change_request: steps.fix.output.change_request}, answerers: {action: "forge:mark_ready"}, deadline: PT2H}
-  - {id: mark, kind: capability, capability: forge.mark_ready@1, arguments: {change_request: steps.fix.output.change_request}}
+  - {id: ready, kind: approval, rendering: {change_request: {ref: steps.fix.output.change_request}}, answerers: {action: "forge:mark_ready"}, deadline: PT2H}
+  - {id: mark, kind: capability, capability: forge.mark_ready@1, arguments: {change_request: {ref: steps.fix.output.change_request}}}
 ```
 
 The others, compactly (Slack arrives in 0.3.x):
@@ -468,7 +469,7 @@ reflexr still never imports artifactr, and artifactr never sees a workflow excep
 | M2 | 2. Runs | Causes, the migration, `start_run`, `waiting`, `resume_run`, facts, REST and MCP | The behaviour suite on three storages |
 | M3 | 3. Executor | One-node graph, `agent_task` on RFC-0011's toolset, deferred approvals, budgets, `then` | oncall's triage runs as a workflow and resumes after an approval |
 | M4 | 4. Reach | portr starts runs and follows them (#917); elicitation answers resume them (#918) | An MCP client starts and follows a run |
-| M5 | 5. Release | Docs, the architecture doc, the upgrade note, the TLA+ spec of the 0.3.0 lifecycle | #898 green without stubs |
+| M5 | 5. Release | Docs, the architecture doc, the upgrade note | #898 green without stubs; the TLA+ spec (#967) does not gate 0.3.0 |
 | 0.3.x | 6 onward | #967's full spec; stored workflows and scopes (#970); the other kinds (#968, #953); plan approval and replanning (#969); code steps (#900); pinning and shadow mode (#972); the renderer (#971); the bundles (#957) | Each issue's acceptance criteria |
 
 ## Decisions
@@ -492,7 +493,7 @@ Recommended, for the owner to confirm:
 | W4 | 0.3.0's schema | Only `agent_task`; each later kind a minor version as its runner ships | The whole vocabulary in v1, refused at check until built: fixes untried fields as a contract |
 | W5 | Pausing a run | `waiting` without a lease, resumed by `resume_run` with a backstop, in 0.3.0 | A second rule continuing on the answer, the architecture's workaround, which loses the agent's turn |
 | W6 | Recording pre-approval | One `Approval` per plan version, with `covers` and a `Coverage` port the enforcer asks, both added to RFC-0011 | One approval per listed action, asked as a batch: no change to RFC-0011, but N records to answer as one, and no single answer bound to the plan |
-| W7 | Data in prompts | Only through `with`, never interpolated | Templates in `task`, which put untrusted text in instructions |
+| W7 | Data in prompts, and references | Data only through `with`, never interpolated; a reference in a value field is `{"ref": ...}`, so it never collides with a literal | Templates in `task`, which put untrusted text in instructions; bare strings as references everywhere, which can't be told from values |
 | W8 | An agent step's reach | `may` narrows the toolset to declared outbound capabilities | The agent's whole list, which no plan could enumerate |
 | W9 | grantr's actions | `reflexr:start_run` and the others, in reflexr's naming | #970's `workflows:*`, a namespace no package owns |
 | W10 | Budgets over the cap | 0.3.0 stops with `budget_exceeded`; 0.3.x asks through an approval | The ask in 0.3.0, before plan approval exists to render it |

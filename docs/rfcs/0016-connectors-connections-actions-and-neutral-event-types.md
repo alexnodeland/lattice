@@ -1,6 +1,6 @@
 # RFC-0016: Connectors: connections, actions and neutral event types
 
-**Status:** Discussion
+**Status:** Accepted
 **Author:** Alex Nodeland
 **Created:** 2026-10-31
 **Discussion:** the pull request that adds this file
@@ -9,7 +9,7 @@
 - [lattice RFC-0011][rfc-0011], the v0.3 platform, is what a connector's action side, credentials, egress and installation stand on: the capability registry with its `connector_action` provider kind, the approval object, the secrets port, the egress policy and its proxy, the adapter registry and its conformance harness, and `lattice_core.bindings`. This RFC cites them and redefines none.
 - [lattice RFC-0013][rfc-0013], event sources, is a connector's source side: the `Source` protocol, the intake, trust levels and origin, bindings, quotas and dead letters. It left a list to this RFC ([its table for #926][rfc-0013-926]); [What this RFC answers](#what-this-rfc-answers-of-rfc-0011-rfc-0013-and-rfc-0015) takes each item.
 - [lattice RFC-0015][rfc-0015], code sessions, holds the forge port and its adapters in `codr`, and puts the forge source in relayr until this RFC decides where connector adapters live (its C13).
-- [lattice RFC-0014][rfc-0014], portr, has a `Connection` of its own: an outside client's OAuth connection *into* lattice, stored by grantr. A connector's connection is lattice's *out* to another system. They are different objects, kept apart by name, id and action ([K2](#recommended-for-the-owner-to-confirm)).
+- [lattice RFC-0014][rfc-0014], portr, has a `Connection` of its own: an outside client's OAuth connection *into* lattice, stored by grantr. A connector's connection is lattice's *out* to another system. They are different objects, kept apart by name, id and action ([K2](#decisions)).
 - [lattice RFC-0004](0004-relayr-and-task-trackers.md) built the first connector, the task trackers: a port, two adapters, a neutral namespace, a webhook that nudges a follower, writes made once by a key. Most of this RFC generalizes it.
 - [lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md), [ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md), [ADR-0027](../adr/0027-integrations-switched-per-workspace-through-one-port.md) and [ADR-0030](../adr/0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md) decide where the code goes, when a distribution is warranted, how each side is switched and how its limits are narrowed.
 
@@ -249,7 +249,7 @@ Each side is an [ADR-0027](../adr/0027-integrations-switched-per-workspace-throu
 
 1. relayr's `plane` and `vikunja` extras declare `source:plane`, `action:plane`, `source:vikunja` and `action:vikunja`, on by default.
 2. A grantr migration copies each stored switch of `tracker:<name>`, at every level, to both new keys, so nothing that was on turns off and nothing that was off turns on.
-3. `tracker:plane` and `tracker:vikunja` stay in `KNOWN`, marked deprecated, read by nothing, because [ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md) has lattice-core change only by addition and deprecation, and an application may name them. `lattice:breaks` would not catch their removal: griffe compares a constant's value as text, which `scripts/breaks.py` leaves uncounted. They are removed in a later minor with `!` and an upgrade note.
+3. `tracker:plane` and `tracker:vikunja` stay in `KNOWN` as deprecated aliases through the 0.3 releases: a switch set on one after the migration is written to both new keys, and nothing reads the old key. They stay because [ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md) has lattice-core change only by addition and deprecation, and an application may name them. `lattice:breaks` would not catch their removal: griffe compares a constant's value as text, which `scripts/breaks.py` leaves uncounted. They are removed in 0.4, with `!` and an upgrade note.
 4. The trackers keep their webhook route, `POST /relayr/v1/trackers/{tenant}/{tracker}`, which deployments have configured in Plane and Vikunja; they are self-driven sources in [RFC-0013][rfc-0013], nudged by it.
 
 ### Egress: the hosts a connection declares
@@ -415,7 +415,7 @@ Data spaces need a third side, bulk tabular data with incremental sync and feder
 
 | Phase | Milestone | Deliverable | Exit criteria |
 |---|---|---|---|
-| 0. Design | M1 | This RFC in Discussion, then accepted; an ADR per decision as it is built | The owner's answers to the K table |
+| 0. Design | M1 | This RFC, accepted on 2026-10-31; an ADR per decision as it is built | K1 to K14 decided |
 | 1. Contracts | M3, after [RFC-0011][rfc-0011]'s phase 1 and [RFC-0013][rfc-0013]'s phase 3 | `lattice_core.connectors`, its fakes and suites; `Domain` in reflexr | 100% coverage; the kit passes on the fakes |
 | 2. Store | M3 | grantr's connections, commands, actions and audit; the health sweep; operator connections from configuration | Two tenants isolated; a revoked connection stops at once |
 | 3. Trackers | M3 | Plane and Vikunja as connectors: split keys and their migration, connections and bindings through the ports, tools as capabilities, `connection-requests` | relayr's tracker suites pass unchanged through the registry; the kit passes on both, on recorded fixtures |
@@ -433,7 +433,7 @@ Data spaces need a third side, bulk tabular data with incremental sync and feder
 
 ## Decisions
 
-Decided already, which this RFC builds on:
+Decided before this RFC, which it builds on:
 
 | # | Decided | Where |
 |---|---|---|
@@ -452,16 +452,16 @@ Decided already, which this RFC builds on:
 | D13 | Knowledge, data spaces and quantr ship in a 0.3.x knowledge release | the owner, v0.3 plan §7.2 |
 | D14 | The generic webhook, email, polls and rows are 0.3.x; stored event types come with #842 | [RFC-0013][rfc-0013], D7, R12 |
 
-### Recommended, for the owner to confirm
+Decided by the owner on 2026-10-31, on accepting this RFC:
 
-| # | Question | Recommended | Instead of |
+| # | Question | Decided | Instead of |
 |---|---|---|---|
 | K1 | What a connection is | One per connector per owner (a tenant or the deployment), shared by both sides, completing [RFC-0013][rfc-0013]'s minimal `Connection`; `pending`, `connected`, `failing`, `revoked`, with a health check on connect, every 15 minutes and on an unauthorized refusal | A connection per side, two credentials for one system (#925's rejected alternative); a workspace's own connections |
-| K2 | Where connections live | `lattice_core.connectors`, the operator's in configuration and a tenant's in grantr's `grantr_connector_connections`, `cxn_` ids; `codr`'s forge connections there too, which amends [RFC-0015][rfc-0015]'s `codr.sql` row | `codr`'s table for forges beside grantr's for the rest, so admin and the forge source read two stores; one `Connection` type with [RFC-0014][rfc-0014]'s client connections |
+| K2 | Where connections live | `lattice_core.connectors`, the operator's in configuration and a tenant's in grantr's `grantr_connector_connections`, `cxn_` ids; `codr`'s forge connections there too, amending [RFC-0015][rfc-0015]'s `codr.sql` row | `codr`'s table for forges beside grantr's for the rest, so admin and the forge source read two stores; one `Connection` type with [RFC-0014][rfc-0014]'s client connections |
 | K3 | Credentials and auth kinds | A tenant's as `SecretRef`s, the operator's as `ConfigRef`s in its configuration; values read at use, generated ones shown once, rotated with a grace; seven kinds declared, four built in 0.3.0 (`none`, `token`, `webhook_secret`, `app`) | A deployment owner in [RFC-0011][rfc-0011]'s `Owner`, putting the operator's credentials in the vault; OAuth in 0.3.0 with nothing to use it |
 | K4 | grantr actions | `grantr:manage_connectors` and `grantr:read_connectors`, a spec naming its own (`code:manage_forges`); no `connectors:` namespace and no aliases for `bind` and `pause` | #926's four `connectors:*` actions |
 | K5 | The action side | An `ActionSpec` per action, a `connector_action` capability `<namespace>.<action>`, gated by `action:<connector>` and one grantr action per tier; the connection from the binding or a `connection` argument; every write keyed; reads `read`, writes `write` with `sends_out`, never `outbound` | Tools in each connector's own toolset, as the trackers' are; writes as `outbound` |
-| K6 | Integration keys | `source:<connector>` and `action:<connector>`, declared by each connector; `tracker:plane` and `tracker:vikunja` split by a migration that copies their switches, kept deprecated in `KNOWN` through 0.3.0; `dataset:<connector>` reserved | One key per connector for both sides, as today; removing the old keys in 0.3.0, a break of lattice-core's public constant that no check would flag |
+| K6 | Integration keys | `source:<connector>` and `action:<connector>`, declared by each connector; `tracker:plane` and `tracker:vikunja` split by a migration that copies their switches, kept in `KNOWN` as deprecated aliases through 0.3 and removed in 0.4; `dataset:<connector>` reserved | One key per connector for both sides, as today; removing the old keys in 0.3.0, a break of lattice-core's public constant that no check would flag |
 | K7 | Hosts a connection declares | A narrowing only: derived from its configuration, refused outside the operator's universe, and each connection's requests allowed only to its own hosts; O6 stands | Tenants adding hosts through a connection |
 | K8 | A connection's total | `connection-requests:<connector>` a minute, shared by its sides, actions first, the tenant lowering it; `calls-per-hour:<connector>` per action | Quotas per binding only, so one tenant's actions and polls exhaust a remote's limit for every workspace |
 | K9 | The neutral registry | A `Domain` beside each neutral namespace, naming the fields that play connector, id, URL and actor; `alert`, `tracker` and `forge` in 0.3.0, the rest reserved; `tracker` kept, not renamed `ticket` | A shared base with renamed fields, a break for `tracker:`; `ticket:` beside `tracker:` |
@@ -519,17 +519,20 @@ Each is settled in its phase, or carried as an exit criterion.
 - [ ] lattice-core: the fixture recorder; the bridges and trackers passing the kit (#929)
 - [ ] reflexr, relayr: the `alert`, `tracker` and `forge` domains' schemas under `lattice:breaks`; the reserved names' test (#946)
 - [ ] reflexr: LiteLLM's, Langfuse's and evalr's connections, in M5 (#846)
+- [ ] reflexr: reflexr's `Event` refuses unknown fields (`extra="forbid"`), so #946's rule that consumers tolerate added fields fails today; load stored envelopes of known types with unknown fields kept, publishing still strict (K10, #946)
+- [ ] lattice: `lattice:breaks` can't see an entry removed from `KNOWN` (griffe compares a constant's value as text, which `scripts/breaks.py` leaves uncounted); make it catch removed integration keys before the 0.4 removal (K6, #946)
 - [ ] 0.3.x: the scaffold and the guide (#929); grantr, files, code sessions and portr as sources (#930); the rest of #931; #931's Supabase criterion moved to #848
 - [ ] lattice ADR: connections in `lattice_core.connectors`, the operator's in configuration and a tenant's in grantr, with `ConfigRef` for the operator's credentials (K1, K2, K3)
 - [ ] codr ADR, with the package: forge connections read from grantr's store, amending [RFC-0015][rfc-0015], whose README status then says "Accepted, amended by codr ADR-NNNN"; its body is not edited (K2)
 - [ ] grantr ADR: `grantr:manage_connectors` and `grantr:read_connectors`, a spec's own management action, no `connectors:` namespace (K4)
 - [ ] lattice ADR: connector actions as capabilities: names, gate, connection selection, keys, and the tiers and effects rule (K5)
-- [ ] lattice ADR: `source:` and `action:` keys per connector, the trackers' split and its deprecation (K6)
+- [ ] lattice ADR: `source:` and `action:` keys per connector, the trackers' split, its deprecated aliases through 0.3 and their removal in 0.4 (K6)
 - [ ] lattice ADR: a connection's hosts as a narrowing of the operator's universe (K7; [RFC-0011][rfc-0011]'s O6)
 - [ ] relayr ADR: `connection-requests` and `calls-per-hour`, generalizing the tracker budget (K8)
 - [ ] reflexr ADR: neutral domains, their field roles and versions, and tolerant loading of stored envelopes (K9, K10; #946)
 - [ ] lattice ADR: where connectors live in 0.3.0, the forge source staying in `relayr.forge` (K11; [RFC-0013][rfc-0013]'s R10, [RFC-0015][rfc-0015]'s C13)
 - [ ] reflexr ADR (0.3.x): raising a connection's trust, the operator's alone (K13)
+- [ ] lattice ADR (with the knowledge release): the dataset side on the connection, `dataset:<connector>` and the shared budget (K14; #1003)
 - [ ] Docs: relayr's and reflexr's architecture docs, lattice-core's connectors guide, the upgrade note's tracker keys and `TrackerCapability` (#946)
 
 ## Evidence

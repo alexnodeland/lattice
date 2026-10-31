@@ -1,6 +1,6 @@
 # RFC-0015: Ports and adapters for code sessions: forge, coding agent, IDE and sandbox
 
-**Status:** Accepted
+**Status:** Accepted, amended by [lattice RFC-0016](0016-connectors-connections-actions-and-neutral-event-types.md)
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file

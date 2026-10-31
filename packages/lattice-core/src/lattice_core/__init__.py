@@ -32,6 +32,12 @@ package (lattice ADR-0018).
   the enforcer, behind the ``agents`` extra.
 - :mod:`lattice_core.approvals`: the approval contract: one call asked of the people who may
   answer it, bound to its arguments, and the ports a store, a policy and a surface implement.
+- :mod:`lattice_core.secrets`: the secrets contract: references kept everywhere, values read
+  only within their owner, and the port a store implements.
+- :mod:`lattice_core.egress`: the egress policy, as pure functions: whether a call may go out
+  under a purpose, and to which checked address.
+- :mod:`lattice_core.adapters`: what answers a port in a deployment, how it is found, and the
+  port versions it implements.
 - :mod:`lattice_core.taint`: whether a turn, a run or a session has read untrusted content.
 - :mod:`lattice_core.contracts`: the platform contracts' JSON Schemas.
 """

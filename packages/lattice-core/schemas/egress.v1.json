@@ -1,0 +1,163 @@
+{
+  "$defs": {
+    "Destination": {
+      "description": "Where a call would go: its host and port, and every address the host resolved to.\n\nRaises:\n    ValueError: If the host is empty.",
+      "properties": {
+        "addresses": {
+          "description": "Every address the host resolved to, each checked.",
+          "items": {
+            "format": "ipvanyaddress",
+            "type": "string"
+          },
+          "title": "Addresses",
+          "type": "array"
+        },
+        "host": {
+          "description": "The host asked for, a name or an address.",
+          "title": "Host",
+          "type": "string"
+        },
+        "port": {
+          "description": "The port asked for.",
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        },
+        "private_data": {
+          "default": false,
+          "description": "Whether the caller built the URL's path or query from private data, which a tainted\ncaller may never send.",
+          "title": "Private Data",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "host",
+        "port",
+        "addresses"
+      ],
+      "title": "Destination",
+      "type": "object"
+    },
+    "InternalUpstream": {
+      "description": "A private destination the operator declares for a purpose, such as a self-hosted forge.\n\nIt is reached only under its purpose, on its port, and only where every address its host\nresolves to is inside its range, still pinned against rebinding and narrowed by taint.\n\nRaises:\n    ValueError: If the host isn't a lowercase name, or is a metadata endpoint's, or the\n        range holds a metadata endpoint's address.",
+      "properties": {
+        "host": {
+          "description": "Its host, exactly: ``forgejo.internal``.",
+          "title": "Host",
+          "type": "string"
+        },
+        "network": {
+          "description": "The range its host must resolve into, such as ``10.0.4.0/24``.",
+          "format": "ipvanynetwork",
+          "title": "Network",
+          "type": "string"
+        },
+        "port": {
+          "description": "Its port.",
+          "maximum": 65535,
+          "minimum": 1,
+          "title": "Port",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "host",
+        "port",
+        "network"
+      ],
+      "title": "InternalUpstream",
+      "type": "object"
+    },
+    "Purpose": {
+      "description": "Why something calls out, and where the operator lets it reach.\n\nRaises:\n    ValueError: If the key isn't of :data:`PURPOSE`'s form, a host pattern isn't a host or\n        ``*.`` and one, or two internal destinations share a host and port.",
+      "properties": {
+        "hosts": {
+          "default": [],
+          "description": "The hosts it may reach, the operator's universe for it, which tenants and workspaces only\nnarrow: names, or ``*.`` and a name for any name below it.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Hosts",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "internal": {
+          "default": [],
+          "description": "The private destinations the operator declares for it.",
+          "items": {
+            "$ref": "#/$defs/InternalUpstream"
+          },
+          "title": "Internal",
+          "type": "array"
+        },
+        "key": {
+          "description": "Its key: ``litellm``, ``reader``, ``sandbox:registries``, ``connector:github``.",
+          "title": "Key",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "title": "Purpose",
+      "type": "object"
+    },
+    "Verdict": {
+      "description": "Whether a call may go out, and to which checked address.\n\nRaises:\n    ValueError: Unless an allowed verdict has an address and a refused one has none.",
+      "properties": {
+        "address": {
+          "anyOf": [
+            {
+              "format": "ipvanyaddress",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The checked address to connect to, and only it, if allowed.",
+          "title": "Address"
+        },
+        "allowed": {
+          "description": "Whether the call may go out.",
+          "title": "Allowed",
+          "type": "boolean"
+        },
+        "internal": {
+          "default": false,
+          "description": "Whether it is one of the purpose's internal destinations.",
+          "title": "Internal",
+          "type": "boolean"
+        },
+        "reason": {
+          "description": "Why, for the log and the caller: never the request's body or headers.",
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "allowed",
+        "reason"
+      ],
+      "title": "Verdict",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "lattice's egress contract: `purpose` is why something calls out and where the operator lets it, `destination` where a call would go, resolved, and `verdict` whether it may, and to which checked address.",
+  "properties": {
+    "destination": {
+      "$ref": "#/$defs/Destination"
+    },
+    "purpose": {
+      "$ref": "#/$defs/Purpose"
+    },
+    "verdict": {
+      "$ref": "#/$defs/Verdict"
+    }
+  },
+  "title": "lattice.egress 1.0.0",
+  "type": "object"
+}

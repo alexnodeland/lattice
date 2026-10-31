@@ -57,6 +57,7 @@ nav:
       - adr/0033-egress-pinned-by-an-original-dst-cluster-that-the-authorizer-addresses.md
       - adr/0034-two-secrets-stores-in-0-3-0-supabase-vault-where-postgres-can-hold-it-aws-secrets-manager-on-aws.md
       - adr/0035-one-approval-per-call-bound-to-its-arguments-declared-in-lattice-core-and-stored-by-grantr.md
+      - adr/0036-egress-decided-by-one-pure-function-hosts-the-operators-and-internal-destinations-declared-per-purpose.md
       - adr/0037-the-enforcement-path-in-lattice-core-refusals-by-step-approvals-resumed-by-id.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md

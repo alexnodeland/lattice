@@ -149,6 +149,27 @@ The `litellm` extra.
       show_root_heading: false
       show_root_toc_entry: false
 
+## lattice_core.secrets
+
+::: lattice_core.secrets
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## lattice_core.egress
+
+::: lattice_core.egress
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## lattice_core.adapters
+
+::: lattice_core.adapters
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## lattice_core.taint
 
 ::: lattice_core.taint

@@ -26,6 +26,8 @@ package (lattice ADR-0018).
 - :mod:`lattice_core.capabilities`: the capability registry's contract: capabilities, the
   providers that offer them, the context a call carries, and the registry that composes them
   (lattice RFC-0011).
+- :mod:`lattice_core.approvals`: the approval contract: one call asked of the people who may
+  answer it, bound to its arguments, and the ports a store, a policy and a surface implement.
 - :mod:`lattice_core.taint`: whether a turn, a run or a session has read untrusted content.
 - :mod:`lattice_core.contracts`: the platform contracts' JSON Schemas.
 """

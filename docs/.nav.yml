@@ -18,6 +18,7 @@ nav:
       - rfcs/0013-event-sources-stored-workflows-and-reflexrs-catalog.md
       - rfcs/0014-portr-the-command-catalog-and-the-mcp-acp-gateway.md
       - rfcs/0015-ports-and-adapters-for-code-sessions-forge-coding-agent-ide-and-sandbox.md
+      - rfcs/0016-connectors-connections-actions-and-neutral-event-types.md
       - Template: rfcs/template.md
   - Decisions:
       - adr/README.md

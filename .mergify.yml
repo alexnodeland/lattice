@@ -33,14 +33,17 @@
 #   (`strict_required_status_checks_policy: false`): a pull request's checks are those of the batch
 #   it is in, not of its own head against the `main` of the moment.
 #
-# Release pull requests skip the wait (ADR-0024's 2026-10-30 amendment). release-please's pull
+# Release pull requests skip the wait (ADR-0024's 2026-10-30 amendments). release-please's pull
 # request (author the lattice GitHub App, `alexnodeland-lattice[bot]`; branch
 # `release-please--branches--main...`; title `chore: release main`, or `chore(main): release ...`
-# from one a package) gets the `queue` label from the rule at the end, but only once its own `CI`
-# and `Title` have passed, so it enters the queue as any pull request does, and its batch must
-# still pass `CI` (`merge_conditions`). Renovate is the same App: the branch and title tell them
+# from one a package) enters the queue without the `queue` label: `queue_conditions` and
+# `auto_merge_conditions` accept either the label or those three, and both lists also require its
+# own `CI` and `Title` to have passed, so it enters only once they have, and its batch must still
+# pass `CI` (`merge_conditions`). Renovate is the same App: the branch and the title tell them
 # apart. In the queue it goes first (`priority_rules`), so it is in the next batch to be checked.
-# Nothing here bypasses a check or the ruleset.
+# Nothing here bypasses a check or the ruleset. This is not a `pull_request_rules` rule adding the
+# label: those belong to Mergify's Workflow Automation, which isn't activated for this repository,
+# so Mergify ignores them (its "Configuration changed" check says so, and #1204 was never labelled).
 queue_rules:
   - name: default
     batch_size:
@@ -60,7 +63,14 @@ queue_rules:
       body: pr-body
     queue_conditions:
       - base = main
-      - label = queue
+      - or:
+          - label = queue
+          - and:
+              - author = alexnodeland-lattice[bot]
+              - head ~= ^release-please--branches--main
+              - "title ~= ^chore(\\(main\\))?: release"
+              - check-success = CI
+              - check-success = Title
       - -draft
     merge_conditions:
       - check-success = CI
@@ -78,18 +88,11 @@ merge_queue:
 
 merge_protections_settings:
   auto_merge_conditions:
-    - label = queue
-
-pull_request_rules:
-  - name: queue release-please's pull request once its checks pass
-    conditions:
-      - base = main
-      - author = alexnodeland-lattice[bot]
-      - head ~= ^release-please--branches--main
-      - "title ~= ^chore(\\(main\\))?: release"
-      - -draft
-      - check-success = CI
-      - check-success = Title
-    actions:
-      label:
-        add: [queue]
+    - or:
+        - label = queue
+        - and:
+            - author = alexnodeland-lattice[bot]
+            - head ~= ^release-please--branches--main
+            - "title ~= ^chore(\\(main\\))?: release"
+            - check-success = CI
+            - check-success = Title

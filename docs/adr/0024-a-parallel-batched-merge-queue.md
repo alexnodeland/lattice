@@ -61,3 +61,11 @@ The owner decided that a failed check is retried once before a pull request is d
 - **A real failure costs one more `CI` run** before the batch is split and the culprit found; the docs don't say whether the retry happens once per batch or once per split part, so the cost in a failed batch of five is to be watched.
 - **`@mergifyio requeue`** stays the way to requeue a pull request that failed twice (CONTRIBUTING.md, Merging).
 - **Rollback:** remove the setting (its default is 0).
+
+## Amendment (2026-10-30): release pull requests enter through the queue's conditions
+
+The first 2026-10-30 amendment's `pull_request_rules` rule never ran: those rules belong to Mergify's Workflow Automation, which isn't activated for this repository, and Mergify's "Configuration changed" check said so ("Workflow Automation is not activated, so its rules will not run"). Release pull request #1204 met every condition and was never labelled; the owner labelled it.
+
+- **The same decision, by other means.** The rule is removed. The default queue's `queue_conditions` and `merge_protections_settings.auto_merge_conditions` each accept either the `queue` label or a pull request matching the rule's author, branch and title with its own `CI` and `Title` passed, so a release pull request enters the queue without a label once its checks pass. Both belong to the merge queue and merge protections, which are active.
+- **No `queue` label is added,** so a queued release pull request shows only Mergify's `queued` label.
+- **To turn it off,** reduce both lists' `or` to `label = queue`.

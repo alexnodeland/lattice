@@ -105,7 +105,7 @@ class Provider(Protocol):
 1. **Integration on?** `Integrations.is_enabled` on `gate.integration`; off is `NotEnabled`, never `Forbidden` (artifactr ADR-0081's order).
 2. **grantr allows?** An `Authorize` callable, `(subject, action, scope) -> bool`, which grantr's `Grants` answers; lattice-core never imports grantr.
 3. **Tier allowed for this agent?** The agent's or workflow's tier ceiling, a `Subset` setting `tiers:<agent>` narrowed per workspace (ADR-0030).
-4. **Limits:** each key in `limits`, read through `Settings` and counted by a `Counter` port; a store that can't be read refuses (fails closed, as ADR-0030 does).
+4. **Limits:** each key in `limits`, read through `Settings` and counted by a `Counter` port, which may count per `CallContext.via` connection (O14); a store that can't be read refuses (fails closed, as ADR-0030 does).
 5. **Taint:** `TaintPolicy.decide(capability, context.taint, scope)` answers `allow`, `ask`, `narrow` or `deny` (#903).
 6. **Approval needed?** `ApprovalPolicy` (below); if so, the enforcer first asks the `Coverage` port whether an approved plan already covers this call, and otherwise defers the call until a new approval resolves.
 7. **Call** the provider.
@@ -203,7 +203,7 @@ What a pre-approval never covers, so the step asks:
 | portalr | the `Request` card in the thread, and the approvals list in the activity view ([#902](https://github.com/alexnodeland/lattice/issues/902)) | the card's buttons, through grantr's `answer` | Yes |
 | Web push on a phone | a notification with Approve and Deny actions ([#952](https://github.com/alexnodeland/lattice/issues/952)); the action opens portalr's approval page, signed in, which answers | portalr, so the answer is a person's with a session, never a bare push action | Yes |
 | MCP elicitation | portr asks the client that made the call, if it supports elicitation (#918) | the elicitation's result | Yes (M4) |
-| ACP permission request | portr, for ACP clients and coding agents (#918, #888) | the permission response | Yes (M4) |
+| ACP permission request | In 0.3.0, a coding agent's permission request is where an ask comes from, not a surface: it becomes an approval (#888, #895) | a person, on the portalr card or by web push | Yes, as a source of asks; editors' ACP surface (#922) is 0.3.x, per lattice RFC-0014 |
 | Slack | a modal through the Slack connector (#932) | the modal | No: 0.3.x |
 
 - **Different-approver approvals never reach the caller's surfaces:** the fan-out leaves out every surface of the subject who asked, and portr's tool returns a pending status with a link instead (#918). A test asserts it for each surface.
@@ -364,8 +364,8 @@ ADR-0018 moves code into lattice-core "when two or more packages have it word fo
 
 | Package | Changes | Breaking |
 |---|---|---|
-| lattice-core | `capabilities` (with `CallContext.via`), `approvals` (with `covers`, `Coverage` and `AnswerScope`), `secrets`, `egress` (with internal destinations), `taint`, `bindings`, `adapters`, `conformance`; the `agents` and `conformance` extras; `secrets.supabase` under `sql`; schemas and their drift tests | No: additions |
-| grantr | The approvals store and its commands (`grantr:answer_approval`, `grantr:read_approvals`), storing `covers` and refusing scoped answers in 0.3.0; `grantr_bindings` and `grantr:manage_bindings`; the `admin-high:different-approver` setting; the secrets metadata table and its RLS, `Authorize` and `Audit` for the enforcer, `capability_called` and `secret_read` audit events | No |
+| lattice-core | `capabilities` (with `CallContext.via`), `approvals` (with `covers`, `Coverage` and `AnswerScope`), `secrets`, `egress` (with internal destinations), `taint`, `bindings`, `adapters`, `conformance`; `admin-high:different-approver` in `KNOWN_SETTINGS` (ADR-0030); the `agents` and `conformance` extras; `secrets.supabase` under `sql`; schemas and their drift tests | No: additions |
+| grantr | The approvals store and its commands (`grantr:answer_approval`, `grantr:read_approvals`), storing `covers` and refusing scoped answers in 0.3.0; `grantr_bindings` and `grantr:manage_bindings`; the tenant's value of `admin-high:different-approver` (its declaration is lattice-core's; O15 sets it no lower than the tenant); the secrets metadata table and its RLS, `Authorize` and `Audit` for the enforcer, `capability_called` and `secret_read` audit events | No |
 | artifactr | A provider for its commands and connected apps; `Risk` mapped to tiers; deferred approvals backed by `Approval` | Only if `requires_approval` tools must now be capabilities (T5) |
 | reflexr | A provider for its commands and stored workflows; workflows' tool lists name capabilities; the `Coverage` answer for plan approvals (RFC-0012) | No: stored workflows are new (#843) |
 | relayr | `deferred_answered` carries the approval's id and surface | No: an optional field |

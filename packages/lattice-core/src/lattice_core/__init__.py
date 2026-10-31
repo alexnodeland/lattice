@@ -23,6 +23,11 @@ package (lattice ADR-0018).
 - :mod:`lattice_core.litellm`: a model over a LiteLLM proxy, behind the ``litellm`` extra.
 - :mod:`lattice_core.logs`: logging left as the application configured it.
 - :mod:`lattice_core.refusals`: the refused body and responses a REST router documents.
+- :mod:`lattice_core.capabilities`: the capability registry's contract: capabilities, the
+  providers that offer them, the context a call carries, and the registry that composes them
+  (lattice RFC-0011).
+- :mod:`lattice_core.taint`: whether a turn, a run or a session has read untrusted content.
+- :mod:`lattice_core.contracts`: the platform contracts' JSON Schemas.
 """
 
 from importlib.metadata import version

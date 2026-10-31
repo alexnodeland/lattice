@@ -332,7 +332,7 @@ The session core runs git in the sandbox through `exec`, as lattice, never as th
 The spike's credential proxy, given the section its recommendation 4 asks for. It is **lattice's own component, and a deliberate exception** to RFC-0011's established egress proxy (its O8): Envoy's `ext_authz` sees requests, not git's pkt-lines or a pack, so no established proxy can check ancestry. It is small because git does the protocol: it is `git http-backend` with hooks, behind an ASGI app in `codr.gateway`, run by stackr as a `git-gateway` service in the `code` profile, on the sandboxes' network and with no route out but the egress proxy.
 
 - **Fetch** (`upload-pack`): for the session's one repository only, forwarded to the forge with the credential it adds.
-- **Push** (`receive-pack`): the gateway receives the pack into **a bare mirror per session** (on the session's volume, retained under [#904](https://github.com/alexnodeland/lattice/issues/904)). Its `pre-receive` hook runs in git's quarantine and refuses, unless every check passes:
+- **Push** (`receive-pack`): the gateway receives the pack into **a bare mirror per session**, seeded from the forge with the base when the session starts and fetched again before each push, so `old` and the base's objects are there (on the session's volume, retained under [#904](https://github.com/alexnodeland/lattice/issues/904)). Its `pre-receive` hook runs in git's quarantine and refuses, unless every check passes:
 
   1. one ref, `refs/heads/lattice/<session>`; no other branch, no tag, no deletion;
   2. `new` is the sha of an open **push grant** for the session, which only an approved `code.push` call opens, for that sha, once;
@@ -373,7 +373,7 @@ The package registers one RFC-0011 provider, `ProviderKind = "code_session"`, th
 | `code.prompt_session(session, message, steer?)`, `code.abort_session(session)` | `run_code` | | `code:start_session` | #888 |
 | `code.revert_session(session, message)`, where the agent declares `revert` | `write` | | `code:start_session` | #888 |
 | `code.session_status(session)`, `code.session_diff(session)` | `read` | `reads_untrusted` | `code:read_session` | #888 |
-| `code.push(session)` | `write` | `sends_out` | `code:push` | #886 |
+| `code.push(session)` | `write`, a departure (below) | `sends_out` | `code:push` | #886 |
 | `code.open_change_request(session, title, body)`, as a draft | `outbound` | `sends_out` | `code:open_change_request` | #888 |
 | `code.mark_ready(change_request)`, `code.reply(comment, body)` | `outbound` | `sends_out` | `code:open_change_request` | #898 |
 | `code.list_tree`, `code.read_file`, `code.search_code`, `code.compare`, `code.read_change_request` | `read` | `reads_private`, `reads_untrusted` | `code:read_repository` | [#901](https://github.com/alexnodeland/lattice/issues/901) |
@@ -382,6 +382,7 @@ The package registers one RFC-0011 provider, `ProviderKind = "code_session"`, th
 - **Where each port reports untrusted reads** (#893's question for #903): every forge read of authored text (bodies, comments, file content, check logs), every agent update and every file read from the sandbox is `reads_untrusted`, and marks the session tainted at RFC-0011's step 8. A session started from a tainted run starts tainted.
 - **A permission ask is an RFC-0011 approval.** When `pending_permissions` returns a request, the session core calls `Approvals.ask` for `code.agent_action`, a capability registered for this and offered to no agent, with a rendering of the command or paths and their `patterns`, bound to the request by its digest. It reaches the thread's card and a phone by web push as any approval does, and only a person answers: the answerers hold `code:start_session` on the session's workspace, and no service principal is granted it. Approved is `once`, denied is `reject`; a withdrawn or expired approval is `reject`.
 - **"Always" is not offered in 0.3.0** (Decision C6). `always` is kept on the model; in 0.3.x it becomes an answer that widens the session's translated policy by those patterns, never past the workspace's, as an audited change of its own, once RFC-0011's answer can carry it (Unresolved).
+- **`code.push` is `write` with `sends_out`,** where RFC-0011's T1 pairs `sends_out` with `outbound`. That is deliberate: the push reaches only lattice's own branch, at a sha the gateway checks, and is compensable; what a person must see leave, the change request and its readiness, is `outbound`.
 - **Pushes in the flagship's CI loop.** A session steered by a failing check's log has read untrusted text, so each later `code.push` meets RFC-0011's taint step. Recommended: the workspace's taint policy maps `code.push` to `narrow`, which the gateway already enforces (the session's branch, the approved sha, fast-forward only), and keeps the person's gate where #898 puts it, at `code.mark_ready` (Decision C12). Otherwise every push of the loop asks a person.
 
 ### Where it lives
@@ -410,7 +411,7 @@ ADR-0018 keeps lattice-core to what the libraries share word for word, with no d
 | `codr.opencode`, `codr.acp` (with the `claude_code` profile) | coding agent adapters | `opencode`, `acp` |
 | `codr.opensandbox`, `codr.docker` | sandbox adapters | `opensandbox`, `docker` |
 
-- **Each adapter is an RFC-0011 adapter,** `AdapterSpec` with kind `forge`, `coding_agent`, `ide` or `sandbox`, found through the `lattice.adapters` entry point and passing its suite in RFC-0011's harness. Each forge and agent is an ADR-0027 integration: `code:sessions`, `code:forge:<name>` and `code:agent:<name>`, off by default.
+- **Each adapter is an RFC-0011 adapter,** `AdapterSpec` with kind `forge`, `coding_agent`, `ide` or `sandbox`, found through the `lattice.adapters` entry point and passing its suite in RFC-0011's harness. Each forge and agent is an ADR-0027 integration, off by default: `code:sessions`, `forge:<name>` (`forge:github`, `forge:forgejo`) and `agent:<name>` (`agent:opencode`, `agent:claude-code`). lattice-core's `KEY` allows a name or `family:name` only, so #895's and #896's `code:agent:<name>` and `code:ide:<name>` become `agent:<name>` and `ide:<name>`.
 - **Who imports `codr`:** the application's composition root (stackr's template, `examples/oncall`), and relayr's `forge` extra, which is the forge source. Nothing else: artifactr and reflexr reach it through the registry, portalr through the routes the application mounts, evalr through `forge:*` events.
 - **The forge source is relayr's,** because the Source protocol is reflexr's ([#841](https://github.com/alexnodeland/lattice/issues/841)) and `codr` imports no reflexr, and because a follower that leases and polls is what relayr's trackers already are (RFC-0004). This depends on what lattice RFC-0013 (#839, in Wave 1) settles about where sources live (Unresolved).
 
@@ -569,14 +570,12 @@ Gathered on 2026-10-30, with lattice read at `origin/main` (`a52c5f81`) and RFC-
 | Claim | Where | |
 |---|---|---|
 | Force-push passed a proxy reading ref names; names, tags and deletions were refused | the spike, "What didn't" | Measured |
-| A 403 on `receive-pack` reads as "remote end hung up" | the spike | Measured |
 | opencode 1.19.5: deprecated permission endpoint, `/permission/{id}/reply`, two surfaces, three streams, `/diff` empty, 105 events a turn, polling worked | the spike | Measured |
 | Claude Code over ACP: `initialize` to `end_turn` in 3 s; no `fs/*` calls; auto-allowed `ls` | the spike | Measured |
 | LiteLLM: `openai/` route bridged to Responses; chat-completions route with `drop_params`; `x-api-key` stripped | the spike | Measured |
 | OpenSandbox 1.2 on gVisor created a sandbox in about 1 s; its exec unreachable from macOS | the spike | Measured |
 | OpenSandbox's `networkPolicy` and `credential-vault` | the spike, from its API | Read, not exercised |
-| gVisor: `latest` 404, helpers beside `runsc`, no emulation | the spike | Measured |
-| Forgejo: draft by `WIP:` title; checks as commit statuses | the spike | Measured |
+| An integration key is a name or `family:name` | `lattice_core/integrations.py` `KEY` | Verified |
 | Libraries pass `ACTIONS` catalogs to grantr's `Grants` | `packages/grantr/src/grantr/sql/__init__.py`, `grants/grants.py` | Verified |
 | `codr` on PyPI is taken; `codr-ai` is free | PyPI's JSON API, 2026-10-30 | Verified |
 | The Source protocol is reflexr's; concrete sources are extras | #841 | Verified |

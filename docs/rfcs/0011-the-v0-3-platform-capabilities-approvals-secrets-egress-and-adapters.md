@@ -58,7 +58,7 @@ graph LR
 - **Each library declares its providers and adapters** in its own code, against those types, and exposes them through an entry point. No library imports another to register.
 - **The application composes them,** at its composition root, as it composes `registry(*KNOWN.values(), mine)` today: stackr's template, docplan and oncall. portr, wherever it lives, reads the composed registry, never a library's internals.
 - **grantr stores what is per tenant and audited:** approvals, secrets' metadata, the egress allowlists' narrowing (as settings), and the adapters a tenant enables (as integrations).
-- **stackr runs what is a service:** the egress proxy, an established one (Envoy, Decision P1), and Supabase Vault in the stack it already has.
+- **stackr runs what is a service:** the egress proxy, an established one (Envoy, Decision O9), and Supabase Vault in the stack it already has.
 
 ### The capability registry (#940)
 
@@ -241,7 +241,7 @@ Two candidates were compared against what this design needs:
 | Per-tenant attribution | The authorizer returns tenant, workspace, purpose and caller as dynamic metadata, written by Envoy's JSON access log to Loki; per-purpose counters as stats, per-tenant counts from logs, to keep stats' cardinality bounded | Its JSON log names the role, so a tenant appears only with a role per tenant and purpose; statsd metrics |
 | stackr's Compose and AWS recipes | One pinned image; an ECS service as stackr's others are (ECS Service Connect is itself Envoy) | One image, built by stackr if no official one is published (Unverified); an ECS service |
 
-**Recommended: Envoy** (Decision P1, for the owner to confirm). It is the only one that meets taint narrowing and injection without a second proxy; smokescreen's strength, resolved-address checks, is the one thing Envoy needs help with, and the authorizer supplies it. Squid, with `external_acl_type` helpers and `request_header_add`, could meet the same needs, but its configuration and operation suit stackr less well than Envoy's.
+**Envoy** (Decision O9, confirmed by the owner on 2026-10-30). It is the only one that meets taint narrowing and injection without a second proxy; smokescreen's strength, resolved-address checks, is the one thing Envoy needs help with, and the authorizer supplies it. Squid, with `external_acl_type` helpers and `request_header_add`, could meet the same needs, but its configuration and operation suit stackr less well than Envoy's.
 
 **How the shared policy becomes Envoy's configuration,** in two layers:
 
@@ -367,12 +367,7 @@ Decided by the owner on 2026-10-30:
 | O6 | Egress hosts | The operator's alone in 0.3.0; tenants and workspaces only narrow them; revisited with connectors (#926) | Tenants adding hosts through a connection's declared hosts |
 | O7 | Switching secrets stores | An operator command copies every secret to the new store and rewrites the references; the old store is then retired | Old references resolving through the old store beside new ones on the new |
 | O8 | The egress proxy | An established proxy (T4 rejected) | A small Python proxy of lattice's own on `lattice_core.egress`, as T4 recommended |
-
-Recommended, for the owner to confirm:
-
-| # | Question | Recommended | Instead of |
-|---|---|---|---|
-| P1 | Which established proxy | Envoy: its configuration rendered from the shared policy, and `ext_authz` to an authorizer the application mounts for taint, tenants' narrowing and credentials ([The proxy](#egress-one-policy-and-one-proxy-943)) | smokescreen: SSRF checks built in, but static per-role ACLs can't narrow by taint, and it can't inject credentials without a second proxy; Squid: could, through helpers, but suits stackr less well |
+| O9 | Which established proxy | Envoy: its configuration rendered from the shared policy, and `ext_authz` to an authorizer the application mounts for taint, tenants' narrowing and credentials ([The proxy](#egress-one-policy-and-one-proxy-943)). Two conditions: a purpose that carries credentials is called as a plain-HTTP forward-proxy request, so Envoy originates TLS and can inject them; and pinning the checked address against DNS rebinding is verified in M2, with smokescreen behind Envoy as the fallback if it can't be | smokescreen: SSRF checks built in, but static per-role ACLs can't narrow by taint, and it can't inject credentials without a second proxy; Squid: could, through helpers, but suits stackr less well |
 
 ## Drawbacks
 
@@ -390,13 +385,12 @@ Recommended, for the owner to confirm:
 - **The registry in portr.** portr reads every library's catalog anyway, but the libraries would then need portr to enforce their own tools.
 - **Per-feature approvals, egress and secrets.** The drift #939 replaces.
 - **A Python proxy of lattice's own** (T4, rejected as O8). One implementation of the policy, but lattice would own a proxy's security, performance and protocol corner cases, which established proxies have already met.
-- **smokescreen with a header-injecting sidecar.** Keeps smokescreen's SSRF checks, at the cost of two proxies in series and taint still unexpressed (P1).
+- **smokescreen with a header-injecting sidecar.** Keeps smokescreen's SSRF checks, at the cost of two proxies in series and taint still unexpressed (O9).
 
 ## Unresolved questions
 
-As of 2026-10-30, approval policy's direction (O5), egress hosts (O6) and switching secrets stores (O7) are decided.
+As of 2026-10-30, approval policy's direction (O5), egress hosts (O6), switching secrets stores (O7) and the egress proxy (O8, O9) are decided.
 
-- **Which established proxy** (P1): Envoy is recommended, for the owner to confirm.
 - **Hosts a connection declares,** revisited with the connector RFC (#926), after O6.
 - **Force-pushes through the credential proxy,** and refusals in `report-status`: for lattice RFC-0015 (#893), after the spike (#1222).
 - **The bypass check's strength:** an AST rule over `src/` catches the obvious; a runtime assertion in the bridge catches the rest only where tests run the agent.
@@ -424,14 +418,14 @@ Each is settled in phase 3, 4 or 5, or carried as an exit criterion.
 - [ ] artifactr: its provider, `Risk` mapped to tiers, deferred approvals backed by `Approval` (#940, #941)
 - [ ] grantr: the approvals store, first answer wins, expiry and audit (#941)
 - [ ] lattice-core and grantr: the Supabase Vault adapter and secrets metadata with RLS (#942)
-- [ ] stackr and lattice-core: Envoy as the egress proxy, its rendered configuration, the authorizer and internal networks (#943), once P1 is confirmed
+- [ ] stackr and lattice-core: Envoy as the egress proxy, its rendered configuration, the authorizer and internal networks (#943, O9), with DNS-rebinding pinning verified, or smokescreen behind Envoy
 - [ ] lattice-core and grantr: the secrets copy command (#942, O7)
 - [ ] lattice-core and stackr: adapter discovery, the harness and `make validate` (#944)
 - [ ] reflexr and grantr: their providers; the cross-package bypass test (#940)
 - [ ] Taint's first cut on these contracts (#903)
 - [ ] portalr: approvals list and page, web push, the Adapters and Egress views (#902, #952, #944)
 - [ ] portr: elicitation and ACP permission surfaces (#918)
-- [ ] Decisions T1 to T3, T5 to T7 and O5 to O8, and P1 once confirmed, each recorded in an ADR as it is built
+- [ ] Decisions T1 to T3, T5 to T7 and O5 to O9, each recorded in an ADR as it is built
 - [ ] Docs: each part's guide, `docs/lattice-core/`, and the architecture docs it changes
 
 ## Evidence

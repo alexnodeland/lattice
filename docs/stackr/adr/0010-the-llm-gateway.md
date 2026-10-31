@@ -1,6 +1,6 @@
 # ADR-0010: The LLM gateway
 
-**Status:** Accepted, amended by [ADR-0047](0047-an-upstream-gateway-for-the-model-groups.md) and on 2026-10-27 (below)
+**Status:** Accepted, amended by [ADR-0047](0047-an-upstream-gateway-for-the-model-groups.md) and on 2026-10-27 and 2026-10-31 (below)
 **Date:** 2026-09-28
 **Deciders:** Alex Nodeland
 
@@ -77,3 +77,11 @@ The guardrail now has `scan_only_tool_results: true` (LiteLLM v1.103.0, applied 
 - **Still possible:** a false positive on a tool result that repeats generated content. artifactr's `read_artifact` returns a mini app's whole HTML, so an agent that reads a generated app back can block its thread one step later, as before ([#830](https://github.com/alexnodeland/lattice/issues/830)).
 - **Not chosen:** a higher severity threshold (the match was already `high`); sending the guardrail only on a turn's first request, or when the newest message is the person's (the thread's history still carries the model's tool arguments, so its next turn is blocked too); `skip_tool_message_in_guardrail` (it keeps the model's tool arguments, where the page was); `experimental_use_latest_role_message_only` (read only by the Bedrock and Prisma AIRS guardrails at this version, not by the content filter).
 - **Revisit:** choosing the guardrail per tool, so a result from a tool that only echoes what the model made (artifactr's mini-app and artifact tools) isn't scanned while one from an outside source is. The proxy can't tell tools apart in a tool message, so that would be the libraries' `GuardrailPolicy` choosing per request from the newest tool result.
+
+## Amendment (2026-10-31): a mini app's HTML read without the guardrail
+
+The 2026-10-27 amendment's "still possible" case, and its "revisit", are settled by the libraries ([artifactr ADR-0098](../../artifactr/adr/0098-a-mini-apps-html-read-by-its-own-tool-whose-results-skip-prompt-injection.md), [#830](https://github.com/alexnodeland/lattice/issues/830)). The proxy's configuration doesn't change.
+
+- **artifactr's `read_artifact` shows a mini app without its HTML.** Its `read_app` returns the HTML alone, which only an agent writes.
+- **artifactr's `LiteLLMGateway` leaves `prompt-injection` out of a request whose every tool result came from `read_app`.** It reads every tool result in the request, the history's too, not only the newest, so one from any other tool keeps the guardrail for the whole request.
+- **Still possible:** a thread whose history also holds an outside tool result, such as a fetched page, is scanned whole, and an app's HTML in it can still block it. Taint tracking ([#903](https://github.com/alexnodeland/lattice/issues/903)) is the lasting answer.

@@ -78,6 +78,17 @@ class Artifact(BaseModel):
         """Return the text the agent sees for this artifact. Defaults to indented JSON."""
         return self.model_dump_json(indent=2)
 
+    def render_for_tool(self) -> str:
+        """Return the text the ``read_artifact`` tool gives the agent for this artifact.
+
+        A tool's result is read by the gateway's ``prompt-injection`` guardrail, and stays in the
+        thread's history, which every later request carries; the agent's instructions, where
+        :meth:`render_for_agent` shows the artifacts it follows, are not. A type whose data holds
+        text an agent wrote that the guardrail's word lists can mistake for an attack, such as a
+        mini app's HTML, leaves that text out here. Defaults to :meth:`render_for_agent`.
+        """
+        return self.render_for_agent()
+
     def describe_change(self, before: Any) -> str | None:
         """Summarize the change from ``before`` to this state, or return None.
 

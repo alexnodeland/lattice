@@ -3,15 +3,21 @@
 import dataclasses
 import json
 import re
-from collections.abc import AsyncIterable, Awaitable, Callable, Mapping, Sequence
+from collections.abc import AsyncIterable, Awaitable, Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, cast, override
+from typing import Any, Final, cast, override
 
 from opentelemetry import propagate
 from pydantic_ai import AgentStreamEvent, RunContext
 from pydantic_ai.capabilities import AbstractCapability
 from pydantic_ai.exceptions import ModelHTTPError
-from pydantic_ai.messages import ModelResponse
+from pydantic_ai.messages import (
+    ModelMessage,
+    ModelRequest,
+    ModelResponse,
+    RetryPromptPart,
+    ToolReturnPart,
+)
 from pydantic_ai.models import ModelRequestContext
 from pydantic_ai.settings import ModelSettings
 
@@ -22,7 +28,9 @@ from lattice_core.litellm import add_propagated_tags, litellm_model
 from lattice_core.tags import request_tags
 
 __all__ = [
+    "ECHO_TOOLS",
     "GUARDRAIL_BLOCKED",
+    "TOOL_RESULT_GUARDRAILS",
     "GuardrailBlocked",
     "GuardrailPolicy",
     "LiteLLMGateway",
@@ -40,6 +48,14 @@ never logs them or puts them on spans.
 
 GuardrailPolicy = Callable[[TenantId, WorkspaceId], Awaitable[Sequence[str]]]
 """Returns the names of the LiteLLM guardrails a workspace's requests use."""
+
+ECHO_TOOLS: Final = frozenset({"read_app"})
+"""The tools whose results only repeat what a model wrote: ``read_app``, a mini app's HTML, which
+only an agent writes (ADR-0098)."""
+
+TOOL_RESULT_GUARDRAILS: Final = frozenset({"prompt-injection"})
+"""The guardrails that read only a request's tool results, as stackr's proxy configures
+``prompt-injection``, left out of a request whose every tool result came from an echo tool."""
 
 GUARDRAIL_BLOCKED = "guardrail_blocked"
 """The ``run_ended`` reason of a run whose model request a guardrail blocked."""
@@ -99,31 +115,51 @@ class LiteLLMGateway(AbstractCapability[Session[Any]]):
     A request a guardrail blocks fails the run with a :class:`GuardrailBlocked`, recorded as
     ``guardrail_blocked``, and is not retried.
 
+    A guardrail that reads only tool results, such as ``prompt-injection``, is left out of a
+    request whose tool results all came from tools that only repeat what a model wrote, such as
+    ``read_app``: they hold nothing from outside, and the proxy already leaves the model's own
+    tool arguments unscanned. Every tool result in the request counts, since the thread's
+    history carries the old ones; one from anywhere else keeps the guardrail (ADR-0098).
+
     Args:
         tenant_key: Returns a tenant's LiteLLM key; the model's own key is used without one.
         guardrails: Returns the guardrails a workspace's requests use.
         tags: More tags for every request, such as the application's name. They must not
             repeat the gateway's own, nor start as they do: ``artifactr``, ``tenant:``,
             ``workspace:`` or ``tenant-workspace:``.
+        echo_tools: The tools whose results only repeat what a model wrote; :data:`ECHO_TOOLS`
+            if omitted.
+        tool_result_guardrails: The guardrails that read only tool results;
+            :data:`TOOL_RESULT_GUARDRAILS` if omitted.
     """
 
     tenant_key: TenantKey | None = None
     guardrails: GuardrailPolicy | None = None
     tags: Sequence[str] = ()
+    echo_tools: Collection[str] = ECHO_TOOLS
+    tool_result_guardrails: Collection[str] = TOOL_RESULT_GUARDRAILS
 
     @override
     async def before_model_request(
         self, ctx: RunContext[Session[Any]], request_context: ModelRequestContext
     ) -> ModelRequestContext:
         """Add the gateway's metadata, guardrails and key to the request."""
-        body, headers = await self.request_options(ctx.deps)
+        body, headers = await self.request_options(ctx.deps, request_context.messages)
         settings: dict[str, Any] = dict(request_context.model_settings or {})
         settings["extra_body"] = {**_mapping(settings.get("extra_body")), **body}
         settings["extra_headers"] = {**_mapping(settings.get("extra_headers")), **headers}
         return dataclasses.replace(request_context, model_settings=cast(ModelSettings, settings))
 
-    async def request_options(self, session: Session[Any]) -> tuple[dict[str, Any], dict[str, str]]:
-        """Return the extra body and headers of a model request in a session's run."""
+    async def request_options(
+        self, session: Session[Any], messages: Sequence[ModelMessage] = ()
+    ) -> tuple[dict[str, Any], dict[str, str]]:
+        """Return the extra body and headers of a model request in a session's run.
+
+        Args:
+            session: The run's session.
+            messages: The request's messages, whose tool results decide whether the guardrails
+                that read only tool results are sent.
+        """
         workspace = session.workspace
         tenant_id, workspace_id = workspace.tenant_id, workspace.workspace_id
         metadata: dict[str, Any] = {
@@ -142,6 +178,8 @@ class LiteLLMGateway(AbstractCapability[Session[Any]]):
             metadata["existing_trace_id"] = trace_id
         body: dict[str, Any] = {"metadata": metadata}
         names = await self.guardrails(tenant_id, workspace_id) if self.guardrails else ()
+        if names and _only_echoes(messages, self.echo_tools):
+            names = [name for name in names if name not in self.tool_result_guardrails]
         if names:
             body["guardrails"] = list(names)
         headers: dict[str, str] = {}
@@ -179,6 +217,19 @@ class LiteLLMGateway(AbstractCapability[Session[Any]]):
             if (blocked := guardrail_block(error)) is None:
                 raise
             raise blocked from error
+
+
+def _only_echoes(messages: Sequence[ModelMessage], echo_tools: Collection[str]) -> bool:
+    """Whether the messages hold tool results, and each came from one of the echo tools."""
+    tools = [
+        part.tool_name
+        for message in messages
+        if isinstance(message, ModelRequest)
+        for part in message.parts
+        if isinstance(part, ToolReturnPart)
+        or (isinstance(part, RetryPromptPart) and part.tool_name is not None)
+    ]
+    return bool(tools) and all(tool in echo_tools for tool in tools)
 
 
 def _mapping(value: object) -> dict[str, Any]:

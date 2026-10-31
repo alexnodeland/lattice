@@ -18,7 +18,9 @@ Routing, fallbacks, budgets, rate limits and guardrails stay in the proxy's conf
 """
 
 from artifactr.litellm.gateway import (
+    ECHO_TOOLS,
     GUARDRAIL_BLOCKED,
+    TOOL_RESULT_GUARDRAILS,
     GuardrailBlocked,
     GuardrailPolicy,
     LiteLLMGateway,
@@ -28,7 +30,9 @@ from artifactr.litellm.gateway import (
 )
 
 __all__ = [
+    "ECHO_TOOLS",
     "GUARDRAIL_BLOCKED",
+    "TOOL_RESULT_GUARDRAILS",
     "GuardrailBlocked",
     "GuardrailPolicy",
     "LiteLLMGateway",

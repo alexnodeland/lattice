@@ -99,7 +99,10 @@ async def test_a_cancelled_call_leaves_the_workspace_usable(
     for iteration in range(ITERATIONS):
         await CANCELS[cancel](operations[operation], rng)
         assert pool.checkedout() == 0, f"iteration {iteration} kept its connection"
+        # The other process's commit takes the lock a cancelled call could have kept. This
+        # process's own next call is the next iteration's, so a commit of its own here only
+        # doubled the loop's database calls, which a loaded machine runs past the timeout.
         await elsewhere.create_thread()
-        await workspace.create_thread()
+    await workspace.create_thread()
     log = await storage.read(SCOPE)
     assert [envelope.seq for envelope in log] == list(range(1, len(log) + 1))

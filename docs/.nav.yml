@@ -15,6 +15,7 @@ nav:
       - rfcs/0008-portalr-product-analytics.md
       - rfcs/0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md
       - rfcs/0012-the-six-primitives-and-the-workflow-spec.md
+      - rfcs/0013-event-sources-stored-workflows-and-reflexrs-catalog.md
       - Template: rfcs/template.md
   - Decisions:
       - adr/README.md

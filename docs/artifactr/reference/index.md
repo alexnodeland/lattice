@@ -20,6 +20,7 @@ The packages are layers. Each depends only on the ones below it, so each is usab
 | [`artifactr.litellm`](litellm.md) | A model over a LiteLLM proxy, and a capability for each request's metadata, key and guardrails | `litellm` extra |
 | [`artifactr.mcp`](mcp.md) | An MCP server for external agents | `mcp` extra |
 | [`artifactr.connect`](connect.md) | Connected apps: an operator's own FreeCAD or Blender, through a vetted MCP server, its code approved every call | `connect` extra |
+| [`artifactr.capabilities`](capabilities.md) | The artifact tools as capabilities, for lattice-core's registry, each called through its enforcer | core |
 | [`artifactr.evals`](evals.md) | evalr for artifactr: datasets from the log, experiments that replay turns, online evaluation of turns, and the end-to-end measures | `evals` extra |
 
 The wire formats have their own pages: the [thread protocol](../protocol.md) and its [JSON Schema](schema.md).

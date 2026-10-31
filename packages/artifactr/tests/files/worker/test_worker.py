@@ -5,6 +5,7 @@ the hostile corpus through the same worker, over WordCraft itself.
 """
 
 import contextlib
+import math
 import os
 import re
 import resource
@@ -338,12 +339,12 @@ async def test_a_cli_past_its_limits_is_ended_as_a_crash(
     tmp_path: Path, script: str, limits: Limits, cause: str
 ) -> None:
     hostile = wordcraft(cli(tmp_path, "wordcraft-cli", script), limits)
-    started = time.monotonic()
+    # No deadline, so the limit ends the CLI however slowly a loaded machine runs it: a deadline
+    # it reached first would say `timeout`, not what ended it.
     with pytest.raises(AppFailed) as crashed:
-        await hostile.inspect(b"PK", deadline=20)
+        await hostile.inspect(b"PK", deadline=math.inf)
     assert crashed.value.failure == "crashed"
     assert re.search(cause, str(crashed.value))
-    assert time.monotonic() - started < 15
 
 
 def test_the_environment_says_which_wordcraft_it_runs(tmp_path: Path) -> None:

@@ -7,8 +7,11 @@
 # is built, pinned by version and by each architecture's sha256, and signed by Grafana Labs: it
 # loads without a network, and no unsigned plugin is allowed.
 
-# The plugin's archive for each architecture the image is built for. Renovate doesn't track it. To
-# move it, take the version and each architecture's sha256 from grafana.com's list of its versions
+# The plugin's archive for each architecture the image is built for. Renovate lists a new version
+# on its Dependency Dashboard (renovate.json's grafana-plugins), and opens a pull request only when
+# it is ticked there; that pull request moves the version in the URL alone, and fails the check
+# below until both digests move with it. To move it, take the version and each architecture's
+# sha256 from grafana.com's list of its versions
 # (https://grafana.com/api/plugins/grafana-clickhouse-datasource/versions/<version>, `packages`),
 # and check each against the download itself:
 #   curl -fsSL '<the URL below, at the new version, os and arch>' | sha256sum

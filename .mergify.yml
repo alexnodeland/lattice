@@ -24,6 +24,11 @@
 #   don't define a round precisely), so the cap of 3 is enough.
 #   Two pull requests that conflict in one batch are taken out with a comment: the draft branch
 #   can't be made, so there is nothing to split.
+# - A failed check is retried once before anything is dequeued (`max_checks_retries: 1`, ADR-0024's
+#   2026-10-30 retry amendment): Mergify recreates the draft and runs `CI` again, so a flake costs
+#   one more run instead of a dequeue and a `@mergifyio requeue`. A real failure also runs twice
+#   before the splitting above finds it. The schema says a value above 0 always uses a draft pull
+#   request, which the queue does already. To roll back, remove the setting (default 0).
 # - This needs the ruleset not to require branches to be up to date
 #   (`strict_required_status_checks_policy: false`): a pull request's checks are those of the batch
 #   it is in, not of its own head against the `main` of the moment.
@@ -43,6 +48,7 @@ queue_rules:
       max: 5
     batch_max_wait_time: 3 minutes
     batch_max_failure_resolution_attempts: 3
+    max_checks_retries: 1
     # Not `auto`, which Mergify computes from this queue's recent CI runtime (its 95th percentile
     # and a margin it doesn't state): a draft waiting for runners ran 31 minutes at the median and
     # 56 at the longest, and a batch of five can run longer. Tier 2's gate and job can take 80

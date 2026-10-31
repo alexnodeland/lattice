@@ -1,5 +1,6 @@
 """The agent's tools, run by artifactr's Runner on a scripted model, on every storage."""
 
+import json
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -20,6 +21,8 @@ import artifactr.agent.runner as runner_module
 from artifactr.agent import ArtifactWorkspace, Runner, Session
 from artifactr.core import (
     AnswerDeferred,
+    Applied,
+    CreateArtifact,
     EditArtifact,
     InvalidState,
     JsonPatch,
@@ -36,7 +39,7 @@ from artifactr.ui.schema import MAX_SCHEMA_BYTES, FormSchema, json_size
 from artifactr.workspace import Storage, Workspace, Workspaces
 from tests.agent.conftest import ask, in_words
 from tests.ui.model import Script, call, say
-from tests.ui.people import ALICE, BOB
+from tests.ui.people import ALICE, BOB, agent
 from tests.ui.refusals import locs
 from tests.ui.toggles import Toggles
 
@@ -329,7 +332,7 @@ async def test_a_dashboard_is_shown_and_updated_as_new_versions(
 
 async def test_the_toolset_offers_what_it_is_asked_for() -> None:
     forms, dashboards = {"ask_form", "create_form"}, {"show_dashboard", "update_dashboard"}
-    apps = {"create_app", "update_app"}
+    apps = {"create_app", "read_app", "update_app"}
     assert set(ui_tools().tools) == forms | dashboards | apps
     assert set(ui_tools(forms=False, apps=False).tools) == dashboards
     assert set(ui_tools(dashboards=False, apps=False).tools) == forms
@@ -381,14 +384,49 @@ async def test_an_app_is_made_and_updated_with_its_state_kept(
     )
 
 
-async def _run(runners: list[Runner[None]], ws: Workspace, script: Script) -> None:
-    """Run a script in a thread of its own, with every integration on."""
+async def test_read_artifact_shows_an_app_without_its_html_and_read_app_shows_it(
+    ws: Workspace, runners: list[Runner[None]]
+) -> None:
+    maker = await ws.create_thread("Made here")
+    app = App(title="Dice", summary="Rolls a die", html=DICE).to_json()
+    made = await ws.as_actor(agent(maker.id)).commit(CreateArtifact(kind=App.kind, data=app))
+    assert isinstance(made, Applied)
+    script = Script(
+        call("read_artifact", "r1", artifact_id=made.artifact_id),
+        call("read_app", "r2", id=made.artifact_id),
+        say("Read."),
+    )
+    thread = await _run(runners, ws, script)
+    [shown] = [p for p in script.last_parts(1) if isinstance(p, ToolReturnPart)]
+    assert shown.content == (
+        f"{made.artifact_id} (app, v1)\n\nDice\n\nRolls a die\n\nIts state: {{}}\n\n"
+        "Its HTML isn't shown here: read it with read_app to change it."
+    )
+    [html] = [p for p in script.last_parts(2) if isinstance(p, ToolReturnPart)]
+    assert html.content == f"{made.artifact_id} (app, v1)\n\n{DICE}"
+    assert (await ws.thread(thread)).focus == (made.artifact_id,), "read, so followed"
+
+
+def test_an_apps_tool_text_names_its_state_but_never_its_html() -> None:
+    app = App(title="Dice", summary="Rolls a die", html=DICE, state={"rolled": 6, "by": "al"})
+    assert app.render_for_tool() == (
+        'Dice\n\nRolls a die\n\nIts state: {"by": "al", "rolled": 6}\n\n'
+        "Its HTML isn't shown here: read it with read_app to change it."
+    )
+    shown = json.loads(app.render_for_agent())
+    assert shown["html"] == DICE, "its instructions, which no guardrail reads, keep it"
+
+
+async def _run(runners: list[Runner[None]], ws: Workspace, script: Script) -> str:
+    """Run a script in a thread of its own, with every integration on, and return the thread's
+    id."""
     thread = await ws.create_thread("Apps")
     sent = await _runner(runners, script, ui_tools(integrations=Toggles())).send(
         ws, thread.id, "Make me a dice roller"
     )
     assert sent.run is not None
     await sent.run.wait()
+    return thread.id
 
 
 async def test_apps_are_offered_only_while_mini_apps_are_on(
@@ -403,8 +441,9 @@ async def test_apps_are_offered_only_while_mini_apps_are_on(
         assert sent.run is not None
         await sent.run.wait()
         toggles.off.clear()
-    apps = {"create_app", "update_app"}
+    apps = {"create_app", "read_app", "update_app"}
     assert [apps <= set(tools) for tools in script.tools] == [False, True, False]
+    assert not any("read_app" in tools for tools in (script.tools[0], script.tools[2]))
 
 
 async def test_a_feature_switched_off_offers_no_tools_and_takes_no_answer(

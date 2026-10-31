@@ -1,0 +1,2 @@
+== route-level request_headers_to_remove of x-lattice-upstream: (output above)
+no healthy upstream / HTTP 503; envoy: original_dst_load_balancer: No downstream connection or no original_dst.

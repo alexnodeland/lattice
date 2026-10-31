@@ -1,0 +1,17 @@
+== flipped before smokescreen asks: a first lookup (an earlier check) takes the public answer
+earlier check got ['198.18.94.20']
+f1-1793436051.rebind.test -> Egress proxying is denied to host 'f1-1793436051.rebind.test': no valid IP found among resolved addresses - 127.0.0.1 denied by rule 'Deny: Self Connection'. . [HTTP 407]
+f1-1793436051.rebind.test (CONNECT) -> PUBLIC (served by 0.0.0.0) [HTTP 200, CONNECT 200]
+earlier check got ['198.18.94.20']
+f2-1793436051.rebind.test -> Egress proxying is denied to host 'f2-1793436051.rebind.test': no valid IP found among resolved addresses - 127.0.0.1 denied by rule 'Deny: Self Connection'. . [HTTP 407]
+f2-1793436051.rebind.test (CONNECT) -> PUBLIC (served by 0.0.0.0) [HTTP 200, CONNECT 200]
+{"role": "dns", "client": "198.18.94.10", "name": "f1-1793436051.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "f1-1793436051.rebind.test", "qtype": 28, "answer": null, "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "f1-1793436051.rebind.test", "qtype": 1, "answer": "127.0.0.1", "n": 2}
+{"role": "dns", "client": "198.18.94.4", "name": "f1-1793436051.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 3}
+{"role": "dns", "client": "198.18.94.4", "name": "f1-1793436051.rebind.test", "qtype": 28, "answer": null, "n": 3}
+{"role": "dns", "client": "198.18.94.10", "name": "f2-1793436051.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "f2-1793436051.rebind.test", "qtype": 1, "answer": "127.0.0.1", "n": 2}
+{"role": "dns", "client": "198.18.94.4", "name": "f2-1793436051.rebind.test", "qtype": 28, "answer": null, "n": 2}
+{"role": "dns", "client": "198.18.94.4", "name": "f2-1793436051.rebind.test", "qtype": 28, "answer": null, "n": 2}
+{"role": "dns", "client": "198.18.94.4", "name": "f2-1793436051.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 3}

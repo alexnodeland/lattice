@@ -1,0 +1,12 @@
+== copy vault.secrets rows from db (from its dump, as pg_dump writes them) into db2, whose root key differs
+COPY 2
+== db2, with its own key: read the decrypted view
+ERROR:  pgsodium_crypto_aead_det_decrypt_by_id: invalid ciphertext
+== the two keys differ:
+sha256(db key)=369a4882853a  sha256(db2 key)=722b8c49914c
+== copy db key file into db2 and restart it
+         name         |   decrypted_secret
+----------------------+----------------------
+ sec_aaaaaaaaaaaaaaaa | TOKEN-OF-TENANT-A-v2
+ sec_bbbbbbbbbbbbbbbb | KEY-OF-TENANT-B
+(2 rows)

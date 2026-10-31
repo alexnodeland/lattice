@@ -1,0 +1,108 @@
+# Spike #943/#942: one Compose project, one network, every name carrying the run's token.
+#   T=$(openssl rand -hex 4) docker compose -p spike0943-$T up -d --build
+#   docker compose -p spike0943-$T down --volumes
+# The network's subnet is given explicitly (198.18.94.0/24, a benchmarking range that is in
+# none of RFC-0011's refused ranges), so it takes nothing from Docker's address pools and
+# stands in for "the internet".
+name: spike0943-${T:?set T to a random token}
+
+networks:
+  net:
+    name: spike0943-${T}-net
+    ipam:
+      config:
+        - subnet: 198.18.94.0/24
+
+services:
+  # Supabase's Postgres at the version Supabase CLI 2.118.0 (stackr's versions.env) runs.
+  db:
+    image: public.ecr.aws/supabase/postgres:17.6.1.171@sha256:658d1c9b09ae4f61b8e95087b6859181b4b7d6940d769cf7b605609c8aad43e9
+    container_name: spike0943-${T}-db
+    environment:
+      POSTGRES_PASSWORD: spike-only-password
+    volumes:
+      - ./vault:/spike:ro
+    networks:
+      net:
+        ipv4_address: 198.18.94.5
+
+  # A second, fresh database with its own generated root key: where the first one's dump is
+  # restored, to see whether the dump alone decrypts.
+  db2:
+    image: public.ecr.aws/supabase/postgres:17.6.1.171@sha256:658d1c9b09ae4f61b8e95087b6859181b4b7d6940d769cf7b605609c8aad43e9
+    container_name: spike0943-${T}-db2
+    profiles: [restore]
+    environment:
+      POSTGRES_PASSWORD: spike-only-password
+    networks:
+      net:
+        ipv4_address: 198.18.94.6
+
+  # --- egress (#943) ---------------------------------------------------------------------------
+  dns:
+    image: &python python:3.13-slim@sha256:70729b46c69b4f1e97c4822c1af3df53a1476cf5ddc6c087c0c10bc3a5678c2f
+    container_name: spike0943-${T}-dns
+    profiles: [egress]
+    command: [python, -u, /egress/servers.py, dns]
+    volumes: [./egress:/egress:ro]
+    networks: {net: {ipv4_address: 198.18.94.53}}
+
+  authz:
+    image: *python
+    container_name: spike0943-${T}-authz
+    profiles: [egress]
+    command: [python, -u, /egress/servers.py, authz]
+    volumes: [./egress:/egress:ro]
+    networks: {net: {ipv4_address: 198.18.94.10}}
+
+  upstream:
+    image: *python
+    container_name: spike0943-${T}-upstream
+    profiles: [egress]
+    command: [python, -u, /egress/servers.py, upstream]
+    volumes: [./egress:/egress:ro, ./egress/certs:/certs:ro]
+    networks: {net: {ipv4_address: 198.18.94.20}}
+
+  envoy:
+    image: envoyproxy/envoy:v1.40.2@sha256:8de97e654644827d62afdbf7e1d3dc9fee01a8690d410dd1c63a30dc6b6cecbb
+    container_name: spike0943-${T}-envoy
+    profiles: [egress]
+    command: [envoy, -c, /egress/envoy.json, --log-level, warn, --file-flush-interval-msec, "200"]
+    volumes: [./egress:/egress:ro, ./egress/certs:/certs:ro]
+    networks: {net: {ipv4_address: 198.18.94.2}}
+
+  # In Envoy's network namespace, on its loopback: what a rebinding to 127.0.0.1 reaches.
+  decoy:
+    image: *python
+    container_name: spike0943-${T}-decoy
+    profiles: [egress]
+    command: [python, -u, /egress/servers.py, decoy]
+    volumes: [./egress:/egress:ro]
+    network_mode: service:envoy
+
+  client:
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
+    container_name: spike0943-${T}-client
+    profiles: [egress]
+    command: [sleep, infinity]
+    networks: {net: {ipv4_address: 198.18.94.100}}
+
+  # The same policy over gRPC ext_authz, for CONNECT (Envoy's HTTP ext_authz can't check one).
+  grpc-authz:
+    image: *python
+    container_name: spike0943-${T}-grpc-authz
+    profiles: [egress]
+    environment: {PYTHONPATH: /egress}
+    command: [sh, -c, "pip install -q --root-user-action=ignore grpcio==1.76.0 && exec python -u /egress/grpc_authz.py"]
+    volumes: [./egress:/egress:ro]
+    networks: {net: {ipv4_address: 198.18.94.11}}
+
+  # The fallback 0011 names: smokescreen, resolving against the same flipping DNS server.
+  smokescreen:
+    build: {context: ./egress, dockerfile: Dockerfile.smokescreen}
+    image: spike0943-${T}-smokescreen
+    container_name: spike0943-${T}-smokescreen
+    profiles: [smokescreen]
+    dns: [198.18.94.53]
+    command: [--listen-ip, 0.0.0.0, --listen-port, "4750", --allow-range, 198.18.94.20/32]
+    networks: {net: {ipv4_address: 198.18.94.4}}

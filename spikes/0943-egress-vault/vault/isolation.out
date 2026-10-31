@@ -1,0 +1,162 @@
+== setup, as supabase_admin
+CREATE ROLE
+CREATE SCHEMA
+GRANT
+CREATE TABLE
+ALTER TABLE
+CREATE POLICY
+GRANT
+ALTER TABLE
+CREATE FUNCTION
+CREATE FUNCTION
+CREATE FUNCTION
+ALTER FUNCTION
+ALTER FUNCTION
+ALTER FUNCTION
+REVOKE
+GRANT
+== as lattice_app: two tenants put a secret each
+SET
+BEGIN
+ set_config
+------------
+ tenant-a
+(1 row)
+
+ put_secret
+------------
+
+(1 row)
+
+COMMIT
+BEGIN
+ set_config
+------------
+ tenant-b
+(1 row)
+
+ put_secret
+------------
+
+(1 row)
+
+COMMIT
+== as lattice_app: tenant-a reads its own, then tries tenant-b's
+BEGIN
+ set_config
+------------
+ tenant-a
+(1 row)
+
+ tenant_a_reads_own
+--------------------
+ TOKEN-OF-TENANT-A
+(1 row)
+
+psql:/spike/isolation.sql:80: ERROR:  no such secret for this tenant
+CONTEXT:  PL/pgSQL function lattice.read_secret(text) line 9 at RAISE
+ROLLBACK
+== as lattice_app: no tenant set
+psql:/spike/isolation.sql:83: ERROR:  no tenant
+CONTEXT:  PL/pgSQL function lattice.read_secret(text) line 7 at RAISE
+== as lattice_app: RLS on the metadata table, tenant-b sees only its row
+BEGIN
+ set_config
+------------
+ tenant-b
+(1 row)
+
+          id          | tenant_id
+----------------------+-----------
+ sec_bbbbbbbbbbbbbbbb | tenant-b
+(1 row)
+
+ROLLBACK
+== as lattice_app: rotate (vault.update_secret) and read the new value
+BEGIN
+ set_config
+------------
+ tenant-a
+(1 row)
+
+ rotate_secret
+---------------
+
+(1 row)
+
+     after_rotate
+----------------------
+ TOKEN-OF-TENANT-A-v2
+(1 row)
+
+COMMIT
+== as lattice_app: the view, the table, the decrypt function and create_secret directly
+psql:/spike/isolation.sql:95: ERROR:  permission denied for schema vault
+LINE 1: select count(*) from vault.decrypted_secrets;
+                             ^
+psql:/spike/isolation.sql:96: ERROR:  permission denied for schema vault
+LINE 1: select count(*) from vault.secrets;
+                             ^
+psql:/spike/isolation.sql:97: ERROR:  permission denied for schema vault
+LINE 1: select vault._crypto_aead_det_decrypt(''::bytea, ''::bytea, ...
+               ^
+psql:/spike/isolation.sql:98: ERROR:  permission denied for schema vault
+LINE 1: select vault.create_secret('x');
+               ^
+RESET
+== Supabase's own roles, as the image ships them
+     role      | view_select | decrypt_exec
+---------------+-------------+--------------
+ lattice_app   | f           | f
+ anon          | f           | f
+ authenticated | f           | f
+ authenticator | f           | f
+ service_role  | t           | t
+ postgres      | t           | t
+(6 rows)
+
+== as postgres (what a hosted project's owner is): try to take service_role off the view
+SET
+REVOKE
+REVOKE
+RESET
+ service_role_still_reads
+--------------------------
+ t
+(1 row)
+
+== as supabase_admin (the self-hosted superuser): take service_role off
+REVOKE
+REVOKE
+REVOKE
+     role      | view_select | decrypt_exec
+---------------+-------------+--------------
+ lattice_app   | f           | f
+ anon          | f           | f
+ authenticated | f           | f
+ authenticator | f           | f
+ service_role  | f           | f
+ postgres      | t           | t
+(6 rows)
+
+== the function still works for lattice_app after the revokes (its owner is postgres)
+SET
+BEGIN
+ set_config
+------------
+ tenant-b
+(1 row)
+
+ tenant_b_reads_own
+--------------------
+ KEY-OF-TENANT-B
+(1 row)
+
+ROLLBACK
+RESET
+== ciphertext at rest
+         name         |        secret_column        | key_id
+----------------------+-----------------------------+--------
+ sec_aaaaaaaaaaaaaaaa | hYI3KtHmqtfi2isd78slvLGW... |
+ sec_bbbbbbbbbbbbbbbb | nkv49HcSOMcdUao/S+8BLfxZ... |
+(2 rows)

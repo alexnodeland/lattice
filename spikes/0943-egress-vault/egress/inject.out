@@ -1,0 +1,53 @@
+== caller sends X-Lattice-Secret and its own Authorization and x-api-key
+HTTP/1.1 200 OK
+server: envoy
+date: Sat, 31 Oct 2026 08:32:39 GMT
+content-type: application/json
+content-length: 415
+x-envoy-upstream-service-time: 46
+
+{
+ "tls": true,
+ "sni": "api.upstream.test",
+ "headers": {
+  "host": "api.upstream.test",
+  "user-agent": "curl/8.22.0",
+  "accept": "*/*",
+  "x-forwarded-proto": "http",
+  "x-request-id": "a248ef54-418e-41fb-85fa-0a848af16f25",
+  "x-lattice-upstream": "198.18.94.20:443",
+  "x-lattice-upstream-ip": "198.18.94.20",
+  "authorization": "Bearer sk-INJECTED-BY-PROXY",
+  "x-envoy-expected-rq-timeout-ms": "15000"
+ }
+}
+== an unknown reference
+egress refused: no such secret for this tenant
+== no credential: the caller's Authorization is stripped, nothing replaces it
+{
+ "tls": true,
+ "sni": "api.upstream.test",
+ "headers": {
+  "host": "api.upstream.test",
+  "user-agent": "curl/8.22.0",
+  "accept": "*/*",
+  "x-forwarded-proto": "http",
+  "x-request-id": "3fb17293-c0bf-497f-9eba-a07b8b134eb5",
+  "x-lattice-upstream": "198.18.94.20:443",
+  "x-lattice-upstream-ip": "198.18.94.20",
+  "x-envoy-expected-rq-timeout-ms": "15000"
+ }
+}
+== Envoy's access log
+{"authority":"api.upstream.test","bytes_sent":415,"checked":"198.18.94.20","code":200,"duration_ms":54,"flags":"-","listener":10002,"method":"GET","purpose":"litellm","tenant":"tenant-a","upstream_host":"198.18.94.20:443","workspace":"ws-1"}
+{"authority":"api.upstream.test","bytes_sent":47,"checked":null,"code":403,"duration_ms":3,"flags":"UAEX","listener":10002,"method":"GET","purpose":null,"tenant":null,"upstream_host":null,"workspace":null}
+{"authority":"api.upstream.test","bytes_sent":365,"checked":"198.18.94.20","code":200,"duration_ms":5,"flags":"-","listener":10002,"method":"GET","purpose":"litellm","tenant":"tenant-a","upstream_host":"198.18.94.20:443","workspace":"ws-1"}
+== the authorizer down: every listener refuses
+listener 10000 -> HTTP 403
+listener 10001 -> HTTP 403
+listener 10002 -> HTTP 403
+listener 10003 -> HTTP 403
+{"authority":"public.test","bytes_sent":0,"checked":null,"code":403,"duration_ms":1004,"flags":"UAEX","listener":10000,"method":"GET","purpose":null,"tenant":null,"upstream_host":null,"workspace":null}
+{"authority":"public.test","bytes_sent":0,"checked":null,"code":403,"duration_ms":999,"flags":"UAEX","listener":10001,"method":"GET","purpose":null,"tenant":null,"upstream_host":null,"workspace":null}
+{"authority":"public.test","bytes_sent":0,"checked":null,"code":403,"duration_ms":1001,"flags":"UAEX","listener":10002,"method":"GET","purpose":null,"tenant":null,"upstream_host":null,"workspace":null}
+{"authority":"public.test","bytes_sent":0,"checked":null,"code":403,"duration_ms":1000,"flags":"UAEX","listener":10003,"method":"GET","purpose":null,"tenant":null,"upstream_host":null,"workspace":null}

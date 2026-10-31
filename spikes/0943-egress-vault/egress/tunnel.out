@@ -1,0 +1,25 @@
+== CONNECT tunnels to fresh rebind.test names, port 80
+t1-1793435771.rebind.test -> PUBLIC (served by 0.0.0.0)
+t2-1793435771.rebind.test -> PUBLIC (served by 0.0.0.0)
+t3-1793435771.rebind.test -> PUBLIC (served by 0.0.0.0)
+== CONNECT to private.test
+HTTP 000, CONNECT answered 403
+== CONNECT, TLS end to end (Envoy sees nothing inside), to api.upstream.test:443
+{
+ "tls": true,
+ "sni": "api.upstream.test",
+== listener 10002 to public.test: the certificate's SAN is api.upstream.test, not public.test
+upstream connect error or disconnect/reset before headers. reset reason: remote connection failure HTTP 503
+{"role": "dns", "client": "198.18.94.11", "name": "t1-1793435771.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.11", "name": "t2-1793435771.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.11", "name": "t3-1793435771.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+== the gRPC authorizer
+{"role": "grpc-authz", "method": "CONNECT", "authority": "t1-1793435771.rebind.test:80", "checked": "198.18.94.20", "verdict": "allow", "reason": null, "t": 1793435771.8222566}
+{"role": "grpc-authz", "method": "CONNECT", "authority": "t2-1793435771.rebind.test:80", "checked": "198.18.94.20", "verdict": "allow", "reason": null, "t": 1793435771.9393592}
+{"role": "grpc-authz", "method": "CONNECT", "authority": "t3-1793435771.rebind.test:80", "checked": "198.18.94.20", "verdict": "allow", "reason": null, "t": 1793435772.021922}
+{"authority":"t1-1793435771.rebind.test:80","bytes_sent":140,"checked":"198.18.94.20","code":200,"duration_ms":87,"flags":"-","listener":10004,"method":"CONNECT","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"t2-1793435771.rebind.test:80","bytes_sent":140,"checked":"198.18.94.20","code":200,"duration_ms":5,"flags":"-","listener":10004,"method":"CONNECT","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"t3-1793435771.rebind.test:80","bytes_sent":140,"checked":"198.18.94.20","code":200,"duration_ms":5,"flags":"-","listener":10004,"method":"CONNECT","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"private.test:80","bytes_sent":41,"checked":null,"code":403,"duration_ms":4,"flags":"UAEX","listener":10004,"method":"CONNECT","purpose":null,"tenant":null,"upstream_host":null,"workspace":null}
+{"authority":"api.upstream.test:443","bytes_sent":2684,"checked":"198.18.94.20","code":200,"duration_ms":56,"flags":"-","listener":10004,"method":"CONNECT","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:443","workspace":"ws-1"}
+{"authority":"public.test","bytes_sent":98,"checked":"198.18.94.20","code":503,"duration_ms":25,"flags":"UF","listener":10002,"method":"GET","purpose":"litellm","tenant":"tenant-a","upstream_host":"198.18.94.20:443","workspace":"ws-1"}

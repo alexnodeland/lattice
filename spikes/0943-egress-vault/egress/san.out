@@ -1,0 +1,5 @@
+cluster.odst_tls.ssl.fail_verify_cert_hash: 0
+cluster.odst_tls.ssl.fail_verify_error: 0
+cluster.odst_tls.ssl.fail_verify_no_cert: 0
+cluster.odst_tls.ssl.fail_verify_san: 1
+cluster.odst_tls.ssl.handshake: 0

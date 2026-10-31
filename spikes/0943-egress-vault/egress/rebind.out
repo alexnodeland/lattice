@@ -1,0 +1,60 @@
+== listener 10000
+r1-10000-1793435532.rebind.test -> PUBLIC (served by 0.0.0.0)
+r2-10000-1793435532.rebind.test -> PUBLIC (served by 0.0.0.0)
+r3-10000-1793435532.rebind.test -> PUBLIC (served by 0.0.0.0)
+r4-10000-1793435532.rebind.test -> PUBLIC (served by 0.0.0.0)
+r5-10000-1793435532.rebind.test -> PUBLIC (served by 0.0.0.0)
+== listener 10001
+r1-10001-1793435532.rebind.test -> INTERNAL (served by 127.0.0.1)
+r2-10001-1793435532.rebind.test -> INTERNAL (served by 127.0.0.1)
+r3-10001-1793435532.rebind.test -> INTERNAL (served by 127.0.0.1)
+r4-10001-1793435532.rebind.test -> INTERNAL (served by 127.0.0.1)
+r5-10001-1793435532.rebind.test -> INTERNAL (served by 127.0.0.1)
+== listener 10003
+r1-10003-1793435532.rebind.test -> PUBLIC (served by 0.0.0.0)
+r2-10003-1793435532.rebind.test -> PUBLIC (served by 0.0.0.0)
+r3-10003-1793435532.rebind.test -> PUBLIC (served by 0.0.0.0)
+r4-10003-1793435532.rebind.test -> PUBLIC (served by 0.0.0.0)
+r5-10003-1793435532.rebind.test -> PUBLIC (served by 0.0.0.0)
+== caller-supplied x-lattice-upstream: 127.0.0.1:80 (and -ip), to an allowed host
+listener 10000 -> PUBLIC (served by 0.0.0.0)
+listener 10003 -> PUBLIC (served by 0.0.0.0)
+== the DNS server's log for this run (who asked, what it got)
+{"role": "dns", "client": "198.18.94.10", "name": "r1-10000-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.10", "name": "r2-10000-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.10", "name": "r3-10000-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.10", "name": "r4-10000-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.10", "name": "r5-10000-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.10", "name": "r1-10001-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.2", "name": "r1-10001-1793435532.rebind.test", "qtype": 1, "answer": "127.0.0.1", "n": 2}
+{"role": "dns", "client": "198.18.94.10", "name": "r2-10001-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.2", "name": "r2-10001-1793435532.rebind.test", "qtype": 1, "answer": "127.0.0.1", "n": 2}
+{"role": "dns", "client": "198.18.94.10", "name": "r3-10001-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.2", "name": "r3-10001-1793435532.rebind.test", "qtype": 1, "answer": "127.0.0.1", "n": 2}
+{"role": "dns", "client": "198.18.94.10", "name": "r4-10001-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.2", "name": "r4-10001-1793435532.rebind.test", "qtype": 1, "answer": "127.0.0.1", "n": 2}
+{"role": "dns", "client": "198.18.94.10", "name": "r5-10001-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.2", "name": "r5-10001-1793435532.rebind.test", "qtype": 1, "answer": "127.0.0.1", "n": 2}
+{"role": "dns", "client": "198.18.94.10", "name": "r1-10003-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.10", "name": "r2-10003-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.10", "name": "r3-10003-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.10", "name": "r4-10003-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.10", "name": "r5-10003-1793435532.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+== Envoy's access log for this run
+{"authority":"r1-10000-1793435532.rebind.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":126,"flags":"-","listener":10000,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"r2-10000-1793435532.rebind.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":4,"flags":"-","listener":10000,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"r3-10000-1793435532.rebind.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":3,"flags":"-","listener":10000,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"r4-10000-1793435532.rebind.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":4,"flags":"-","listener":10000,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"r5-10000-1793435532.rebind.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":3,"flags":"-","listener":10000,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"r1-10001-1793435532.rebind.test","bytes_sent":31,"checked":"198.18.94.20","code":200,"duration_ms":24,"flags":"-","listener":10001,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"127.0.0.1:80","workspace":"ws-1"}
+{"authority":"r2-10001-1793435532.rebind.test","bytes_sent":31,"checked":"198.18.94.20","code":200,"duration_ms":4,"flags":"-","listener":10001,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"127.0.0.1:80","workspace":"ws-1"}
+{"authority":"r3-10001-1793435532.rebind.test","bytes_sent":31,"checked":"198.18.94.20","code":200,"duration_ms":3,"flags":"-","listener":10001,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"127.0.0.1:80","workspace":"ws-1"}
+{"authority":"r4-10001-1793435532.rebind.test","bytes_sent":31,"checked":"198.18.94.20","code":200,"duration_ms":3,"flags":"-","listener":10001,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"127.0.0.1:80","workspace":"ws-1"}
+{"authority":"r5-10001-1793435532.rebind.test","bytes_sent":31,"checked":"198.18.94.20","code":200,"duration_ms":3,"flags":"-","listener":10001,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"127.0.0.1:80","workspace":"ws-1"}
+{"authority":"r1-10003-1793435532.rebind.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":4,"flags":"-","listener":10003,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"r2-10003-1793435532.rebind.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":3,"flags":"-","listener":10003,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"r3-10003-1793435532.rebind.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":2,"flags":"-","listener":10003,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"r4-10003-1793435532.rebind.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":2,"flags":"-","listener":10003,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"r5-10003-1793435532.rebind.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":3,"flags":"-","listener":10003,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"public.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":3,"flags":"-","listener":10000,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}
+{"authority":"public.test","bytes_sent":27,"checked":"198.18.94.20","code":200,"duration_ms":3,"flags":"-","listener":10003,"method":"GET","purpose":"sandbox:registries","tenant":"tenant-a","upstream_host":"198.18.94.20:80","workspace":"ws-1"}

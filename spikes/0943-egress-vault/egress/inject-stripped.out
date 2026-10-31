@@ -1,0 +1,12 @@
+{
+ "tls": true,
+ "sni": "api.upstream.test",
+ "headers": {
+  "host": "api.upstream.test",
+  "user-agent": "curl/8.22.0",
+  "accept": "*/*",
+  "x-forwarded-proto": "http",
+  "x-request-id": "2c4c5dff-77db-45cf-9f47-e101dd4fab3f",
+  "authorization": "Bearer sk-INJECTED-BY-PROXY"
+ }
+}

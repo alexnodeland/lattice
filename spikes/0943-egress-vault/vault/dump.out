@@ -1,0 +1,6 @@
+root key: /etc/postgresql-custom/pgsodium_root.key, 64 hex chars; PGDATA is /var/lib/postgresql/data
+/tmp/dump.sql: key (any case) 0, TOKEN-OF-TENANT-A 0, KEY-OF-TENANT-B 0, vault.secrets rows 2
+/tmp/dumpall.sql: key (any case) 0, TOKEN-OF-TENANT-A 0, KEY-OF-TENANT-B 0, vault.secrets rows 2
+files under PGDATA containing the key: 0
+sec_bbbbbbbbbbbbbbbb	litellm:key	nkv49HcSOMcdUao/S+8BLfxZ0sqsa60VMv1o6urj731p5+bVO0PkAN1X2bxiQGQ=
+sec_aaaaaaaaaaaaaaaa	forge:token	hYI3KtHmqtfi2isd78slvLGWnxhNj6rSvl5HEiGAkCqn4R+xLEXQ5xgnSkfN4arZtQjDrQ==

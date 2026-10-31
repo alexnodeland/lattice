@@ -1,0 +1,43 @@
+== plain HTTP, fresh rebind.test names
+s1-1793436036.rebind.test -> PUBLIC (served by 0.0.0.0) [HTTP 200]
+s2-1793436036.rebind.test -> PUBLIC (served by 0.0.0.0) [HTTP 200]
+s3-1793436036.rebind.test -> PUBLIC (served by 0.0.0.0) [HTTP 200]
+s4-1793436036.rebind.test -> PUBLIC (served by 0.0.0.0) [HTTP 200]
+== CONNECT, fresh rebind.test names
+p1-1793436036.rebind.test -> PUBLIC (served by 0.0.0.0) [HTTP 200, CONNECT 200]
+p2-1793436036.rebind.test -> PUBLIC (served by 0.0.0.0) [HTTP 200, CONNECT 200]
+p3-1793436036.rebind.test -> PUBLIC (served by 0.0.0.0) [HTTP 200, CONNECT 200]
+p4-1793436036.rebind.test -> PUBLIC (served by 0.0.0.0) [HTTP 200, CONNECT 200]
+== private.test
+Egress proxying is denied to host 'private.test': no valid IP found among resolved addresses - 127.0.0.1 denied by rule 'Deny: Self Connection'. .
+ [HTTP 407]
+== the DNS server's log for this run
+{"role": "dns", "client": "198.18.94.4", "name": "s1-1793436036.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "s1-1793436036.rebind.test", "qtype": 28, "answer": null, "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "s2-1793436036.rebind.test", "qtype": 28, "answer": null, "n": null}
+{"role": "dns", "client": "198.18.94.4", "name": "s2-1793436036.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "s3-1793436036.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "s3-1793436036.rebind.test", "qtype": 28, "answer": null, "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "s4-1793436036.rebind.test", "qtype": 28, "answer": null, "n": null}
+{"role": "dns", "client": "198.18.94.4", "name": "s4-1793436036.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "p1-1793436036.rebind.test", "qtype": 28, "answer": null, "n": null}
+{"role": "dns", "client": "198.18.94.4", "name": "p1-1793436036.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "p2-1793436036.rebind.test", "qtype": 28, "answer": null, "n": null}
+{"role": "dns", "client": "198.18.94.4", "name": "p2-1793436036.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "p3-1793436036.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "p3-1793436036.rebind.test", "qtype": 28, "answer": null, "n": 1}
+{"role": "dns", "client": "198.18.94.4", "name": "p4-1793436036.rebind.test", "qtype": 28, "answer": null, "n": null}
+{"role": "dns", "client": "198.18.94.4", "name": "p4-1793436036.rebind.test", "qtype": 1, "answer": "198.18.94.20", "n": 1}
+== smokescreen's log for this run
+{"allow":true,"conn_establish_time_ms":0,"content_length":27,"decision_reason":"Egress ACL is not configured","dns_lookup_time_ms":13,"enforce_would_deny":false,"id":"dbiqj14k8h8c7388lbhg","inbound_remote_addr":"198.18.94.100:37134","level":"info","msg":"CANONICAL-PROXY-DECISION","outbound_local_addr":"198.18.94.4:58884","outbound_remote_addr":"198.18.94.20:80","project":"","proxy_type":"http","re
+{"allow":true,"conn_establish_time_ms":0,"content_length":27,"decision_reason":"Egress ACL is not configured","dns_lookup_time_ms":0,"enforce_would_deny":false,"id":"dbiqj14k8h8c7388lbi0","inbound_remote_addr":"198.18.94.100:37144","level":"info","msg":"CANONICAL-PROXY-DECISION","outbound_local_addr":"198.18.94.4:58900","outbound_remote_addr":"198.18.94.20:80","project":"","proxy_type":"http","req
+{"allow":true,"conn_establish_time_ms":0,"content_length":27,"decision_reason":"Egress ACL is not configured","dns_lookup_time_ms":0,"enforce_would_deny":false,"id":"dbiqj14k8h8c7388lbig","inbound_remote_addr":"198.18.94.100:37156","level":"info","msg":"CANONICAL-PROXY-DECISION","outbound_local_addr":"198.18.94.4:58904","outbound_remote_addr":"198.18.94.20:80","project":"","proxy_type":"http","req
+{"allow":true,"conn_establish_time_ms":0,"content_length":27,"decision_reason":"Egress ACL is not configured","dns_lookup_time_ms":0,"enforce_would_deny":false,"id":"dbiqj14k8h8c7388lbj0","inbound_remote_addr":"198.18.94.100:37172","level":"info","msg":"CANONICAL-PROXY-DECISION","outbound_local_addr":"198.18.94.4:58920","outbound_remote_addr":"198.18.94.20:80","project":"","proxy_type":"http","req
+{"allow":true,"decision_reason":"Egress ACL is not configured","dns_lookup_time_ms":0,"enforce_would_deny":false,"id":"dbiqj14k8h8c7388lbjg","inbound_remote_addr":"198.18.94.100:37180","level":"info","msg":"CANONICAL-PROXY-DECISION","project":"","proxy_type":"connect","requested_host":"p1-1793436036.rebind.test:80","role":"","start_time":"2026-10-31T08:40:36.524507627Z","time":"2026-10-31T08:40:36
+{"bytes_in":140,"bytes_out":89,"conn_establish_time_ms":0,"duration":0.003660542,"end_time":"2026-10-31T08:40:36.529829377Z","error":"","id":"dbiqj14k8h8c7388lbjg","inbound_remote_addr":"198.18.94.100:37180","last_activity":"2026-10-31T08:40:36.529234002Z","level":"info","msg":"CANONICAL-PROXY-CN-CLOSE","outbound_local_addr":"198.18.94.4:58928","outbound_remote_addr":"198.18.94.20:80","project":""
+{"allow":true,"decision_reason":"Egress ACL is not configured","dns_lookup_time_ms":0,"enforce_would_deny":false,"id":"dbiqj14k8h8c7388lbk0","inbound_remote_addr":"198.18.94.100:37182","level":"info","msg":"CANONICAL-PROXY-DECISION","project":"","proxy_type":"connect","requested_host":"p2-1793436036.rebind.test:80","role":"","start_time":"2026-10-31T08:40:36.616817419Z","time":"2026-10-31T08:40:36
+{"bytes_in":140,"bytes_out":89,"conn_establish_time_ms":0,"duration":0.003011333,"end_time":"2026-10-31T08:40:36.620719627Z","error":"","id":"dbiqj14k8h8c7388lbk0","inbound_remote_addr":"198.18.94.100:37182","last_activity":"2026-10-31T08:40:36.620545169Z","level":"info","msg":"CANONICAL-PROXY-CN-CLOSE","outbound_local_addr":"198.18.94.4:58942","outbound_remote_addr":"198.18.94.20:80","project":""
+{"allow":true,"decision_reason":"Egress ACL is not configured","dns_lookup_time_ms":0,"enforce_would_deny":false,"id":"dbiqj14k8h8c7388lbkg","inbound_remote_addr":"198.18.94.100:37186","level":"info","msg":"CANONICAL-PROXY-DECISION","project":"","proxy_type":"connect","requested_host":"p3-1793436036.rebind.test:80","role":"","start_time":"2026-10-31T08:40:36.710922461Z","time":"2026-10-31T08:40:36
+{"bytes_in":140,"bytes_out":89,"conn_establish_time_ms":0,"duration":0.00290975,"end_time":"2026-10-31T08:40:36.714884461Z","error":"","id":"dbiqj14k8h8c7388lbkg","inbound_remote_addr":"198.18.94.100:37186","last_activity":"2026-10-31T08:40:36.714744836Z","level":"info","msg":"CANONICAL-PROXY-CN-CLOSE","outbound_local_addr":"198.18.94.4:58956","outbound_remote_addr":"198.18.94.20:80","project":"",
+{"allow":true,"decision_reason":"Egress ACL is not configured","dns_lookup_time_ms":0,"enforce_would_deny":false,"id":"dbiqj14k8h8c7388lbl0","inbound_remote_addr":"198.18.94.100:37200","level":"info","msg":"CANONICAL-PROXY-DECISION","project":"","proxy_type":"connect","requested_host":"p4-1793436036.rebind.test:80","role":"","start_time":"2026-10-31T08:40:36.801058711Z","time":"2026-10-31T08:40:36
+{"bytes_in":140,"bytes_out":89,"conn_establish_time_ms":0,"duration":0.002956417,"end_time":"2026-10-31T08:40:36.805133044Z","error":"","id":"dbiqj14k8h8c7388lbl0","inbound_remote_addr":"198.18.94.100:37200","last_activity":"2026-10-31T08:40:36.805015711Z","level":"info","msg":"CANONICAL-PROXY-CN-CLOSE","outbound_local_addr":"198.18.94.4:58968","outbound_remote_addr":"198.18.94.20:80","project":""

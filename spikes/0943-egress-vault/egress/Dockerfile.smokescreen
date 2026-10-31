@@ -1,0 +1,8 @@
+# smokescreen has no published image (Docker Hub 404, GHCR's anonymous pull refused, 2026-10-31):
+# built from source at a pinned commit.
+FROM golang:1.26-alpine AS build
+RUN go install github.com/stripe/smokescreen@336cb34495041ce3a33b8d489a2edcbf5f300913
+
+FROM alpine:3.21
+COPY --from=build /go/bin/smokescreen /usr/local/bin/smokescreen
+ENTRYPOINT ["smokescreen"]

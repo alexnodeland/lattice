@@ -1,0 +1,18 @@
+# Listener 10004 with the HTTP ext_authz service (before switching it to gRPC), Envoy at debug:
+# the check for `CONNECT public.test:80` is itself sent to the authorizer as a CONNECT, and
+# Envoy's async client answers it 503, so the filter fails closed with ext_authz_error.
+# (The authorizer had logged "allow" for the same requests.)
+cluster 'authz' match for URL ''
+router decoding headers:
+':authority', 'public.test:80'
+':method', 'CONNECT'
+':scheme', 'http'
+'content-length', '0'
+'proxy-authorization', 'Bearer tok-sandbox-a'
+'x-envoy-internal', 'true'
+'x-envoy-expected-rq-timeout-ms', '2000'
+async http request response headers (end_stream=false):
+':status', '503'
+Sending local reply with details ext_authz_error
+':status', '403'
+# Access log: {"authority":"public.test:80"...,"code":403,"flags":"UAEX","listener":10004,"method":"CONNECT",...}

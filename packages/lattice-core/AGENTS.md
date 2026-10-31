@@ -15,6 +15,8 @@ lattice-core holds the infrastructure two or more lattice packages share and mus
 | Path | What it is | Extra |
 |---|---|---|
 | `src/lattice_core/schema.py`, `text.py`, `origins.py`, `tags.py`, `refusals.py`, `logs.py`, `settings.py`, `integrations.py` | Shared helpers: tagged-union schemas, `holds_nul`, origins, the refusal schema, logging, settings, integration switches | none |
+| `src/lattice_core/capabilities.py`, `taint.py` | The platform's contracts ([RFC-0011](../../docs/rfcs/0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md), [ADR-0032](../../docs/adr/0032-the-capability-registry-in-lattice-core-four-tiers-three-effects-and-entry-points.md)): types, ports and fakes; `capabilities` carries its `CONTRACT` version | none |
+| `src/lattice_core/contracts.py`, `schemas/` | The contracts' JSON Schemas, printed by `contracts` and checked in, named by major version | none |
 | `src/lattice_core/sql/` | The storages' shared SQL helpers: sessions, SQLite, tenancy | `sql` |
 | `src/lattice_core/otel/` | OpenTelemetry setup; `otel/contribution.py`, the telemetry contract, needs no extra ([ADR-0020](../../docs/adr/0020-the-telemetry-contract-needs-no-extra.md)) | `otel` |
 | `src/lattice_core/langfuse.py` | Langfuse's span filters | `langfuse` |
@@ -23,7 +25,7 @@ lattice-core holds the infrastructure two or more lattice packages share and mus
 
 ## Tasks
 
-Only the inherited ones: `lint`, `typecheck`, `test`, `format`, `check`, plus `build`, `standalone` and `deptry`. No schema, PostgreSQL or API tasks. A focused run is `uv run pytest packages/lattice-core/tests/<path>.py -n0`. It has no `conftest.py`.
+The inherited ones: `lint`, `typecheck`, `test`, `format`, `check`, plus `build`, `standalone` and `deptry`; and `schema`, which regenerates the contracts' JSON Schemas in `schemas/` (never edit them by hand; a test fails on drift). No PostgreSQL or API tasks. A focused run is `uv run pytest packages/lattice-core/tests/<path>.py -n0`. It has no `conftest.py`.
 
 A change here affects every dependent: run `moon run :check`, not just `lattice-core:check`.
 

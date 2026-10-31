@@ -11,12 +11,13 @@ is given, as SoundCraft does. Its replies are JSON in text. Run as `python -I fa
 import argparse
 import asyncio
 import json
+import sys
 from pathlib import Path
 from typing import Any
 
-from mcp.server.mcpserver import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
-from mcp.types import CallToolResult, TextContent
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))  # `python -I` leaves it off
+
+from tests.files.craft.stdio_mcp import CallToolResult, MCPServer, TextContent, ToolError
 
 COMMANDS = [
     {"id": "track.new", "label": "New...", "menu": ["Track"], "params": "{kind?, name?}"},

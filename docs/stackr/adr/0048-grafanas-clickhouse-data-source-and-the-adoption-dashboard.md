@@ -51,3 +51,12 @@ portalr links no tenant to Grafana: its deep links go only to callers allowed `p
 - A plugin release is a hand-made change: its version and its two digests.
 - The smoke test checks that Grafana's user reads both tenants and is refused an insert, `system.query_log`, any higher limit and any limit of 0. It also runs each of the dashboard's queries as that user. With Grafana running, it checks that the data source is healthy and the dashboard is there.
 - Each smoke job that builds Grafana downloads the plugin from grafana.com, with no cache across jobs, so an outage there fails the build.
+
+## Amendment (2026-10-31): Renovate reports the plugin's drift
+
+The plugin's version moved by hand, and nothing said when grafana.com had a newer one ([#664](https://github.com/alexnodeland/lattice/issues/664)). Renovate now reads it, and still never moves it on its own:
+
+- **A custom datasource, `grafana-plugins`,** reads a plugin's versions from grafana.com's list (`https://grafana.com/api/plugins/<plugin>/versions`), and a regex manager finds the version in the Dockerfile's download URL.
+- **A new version waits on the Dependency Dashboard** (`dependencyDashboardApproval`): Renovate opens no pull request until someone ticks it there. That pull request moves the version in the URL alone, so the sha256 check fails the build until both architectures' digests move with it, taken from grafana.com's list and checked against the downloads, as above. A release is still a hand-made change; Renovate only says when there is one.
+- **The Dockerfile's `# syntax=docker/dockerfile` line** was already Renovate's: its Dockerfile manager reads the directive, and the dashboard lists it.
+- **Not chosen:** a nightly job of its own that opens or updates an issue. It would need a token that writes issues, for what the Dependency Dashboard, already an issue Renovate keeps up to date, says.

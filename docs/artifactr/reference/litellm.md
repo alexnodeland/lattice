@@ -18,6 +18,10 @@ The `litellm` extra. See [The LLM gateway](../guides/gateway.md).
 
 ::: artifactr.litellm.GuardrailPolicy
 
+::: artifactr.litellm.ECHO_TOOLS
+
+::: artifactr.litellm.TOOL_RESULT_GUARDRAILS
+
 ## Guardrail blocks
 
 ::: artifactr.litellm.GuardrailBlocked

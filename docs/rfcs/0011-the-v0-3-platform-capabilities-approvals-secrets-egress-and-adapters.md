@@ -1,6 +1,6 @@
 # RFC-0011: The v0.3 platform: capabilities, approvals, secrets, egress and adapters
 
-**Status:** Draft
+**Status:** Discussion
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file
@@ -48,7 +48,8 @@ graph LR
     ap --> surf["surfaces: portalr cards, web push,<br/>MCP elicitation, ACP permission"]
     enf -- "call" --> tool["the tool"]
     tool -- "SecretRef" --> vault["Secrets port<br/>Supabase Vault"]
-    tool -- "every request" --> proxy["stackr: egress proxy<br/>lattice_core.egress policy"]
+    tool -- "every request" --> proxy["stackr: Envoy<br/>config rendered from lattice_core.egress"]
+    proxy -- "ext_authz" --> authz["the application: egress authorizer<br/>taint, settings, secrets"]
     proxy --> net(("internet"))
     adapters["entry points: lattice.adapters"] --> areg["lattice_core.adapters<br/>AdapterRegistry, conformance"]
 ```
@@ -57,7 +58,7 @@ graph LR
 - **Each library declares its providers and adapters** in its own code, against those types, and exposes them through an entry point. No library imports another to register.
 - **The application composes them,** at its composition root, as it composes `registry(*KNOWN.values(), mine)` today: stackr's template, docplan and oncall. portr, wherever it lives, reads the composed registry, never a library's internals.
 - **grantr stores what is per tenant and audited:** approvals, secrets' metadata, the egress allowlists' narrowing (as settings), and the adapters a tenant enables (as integrations).
-- **stackr runs what is a service:** the egress proxy, and Supabase Vault in the stack it already has.
+- **stackr runs what is a service:** the egress proxy, an established one (Envoy, Decision P1), and Supabase Vault in the stack it already has.
 
 ### The capability registry (#940)
 
@@ -159,7 +160,7 @@ class Approvals(Protocol):
     def watch(self, id: ApprovalId) -> AsyncIterator[Approval]: ...
 ```
 
-- **One policy.** `ApprovalPolicy.needed(capability, context, scope) -> Answerers | None` decides from the tier, the taint step's `ask`, the capability's `risk_class`, and settings: `approve:<tier>` is a `Subset` of tiers that need a person, which a tenant or workspace may widen to more tiers but never shrink below the operator's (asking more is the narrower direction). `different_approver` comes from the gate, or from a tainted outbound call, and is always set for `risk_class="admin_high"`.
+- **One policy.** `ApprovalPolicy.needed(capability, context, scope) -> Answerers | None` decides from the tier, the taint step's `ask`, the capability's `risk_class`, and settings: `approve:<tier>` is a `Subset` of tiers that need a person, whose floor the operator sets. A tenant or workspace may require approval on more tiers, never on fewer (Decision O5): asking more is the narrower direction ADR-0030 allows, so the setting is resolved as a union down the layers, where other `Subset` settings intersect. `different_approver` comes from the gate, or from a tainted outbound call, and is always set for `risk_class="admin_high"`.
 - **First answer wins.** `answer` is a compare-and-set on `state = 'pending'` in grantr's store, in one transaction with its audit entry. The second answer gets `AlreadyAnswered` with the first's answer, surface and time, which every surface shows. A test runs answers from many tasks at once against SQLite and PostgreSQL and finds exactly one.
 - **Bound to what was shown.** An answer carries the `arguments_digest` it saw; one for other arguments is refused. A replanned call is a new approval.
 - **Delegation.** `answerers` names a grantr action, so anyone who holds it may answer, and grantr's grants are how a person delegates. A named delegation, "Sam answers mine this week", is a grant with an expiry, not a field of the approval (Decision T3). A service principal may answer only if granted the action specifically, and never an `admin_high` one (#918).
@@ -220,13 +221,31 @@ def decide(request: Destination, purpose: Purpose, allowed: frozenset[HostPatter
 ```
 
 - **Always refused,** whatever the purpose: private, loopback, link-local, CGNAT and tailnet ranges, and metadata endpoints, checked on every resolved address, again after each redirect, and pinned for the connection so DNS rebinding can't swap it.
-- **Allowlists per purpose.** The operator's configuration holds each purpose's hosts. A tenant or workspace narrows them as an ADR-0030 `Subset` setting, `egress:<purpose>`, over that universe; never wider. A setting is never free text, so a tenant adding a host it may reach (a remote MCP server, #921) is the operator's catalog or a connection's declared hosts, not a typed hostname.
+- **Allowlists per purpose.** The operator's configuration holds each purpose's hosts. A tenant or workspace narrows them as an ADR-0030 `Subset` setting, `egress:<purpose>`, over that universe; never wider. In 0.3.0 only the operator adds hosts (Decision O6): a remote MCP server a tenant adds (#921) is reachable only where its host is in the operator's catalog. Hosts a connection declares are revisited with the connector RFC (#926).
 - **Narrowed by taint.** For a tainted turn, run or session, `decide` allows only hosts that appeared in what was read (the taint's recorded `seen_hosts`) and are also allowlisted, and refuses a URL with a query or path built from private data, which the caller marks as such (#903's "narrow").
 - **Limits** on size, time and rate per purpose, as settings.
-- **Credentials injected at the proxy.** A caller sends `X-Lattice-Secret: <ref>`; the proxy reads the value through the `Secrets` port, sets the header the purpose names, and strips the reference. Callers, sandboxes and models never hold model keys or forge tokens.
+- **Credentials injected at the proxy.** A caller sends `X-Lattice-Secret: <ref>`; the authorizer reads the value through the `Secrets` port, the proxy sets the header the purpose names, and the reference is stripped. Callers, sandboxes and models never hold model keys or forge tokens. Injection needs the proxy to originate TLS, so a purpose with credentials is called as a plain-HTTP forward-proxy request to the proxy, which opens TLS upstream; a purpose without them, such as package registries, may tunnel with CONNECT.
 - **Logged:** each request's tenant, workspace, purpose, caller, destination host, verdict, size and duration; never bodies or headers. Operators see egress by purpose and destination, and refusals, in portalr's admin.
 
-**The proxy** is a stackr service, `egress`, on the network every outbound caller sits on, and the only service on that network with a route out. Compose marks the callers' networks `internal: true`, as stackr already does for its databases, so nothing else can reach the internet, which `make validate` and a smoke test check. It speaks HTTP CONNECT and forward proxying, identifies each caller by a token the stack issues per purpose (a sandbox's per session), and asks `lattice_core.egress.decide` (Decision T4). The reader and the sandbox's proxy become clients of it, and keep their own guards as defence in depth.
+**The proxy is an established one, not lattice's own** (Decision O8). It runs as a stackr service, `egress`, on the network every outbound caller sits on, and is the only service on that network with a route out. Compose marks the callers' networks `internal: true`, as stackr already does for its databases, so nothing else can reach the internet, which `make validate` and a smoke test check. Each caller is identified by a token the stack issues per purpose (a sandbox's per session), sent as `Proxy-Authorization`. The reader and the sandbox's proxy become clients of it, and keep their own guards as defence in depth.
+
+Two candidates were compared against what this design needs:
+
+| Need | Envoy | smokescreen |
+|---|---|---|
+| Allowlists per purpose, from the shared policy | A route per purpose with an RBAC filter on the host, rendered from the policy | An ACL role per purpose, rendered as its YAML |
+| Private ranges on the resolved address, rebinding | Not built in for the dynamic forward proxy: the authorizer resolves and checks, and Envoy must connect to the address it checked (Unverified) | Built in: it is Stripe's SSRF proxy, and denies private ranges after resolution by default |
+| Narrowing by taint, which changes during a run | `ext_authz`: Envoy asks an authorizer on every request, which reads the session's taint | Not expressible: an ACL is static per role, so a taint would need a reload or a fork of its Go hooks |
+| Credential injection | The authorizer's allow response adds headers to the upstream request (or the `credential_injector` filter), where Envoy originates TLS | None: HTTPS passes through CONNECT tunnels it can't open, so injection needs a second proxy beside it |
+| Per-tenant attribution | The authorizer returns tenant, workspace, purpose and caller as dynamic metadata, written by Envoy's JSON access log to Loki; per-purpose counters as stats, per-tenant counts from logs, to keep stats' cardinality bounded | Its JSON log names the role, so a tenant appears only with a role per tenant and purpose; statsd metrics |
+| stackr's Compose and AWS recipes | One pinned image; an ECS service as stackr's others are (ECS Service Connect is itself Envoy) | One image, built by stackr if no official one is published (Unverified); an ECS service |
+
+**Recommended: Envoy** (Decision P1, for the owner to confirm). It is the only one that meets taint narrowing and injection without a second proxy; smokescreen's strength, resolved-address checks, is the one thing Envoy needs help with, and the authorizer supplies it. Squid, with `external_acl_type` helpers and `request_header_add`, could meet the same needs, but its configuration and operation suit stackr less well than Envoy's.
+
+**How the shared policy becomes Envoy's configuration,** in two layers:
+
+- **Static, rendered:** `lattice_core.egress.envoy(policy) -> dict` renders the operator's purposes, their host universes, limits and the always-refused ranges into Envoy's listeners, routes, RBAC filters and clusters, as plain data, with no Envoy dependency. stackr's `scripts/egress-config` writes it to `deploy/egress/` when the stack starts, and Envoy reads it as file-based xDS, so a change of the operator's configuration is picked up without a restart. A drift test holds the committed example to the renderer. This layer holds even if the authorizer errs: nothing outside the operator's universe is ever reachable.
+- **Dynamic, asked:** `ext_authz` calls `lattice_core.egress.fastapi`'s authorizer, a router behind the `fastapi` extra that the application mounts, not a service of its own. It identifies the caller, applies the tenant's and workspace's narrowing, taint and `decide`, reads any credential through `Secrets`, and answers allow with headers and metadata, or deny with a reason. Envoy is configured with `failure_mode_allow: false`, so an authorizer that can't answer refuses.
 
 ### Taint, as these parts read it (#903)
 
@@ -250,7 +269,7 @@ class AdapterSpec(BaseModel, frozen=True):
 ```
 
 - **Discovery through entry points,** group `lattice.adapters`, read with `importlib.metadata`, so installing an extra registers its adapter and removing it removes it. The application composes `KNOWN` with the installed adapters' `integrations`, so an adapter's integrations exist only when it is installed, and ADR-0027 already makes one that isn't installed off everywhere ("not installed in this deployment").
-- **Enabled by the operator.** The deployment's configuration names which installed adapter answers each port (`secrets: supabase-vault`), validated against its `config_schema` at startup; a tenant switches the integrations it adds. Switching an adapter is a configuration change and a restart; for secrets, a migration command copies refs from one adapter to another (Unresolved).
+- **Enabled by the operator.** The deployment's configuration names which installed adapter answers each port (`secrets: supabase-vault`), validated against its `config_schema` at startup; a tenant switches the integrations it adds. Switching an adapter is a configuration change and a restart. Secrets are switched by a copy command (Decision O7): an operator command, `lattice secrets copy --to <adapter>`, copies every secret, with its current and grace versions, to the new store and rewrites each reference's store id in `lattice_secrets`, in batches, each read and write audited; the deployment is then pointed at the new store, and the old one is retired once the command reports every reference moved.
 - **One conformance harness,** `lattice_core.conformance`: a suite per port, written as plain async checks that take a factory and return results, so it runs under pytest in each adapter's CI (a thin plugin behind a `conformance` extra) and from `make validate` against a running deployment. Each suite also checks the adapter's `implements` against the port's version.
 - **One admin view, "Adapters",** in portalr's admin: each installed adapter by kind, its version, its conformance result from the last `make validate`, its configuration (secrets shown as refs) and its integrations, linking to each kind's own page. portalr reads it through an endpoint the composed registry answers, never by importing the adapters.
 - **Pinned and updated** like any dependency: an adapter is an extra, so `uv.lock` pins it and Renovate updates it.
@@ -265,7 +284,7 @@ ADR-0018 moves code into lattice-core "when two or more packages have it word fo
 | Agent toolset bridge | `agents` | `agents` (pydantic-ai-slim) | | artifactr's and reflexr's agent layers |
 | Approvals | `approvals` | none | grantr's store (`grantr[sql]`) | artifactr's agent layer, portalr, portr |
 | Secrets | `secrets` | none | `secrets.supabase` (`sql`), the fake | the credential and egress proxies, connectors, the MCP client |
-| Egress policy | `egress` | none | stackr's `egress` service | the proxy, the reader, the sandbox's proxy |
+| Egress policy | `egress`; its authorizer in `egress.fastapi` | `fastapi` for the authorizer | stackr's Envoy, with the static layer rendered from it and the dynamic one asked of the authorizer | the application, stackr's config script, the reader, the sandbox's proxy |
 | Taint | `taint` | none | | everything above |
 | Adapters, conformance | `adapters`, `conformance` | `conformance` (pytest) for the plugin | each adapter's entry point | the application, `make validate`, portalr's endpoint |
 
@@ -287,7 +306,7 @@ ADR-0018 moves code into lattice-core "when two or more packages have it word fo
 - **One suite for all providers:** a parametrized test runs tiers, approvals, limits, taint and audit against a fake provider of each `ProviderKind`, and then against each library's real provider, in root `tests/`, since it spans libraries.
 - **Nothing bypasses the enforcer:** a root test builds the template's composed agents and asserts that every tool an `Agent` holds is the bridge's, and an AST check fails on a `FunctionToolset` built in a library's `src/` outside an allowlist of the bridge's own.
 - **First answer wins under races,** on SQLite and PostgreSQL; different-approver approvals never offered to the caller; expiry by a fake clock, never by waiting.
-- **Egress:** `decide` against #879's SSRF cases and injection fixtures; the proxy in stackr's smoke job, with a container on an internal network that can reach only it.
+- **Egress:** `decide` and the authorizer against #879's SSRF cases and injection fixtures; the Envoy renderer against golden configurations; Envoy in stackr's smoke job, with a container on an internal network that can reach only it.
 - **Adapters:** the harness tested against a fake adapter that passes and one that fails each check; installing and removing an extra in `standalone` adds and removes its integrations.
 
 ### What changes in each package
@@ -300,7 +319,7 @@ ADR-0018 moves code into lattice-core "when two or more packages have it word fo
 | reflexr | A provider for its commands and stored workflows; workflows' tool lists name capabilities | No: stored workflows are new (#843) |
 | relayr | `deferred_answered` carries the approval's id and surface | No: an optional field |
 | portalr | Approvals list and page, web push actions, the Adapters and Egress admin views | No |
-| stackr | The `egress` service and internal networks, Vault enabled, the template composing registries | Callers without the proxy lose the internet: an upgrade note (#946) |
+| stackr | The `egress` service (Envoy) with its rendered configuration and internal networks, Vault enabled, the template composing registries | Callers without the proxy lose the internet: an upgrade note (#946) |
 
 ### Phases
 
@@ -311,7 +330,7 @@ M2 in the v0.3 plan builds these, in this order, each a pull request or two:
 | 1. Contracts | `capabilities`, `taint`, `approvals`, `secrets`, `egress`, `adapters` as types, ports and fakes; versions and schemas | 100% coverage; schemas checked by `lattice:breaks` |
 | 2. Enforcer | The nine steps and the `agents` bridge; one provider from artifactr | The enforcement suite passes on a fake and on artifactr's provider |
 | 3. Stores | grantr's approvals (first answer wins, expiry, audit) and secrets metadata; Supabase Vault adapter | The race test finds one answer on both databases; the secrets contract suite passes on Vault with RLS isolation tested across two tenants |
-| 4. Egress | stackr's proxy on the shared policy, internal networks | The SSRF suite passes at the proxy; a caller off the proxy reaches nothing |
+| 4. Egress | Envoy in stackr, its rendered configuration, the authorizer and internal networks; the secrets copy command | The SSRF suite passes at Envoy; a tainted session reaches only hosts it has seen; an injected credential never reaches the caller; a caller off the proxy reaches nothing; the authorizer down refuses everything |
 | 5. Adapters | Entry-point discovery, the harness and its pytest plugin, `make validate` running it | Supabase Vault and the fake pass through the harness; installing an extra adds its integrations |
 | 6. One provider per library | reflexr's and grantr's providers; the bypass test | M2's exit: one provider registered from each library, and nothing bypasses the enforcer |
 
@@ -327,18 +346,22 @@ Decided by the owner on 2026-10-30:
 | O2 | Slack | Not in 0.3.0; designed for as a surface | Required for phone approvals |
 | O3 | Phone approvals | portalr's web push | Slack or a native app |
 | O4 | The first secrets store | Supabase Vault | Own envelope encryption, or a cloud KMS first |
-
-Recommended, for the owner to decide:
-
-| # | Question | Recommended | Instead of |
-|---|---|---|---|
 | T1 | Tiers | #940's four tiers and three effects, with artifactr's `Risk` mapped onto them | `Risk`'s five values everywhere, which mixes what a tool does (`edit`) with what it reaches (`network`) |
 | T2 | Where approvals are stored | grantr: its subjects define who may answer, and it already keeps audited stores per tenant | artifactr, beside deferred tools (reflexr and portr couldn't reach it); a new package (one more release for one table) |
 | T3 | Delegation | A grantr grant with an expiry | A delegate field on each approval, which grantr couldn't check |
-| T4 | The egress proxy | A small Python service in stackr on `lattice_core.egress`, so the proxy and in-process guards share one policy | smokescreen or Envoy with an ACL generated from the policy: proven, but a second implementation of the taint rules |
 | T5 | Approvals on artifactr's own tools | `requires_approval` stays as the mechanism, and the enforcer sets it from the policy | Every tool's approval declared on the tool, as today, beside a policy that disagrees |
 | T6 | Registration | Entry points, with explicit composition always allowed | Explicit composition only: no discovery, but every application lists every provider |
 | T7 | The second secrets adapter | In 0.3.x, after the port is stable | In 0.3.0, as #942's acceptance asks |
+| O5 | Approval policy's direction | The operator sets the floor; a tenant or workspace may require approval on more tiers, never fewer | Operator-only approval policy in 0.3.0 |
+| O6 | Egress hosts | The operator's alone in 0.3.0; tenants and workspaces only narrow them; revisited with connectors (#926) | Tenants adding hosts through a connection's declared hosts |
+| O7 | Switching secrets stores | An operator command copies every secret to the new store and rewrites the references; the old store is then retired | Old references resolving through the old store beside new ones on the new |
+| O8 | The egress proxy | An established proxy (T4 rejected) | A small Python proxy of lattice's own on `lattice_core.egress`, as T4 recommended |
+
+Recommended, for the owner to confirm:
+
+| # | Question | Recommended | Instead of |
+|---|---|---|---|
+| P1 | Which established proxy | Envoy: its configuration rendered from the shared policy, and `ext_authz` to an authorizer the application mounts for taint, tenants' narrowing and credentials ([The proxy](#egress-one-policy-and-one-proxy-943)) | smokescreen: SSRF checks built in, but static per-role ACLs can't narrow by taint, and it can't inject credentials without a second proxy; Squid: could, through helpers, but suits stackr less well |
 
 ## Drawbacks
 
@@ -346,7 +369,8 @@ Recommended, for the owner to decide:
 - **One enforcement path is one place to get wrong:** a bug there is a bug in every tool. It is also one place to test, which is the point.
 - **An approval store in grantr couples approvals to grantr,** so an application without grantr has the fake only. Today every governed deployment has grantr.
 - **Entry points are global to an environment:** an extra installed for one application registers for every one in it. Composition stays explicit in tests.
-- **A proxy for everything** adds a hop and a service that must stay up; when it is down, nothing calls out.
+- **A proxy for everything** adds a hop and a service that must stay up; when it, or the authorizer it asks, is down, nothing calls out.
+- **Envoy is large and its configuration is verbose.** Rendering it from the policy keeps people out of it, but a renderer is one more thing to test, and an Envoy upgrade can change what it accepts.
 
 ## Alternatives
 
@@ -354,12 +378,15 @@ Recommended, for the owner to decide:
 - **A new `lattice-platform` package** for the contracts. Keeps lattice-core small, but every library would depend on two shared packages, and ADR-0027 and ADR-0030 already put ports in lattice-core.
 - **The registry in portr.** portr reads every library's catalog anyway, but the libraries would then need portr to enforce their own tools.
 - **Per-feature approvals, egress and secrets.** The drift #939 replaces.
+- **A Python proxy of lattice's own** (T4, rejected as O8). One implementation of the policy, but lattice would own a proxy's security, performance and protocol corner cases, which established proxies have already met.
+- **smokescreen with a header-injecting sidecar.** Keeps smokescreen's SSRF checks, at the cost of two proxies in series and taint still unexpressed (P1).
 
 ## Unresolved questions
 
-- **Approvals' policy direction:** this RFC lets a workspace ask for approval on more tiers but never fewer. Is "more approvals" the narrowing ADR-0030 means, or should approval policy be operator-only in 0.3.0?
-- **Switching a secrets adapter:** a copy command between adapters, or new secrets only on the new adapter while old refs keep resolving through the old one.
-- **Tenants' own egress hosts:** whether a tenant may add a host outside the operator's universe through a connection's declared hosts, and who vets it.
+As of 2026-10-30, approval policy's direction (O5), egress hosts (O6) and switching secrets stores (O7) are decided.
+
+- **Which established proxy** (P1): Envoy is recommended, for the owner to confirm.
+- **Hosts a connection declares,** revisited with the connector RFC (#926), after O6.
 - **The bypass check's strength:** an AST rule over `src/` catches the obvious; a runtime assertion in the bridge catches the rest only where tests run the agent.
 - **Where portr and the code sessions package live** (#915, #893): this RFC requires only that they read the composed registry.
 
@@ -373,6 +400,9 @@ Each is settled in phase 3, 4 or 5, or carried as an exit criterion.
 - MCP elicitation and ACP permission requests can carry the rendering and an answer bound to the digest.
 - Web push actions on iOS and Android open portalr signed in.
 - Compose's `internal: true` networks leave no route out but the proxy's, under Docker and gVisor alike.
+- Envoy's dynamic forward proxy can be made to connect only to the address the authorizer resolved and checked, so DNS rebinding can't swap it between the check and the connection; if not, a cluster addressed by the authorizer's answer, or smokescreen behind Envoy for those checks.
+- `ext_authz`'s allow response sets upstream headers on a forward-proxy request Envoy originates TLS for, and its dynamic metadata reaches the access log.
+- File-based xDS picks up a re-rendered configuration without dropping connections, in Compose and on ECS.
 
 ## Tracking
 
@@ -382,13 +412,14 @@ Each is settled in phase 3, 4 or 5, or carried as an exit criterion.
 - [ ] artifactr: its provider, `Risk` mapped to tiers, deferred approvals backed by `Approval` (#940, #941)
 - [ ] grantr: the approvals store, first answer wins, expiry and audit (#941)
 - [ ] lattice-core and grantr: the Supabase Vault adapter and secrets metadata with RLS (#942)
-- [ ] stackr: the egress proxy and internal networks (#943)
+- [ ] stackr and lattice-core: Envoy as the egress proxy, its rendered configuration, the authorizer and internal networks (#943), once P1 is confirmed
+- [ ] lattice-core and grantr: the secrets copy command (#942, O7)
 - [ ] lattice-core and stackr: adapter discovery, the harness and `make validate` (#944)
 - [ ] reflexr and grantr: their providers; the cross-package bypass test (#940)
 - [ ] Taint's first cut on these contracts (#903)
 - [ ] portalr: approvals list and page, web push, the Adapters and Egress views (#902, #952, #944)
 - [ ] portr: elicitation and ACP permission surfaces (#918)
-- [ ] Decisions T1 to T7, each recorded in an ADR as it is built
+- [ ] Decisions T1 to T3, T5 to T7 and O5 to O8, and P1 once confirmed, each recorded in an ADR as it is built
 - [ ] Docs: each part's guide, `docs/lattice-core/`, and the architecture docs it changes
 
 ## Evidence

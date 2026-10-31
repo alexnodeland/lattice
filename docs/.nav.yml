@@ -13,6 +13,7 @@ nav:
       - rfcs/0006-excalidraw-diagrams-drawn-live.md
       - rfcs/0007-portalr-brand-kits.md
       - rfcs/0008-portalr-product-analytics.md
+      - rfcs/0015-ports-and-adapters-for-code-sessions-forge-coding-agent-ide-and-sandbox.md
       - Template: rfcs/template.md
   - Decisions:
       - adr/README.md

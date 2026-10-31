@@ -42,6 +42,7 @@ from lattice_core.enforcement import (
     Forbidden,
     LimitReached,
     NotEnabled,
+    Step,
     TaintDenied,
     TierRefused,
     UnknownCapability,
@@ -380,6 +381,40 @@ async def test_a_call_that_needs_approval_waits_and_goes_ahead_once_approved() -
     called = await built.call(approval="apr_1")
     assert (called.result.output, called.approval) == ("sent", "apr_1")
     assert built.audit.entries[-1].approval == "apr_1"
+
+
+async def test_an_approval_lets_one_call_through() -> None:
+    built = Built(capability(), approvals=Policy(Answerers(subjects=frozenset({"sam"}))))
+    with pytest.raises(ApprovalPending):
+        await built.call()
+    yes = Answer(approved=True, arguments_digest=arguments_digest(ARGUMENTS), surface="portalr")
+    await built.store.answer("apr_1", yes, subject=Subject(id="sam"))
+    await built.call(approval="apr_1")
+    with pytest.raises(ApprovalClosed, match="apr_1 let its one call through at "):
+        await built.call(approval="apr_1")
+    assert len(built.provider.calls) == 1
+    assert (await built.store.get("apr_1")).taken_at == NOW
+
+
+async def test_a_call_resumed_on_its_approval_was_counted_as_it_asked() -> None:
+    counter = FakeCounter()
+    built = Built(
+        capability(limits=(PER_HOUR.key,)),
+        approvals=Policy(Answerers(subjects=frozenset({"sam"}))),
+        counter=counter,
+        settings=SettingsDefaults({PER_HOUR.key: PER_HOUR}, {PER_HOUR.key: 1}),
+    )
+    with pytest.raises(ApprovalPending):
+        await built.call()
+    yes = Answer(approved=True, arguments_digest=arguments_digest(ARGUMENTS), surface="portalr")
+    await built.store.answer("apr_1", yes, subject=Subject(id="sam"))
+    await built.call(approval="apr_1")
+    assert counter.counts == {(PER_HOUR.key, HERE): 1}
+    assert built.audit.entries[-1].steps[3] == Step(
+        name="limits", passed=True, note="counted as it asked approval"
+    )
+    with pytest.raises(LimitReached):
+        await built.call()
 
 
 async def test_a_denied_or_closed_approval_refuses() -> None:

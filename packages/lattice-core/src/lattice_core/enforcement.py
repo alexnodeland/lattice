@@ -42,6 +42,7 @@ from lattice_core.approvals import (
     ApprovalRequest,
     Approvals,
     Coverage,
+    NotApproved,
     Rendering,
     arguments_digest,
 )
@@ -413,7 +414,7 @@ class Enforcer:
         try:
             if found is None:
                 raise UnknownCapability("registry", f"no capability {name} in this workspace")
-            await self._check(found.capability, context, steps)
+            await self._check(found.capability, context, steps, resumed=approval is not None)
             verdict = await self._taint_step(found.capability, context, steps)
             allowed = await self._approval_step(
                 found.capability, arguments, digest, context, verdict, approval, steps
@@ -461,8 +462,14 @@ class Enforcer:
         steps.append(Step(name="mark", passed=True, note=marked.state))
         return marked
 
-    async def _check(self, capability: Capability, context: CallContext, steps: list[Step]) -> None:
-        """Steps 1 to 4: the integration, the grant, the tier and the limits."""
+    async def _check(
+        self, capability: Capability, context: CallContext, steps: list[Step], *, resumed: bool
+    ) -> None:
+        """Steps 1 to 4: the integration, the grant, the tier and the limits.
+
+        A try is counted once, when first made: a call resumed on an approval was counted as it
+        asked for it, and its approval lets one call through.
+        """
         scope, gate = context.scope, capability.gate
         if gate.integration is not None and not await self._integrations.is_enabled(
             scope.tenant_id, scope.workspace_id, gate.integration
@@ -478,6 +485,9 @@ class Enforcer:
             if capability.tier not in ceiling:
                 raise TierRefused("tier", f"{caller.agent} may not call {capability.tier} tools")
         steps.append(Step(name="tier", passed=True))
+        if resumed and capability.limits:
+            steps.append(Step(name="limits", passed=True, note="counted as it asked approval"))
+            return
         for key in capability.limits:
             try:
                 limit = await self._settings.value(scope.tenant_id, scope.workspace_id, key)
@@ -547,14 +557,16 @@ class Enforcer:
         raise ApprovalPending(asked.id)
 
     async def _answered(self, id: ApprovalId, capability: Capability, digest: str) -> None:
-        """Check that an approval given is this call's, and approved."""
+        """Check that an approval given is this call's and approved, and take it for the call."""
         approval = await self._store.get(id)
         if approval.capability != capability.name or approval.arguments_digest != digest:
             raise WrongApproval("approval", f"approval {id} is for another call")
         if approval.state == "pending":
             raise ApprovalPending(id)
-        if approval.state != "approved":
-            raise ApprovalClosed("approval", f"approval {id} is {approval.state}")
+        try:
+            await self._store.take(id)
+        except NotApproved as closed:
+            raise ApprovalClosed("approval", str(closed)) from closed
 
 
 # ─── Fakes, for tests ─────────────────────────────────────────────────────────

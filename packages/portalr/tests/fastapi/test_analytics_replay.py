@@ -1225,7 +1225,15 @@ async def test_a_no_to_analytics_where_replay_owes_nothing_settles_nothing_for_i
     assert not [r for r in stand.sent if r.method == "DELETE"], "nothing deleted for replay"
 
 
-async def test_many_asking_whether_umami_keeps_replays_at_once_ask_it_once(stack: Stack) -> None:
+async def test_many_asking_whether_umami_keeps_replays_at_once_ask_it_once(
+    stack: Stack, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Five ask while the first question is out; each waits for its answer.
+
+    The question's deadline, ``ASK``, is lifted: this is about asking once, and on a loaded
+    runner a second of the wall clock can pass before the slowed read is answered.
+    """
+    monkeypatch.setattr("portalr.readers.umami.ASK", 60.0)
     stack.stand.slow = 0.05
     umami = umami_of(stack.stand)
     answers = await asyncio.gather(*(umami.replay_enabled() for _ in range(5)))

@@ -235,7 +235,8 @@ An **approval** asks whether something may happen; a **confirmation** asks the c
 - **A confirmation is out of band, never in the client.** It is a URL-mode elicitation to portalr's confirm page, `/portalr/admin/confirm/{id}`, which the person opens signed in; it names the action and its target and asks them to type the target's name. Form-mode elicitation is answered by the client's software, which may be set to accept on its own; a URL-mode elicitation opens a page the client can't read or fill (MCP's elicitation rules), and portalr checks that the person who opens it is the caller, as MCP requires. Where the client has no URL mode, the tool returns the same link as a pending status.
 - **Refused to service principals by default.** grantr grants roles, never bare actions, so a key may call an `admin_high` command only if it holds the action through a custom role granted to it, never through a built-in one such as `owner` or `admin`; each grant names its role, so the check can tell. Its call then needs no confirmation, since no person is there, and is audited as such.
 - **Audited** as from the client: "Alex via Claude revoked key ci-bot", with the confirmation's id.
-- **How it is built on RFC-0011:** a confirmation is an `Approval` whose `answerers` name exactly the caller, offered on the URL surface alone. That gives it expiry, first answer wins and audit, and puts it in portalr's approvals list, with no second mechanism. It conflicts with one line of RFC-0011 ([Requests to RFC-0011](#requests-to-rfc-0011)).
+- **How it is built on RFC-0011:** a confirmation is an `Approval` whose `answerers` name exactly the caller, offered on the URL surface alone. That gives it expiry, first answer wins and audit, and puts it in portalr's approvals list, with no second mechanism (Decision O8).
+- **A different approver, where asked.** For particular `admin_high` commands, the operator may require a second person through an ADR-0030 `Subset` setting over those commands, which a tenant may only widen to more of them, never fewer; such a command then needs the caller's confirmation and an approval with `different_approver`, which never reaches the caller's surfaces. RFC-0011's follow-up records this rule and names the setting.
 
 ### Limits per client (#917)
 
@@ -252,12 +253,11 @@ A limit reached answers a tool error that names it, the setting's layer and when
 
 ### Requests to RFC-0011
 
-RFC-0011 is in Discussion, so these are raised there, not decided here:
+RFC-0011 is in Discussion, so these are raised there, not decided here. How `admin_high` relates to `different_approver` is no longer among them: the owner decided it (Decision O8), and RFC-0011's follow-up records it.
 
 1. **`CallContext` carries the client:** an optional `via` with the connection's id, the client's name and the surface, so providers can build `ExternalAgentActor(on_behalf_of=...)` and audit can name the client. Without it, "via <client>" can't be attributed.
-2. **`admin_high` and `different_approver`.** RFC-0011's "One policy" bullet, under "The approval object", says `different_approver` "is always set for `risk_class="admin_high"`". Read literally, revoking a leaked key, or a sole owner deleting their tenant, would need a second person. This RFC recommends instead that `admin_high` asks the caller's own confirmation, out of band, and a different approver only where the gate or a tenant's approval policy says so (Decision P10). The alternatives are in the decision's row.
-3. **ACP's surface in 0.3.0** is the coding agent's permission requests (#895, #888), not editors', which RFC-0011's surface table may want to say.
-4. **The `Counter` port keys by the connection:** RFC-0011 says what a limit counts, not by whom; [Limits per client](#limits-per-client-917) needs a count per `CallContext.via`.
+2. **ACP's surface in 0.3.0** is the coding agent's permission requests (#895, #888), not editors', which RFC-0011's surface table may want to say.
+3. **The `Counter` port keys by the connection:** RFC-0011 says what a limit counts, not by whom; [Limits per client](#limits-per-client-917) needs a count per `CallContext.via`.
 
 ### The rest of #914, in 0.3.x
 
@@ -308,7 +308,7 @@ Each builds on a section above, which its issue links:
 
 ## Decisions
 
-Decided by the owner (#914, the v0.3 plan's decisions of 2026-10-30, and O7 on 2026-10-31):
+Decided by the owner (#914, the v0.3 plan's decisions of 2026-10-30, and O7 and O8 on 2026-10-31):
 
 | # | Question | Decided | Instead of |
 |---|---|---|---|
@@ -319,6 +319,7 @@ Decided by the owner (#914, the v0.3 plan's decisions of 2026-10-30, and O7 on 2
 | O5 | The 0.3.0 slice | #916, #917 and #918; the rest of #914 in 0.3.x | The whole epic in 0.3.0 |
 | O6 | Not now | Registry listings and Agent2Agent | |
 | O7 | Where portr lives (2026-10-31) | A new package, `portr`, depending only on lattice-core and grantr, reaching commands only through RFC-0011's registry ([Where portr lives](#where-portr-lives)) | Inside portalr; importing each library; in the template |
+| O8 | `admin_high` (2026-10-31) | By default, the caller's own fresh confirmation on a signed-in portalr confirm page, not a second person, built as an `Approval` answered by the caller. A different approver may be required for particular `admin_high` actions, through an ADR-0030 setting the operator sets and a tenant may tighten ([Confirmations](#confirmations-and-risk-classes-918)) | A second person for every one, as RFC-0011 first said, which blocks revoking a leaked key; a confirmation mechanism of portr's own beside approvals |
 
 Recommended, for the owner to confirm:
 
@@ -332,7 +333,6 @@ Recommended, for the owner to confirm:
 | P7 | Connections | A grantr object, listed, limited, audited and revoked like keys | portr's own table; Supabase's grants alone, which can't be revoked at once |
 | P8 | Tenants | One tenant per connection, chosen at consent. Its cost: most clients keep one connector per server URL (from memory), so a person in two tenants reaches one at a time from one client, unless the URL names the tenant, `/portr/t/{tenant}/mcp`, with RFC 9728's metadata per path (from memory), which is the fallback if the owner finds the cost too high | A `tenant` argument on every tool; a tenant in the URL from the start |
 | P9 | Client registration | Dynamic Client Registration first, as Supabase offers it; Client ID Metadata Documents when Supabase supports them | Pre-registered clients only |
-| P10 | `admin_high` | The caller's own confirmation, out of band in portalr, built as an `Approval` answered by the caller; a different approver only by policy | RFC-0011 as written: a second person for every one, which blocks revoking a leaked key; a confirmation mechanism of portr's own beside approvals |
 | P11 | Approvals in clients | Form elicitation for approvals the caller may answer; never a tool that answers; the ACP client picks only `*_once` | Approvals in portalr alone (#918's Alternatives) |
 | P12 | Limits | Four settings, counted per connection; per client app across a tenant in 0.3.x | Keys per client app in ADR-0030's registry |
 | P13 | Parity's mechanism | `x-lattice-command` on every operation, command frames' `type`, the client's generated `CommandName` and manifest | Tagging in the UIs' components |
@@ -356,8 +356,8 @@ Recommended, for the owner to confirm:
 
 ## Unresolved questions
 
-- **P2 to P13,** for the owner.
-- **RFC-0011's four requests** ([Requests to RFC-0011](#requests-to-rfc-0011)), settled in its Discussion.
+- **P2 to P9 and P11 to P13,** for the owner.
+- **RFC-0011's three requests** ([Requests to RFC-0011](#requests-to-rfc-0011)), settled in its Discussion.
 - **Per-client-app limits across a tenant,** and the operator naming known client apps, in 0.3.x.
 - **What 0.3.0's search reads,** if a text match over threads and artifacts is too slow at a large workspace's size.
 
@@ -375,8 +375,8 @@ Each is settled in phase 3 or 4, or carried as an exit criterion; items marked "
 
 ## Tracking
 
-- [ ] Sign-off on P2 to P13, and RFC-0011's four requests
-- [ ] ADRs: the command declaration (P2, P3, P4); portr's home (O7); connections (P7, P8); confirmations (P10)
+- [ ] Sign-off on P2 to P9 and P11 to P13, and RFC-0011's three requests
+- [ ] ADRs: the command declaration (P2, P3, P4); portr's home (O7); connections (P7, P8); confirmations (O8)
 - [ ] lattice-core: `commands` and its schema (#916)
 - [ ] artifactr, grantr, reflexr, relayr, portalr: their catalogs, providers, `x-lattice-command` and schemas (#916)
 - [ ] portalr's client: `CommandName` and `commands.used.json`; root `tests/test_parity.py` and its fixtures (#916)

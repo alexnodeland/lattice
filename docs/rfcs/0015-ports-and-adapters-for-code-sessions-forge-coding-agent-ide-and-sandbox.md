@@ -432,7 +432,7 @@ ADR-0018 keeps lattice-core to what the libraries share word for word, with no d
 | gVisor's traps | A pinned release, helpers beside `runsc`, the platform in `ImageRef`, `make validate` |
 | Exec through OpenSandbox unproven | Phase 2's exit criterion, on a Linux runner |
 | A scripted stub model through LiteLLM for conformance | [Testing](#testing-at-100-branch-coverage) |
-| Finish #899's first criterion on GitHub before Discussion ends | Tracking, and Decision C10 |
+| Finish #899's first criterion on GitHub | Tracking, and Decision C10: before the GitHub nightly run ships |
 | Draft and checks as forge capabilities | [Capability flags](#the-forge-port) |
 
 ### Testing at 100% branch coverage
@@ -504,7 +504,7 @@ Decided by the owner on 2026-10-31, on accepting this RFC:
 | C6 | Permission answers | An [RFC-0011][rfc-0011] approval, `once` or `reject`; "always" in 0.3.x through `AnswerScope`, whose shape is decided by [RFC-0011][rfc-0011] (O12, 2026-10-31) | Offering "always" now, beside an approval bound to one request |
 | C7 | The diff | Lattice's `git diff`, untracked files included; no ACP `fs/*` | opencode's `/diff`; serving `fs/*` from the sandbox (#895) |
 | C9 | Forge credentials | Read by the gateway and the forge client only, through `Forge.credential`, tunnelled through the egress proxy | Injected by Envoy from `X-Lattice-Secret`, which can't mint GitHub's installation tokens without the authorizer learning each forge |
-| C10 | The flagship's forge in CI | Forgejo in a container on every run; GitHub nightly; #899's GitHub half done before this leaves Discussion | GitHub in CI, which needs an App's secrets |
+| C10 | The flagship's forge in CI | Forgejo in a container on every run; GitHub nightly; #899's GitHub half done before the GitHub nightly run ships, in phase 4 (M3) | GitHub in CI, which needs an App's secrets |
 | C11 | grantr actions | #893's `code:start_session`, `code:push`, `code:open_change_request` and `code:manage_forges`, plus `code:read_session` and `code:read_repository`; bindings under [RFC-0011][rfc-0011]'s `grantr:manage_bindings` (O13) | Reading under `code:start_session` |
 | C12 | Pushes in a tainted session | `code.push` mapped to `narrow`, which the gateway enforces; the person's gate at `code.mark_ready` | Every push of a CI loop asking a person |
 | C13 | The forge source | relayr's `forge` extra, `relayr.forge`, as [RFC-0013][rfc-0013] decides (its R10) | In `codr`, which would import reflexr |
@@ -550,7 +550,7 @@ Each is settled in its phase, or carried as an exit criterion.
 
 ## Tracking
 
-- [ ] #899's GitHub half, before this leaves Discussion (C10)
+- [ ] #899's GitHub half, before the GitHub nightly run ships in phase 4 (M3) (C10)
 - [ ] ADR: `codr`, a new library for code sessions, under ADR-0018 and ADR-0026 (C1)
 - [ ] codr: the four ports, models, fakes and suites (#893)
 - [ ] codr and stackr: the sandbox port's adapters, the `code` profile and gVisor pinned (#885)

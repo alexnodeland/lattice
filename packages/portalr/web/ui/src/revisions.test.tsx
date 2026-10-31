@@ -48,7 +48,14 @@ async function shown(
   const screen = await render(
     <IntegrationsContext value={enabled}>
       <AppHostContext value={apps}>
-        <Revisions id="art_1" revisions={revisions} renderers={RENDERERS} compare={compare} />
+        <Revisions
+          id="art_1"
+          revisions={revisions}
+          renderers={RENDERERS}
+          compare={compare}
+          // A pinned "now", so "how long ago" reads the same on every day the tests run.
+          now={new Date("2026-10-20T12:00:00Z")}
+        />
       </AppHostContext>
     </IntegrationsContext>,
   );

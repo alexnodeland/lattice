@@ -489,13 +489,18 @@ Decided by [RFC-0011's Decision O11](0011-the-v0-3-platform-capabilities-approva
 |---|---|---|---|
 | W6 | Recording pre-approval | One `Approval` per plan version, with `covers` (each `ListedAction`'s `target` held as the condition's JSON) and a `Coverage` port the enforcer asks at step 6, both in RFC-0011's `lattice_core.approvals` | One approval per listed action, asked as a batch: no change to RFC-0011, but N records to answer as one, and no single answer bound to the plan |
 
+Decided by the owner on 2026-10-31:
+
+| # | Question | Decided | Instead of |
+|---|---|---|---|
+| W3 | Runs | One `Run` with a `cause` union; the firing's fields optional; the break taken once in 0.3.0, with `!` in the title and an upgrade note, and no deprecated aliases | A separate `WorkflowRun` beside `Run`: no break, but two durability models, which #968 rules out; or the old fields kept as aliases through 0.3.x |
+
 Recommended, for the owner to confirm:
 
 | # | Question | Recommended | Instead of |
 |---|---|---|---|
 | W1 | Where the spec lives | `reflexr.core.workflows`; the artifact in relayr, as `rule` is | lattice-core `workflows`: every library could read it, but it is one package's domain, which ADR-0018 keeps out |
 | W2 | The condition language | reflexr's `where`, `all`, `any`, `not` over the run document, one comparison for both; `to_field` added; no `on` or `predicate`, no `matches` when stored | A second expression language (CEL, JSONLogic), which rules and workflows would read differently |
-| W3 | Runs | One `Run` with a `cause` union; the firing's fields optional; a break, taken once in 0.3.0 | A separate `WorkflowRun` beside `Run`: no break, but two durability models, which #968 rules out |
 | W4 | 0.3.0's schema | Only `agent_task`; each later kind a minor version as its runner ships | The whole vocabulary in v1, refused at check until built: fixes untried fields as a contract |
 | W5 | Pausing a run | `waiting` without a lease, resumed by `resume_run` with a backstop, in 0.3.0 | A second rule continuing on the answer, the architecture's workaround, which loses the agent's turn |
 | W7 | Data in prompts, and references | Data only through `with`, never interpolated; a reference in a value field is `{"ref": ...}`, so it never collides with a literal | Templates in `task`, which put untrusted text in instructions; bare strings as references everywhere, which can't be told from values |

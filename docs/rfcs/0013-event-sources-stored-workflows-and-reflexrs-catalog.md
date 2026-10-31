@@ -1,6 +1,6 @@
 # RFC-0013: Event sources, stored workflows and reflexr's catalog
 
-**Status:** Discussion
+**Status:** Accepted
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file
@@ -289,7 +289,7 @@ The template rules of #890 (an issue labelled, CI red on a session's change requ
 
 ### How a source's events start a workflow run
 
-Workflows are [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s (draft): their spec, steps, versions, scopes, budgets and grantr actions. Automations pin them (#972), and runs are decoupled from rules (#968). This RFC fixes only what crosses from the source to the run:
+Workflows are [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s: their spec, steps, versions, scopes, budgets and grantr actions. Automations pin them (#972), and runs are decoupled from rules (#968). This RFC fixes only what crosses from the source to the run:
 
 1. **A rule's `then` names a workflow** and a version, with a mapping from the event's fields to its inputs (#972); code actions stay as one-step workflows. The run's cause is the firing (#968).
 2. **The run carries a trust level,** the lowest among the firing's matched envelopes, and passes it on: the run's events are no more trusted than it (the causation rule), its taint starts as [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) describes, and a code action's `Reaction` gains `trust`.
@@ -414,9 +414,9 @@ Decided by the owner:
 | D7 | The webhook, email, polls and rows | 0.3.x: #842 and #848 are `v0.3`, not `v0.3-core` | their labels; the v0.3 plan, §2 |
 | D8 | Where bindings are stored (this RFC's R4) | A `lattice_core.bindings` port, stored and audited by grantr under `grantr:manage_bindings`, held by a tenant's owners and admins | [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md), Decision O13 (2026-10-31) |
 
-Recommended, for the owner to confirm:
+Decided by the owner on 2026-10-31, on accepting this RFC:
 
-| # | Question | Recommended | Instead of |
+| # | Question | Decided | Instead of |
 |---|---|---|---|
 | R1 | Trust's shape | Three ordered levels, one per envelope, lowered and never raised by binding, occurrence and causation; non-source actors by the table | A level per field (#847's question), which the payload would carry |
 | R2 | Filtering on trust | `trust` and `origin` filter kinds in core | A reserved event field `trust`, which the payload would then hold |
@@ -453,7 +453,7 @@ Recommended, for the owner to confirm:
 
 ## Unresolved questions
 
-- **[RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s field names** for the accepted level and the input mapping, settled when both RFCs are in Discussion.
+- **The accepted level, between this RFC and [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md).** R13 asks for a workflow's lowest accepted level, `authenticated` by default, refused as `trust_refused`; RFC-0012, accepted with this one, puts the levels on the agent (#947), fails an `agent_task` below them with `untrusted_trigger`, and declares none on the workflow. Which is built is still to reconcile. RFC-0012 fixes the input mapping (`then`'s `inputs`).
 - **Whether evaluator verdicts on untrusted runs** should be `untrusted` too, by the causation rule, or `internal`, as judgements of lattice's own models.
 - **Paused intervals in preview:** 0.3.0 reports `bound_at`; reporting the gaps a pause left is 0.3.x.
 - **The neutral `alert:` fields** may grow when #926's registry lands; additions only.
@@ -484,7 +484,14 @@ Each is settled in phase 5 or 6, and recorded as a fixture.
 - [ ] stackr and reflexr: #890's template rules, with trust carried to the run (#890, #968, #972)
 - [ ] reflexr: the catalog and status reads on REST and MCP, the four actions, grantr's roles and `access.md` (#840, #841)
 - [ ] reflexr: budgets, scores and evaluations (#846)
-- [ ] Decisions R1 to R3 and R5 to R14, each recorded in an ADR as it is built
+- [ ] reflexr ADR: trust levels and origin on envelopes, set by reflexr and never by the payload, with the `trust` and `origin` filters; rules skip non-live envelopes unless they opt in (D2, R1, R2, R3)
+- [ ] reflexr ADR: the intake: bindings select by declared selectors only, a paused binding refused and counted, a registered source's actor publishes only through it (R5, R6, R7)
+- [ ] reflexr ADR: where sources live: the `Source` protocol in reflexr's base, Alertmanager and the stack's signals as reflexr extras, the forge source in relayr (D1, R10)
+- [ ] reflexr and stackr ADRs: Alertmanager in stackr's observability profile, nudged and followed, keyed by fingerprint and `startsAt`, tenants by `tenant_id`, `internal`; #846's other signals in M5 (R8, R14)
+- [ ] relayr ADR: the forge source, `relayr.forge`, its events `untrusted` with no raise in 0.3.0 (R9; RFC-0015's C13)
+- [ ] reflexr ADR: the catalog's four actions (R11)
+- [ ] reflexr ADR: what a run started by a source carries, a workflow's lowest accepted level and untrusted fields kept out of instructions, reconciled with RFC-0012's trust on the agent (R13)
+- [ ] reflexr ADR (0.3.x, with #842): stored event types, as JSON Schema under a tenant's namespace, versioned by addition only (R12)
 - [ ] Docs: reflexr's and relayr's architecture and protocol, the sources guide, stackr's Alertmanager guide, the upgrade note (#946)
 
 ### Where each item of #839 is settled

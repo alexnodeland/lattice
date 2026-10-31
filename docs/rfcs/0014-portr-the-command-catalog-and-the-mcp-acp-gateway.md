@@ -1,6 +1,6 @@
 # RFC-0014: portr, the command catalog and the MCP/ACP gateway
 
-**Status:** Discussion
+**Status:** Accepted
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file
@@ -163,7 +163,7 @@ The plan left this open (§6 Q4, §7.7); the owner decided it on 2026-10-31 (O7)
 4. Supabase sends the browser to the consent page, which the application hosts: portalr's `/portalr/app/connect`, signed in as usual. It names the client, asks for the tenant the connection is for and the toolsets it may use, shows each toolset's tiers, and on Allow records the **connection** in grantr before calling Supabase's approval endpoint.
 5. Authorization code with PKCE, then access and refresh tokens. portr verifies each access token's signature against Supabase's JWKS, its issuer and expiry, its audience, and its `client_id` against a live connection.
 
-**Audience.** MCP requires a resource server to accept only tokens issued for it; Supabase Auth is not known to honour RFC 8707's `resource` parameter (a FastMCP guide says so; Unverified). Two defences, both recommended (Decision P6): a Supabase custom access token hook that sets `aud` to the gateway's canonical URI for tokens issued to OAuth clients, which portr requires; and the connection check, which refuses any token whose `client_id` and `sub` name no live connection, so a portalr session's token, which has no OAuth client, is never accepted at the gateway.
+**Audience.** MCP requires a resource server to accept only tokens issued for it; Supabase Auth is not known to honour RFC 8707's `resource` parameter (a FastMCP guide says so; Unverified). Two defences, both decided (Decision P6): a Supabase custom access token hook that sets `aud` to the gateway's canonical URI for tokens issued to OAuth clients, which portr requires; and the connection check, which refuses any token whose `client_id` and `sub` name no live connection, so a portalr session's token, which has no OAuth client, is never accepted at the gateway.
 
 **Keys.** A service principal sends its grantr key, `Authorization: Bearer grantr_sk_...`, as the template's `auth.py` already accepts keys in place of tokens. It is a second scheme, told apart by its prefix, never confused with an OAuth token, and never sent anywhere else. A key's connection is the key itself: it is listed, limited and revoked as keys are (portalr ADR-0024), and its toolsets are granted to it in admin.
 
@@ -327,9 +327,9 @@ Decided by the owner (#914, the v0.3 plan's decisions of 2026-10-30, and O7 and 
 | O12 | Tenants (2026-10-31) | One tenant per connection, chosen at consent; a second tenant is a second connection, from the tenant-named URL `/portr/t/{tenant}/mcp` | A `tenant` argument on every tool, which makes one connection's reach every tenant the person is in |
 | O13 | A key's `admin_high` call (2026-10-31) | No exception: a key never runs an `admin_high` action on its own word. Automation may request it, and a person confirms it on portalr's confirm page or by web push | #918's exception for a key granted the action specifically |
 
-Recommended, for the owner to confirm:
+Decided by the owner on 2026-10-31, on accepting this RFC:
 
-| # | Question | Recommended | Instead of |
+| # | Question | Decided | Instead of |
 |---|---|---|---|
 | P2 | The command's shape | `Command` in lattice-core: a [RFC-0011][rfc-0011] `Capability` plus toolset, exposure, route, resource and surfaces | A second tool type beside capabilities; metadata held by portr |
 | P3 | Declaration and binding | A static catalog per package, through [RFC-0011][rfc-0011]'s entry point; a provider bound at the composition root | Catalogs built only at runtime, which the parity test and schemas couldn't read |
@@ -361,7 +361,8 @@ Recommended, for the owner to confirm:
 
 ## Unresolved questions
 
-- **P2 to P7, P9 and P11 to P13,** for the owner.
+As of 2026-10-31, P2 to P7, P9 and P11 to P13 are decided ([Decisions](#decisions)).
+
 - **Per-client-app limits across a tenant,** and the operator naming known client apps, in 0.3.x.
 - **What 0.3.0's search reads,** if a text match over threads and artifacts is too slow at a large workspace's size.
 
@@ -379,8 +380,13 @@ Each is settled in phase 3 or 4, or carried as an exit criterion; items marked "
 
 ## Tracking
 
-- [ ] Sign-off on P2 to P9 and P11 to P13
-- [ ] ADRs: the command declaration (P2, P3, P4); portr's home (O7); connections (P7, O12); confirmations (O8, O13)
+- [ ] lattice-core ADR: the command declaration: `Command` as an RFC-0011 `Capability` plus toolset, exposure, route, resource and surfaces; a static catalog per package, bound at the composition root; tool names `<package>_<name>`, a breaking change a new command (P2, P3, P4)
+- [ ] lattice ADR: portr, a new package on lattice-core and grantr, reaching commands only through RFC-0011's registry (O7)
+- [ ] lattice ADR: parity's mechanism: `x-lattice-command` on every operation, command frames' `type`, the client's `CommandName` and manifest, root `tests/test_parity.py` (P13)
+- [ ] portr ADR, with the package: the gateway's transport and tokens: MCP 2026-07-28 first and stateless, the access token hook's `aud` and a live connection on every call, Dynamic Client Registration first (P5, P6, P9)
+- [ ] grantr ADR: connections as grantr objects, one tenant each, listed, limited, audited and revoked like keys (P7, O12)
+- [ ] portr ADR, with the package: approvals by form elicitation and never a tool that answers; the ACP client picks only `*_once`; confirmations out of band on portalr's confirm page, and no `admin_high` on a key's word (P11, O8, O13)
+- [ ] portr ADR, with the package: limits per connection, four settings; per client app in 0.3.x (P12)
 - [ ] lattice-core: `commands` and its schema (#916)
 - [ ] artifactr, grantr, reflexr, relayr, portalr: their catalogs, providers, `x-lattice-command` and schemas (#916)
 - [ ] portalr's client: `CommandName` and `commands.used.json`; root `tests/test_parity.py` and its fixtures (#916)

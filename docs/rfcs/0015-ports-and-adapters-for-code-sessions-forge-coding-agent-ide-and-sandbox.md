@@ -493,13 +493,13 @@ Decided by the owner, here or in [RFC-0011][rfc-0011]:
 | C1 | Where it lives | A new library, `codr`, distributed on PyPI as `codr-ai`, importing only lattice-core, adapters as extras (2026-10-31; [Where it lives](#where-it-lives)) | lattice-core and stackr; an extra of relayr or artifactr |
 | C2 | The first ACP agent | Claude Code through `claude-agent-acp`, on the condition that its terms allow running it on a server through a gateway; the terms check stays in Tracking (2026-10-31). The spike ran it end to end through LiteLLM (3 s, every method mapped) | Codex (its Responses route through LiteLLM unverified) or Gemini CLI (its ACP flag differs by version, unverified), the fallback if Claude Code's terms don't allow it |
 | C8 | OpenSandbox's vault and egress (decided by [RFC-0011][rfc-0011], 2026-10-31) | Lattice keeps policy and audit; `networkPolicy` derived from the session's two endpoints; the vault unused | OpenSandbox's as the enforcement; registries copied into `networkPolicy` |
+| C3 | Force-pushes (2026-10-31) | The gateway receives into a per-session mirror and checks `--is-ancestor` in quarantine before it pushes upstream; forge branch protection on `lattice/*` as the second line | Ref names alone (the spike's hole); forge protection alone (not every forge, and too late) |
+| C4 | Who may push (2026-10-31) | Only an open push grant for the approved sha, opened by `code.push` | Any push from the sandbox to the session's branch, which the agent could make itself |
 
 Recommended, for the owner to confirm:
 
 | # | Question | Recommended | Instead of |
 |---|---|---|---|
-| C3 | Force-pushes | The gateway receives into a per-session mirror and checks `--is-ancestor` in quarantine before it pushes upstream; forge branch protection on `lattice/*` as the second line | Ref names alone (the spike's hole); forge protection alone (not every forge, and too late) |
-| C4 | Who may push | Only an open push grant for the approved sha, opened by `code.push` | Any push from the sandbox to the session's branch, which the agent could make itself |
 | C5 | The agent port's contract | ACP's session shape; events are hints, `status` and `pending_permissions` the truth | opencode's model; trusting the stream |
 | C6 | Permission answers | An [RFC-0011][rfc-0011] approval, `once` or `reject`; "always" in 0.3.x through `AnswerScope`, whose shape is decided by [RFC-0011][rfc-0011] (O12, 2026-10-31) | Offering "always" now, beside an approval bound to one request |
 | C7 | The diff | Lattice's `git diff`, untracked files included; no ACP `fs/*` | opencode's `/diff`; serving `fs/*` from the sandbox (#895) |

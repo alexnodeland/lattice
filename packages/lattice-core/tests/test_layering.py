@@ -89,7 +89,13 @@ def _within(name: str, prefixes: set[str]) -> bool:
 
 def test_the_modules_that_need_no_extra_are_found() -> None:
     base = {module for module, extra in MODULES.items() if extra is None}
-    assert base >= {"lattice_core.logs", "lattice_core.otel.contribution", "lattice_core.schema"}
+    assert base >= {
+        "lattice_core.capabilities",
+        "lattice_core.logs",
+        "lattice_core.otel.contribution",
+        "lattice_core.schema",
+        "lattice_core.taint",
+    }
 
 
 @pytest.mark.parametrize("module", sorted(MODULES))

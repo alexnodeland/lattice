@@ -14,7 +14,7 @@
 
 ## Summary
 
-Code sessions ([#884](https://github.com/alexnodeland/lattice/issues/884)) run a coding agent in a self-hosted sandbox on a repository's clone, and lattice turns its work into a branch, a change request and a record. They sit on **four ports**, each with normalized models, capability flags and a conformance suite: a **forge** (repositories, content, change requests, reviews, checks, events), a **coding agent** (launch, model wiring, policy, a session shaped as ACP's), an **IDE** (launch and links; its shape only in 0.3.0) and a **sandbox** (create, exec as a duplex stream, files, expose, lifecycle). **Lattice owns git state:** the diff is lattice's `git diff`, and every push goes through lattice's **git gateway**, which receives the pack into a mirror of its own, checks names and ancestry there, answers in git's `report-status`, and only then pushes upstream with a credential the sandbox never sees. The first adapters are GitHub, opencode and OpenSandbox on gVisor; the second, built beside them, are Forgejo and Claude Code over a generic ACP adapter. Every tool a code session offers is an RFC-0011 capability, every permission ask an RFC-0011 approval, and every byte that leaves the sandbox goes through RFC-0011's egress proxy or the git gateway. The code lives in a new library, `codr` (recommended; [Where it lives](#where-it-lives)). Tracked by [#893](https://github.com/alexnodeland/lattice/issues/893), under the epic #884.
+Code sessions ([#884](https://github.com/alexnodeland/lattice/issues/884)) run a coding agent in a self-hosted sandbox on a repository's clone, and lattice turns its work into a branch, a change request and a record. They sit on **four ports**, each with normalized models, capability flags and a conformance suite: a **forge** (repositories, content, change requests, reviews, checks, events), a **coding agent** (launch, model wiring, policy, a session shaped as ACP's), an **IDE** (launch and links; its shape only in 0.3.0) and a **sandbox** (create, exec as a duplex stream, files, expose, lifecycle). **Lattice owns git state:** the diff is lattice's `git diff`, and every push goes through lattice's **git gateway**, which receives the pack into a mirror of its own, checks names and ancestry there, answers in git's `report-status`, and only then pushes upstream with a credential the sandbox never sees. The first adapters are GitHub, opencode and OpenSandbox on gVisor; the second, built beside them, are Forgejo and Claude Code over a generic ACP adapter. Every tool a code session offers is an RFC-0011 capability, every permission ask an RFC-0011 approval, and every byte that leaves the sandbox goes through RFC-0011's egress proxy or the git gateway. The code lives in a new library, `codr`, distributed as `codr-ai` (decided; [Where it lives](#where-it-lives)). Tracked by [#893](https://github.com/alexnodeland/lattice/issues/893), under the epic #884.
 
 ## Motivation
 
@@ -247,7 +247,7 @@ class CodingAgent(Protocol):
 | `usage` | Unverified | yes (`usage_update`, the spike) |
 | `client_fs` | no | **not offered:** the spike's agent never called `fs/*`, so the ACP client declares no file-system capability, and #895's "served from the sandbox" is dropped |
 
-**The generic ACP adapter** (`codr.acp`) runs the agent's ACP command with `exec` in the sandbox and speaks JSON-RPC over its stdin and stdout: `initialize`, `session/new`, `session/prompt` to a stop reason, `session/cancel`, `session/update` notifications, and `session/request_permission`, answered `allow_once` or `reject_once` (the spike ran each but cancel). An agent is a **profile** on it: an image layer, the launch command, the wire API and the policy translation. Claude Code's is the first (Decision C2).
+**The generic ACP adapter** (`codr.acp`) runs the agent's ACP command with `exec` in the sandbox and speaks JSON-RPC over its stdin and stdout: `initialize`, `session/new`, `session/prompt` to a stop reason, `session/cancel`, `session/update` notifications, and `session/request_permission`, answered `allow_once` or `reject_once` (the spike ran each but cancel). An agent is a **profile** on it: an image layer, the launch command, the wire API and the policy translation. Claude Code's is the first (Decided, C2), if its terms allow this use.
 
 ### The IDE port: its shape, in 0.3.0
 
@@ -391,13 +391,13 @@ ADR-0018 keeps lattice-core to what the libraries share word for word, with no d
 
 | Option | For | Against |
 |---|---|---|
-| **A. A new library, `codr`, beside artifactr and reflexr and importing neither (recommended)** | Meets both of ADR-0026's reasons: OpenSandbox's SDK, forge clients and git are dependencies no other library should carry, and its consumers (artifactr's chat agent, reflexr's rules, portalr, evalr's scores, later quantr) are several, none of which may own it. It needs only lattice-core, and is reached through capabilities and events | A distribution's cost (ADR-0026): a pending publisher on PyPI, a release pull request, a place in `STAGES`, a moon project, a database in CI and a docs section |
+| **A. A new library, `codr`, beside artifactr and reflexr and importing neither (decided)** | Meets both of ADR-0026's reasons: OpenSandbox's SDK, forge clients and git are dependencies no other library should carry, and its consumers (artifactr's chat agent, reflexr's rules, portalr, evalr's scores, later quantr) are several, none of which may own it. It needs only lattice-core, and is reached through capabilities and events | A distribution's cost (ADR-0026): a pending publisher on PyPI, a release pull request, a place in `STAGES`, a moon project, a database in CI and a docs section |
 | B. The ports and models in lattice-core, the code in stackr | No new distribution | Sessions, forges and agents are domain, which ADR-0018 keeps out of lattice-core; stackr is the stack and its template, not a library applications import |
 | C. An extra of relayr | relayr already bridges artifactr and reflexr | relayr imports both, so code sessions could never run without artifactr; relayr's releases would carry the sandbox's |
 | D. An extra of artifactr | No new distribution | reflexr's rules (#890) would need artifactr; quantr (#1013) too, for the sandbox |
 | E. The sandbox port in lattice-core now, the rest in A | quantr and the code interpreter share it | Nothing is shared word for word yet; ADR-0018 moves code when it is |
 
-**Recommended: A** (Decision C1). The name is the owner's: `codr` follows the libraries' `-r`, and since `codr` on PyPI is an unrelated project (checked 2026-10-30) the distribution would be `codr-ai`, as `lattice-core-ai` and `relayr-ai` are, imported as `codr`.
+**Decided: A** (C1, by the owner on 2026-10-31). The library is `codr`, after the libraries' `-r`; since `codr` on PyPI is an unrelated project (checked 2026-10-30), it is distributed as `codr-ai`, as `lattice-core-ai` and `relayr-ai` are, and imported as `codr`.
 
 | Module | Holds | Extra |
 |---|---|---|
@@ -484,13 +484,13 @@ Decided by the owner:
 | O4 | IDE | The port's shape in 0.3.0; code-server (#891), the viewer (#892) and #896 in 0.3.x | code-server in 0.3.0 |
 | O5 | Principles | Four ports; lattice owns git state; no secrets in the sandbox; neutral `code:*` actions (#884's re-scope, 2026-10-28) | GitHub, opencode and code-server hard-wired |
 | O6 | Egress | RFC-0011's established proxy, Envoy recommended there (its O8, P1) | A proxy of the sandbox's own |
+| C1 | Where it lives | A new library, `codr`, distributed on PyPI as `codr-ai`, importing only lattice-core, adapters as extras (2026-10-31; [Where it lives](#where-it-lives)) | lattice-core and stackr; an extra of relayr or artifactr |
+| C2 | The first ACP agent | Claude Code through `claude-agent-acp`, on the condition that its terms allow running it on a server through a gateway; the terms check stays in Tracking (2026-10-31). The spike ran it end to end through LiteLLM (3 s, every method mapped) | Codex (its Responses route through LiteLLM unverified) or Gemini CLI (its ACP flag differs by version, unverified), the fallback if Claude Code's terms don't allow it |
 
 Recommended, for the owner to confirm:
 
 | # | Question | Recommended | Instead of |
 |---|---|---|---|
-| C1 | Where it lives | A new library, `codr` (`codr-ai`), importing only lattice-core, adapters as extras; the name the owner's ([Where it lives](#where-it-lives)) | lattice-core and stackr; an extra of relayr or artifactr |
-| C2 | The first ACP agent | Claude Code through `claude-agent-acp`: the only one the spike ran end to end through LiteLLM (3 s, every method mapped), with its quirks known. Its licence and terms for running on a server through a gateway are checked before it ships (#895) | Codex (its Responses route through LiteLLM unverified) or Gemini CLI (its ACP flag differs by version, unverified); either is the fallback if Claude Code's terms don't allow it |
 | C3 | Force-pushes | The gateway receives into a per-session mirror and checks `--is-ancestor` in quarantine before it pushes upstream; forge branch protection on `lattice/*` as the second line | Ref names alone (the spike's hole); forge protection alone (not every forge, and too late) |
 | C4 | Who may push | Only an open push grant for the approved sha, opened by `code.push` | Any push from the sandbox to the session's branch, which the agent could make itself |
 | C5 | The agent port's contract | ACP's session shape; events are hints, `status` and `pending_permissions` the truth | opencode's model; trusting the stream |
@@ -524,9 +524,10 @@ Recommended, for the owner to confirm:
 
 ## Unresolved questions
 
-- **The package's name** (C1).
-- **For RFC-0011:** forges and LiteLLM on private addresses. A self-hosted Forgejo and the stack's LiteLLM are on private ranges, which RFC-0011's egress always refuses. The `forge:<connection>` and `litellm` purposes need an operator-declared internal destination, or the gateway and the sandbox's model route need a path past the proxy. Recommended: an operator-declared internal upstream per purpose, in RFC-0011.
-- **For RFC-0011:** an answer that carries a scope, for "always" in 0.3.x (C6).
+Two are asks of RFC-0011, for the follow-up that takes in the other RFCs' requests once it merges (#1217); this RFC doesn't define either.
+
+- **Asked of RFC-0011:** forges and LiteLLM on private addresses. A self-hosted Forgejo and the stack's LiteLLM are on private ranges, which RFC-0011's egress always refuses. The `forge:<connection>` and `litellm` purposes need an operator-declared internal destination, or the gateway and the sandbox's model route need a path past the proxy. Recommended: an operator-declared internal upstream per purpose, in RFC-0011.
+- **Asked of RFC-0011:** an approval answer that carries a scope, for "always" in 0.3.x (C6).
 - **For RFC-0013:** where the Source protocol and concrete sources live, which settles C13.
 - **Mirrors for large repositories:** a shared object store per repository and tenant, with alternates, may replace the per-session mirror's full copy. Measured in phase 3.
 - **Which opencode surface:** `/api/session/...` if, at the pinned release, it covers status, pending asks and replies; the spike's otherwise.
@@ -553,6 +554,7 @@ Each is settled in its phase, or carried as an exit criterion.
 - [ ] codr and stackr: git state, the gateway, its mirror and ref log (#886)
 - [ ] codr: the GitHub adapter (#886) and the Forgejo adapter (#894)
 - [ ] relayr: the forge source, after RFC-0013 (#847)
+- [ ] Claude Code's terms checked for running it on a server through a gateway, before its profile ships (C2); if they don't allow it, Codex or Gemini CLI instead (#895)
 - [ ] codr: the opencode adapter (#887), the ACP adapter and Claude Code's profile (#895), after the terms check
 - [ ] codr and artifactr: the provider, delegation and the `code_session` artifact (#888)
 - [ ] codr: questions about a codebase (#901)
@@ -560,7 +562,7 @@ Each is settled in its phase, or carried as an exit criterion.
 - [ ] reflexr and stackr: the forge-event rules, "CI red" first (#890)
 - [ ] evalr: the first session scores (#906)
 - [ ] #898's code-session steps in CI on Forgejo
-- [ ] Decisions C1 to C13, each recorded in an ADR as it is built
+- [ ] Decisions C1 to C13, each recorded in an ADR as it is built (C1's in the ADR above)
 - [ ] Docs: `docs/codr/`, its architecture, the forge and agent guides, the host requirements
 
 ## Evidence

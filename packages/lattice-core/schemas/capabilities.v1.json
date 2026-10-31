@@ -1,0 +1,524 @@
+{
+  "$defs": {
+    "CallContext": {
+      "description": "What a call carries besides its arguments: where, who, its taint and where it came from.\n\nThe approvals and the egress policy read the same context.",
+      "properties": {
+        "caller": {
+          "$ref": "#/$defs/Caller",
+          "description": "Who calls."
+        },
+        "correlation_id": {
+          "description": "The id that ties the call to the turn, run or session that made it, in logs and audit.",
+          "title": "Correlation Id",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope",
+          "description": "The tenant's workspace the call is made in."
+        },
+        "surface": {
+          "description": "The surface the call came from, such as ``portalr``, ``mcp`` or ``acp``.",
+          "title": "Surface",
+          "type": "string"
+        },
+        "taint": {
+          "$ref": "#/$defs/Taint",
+          "description": "The caller's taint: its turn's, run's or session's."
+        },
+        "via": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Via"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The outside client the call came through, or None for a call from lattice's own\nsurfaces."
+        }
+      },
+      "required": [
+        "scope",
+        "caller",
+        "taint",
+        "correlation_id",
+        "surface"
+      ],
+      "title": "CallContext",
+      "type": "object"
+    },
+    "Caller": {
+      "discriminator": {
+        "mapping": {
+          "person": "#/$defs/PersonCaller",
+          "run": "#/$defs/RunCaller",
+          "session": "#/$defs/SessionCaller"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PersonCaller"
+        },
+        {
+          "$ref": "#/$defs/RunCaller"
+        },
+        {
+          "$ref": "#/$defs/SessionCaller"
+        }
+      ]
+    },
+    "Capability": {
+      "description": "A tool an agent can call, as its provider declares it.\n\nRaises:\n    ValueError: If the name isn't of :data:`NAME`'s form, the version isn't of\n        :data:`VERSION`'s, the description is empty, or a limit isn't a setting's key.",
+      "properties": {
+        "description": {
+          "description": "What it does, for the agent that picks it and the person who approves it.",
+          "title": "Description",
+          "type": "string"
+        },
+        "effects": {
+          "description": "What a call does that taint reads.",
+          "items": {
+            "enum": [
+              "reads_private",
+              "reads_untrusted",
+              "sends_out"
+            ],
+            "type": "string"
+          },
+          "title": "Effects",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "gate": {
+          "$ref": "#/$defs/Gate",
+          "description": "The integration and the grantr action that gate it."
+        },
+        "input_schema": {
+          "$ref": "#/$defs/JsonObject",
+          "description": "The JSON Schema of its arguments."
+        },
+        "limits": {
+          "default": [],
+          "description": "The keys of the settings that limit it (lattice ADR-0030), such as\n``calls-per-hour:mcp-github``.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Limits",
+          "type": "array"
+        },
+        "name": {
+          "description": "Its provider, a dot and its tool: ``artifactr.edit_text``, ``mcp.github.create_issue``.",
+          "title": "Name",
+          "type": "string"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonObject"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The JSON Schema of its output, or None if it declares none."
+        },
+        "provider": {
+          "description": "The kind of provider that offers it.",
+          "enum": [
+            "command",
+            "connector_action",
+            "mcp_tool",
+            "code_session",
+            "workflow",
+            "builtin"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "reversibility": {
+          "description": "Whether a call can be undone.",
+          "enum": [
+            "none",
+            "undoable",
+            "compensable",
+            "irreversible"
+          ],
+          "title": "Reversibility",
+          "type": "string"
+        },
+        "risk_class": {
+          "anyOf": [
+            {
+              "const": "admin_high",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A risk class beyond its tier, if it has one.",
+          "title": "Risk Class"
+        },
+        "tier": {
+          "description": "Its capability tier.",
+          "enum": [
+            "read",
+            "write",
+            "run_code",
+            "outbound"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "version": {
+          "description": "The tool's own semantic version: a new input field is a minor version.",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "description",
+        "input_schema",
+        "output_schema",
+        "provider",
+        "tier",
+        "effects",
+        "reversibility",
+        "gate"
+      ],
+      "title": "Capability",
+      "type": "object"
+    },
+    "Cause": {
+      "description": "What tainted a turn, a run or a session: a capability or an event, and when.\n\nRaises:\n    ValueError: Unless exactly one of ``capability`` and ``event`` is given.",
+      "properties": {
+        "at": {
+          "description": "When it was read.",
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "capability": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The name of the capability whose result was read.",
+          "title": "Capability"
+        },
+        "event": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The id of the event whose untrusted content was read, such as a matched envelope's.",
+          "title": "Event"
+        }
+      },
+      "required": [
+        "at"
+      ],
+      "title": "Cause",
+      "type": "object"
+    },
+    "Clean": {
+      "description": "Nothing untrusted has been read.",
+      "properties": {
+        "state": {
+          "const": "clean",
+          "default": "clean",
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "state"
+      ],
+      "title": "Clean",
+      "type": "object"
+    },
+    "Gate": {
+      "description": "What gates a capability: the integration it needs on, and the grantr action it needs.\n\nRaises:\n    ValueError: If ``integration`` isn't an integration key, or ``action`` isn't of\n        :data:`ACTION`'s form.",
+      "properties": {
+        "action": {
+          "description": "The grantr action the caller must hold, such as ``artifactr:edit_artifact``.",
+          "title": "Action",
+          "type": "string"
+        },
+        "different_approver": {
+          "default": false,
+          "description": "Whether an approval of a call must come from someone other than the caller.",
+          "title": "Different Approver",
+          "type": "boolean"
+        },
+        "integration": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "An integration's key (lattice ADR-0027), or None for a capability always installed.",
+          "title": "Integration"
+        }
+      },
+      "required": [
+        "integration",
+        "action"
+      ],
+      "title": "Gate",
+      "type": "object"
+    },
+    "JsonObject": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+    },
+    "JsonValue": {},
+    "PersonCaller": {
+      "description": "A person calling for themselves, by their identity provider's id.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "person",
+          "default": "person",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "PersonCaller",
+      "type": "object"
+    },
+    "RunCaller": {
+      "description": "An agent's run, or a stored workflow's, calling as part of its work.",
+      "properties": {
+        "agent": {
+          "description": "The agent or stored workflow the run runs, whose tier ceiling applies.",
+          "title": "Agent",
+          "type": "string"
+        },
+        "id": {
+          "description": "The run's id.",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "run",
+          "default": "run",
+          "title": "Kind",
+          "type": "string"
+        },
+        "on_behalf_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The id of the person the run acts for, if it acts for one.",
+          "title": "On Behalf Of"
+        }
+      },
+      "required": [
+        "id",
+        "agent",
+        "kind"
+      ],
+      "title": "RunCaller",
+      "type": "object"
+    },
+    "Scope": {
+      "description": "Where capabilities are offered and called: a tenant's workspace.",
+      "properties": {
+        "tenant_id": {
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "workspace_id": {
+          "title": "Workspace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "workspace_id"
+      ],
+      "title": "Scope",
+      "type": "object"
+    },
+    "SessionCaller": {
+      "description": "A code session calling as part of its work.",
+      "properties": {
+        "id": {
+          "description": "The session's id.",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "session",
+          "default": "session",
+          "title": "Kind",
+          "type": "string"
+        },
+        "on_behalf_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The id of the person the session acts for, if it acts for one.",
+          "title": "On Behalf Of"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "SessionCaller",
+      "type": "object"
+    },
+    "Taint": {
+      "discriminator": {
+        "mapping": {
+          "clean": "#/$defs/Clean",
+          "tainted": "#/$defs/Tainted"
+        },
+        "propertyName": "state"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Clean"
+        },
+        {
+          "$ref": "#/$defs/Tainted"
+        }
+      ]
+    },
+    "Tainted": {
+      "description": "Untrusted content has been read: by what and when, and the hosts seen since.",
+      "properties": {
+        "causes": {
+          "description": "What tainted it, in the order it was read.",
+          "items": {
+            "$ref": "#/$defs/Cause"
+          },
+          "minItems": 1,
+          "title": "Causes",
+          "type": "array"
+        },
+        "seen_hosts": {
+          "default": [],
+          "description": "The hosts that appeared in what was read, the only ones a narrowed call may reach.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Seen Hosts",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "state": {
+          "const": "tainted",
+          "default": "tainted",
+          "title": "State",
+          "type": "string"
+        }
+      },
+      "required": [
+        "causes",
+        "state"
+      ],
+      "title": "Tainted",
+      "type": "object"
+    },
+    "ToolResult": {
+      "description": "What a call returned.",
+      "properties": {
+        "output": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null,
+          "description": "The call's output, as JSON, of the capability's ``output_schema`` where it declares one."
+        }
+      },
+      "title": "ToolResult",
+      "type": "object"
+    },
+    "Via": {
+      "description": "The outside client a call came through (lattice RFC-0014).\n\nA provider builds its actor from it, the client acting for the caller, so grants are the\ncaller's own and audit names the client.",
+      "properties": {
+        "client_name": {
+          "description": "The client's name, as audit shows it: \"Alex via Claude\".",
+          "title": "Client Name",
+          "type": "string"
+        },
+        "connection_id": {
+          "description": "The id of the connection the client called through.",
+          "title": "Connection Id",
+          "type": "string"
+        },
+        "surface": {
+          "description": "The protocol the client called through.",
+          "enum": [
+            "mcp",
+            "acp"
+          ],
+          "title": "Surface",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection_id",
+        "client_name",
+        "surface"
+      ],
+      "title": "Via",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "lattice's capability contract: `capability` is a tool as its provider declares it, `context` what a call carries besides its arguments, and `result` what it returns.",
+  "properties": {
+    "capability": {
+      "$ref": "#/$defs/Capability"
+    },
+    "context": {
+      "$ref": "#/$defs/CallContext"
+    },
+    "result": {
+      "$ref": "#/$defs/ToolResult"
+    }
+  },
+  "title": "lattice.capabilities 1.0.0",
+  "type": "object"
+}

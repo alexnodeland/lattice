@@ -37,5 +37,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0029](0029-each-wheel-checked-at-its-floors.md) | Each wheel checked at its floors | Accepted |
 | [0030](0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md) | Settings: typed, declared in lattice-core, and only narrowed below the operator | Accepted |
 | [0031](0031-one-approval-publishes-every-package-a-release-made.md) | One approval publishes every package a release made | Accepted |
+| [0032](0032-the-capability-registry-in-lattice-core-four-tiers-three-effects-and-entry-points.md) | The capability registry in lattice-core: four tiers, three effects, and entry points | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

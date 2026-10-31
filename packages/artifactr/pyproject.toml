@@ -22,7 +22,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "lattice-core-ai>=0.3.0",
+    "lattice-core-ai>=0.2.0",
     "pydantic>=2.13",
     "jsonpatch>=1.33",
     "jsonpointer>=1.9",

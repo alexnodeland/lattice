@@ -1,8 +1,8 @@
 """The permission matrix (lattice RFC-0001, ADR-0056): every way in asks ``authorize``.
 
 Every public ``Workspace`` and ``Workspaces`` method is listed with what it asks for, and every
-REST route, WebSocket command, and MCP tool and resource with the actions its caller is asked
-for, which are those of the methods it calls. Each is called with a hook that records what it
+REST route, WebSocket command, MCP tool and resource, and capability with the actions its caller
+is asked for, which are those of the methods it calls. Each is called with a hook that records what it
 is asked. A method or surface missing from the tables fails, as does one that asks for an
 action outside :data:`~artifactr.workspace.ACTIONS`, or one that asks for nothing. A surface
 that is open on purpose is listed with its reason, and asks nothing.
@@ -27,6 +27,7 @@ from pydantic_ai.models.function import AgentInfo
 from starlette.requests import HTTPConnection
 
 from artifactr.agent import USE_MODEL, ArtifactWorkspace, Runner, Session, function_model
+from artifactr.capabilities import ArtifactrProvider
 from artifactr.connect import RUN_CODE
 from artifactr.core import (
     Actor,
@@ -45,6 +46,8 @@ from artifactr.fastapi import artifactr_router
 from artifactr.files.native import CREATE_NATIVE_FILE
 from artifactr.mcp import ArtifactrMcp, artifact_uri
 from artifactr.workspace import ACTIONS, Access, InMemoryStorage, Workspace, Workspaces
+from lattice_core.capabilities import CallContext, PersonCaller, Scope, Via
+from lattice_core.taint import Clean
 from tests.artifact_types import Note
 from tests.fastapi.conftest import closing
 
@@ -526,6 +529,53 @@ async def test_every_tool_and_resource_asks_for_the_actions_of_the_methods_it_ca
         assert recorder.by(CLIENT) == ["artifactr:open", read, read], "each artifact is a read"
 
 
+# ─── every capability ────────────────────────────────────────────────────────
+
+CAPABILITIES: dict[str, tuple[dict[str, Any], list[str]]] = {
+    "artifactr.list_artifacts": ({}, ["artifactr:read_artifacts"]),
+    "artifactr.read_artifact": ({"artifact_id": ARTIFACT}, ["artifactr:read_artifacts"]),
+    "artifactr.create_artifact": ({"kind": "note", "data": {}}, ["artifactr:create_artifact"]),
+    "artifactr.propose_text": (
+        {"artifact_id": ARTIFACT, "old": "Friday", "new": "Monday"},
+        ["artifactr:read_artifacts", "artifactr:propose_change"],
+    ),
+    "artifactr.edit_text": (
+        {"artifact_id": ARTIFACT, "old": "Friday", "new": "Monday"},
+        ["artifactr:read_artifacts", "artifactr:edit_artifact"],
+    ),
+    "artifactr.archive_artifact": (
+        {"artifact_id": ARTIFACT},
+        ["artifactr:read_artifacts", "artifactr:archive_artifact"],
+    ),
+}
+"""Each capability of artifactr's provider, arguments for it, and what its caller is asked for
+after ``artifactr:open``. Its gate's action, which the enforcer asks before the call, is among
+them."""
+
+
+async def test_every_capability_asks_for_the_actions_of_the_methods_it_calls(
+    workspaces: Workspaces, recorder: Recorder
+) -> None:
+    await _seed(workspaces, recorder)
+    provider = ArtifactrProvider(workspaces, types=[Note])
+    scope = Scope(tenant_id=TENANT, workspace_id=WORKSPACE)
+    offered = {capability.name: capability for capability in provider.capabilities(scope)}
+    assert set(offered) == set(CAPABILITIES)
+    via = Via(connection_id=CLIENT.client_id, client_name="Claude", surface="mcp")
+    context = CallContext(
+        scope=scope,
+        caller=PersonCaller(id=ALICE.id),
+        taint=Clean(),
+        correlation_id="c1",
+        surface="mcp",
+        via=via,
+    )
+    for name, (args, actions) in CAPABILITIES.items():
+        await provider.call(offered[name], args, context)
+        assert recorder.by(CLIENT) == ["artifactr:open", *actions], name
+        assert offered[name].gate.action in actions, name
+
+
 # ─── the catalog ─────────────────────────────────────────────────────────────
 
 
@@ -537,6 +587,7 @@ def test_the_catalog_is_every_action_asked_for_and_no_other() -> None:
     asked |= {action for _, actions in FRAMES.values() for action in actions}
     asked |= {action for _, actions in ROUTES.values() for action in actions}
     asked |= {action for _, actions in TOOLS.values() for action in actions}
+    asked |= {action for _, actions in CAPABILITIES.values() for action in actions}
     asked.add(CREATE_NATIVE_FILE)  # native files' upload route asks it (tests/files/fastapi)
     asked.add(RUN_CODE)  # a connected app's toolset asks it beside the workspace (tests/connect)
     asked.add(USE_MODEL)  # a turn asks it of a model its message names (tests/agent)

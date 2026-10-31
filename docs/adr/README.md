@@ -41,5 +41,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0033](0033-egress-pinned-by-an-original-dst-cluster-that-the-authorizer-addresses.md) | Egress pinned by an ORIGINAL_DST cluster that the authorizer addresses | Accepted |
 | [0034](0034-two-secrets-stores-in-0-3-0-supabase-vault-where-postgres-can-hold-it-aws-secrets-manager-on-aws.md) | Two secrets stores in 0.3.0: Supabase Vault where Postgres can hold it, AWS Secrets Manager on AWS | Accepted |
 | [0035](0035-one-approval-per-call-bound-to-its-arguments-declared-in-lattice-core-and-stored-by-grantr.md) | One approval per call, bound to its arguments, declared in lattice-core and stored by grantr | Accepted |
+| [0037](0037-the-enforcement-path-in-lattice-core-refusals-by-step-approvals-resumed-by-id.md) | The enforcement path in lattice-core: refusals by step, approvals resumed by id | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

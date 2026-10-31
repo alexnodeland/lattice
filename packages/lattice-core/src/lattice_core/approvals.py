@@ -481,6 +481,14 @@ class Approvals(Protocol):
         """Ask an approval, pending, and return it."""
         ...
 
+    async def get(self, id: ApprovalId, /) -> Approval:
+        """Return the approval as it stands.
+
+        Raises:
+            UnknownApproval: If there is no approval of the id.
+        """
+        ...
+
     async def answer(self, id: ApprovalId, answer: Answer, /, *, subject: Subject) -> Approval:
         """Answer a pending approval as the subject, and return it settled.
 
@@ -645,6 +653,14 @@ class FakeApprovals:
             self._approvals[approval.id] = approval
             self._changed[approval.id] = asyncio.Condition()
             return approval
+
+    async def get(self, id: ApprovalId, /) -> Approval:
+        """Return the approval as it stands.
+
+        Raises:
+            UnknownApproval: If there is no approval of the id.
+        """
+        return self._get(id)
 
     async def answer(self, id: ApprovalId, answer: Answer, /, *, subject: Subject) -> Approval:
         """Answer a pending approval as the subject, and return it settled.

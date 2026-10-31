@@ -41,6 +41,9 @@ otel = [
 # internal key (lattice ADR-0022); the lockfile's langfuse is the version verified.
 langfuse = ["langfuse>=4.15,<5", "opentelemetry-sdk>=1.45"]
 litellm = ["pydantic-ai-slim[openai]>=2.51", "httpx2>=2.7", "opentelemetry-api>=1.45"]
+# The agents bridge offers capabilities as a toolset rebuilt at each run step, and defers a call for
+# an approval with ApprovalRequired's metadata, given back as the call resumes.
+agents = ["pydantic-ai-slim>=2.53"]
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/lattice-core/"

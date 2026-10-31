@@ -26,6 +26,10 @@ package (lattice ADR-0018).
 - :mod:`lattice_core.capabilities`: the capability registry's contract: capabilities, the
   providers that offer them, the context a call carries, and the registry that composes them
   (lattice RFC-0011).
+- :mod:`lattice_core.enforcement`: the enforcement path, the only way a capability is called:
+  nine steps, each a port, and every call audited.
+- :mod:`lattice_core.agents`: capabilities offered to a pydantic-ai agent, each called through
+  the enforcer, behind the ``agents`` extra.
 - :mod:`lattice_core.approvals`: the approval contract: one call asked of the people who may
   answer it, bound to its arguments, and the ports a store, a policy and a surface implement.
 - :mod:`lattice_core.taint`: whether a turn, a run or a session has read untrusted content.

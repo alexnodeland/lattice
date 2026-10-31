@@ -19,5 +19,6 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 | [0013](0013-event-sources-stored-workflows-and-reflexrs-catalog.md) | Event sources, stored workflows and reflexr's catalog | Accepted |
 | [0014](0014-portr-the-command-catalog-and-the-mcp-acp-gateway.md) | portr, the command catalog and the MCP/ACP gateway | Accepted |
 | [0015](0015-ports-and-adapters-for-code-sessions-forge-coding-agent-ide-and-sandbox.md) | Ports and adapters for code sessions: forge, coding agent, IDE and sandbox | Accepted |
+| [0016](0016-connectors-connections-actions-and-neutral-event-types.md) | Connectors: connections, actions and neutral event types | Draft |
 
 To propose one, copy [`template.md`](template.md) to the next number. Each package's series uses the same template.

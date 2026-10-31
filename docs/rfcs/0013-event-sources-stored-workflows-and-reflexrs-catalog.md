@@ -6,26 +6,26 @@
 **Discussion:** the pull request that adds this file
 **Siblings:**
 
-- lattice RFC-0011, the v0.3 platform ([PR #1217](https://github.com/alexnodeland/lattice/pull/1217)), in Discussion, is what this builds on and does not redefine: the capability registry, the approval object, the secrets port, egress and taint, and the adapter registry. This RFC cites its sections.
-- RFC 0012 (draft), the workflow spec ([#966](https://github.com/alexnodeland/lattice/issues/966)), written in parallel, defines stored workflows. This RFC keeps only how a source's events start a workflow run.
+- lattice [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md), the v0.3 platform, is what this builds on and does not redefine: the capability registry, the approval object, the secrets port, egress and taint, and the adapter registry. This RFC cites its sections.
+- lattice [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md), the six primitives and the workflow spec ([#966](https://github.com/alexnodeland/lattice/issues/966)), defines stored workflows. This RFC keeps only how a source's events start a workflow run.
 - [reflexr ADR-0057](../reflexr/adr/0057-reserved-publishers.md) reserves a namespace to its publisher; this RFC gives it the library-exported entry it left to revisit.
 - [lattice RFC-0004](0004-relayr-and-task-trackers.md) is the shape every source here follows: a webhook nudges, a follower reads, with a lease and a cursor, and ids derived so that publishing is exactly once.
 
 ## Summary
 
-reflexr gains **sources**: a `Source` protocol in `reflexr.sources`, through which anything outside a workspace publishes into it ([#839](https://github.com/alexnodeland/lattice/issues/839), [#841](https://github.com/alexnodeland/lattice/issues/841)). A source declares its event types, its trust level and what its bindings may select on; it is followed with a lease and a cursor, delivery is at least once and its effect exactly once, and what it can't deliver is a dead letter, never an append. Every envelope gains a **trust level**, which reflexr sets from the source's binding and never from the payload, and an **origin**, so a backfill or a test event can't set off rules written for live ones. **Bindings** route a tenant's or a deployment's source to workspaces; they are a lattice-core port that grantr stores and audits, as integrations are. **Quotas** are ADR-0030 settings per binding. relayr's bridges and trackers register as sources, with what they publish unchanged. reflexr's **catalog** reads (event types, actions, sources and their health) back #840's pages and the chat agent's drafting. The first sources are those the flagship [#898](https://github.com/alexnodeland/lattice/issues/898) needs: **Alertmanager** ([#846](https://github.com/alexnodeland/lattice/issues/846)) and **forge events** through the forge port ([#847](https://github.com/alexnodeland/lattice/issues/847), [#890](https://github.com/alexnodeland/lattice/issues/890)). Stored workflows are RFC 0012's; this RFC fixes only what a run started by a source's events carries. Tracked by #839, under the epic [#837](https://github.com/alexnodeland/lattice/issues/837).
+reflexr gains **sources**: a `Source` protocol in `reflexr.sources`, through which anything outside a workspace publishes into it ([#839](https://github.com/alexnodeland/lattice/issues/839), [#841](https://github.com/alexnodeland/lattice/issues/841)). A source declares its event types, its trust level and what its bindings may select on; it is followed with a lease and a cursor, delivery is at least once and its effect exactly once, and what it can't deliver is a dead letter, never an append. Every envelope gains a **trust level**, which reflexr sets from the source's binding and never from the payload, and an **origin**, so a backfill or a test event can't set off rules written for live ones. **Bindings** route a tenant's or a deployment's source to workspaces; they are a lattice-core port that grantr stores and audits, as integrations are. **Quotas** are ADR-0030 settings per binding. relayr's bridges and trackers register as sources, with what they publish unchanged. reflexr's **catalog** reads (event types, actions, sources and their health) back #840's pages and the chat agent's drafting. The first sources are those the flagship [#898](https://github.com/alexnodeland/lattice/issues/898) needs: **Alertmanager** ([#846](https://github.com/alexnodeland/lattice/issues/846)) and **forge events** through the forge port ([#847](https://github.com/alexnodeland/lattice/issues/847), [#890](https://github.com/alexnodeland/lattice/issues/890)). Stored workflows are [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s; this RFC fixes only what a run started by a source's events carries. Tracked by #839, under the epic [#837](https://github.com/alexnodeland/lattice/issues/837).
 
 ## Motivation
 
 - **reflexr listens only to its own log.** External systems publish as a `SourceActor(name=...)` they choose, and nothing records what feeds a workspace, whether it is healthy, or how far its events can be trusted (#837). The bridges that exist (relayr's `artifactr:*`, `ui:form_submitted`, `excalidraw:elements_changed`, `tracker:*`, and schedules) were each built their own way.
 - **The flagship starts with an alert and is steered by a red check** (#898, steps 1 and 6). Neither can reach a workspace today: stackr runs Prometheus and Grafana, but no Alertmanager and nothing that turns an alert into an event, and there is no forge source.
-- **Prompt injection needs a boundary that a payload can't cross.** Forge comments, tracker items and webhook bodies are written by whoever can reach them. Taint (RFC-0011, #903) narrows what leaves a run that read them; it needs reflexr to say, for every envelope, which ones those are, from something the publisher can't forge.
+- **Prompt injection needs a boundary that a payload can't cross.** Forge comments, tracker items and webhook bodies are written by whoever can reach them. Taint ([RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md), #903) narrows what leaves a run that read them; it needs reflexr to say, for every envelope, which ones those are, from something the publisher can't forge.
 - **Connectors (#925) and code sessions (#884) are about to build on it.** The connector port ([#926](https://github.com/alexnodeland/lattice/issues/926)) adds the action side and the connection to this protocol, and the forge port ([#893](https://github.com/alexnodeland/lattice/issues/893)) puts its event side on it. Fixing the source side first keeps them from each inventing one.
-- **Why now:** #839 is in Wave 1 of the v0.3 plan, after RFC-0011 reached Discussion; M3, the flagship's thin path, builds #841, #846, #847 and #890 on it.
+- **Why now:** #839 is in Wave 1 of the v0.3 plan, after [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) reached Discussion; M3, the flagship's thin path, builds #841, #846, #847 and #890 on it.
 
 ## Non-goals
 
-- **Stored workflows' model,** the tool registry, dry runs, atomic proposals, budgets and their grantr actions (#843, #844). #843 and #844 were re-scoped to agents ([#947](https://github.com/alexnodeland/lattice/issues/947)) and workflows ([#965](https://github.com/alexnodeland/lattice/issues/965)); RFC 0012 (draft) defines them, and the tool registry is RFC-0011's capability registry. [How a source's events start a workflow run](#how-a-sources-events-start-a-workflow-run) is all this RFC says of them.
+- **Stored workflows' model,** the tool registry, dry runs, atomic proposals, budgets and their grantr actions (#843, #844). #843 and #844 were re-scoped to agents ([#947](https://github.com/alexnodeland/lattice/issues/947)) and workflows ([#965](https://github.com/alexnodeland/lattice/issues/965)); [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md) defines them, and the tool registry is [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s capability registry. [How a source's events start a workflow run](#how-a-sources-events-start-a-workflow-run) is all this RFC says of them.
 - **The connector port's other halves:** the connection's lifecycle, the action side, the neutral event-type registry and the SDK ([#926](https://github.com/alexnodeland/lattice/issues/926), Wave 2). [What this RFC fixes and what it leaves to #926](#what-this-rfc-fixes-and-what-it-leaves-to-926) draws the line.
 - **The generic signed webhook ([#842](https://github.com/alexnodeland/lattice/issues/842)), email, polls and Supabase rows ([#848](https://github.com/alexnodeland/lattice/issues/848)),** labelled `v0.3`, not `v0.3-core`, so 0.3.x. The protocol covers them; they are not built here.
 - **Stored event types,** defined as data without code. Nothing in 0.3.0 needs them; they come with #842 (Decision R12).
@@ -53,12 +53,12 @@ graph LR
     intake -- "refused" --> dl[("source dead letters")]
     intake -- "Bindings port" --> gr["grantr: bindings, switches,<br/>settings, audit"]
     intake -- "publish as source:<name>,<br/>trust set here" --> ws["reflexr workspace log"]
-    ws --> rules["rules"] -- "firing" --> run["a run of a workflow<br/>(RFC 0012, #968)"]
+    ws --> rules["rules"] -- "firing" --> run["a run of a workflow<br/>([RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md), #968)"]
     ws --> cat["catalog reads:<br/>event types, actions, sources"]
 ```
 
 - **A source adapts one system.** It says what it publishes, how to read it, and how to verify a webhook. It holds no lease, cursor, quota or trust logic.
-- **The intake is reflexr's, one path for every source,** as RFC-0011's enforcer is one path for every capability: it routes each occurrence to its bindings, checks the switch, the quota and the size, sets the trust level and origin, and publishes or dead-letters. A source's actor publishes only through it.
+- **The intake is reflexr's, one path for every source,** as [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s enforcer is one path for every capability: it routes each occurrence to its bindings, checks the switch, the quota and the size, sets the trust level and origin, and publishes or dead-letters. A source's actor publishes only through it.
 - **The followers are reflexr's for the sources it drives,** with their leases and cursors in reflexr's storage. A self-driven source, such as relayr's followers, keeps its own lease and cursor and calls the intake; it reports its position, so its health reads the same.
 
 ### Trust levels
@@ -98,7 +98,7 @@ class Envelope(BaseModel):
 - **No publisher can set it.** `Workspace.publish` has no trust argument; the intake's handle is the only one that passes a level, and it computes it. An event type may have a field named `trust`, which is the event's and means nothing to reflexr.
 - **A registered source's actor publishes only through the intake.** `publish` as `SourceActor(name="alertmanager")` from any other handle is `forbidden`, beside ADR-0057's check. That closes the hole ADR-0057 names, an application resolving a client to a reserved source, for every registered source (Decision R7).
 - **Envelopes written before this** carry neither field. A before-validator fills an absent `trust` from the envelope's actor, by the table, with `SourceActor` as `untrusted`, and an absent `origin` as `live`; the field's own default, `untrusted`, applies only where no actor says more. Nothing is rewritten. Adding two fields with defaults is a minor change to reflexr's protocol schema (`reflexr:schema`, checked by `lattice:breaks`).
-- **Trust and taint.** A run whose firing matched an `untrusted` envelope starts tainted, with those envelopes' ids as its causes, in RFC-0011's `Taint` ("Taint, as these parts read it"); the levels are what reflexr reads, and taint is what the enforcer narrows by.
+- **Trust and taint.** A run whose firing matched an `untrusted` envelope starts tainted, with those envelopes' ids as its causes, in [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s `Taint` ("Taint, as these parts read it"); the levels are what reflexr reads, and taint is what the enforcer narrows by.
 
 **Rules filter on it,** through two new filter kinds in `reflexr.core`, because `where` reaches only an event's fields (Decision R2):
 
@@ -110,11 +110,11 @@ on(AlertFiring).including("backfill")
 ```
 
 - **`origin` defaults to live.** A rule whose filter names no `origin` stage admits only `live` envelopes; the others still move its clock. So a backfill of 2000 past events, which lands at once because `ts` is the append time and never decreases, fires no `count` rule, and a test event from admin's "Send a test event" (#927) runs no workflow unless a rule opts in (Decision R3).
-- Both are pure and stateless, so they join core's conformance fixtures, the rules' JSON Schema and the rule renderer (#838), and preview and replay stay exact. They are part of the condition language RFC 0012 shares with rule predicates.
+- Both are pure and stateless, so they join core's conformance fixtures, the rules' JSON Schema and the rule renderer (#838), and preview and replay stay exact. They are part of the condition language [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md) shares with rule predicates.
 
 ### The Source protocol
 
-`reflexr.sources`, in reflexr's base distribution; it imports `reflexr.core`, `reflexr.workspace` and lattice-core's `integrations`, `settings`, `bindings` and RFC-0011's `secrets`.
+`reflexr.sources`, in reflexr's base distribution; it imports `reflexr.core`, `reflexr.workspace` and lattice-core's `integrations`, `settings`, `bindings` and [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s `secrets`.
 
 ```python
 class SourceSpec(BaseModel, frozen=True):
@@ -157,7 +157,7 @@ class Source(Protocol):
 - **The cursor is the source's state.** A level-triggered source keeps its snapshot in it (Alertmanager's active alerts), so it needs no table of its own; the limit keeps it a cursor and not a store.
 - **Delivery is at least once, the effect exactly once.** The follower publishes a page, then saves its cursor; a crash between them, or a second process taking the lease, reads the page again. The intake derives each event's id, `src_` and the first 16 hex digits of a SHA-256 over the source, the connection, and the occurrence's key, joined by NUL bytes, and reflexr's `publish` appends an id once per workspace. Order is kept per stream and lease holder.
 - **Started on open and at startup,** as relayr's followers are ([relayr ADR-0016](../relayr/adr/0016-followers-start-on-open.md)): the reactor resumes every stream with a binding, so a source is read even if no one opens a workspace.
-- **Registered once,** `Workspaces(sources=[alertmanager, forge, ...])`, which derives `events=` and `publishers=` from the specs: each type in the workspaces' allowlist, reserved to `source:<name>`. A type two sources publish, such as `alert:firing` from Alertmanager and later from PagerDuty, is reserved to both. That is the library-exported entry ADR-0057 left to revisit. Each spec also declares its `Integration` (`source:<name>`, off by default unless the source says otherwise), which the application composes into its registry beside `KNOWN`, as RFC-0011's adapters declare theirs; lattice-core's `KNOWN` gains none.
+- **Registered once,** `Workspaces(sources=[alertmanager, forge, ...])`, which derives `events=` and `publishers=` from the specs: each type in the workspaces' allowlist, reserved to `source:<name>`. A type two sources publish, such as `alert:firing` from Alertmanager and later from PagerDuty, is reserved to both. That is the library-exported entry ADR-0057 left to revisit. Each spec also declares its `Integration` (`source:<name>`, off by default unless the source says otherwise), which the application composes into its registry beside `KNOWN`, as [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s adapters declare theirs; lattice-core's `KNOWN` gains none.
 
 ### The intake
 
@@ -166,7 +166,7 @@ class Source(Protocol):
 1. **Valid?** Its event's type is in the spec's `events`, and its size is within the source's limit (`source-size:<name>`, below). Otherwise it is dead-lettered as `invalid` or `too_large`, once, and nothing is appended anywhere.
 2. **Routed:** the bindings of the connection (`Bindings.for_connection`) whose tenant is the occurrence's, whose `types` include its type, and whose `select` matches its selectors. A deployment's connection reaches a tenant's binding only for the tenant the source names, and an occurrence with no tenant reaches only bindings the operator made. None is counted as `unrouted`, not dead-lettered: a repository no one bound is not a failure.
 3. **On?** `Integrations.is_enabled(tenant, workspace, "source:<name>")` for each binding. Off is counted as `paused` for that binding, neither queued nor dead-lettered (Decision R6). When every binding of a stream is off, its follower stops at its cursor instead, so turning the source on again resumes where it stopped, within what the remote keeps.
-4. **Within quota?** The binding's rate (`source-rate:<name>`), counted through RFC-0011's `Counter` port. Over is dead-lettered as `rate_limited`.
+4. **Within quota?** The binding's rate (`source-rate:<name>`), counted through [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s `Counter` port. Over is dead-lettered as `rate_limited`.
 5. **Trust and origin** as [above](#trust-levels); `origin` is `live` for a follower's pages, `backfill` for `backfill`'s, and `test` for admin's test event.
 6. **Published** into each binding's workspace as `SourceActor(name=spec.name)`, with the derived id. A self-driven source may pass a `correlation_id` and causation, as relayr's follower does for a run's own writes ([relayr ADR-0021](../relayr/adr/0021-chains-continue-across-the-bridge.md)).
 7. **Recorded:** the binding's last event, counts by outcome, and the stream's position, which the status reads report.
@@ -184,7 +184,7 @@ Source dead letters are a new kind: today's are a rule's.
 
 ### Bindings
 
-A binding says which of a source's events reach which workspace. It is a port in lattice-core, because three packages read it: reflexr's intake, relayr's trackers and the code sessions' repositories (#893). grantr stores it, audited, as it stores integrations and settings (Decision R4).
+A binding says which of a source's events reach which workspace. It is a port in lattice-core, because three packages read it: reflexr's intake, relayr's trackers and the code sessions' repositories (#893). grantr stores it, audited, as it stores integrations and settings (Decision D8, [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s O13).
 
 ```python
 class Binding(BaseModel, frozen=True):
@@ -289,15 +289,15 @@ The template rules of #890 (an issue labelled, CI red on a session's change requ
 
 ### How a source's events start a workflow run
 
-Workflows are RFC 0012's (draft): their spec, steps, versions, scopes, budgets and grantr actions. Automations pin them (#972), and runs are decoupled from rules (#968). This RFC fixes only what crosses from the source to the run:
+Workflows are [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s (draft): their spec, steps, versions, scopes, budgets and grantr actions. Automations pin them (#972), and runs are decoupled from rules (#968). This RFC fixes only what crosses from the source to the run:
 
 1. **A rule's `then` names a workflow** and a version, with a mapping from the event's fields to its inputs (#972); code actions stay as one-step workflows. The run's cause is the firing (#968).
-2. **The run carries a trust level,** the lowest among the firing's matched envelopes, and passes it on: the run's events are no more trusted than it (the causation rule), its taint starts as RFC-0011 describes, and a code action's `Reaction` gains `trust`.
-3. **A workflow declares the lowest level it accepts.** This RFC asks RFC 0012 for the field, with `authenticated` as its default. A firing below it starts no run: the run is dead-lettered at once with the reason `trust_refused`, so the refusal is visible, and drafting (`check_draft`) says so when a rule's types come only from sources below it.
-4. **Untrusted content reaches an agent only as data.** An input mapped from an `untrusted` envelope may be passed as a typed input and read through a tool's result (`read_events` today), never interpolated into an `agent_task`'s instructions or task text. This RFC asks RFC 0012's static checks to refuse the interpolation.
-5. **The tools a run may call** are RFC-0011's capabilities, narrowed by the run's taint; this RFC adds no registry.
+2. **The run carries a trust level,** the lowest among the firing's matched envelopes, and passes it on: the run's events are no more trusted than it (the causation rule), its taint starts as [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) describes, and a code action's `Reaction` gains `trust`.
+3. **A workflow declares the lowest level it accepts.** This RFC asks [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md) for the field, with `authenticated` as its default. A firing below it starts no run: the run is dead-lettered at once with the reason `trust_refused`, so the refusal is visible, and drafting (`check_draft`) says so when a rule's types come only from sources below it.
+4. **Untrusted content reaches an agent only as data.** An input mapped from an `untrusted` envelope may be passed as a typed input and read through a tool's result (`read_events` today), never interpolated into an `agent_task`'s instructions or task text. This RFC asks [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s static checks to refuse the interpolation.
+5. **The tools a run may call** are [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s capabilities, narrowed by the run's taint; this RFC adds no registry.
 
-For the flagship: `alert:firing` (`internal`) fires a rule whose one-step `agent_task` triages; `forge:check.completed` with `state="failed"` (`untrusted`) fires #890's rule, whose workflow accepts `untrusted`, and the session it steers is tainted, so marking the change request ready asks a person (#898 step 7, RFC-0011's approvals).
+For the flagship: `alert:firing` (`internal`) fires a rule whose one-step `agent_task` triages; `forge:check.completed` with `state="failed"` (`untrusted`) fires #890's rule, whose workflow accepts `untrusted`, and the session it steers is tainted, so marking the change request ready asks a person (#898 step 7, [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s approvals).
 
 ### The catalog
 
@@ -306,7 +306,7 @@ Each read is a `Workspace` method, carried on REST, WebSocket where it streams, 
 | Route | MCP tool | Answers | Asks `authorize` |
 |---|---|---|---|
 | `GET /workspaces/{id}/event-types` | `list_event_types` | each type in the workspace's registry: name, namespace, JSON Schema, reserved publishers, whether only runs may publish it, the sources that publish it here with their level, and `history_from` | `reflexr:read_catalog` |
-| `GET /workspaces/{id}/actions` | `list_actions` | each action: name, kind (`function`, `agent`, `graph`, `workflow`), version, description, its params or inputs schema, emit allowlist, the rules that run it, a graph as Mermaid; a workflow's further fields are RFC 0012's | `reflexr:read_catalog` |
+| `GET /workspaces/{id}/actions` | `list_actions` | each action: name, kind (`function`, `agent`, `graph`, `workflow`), version, description, its params or inputs schema, emit allowlist, the rules that run it, a graph as Mermaid; a workflow's further fields are [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s | `reflexr:read_catalog` |
 | `GET /workspaces/{id}/sources` | `list_sources` | each binding reaching the workspace: source, connection, state (on, paused, off for the tenant, not installed), level, types, last event, lag, outcomes by reason over the last hour and day, dead letters, `bound_at`, `history_from`, whether it can backfill | `reflexr:read_sources` |
 | `GET /sources` | `list_sources` with no workspace | the same across the tenant, by connection, for admin (#927) | `reflexr:read_sources`, no workspace |
 | `GET /workspaces/{id}/sources/{binding}/dead-letters` | `list_source_dead_letters` | the binding's dead letters, newest first | `reflexr:read_dead_letters` |
@@ -315,7 +315,7 @@ Each read is a `Workspace` method, carried on REST, WebSocket where it streams, 
 | `GET /workspaces/{id}/events?participant=&correlation_id=` | `read_events` | the log as today, filtered also by actor and chain, for #840's Events page | `reflexr:read_events` |
 | `POST /sources/{source}/{connection}` | none | a webhook's delivery: 204 for a nudge, 2xx once a push is committed, the same 401 for an unknown connection and a bad signature | none: verified by the source; refused above 1 MB before it is read |
 
-- **Tools are not in reflexr's catalog.** They are RFC-0011's capabilities; portr and portalr read them from the composed registry.
+- **Tools are not in reflexr's catalog.** They are [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s capabilities; portr and portalr read them from the composed registry.
 - **Four new actions** join `ACTIONS`: `reflexr:read_catalog` and `reflexr:read_sources` (members), and `reflexr:retry_source_dead_letter` and `reflexr:backfill_source` (workspace admins). grantr's built-in roles gain them, and the template's `access.md` matrix and `tests/test_access.py` list each. The intake publishes beneath `authorize`, as the reactor's own work does: who may reach a source is the binding's, not a subject's.
 - **`draft_rule` reads the catalog,** so a draft names real types, fields and actions, and is refused naming the known ones otherwise (#840).
 - **Scoped by permission:** a read filters what it returns by what the caller may read, as `rules_for` does; a source's dead letters name events, so they need `read_dead_letters`, not only `read_sources`.
@@ -325,15 +325,15 @@ Each read is a `Workspace` method, carried on REST, WebSocket where it streams, 
 | Fixed here, for 0.3.0 | Left to the connector port's RFC (#926) |
 |---|---|
 | The `Source` protocol, the intake and its order, delivery and dead letters | The connection's lifecycle: auth kinds, OAuth, refresh, revocation, a health check |
-| Trust levels and origin on envelopes | The action side, registered as RFC-0011 capabilities |
-| `Binding` and the `Bindings` port, grantr's store, `grantr:manage_bindings` | `connectors:*` grantr actions for connections; whether #926's `connectors:bind` and `connectors:pause` become these or aliases (R4) |
+| Trust levels and origin on envelopes | The action side, registered as [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) capabilities |
+| `Binding` and the `Bindings` port, grantr's store, `grantr:manage_bindings` | `connectors:*` grantr actions for connections; whether #926's `connectors:bind` and `connectors:pause` become these or aliases (D8: this RFC recommends #926 adopt these) |
 | `source:<name>` as each source side's integration key | Splitting trackers' `tracker:<name>` into `source:` and `action:` keys |
 | The quotas' settings per binding | A tenant's say over a connection's total; back-pressure across connectors |
 | `alert:` types; the forge port's event side as this RFC needs it | The neutral event-type registry by domain, and which fields each guarantees |
-| The minimal `Connection` the protocol reads: `id`, `source`, owner (the deployment or a tenant), `config`, and RFC-0011 `SecretRef`s | Where connections are stored and how admins create them (#927) |
+| The minimal `Connection` the protocol reads: `id`, `source`, owner (the deployment or a tenant), `config`, and [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) `SecretRef`s | Where connections are stored and how admins create them (#927) |
 | The source contract suite, below | The SDK, scaffold, recorded fixtures and conformance kit built on it (#929) |
 | Where 0.3.0's sources live | Where connector adapters live from then on, including whether relayr becomes "connectors and bridges" |
-| | Hosts a connection declares for egress (RFC-0011's O6) |
+| | Hosts a connection declares for egress ([RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s O6) |
 
 In 0.3.0, connections come from the deployment's configuration (Alertmanager) and from the forge port's connections (#886); nothing here creates one from admin.
 
@@ -388,7 +388,7 @@ Under [ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md), with [AD
 
 | Phase | Milestone | Deliverable | Exit criteria |
 |---|---|---|---|
-| 0. Design | M1 | This RFC accepted; an ADR per decision as it is built | Accepted with RFC-0011 and RFC 0012 |
+| 0. Design | M1 | This RFC accepted; an ADR per decision as it is built | Accepted with [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) and [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md) |
 | 1. The envelope | M3 | `trust` and `origin`, the two filters, their fixtures, the schema | Fixtures pass; `lattice:breaks` reports a minor change; no payload sets a level |
 | 2. The protocol | M3 | `reflexr.sources`, the intake, followers, storage and migration, dead letters, quotas, statuses, the webhook route, `Workspaces(sources=)`; the TLA+ spec | Delivery once across crash and takeover on every storage; a burst over quota is dead-lettered and not appended; the contract suite passes on the fakes |
 | 3. Bindings | M3 | `lattice_core.bindings`, grantr's store and commands, each source's `source:<name>` declared and composed, `TRACKER_BINDINGS` as the operator's layer | Two tenants never see each other's; every change is in Audit |
@@ -407,11 +407,12 @@ Decided by the owner:
 |---|---|---|---|
 | D1 | Where the protocol lives | A `Source` protocol in reflexr, concrete sources as extras, each an integration switched per tenant and workspace; relayr's bridges implement it | #837, Decisions so far; #841 |
 | D2 | Who sets trust | Each source declares a level, which reflexr sets on its envelopes, never the payload | #837, cross-cutting concerns |
-| D3 | Stored workflows | RFC 0012 is written and accepted in M1, and this RFC builds on it; 0.3.0 ships a one-step `agent_task` workflow and decoupled runs (#968) | v0.3 plan, §7.1 (2026-10-30) |
+| D3 | Stored workflows | [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md) is written and accepted in M1, and this RFC builds on it; 0.3.0 ships a one-step `agent_task` workflow and decoupled runs (#968) | v0.3 plan, §7.1 (2026-10-30) |
 | D4 | Slack | Not in 0.3.0; no chat source here | v0.3 plan, §7.4 |
 | D5 | Forges and agents | Forgejo plus one ACP agent; GitHub stays the forge port's first adapter | v0.3 plan, §7.5 and §7.6; #958 |
-| D6 | The platform | One RFC for #940 to #944, RFC-0011, which this cites and does not redefine | v0.3 plan, §7.3 |
+| D6 | The platform | One RFC for #940 to #944, [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md), which this cites and does not redefine | v0.3 plan, §7.3 |
 | D7 | The webhook, email, polls and rows | 0.3.x: #842 and #848 are `v0.3`, not `v0.3-core` | their labels; the v0.3 plan, §2 |
+| D8 | Where bindings are stored (this RFC's R4) | A `lattice_core.bindings` port, stored and audited by grantr under `grantr:manage_bindings`, held by a tenant's owners and admins | [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md), Decision O13 (2026-10-31) |
 
 Recommended, for the owner to confirm:
 
@@ -420,7 +421,6 @@ Recommended, for the owner to confirm:
 | R1 | Trust's shape | Three ordered levels, one per envelope, lowered and never raised by binding, occurrence and causation; non-source actors by the table | A level per field (#847's question), which the payload would carry |
 | R2 | Filtering on trust | `trust` and `origin` filter kinds in core | A reserved event field `trust`, which the payload would then hold |
 | R3 | Backfills and test events | `origin` on the envelope; rules skip non-live envelopes unless they opt in | Backfills published as live, which fire every `count` rule at once |
-| R4 | Where bindings are stored | A `lattice_core.bindings` port, grantr's audited table, `grantr:manage_bindings`; #926 adopts these rather than new `connectors:bind` | reflexr's storage, which relayr's trackers and code sessions couldn't share; bindings in each package |
 | R5 | Filtering before the log | Bindings select by declared selectors only; content is rules' | A predicate on the source, which preview and replay couldn't see |
 | R6 | Pausing a source in a workspace | Refused for that binding and counted, neither queued nor dead-lettered; resumed with a backfill where the source has one | Queued until resumed, which a pause of days would grow without bound |
 | R7 | A registered source's actor | Publishes only through the intake | ADR-0057's rule alone, which trusts the application never to resolve a client to it |
@@ -429,7 +429,7 @@ Recommended, for the owner to confirm:
 | R10 | Where the sources live | `reflexr.sources` in reflexr's base; Alertmanager and the stack's signals as reflexr extras; the forge source in relayr | Every adapter in relayr now, #926's proposal, which would make reflexr's own alerts need artifactr installed |
 | R11 | Catalog actions | Four: `reflexr:read_catalog`, `read_sources`, `retry_source_dead_letter`, `backfill_source` | Reusing `read_rules`, which says nothing of what the read shows |
 | R12 | Stored event types | Not in 0.3.0; with #842, by an ADR: types as JSON Schema under a tenant's namespace, versioned by addition only | Deciding now, with no source that needs one |
-| R13 | What RFC 0012 is asked for | A workflow's lowest accepted level, `authenticated` by default; refusing untrusted fields in instructions | A workflow that accepts whatever fires it |
+| R13 | What [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md) is asked for | A workflow's lowest accepted level, `authenticated` by default; refusing untrusted fields in instructions | A workflow that accepts whatever fires it |
 | R14 | #846's other signals | Budgets, scores and evaluations in M5, after the flagship's path; #846 stays core | All four in M3 |
 
 ## Drawbacks
@@ -453,7 +453,7 @@ Recommended, for the owner to confirm:
 
 ## Unresolved questions
 
-- **RFC 0012's field names** for the accepted level and the input mapping, settled when both RFCs are in Discussion.
+- **[RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md)'s field names** for the accepted level and the input mapping, settled when both RFCs are in Discussion.
 - **Whether evaluator verdicts on untrusted runs** should be `untrusted` too, by the causation rule, or `internal`, as judgements of lattice's own models.
 - **Paused intervals in preview:** 0.3.0 reports `bound_at`; reporting the gaps a pause left is 0.3.x.
 - **The neutral `alert:` fields** may grow when #926's registry lands; additions only.
@@ -476,7 +476,7 @@ Each is settled in phase 5 or 6, and recorded as a fixture.
 - [ ] reflexr: `trust` and `origin` on envelopes, the two filters, fixtures and schema (#841)
 - [ ] reflexr: `reflexr.sources`, the intake, followers, storage, dead letters, quotas, statuses and the webhook route (#841)
 - [ ] reflexr: the TLA+ spec of followers and its tests (ADR-0025)
-- [ ] lattice-core and grantr: `lattice_core.bindings`, grantr's store and commands, `source:*` integrations (#841)
+- [ ] lattice-core and grantr: `lattice_core.bindings`, grantr's store and commands (D8, RFC-0011's O13), `source:*` integrations (#841)
 - [ ] stackr: `TRACKER_BINDINGS` read as the operator's bindings
 - [ ] relayr: the bridges and trackers as sources (#841, #930)
 - [ ] stackr and reflexr: Alertmanager, the source, oncall on real alerts (#846, #931)
@@ -484,7 +484,7 @@ Each is settled in phase 5 or 6, and recorded as a fixture.
 - [ ] stackr and reflexr: #890's template rules, with trust carried to the run (#890, #968, #972)
 - [ ] reflexr: the catalog and status reads on REST and MCP, the four actions, grantr's roles and `access.md` (#840, #841)
 - [ ] reflexr: budgets, scores and evaluations (#846)
-- [ ] Decisions R1 to R14, each recorded in an ADR as it is built
+- [ ] Decisions R1 to R3 and R5 to R14, each recorded in an ADR as it is built
 - [ ] Docs: reflexr's and relayr's architecture and protocol, the sources guide, stackr's Alertmanager guide, the upgrade note (#946)
 
 ### Where each item of #839 is settled
@@ -498,15 +498,15 @@ Each is settled in phase 5 or 6, and recorded as a fixture.
 | No history and backfill | [Bindings](#bindings), and `origin` in [Trust levels](#trust-levels) |
 | Stored event types | Deferred to #842, in 0.3.x (R12) |
 | relayr's bridges and trackers | [relayr's bridges as sources](#relayrs-bridges-as-sources) |
-| Stored workflows' model, tool registry, dry run, atomic proposals, cost and evaluation | RFC 0012 (draft), #947, #965; the tool registry is RFC-0011's capability registry |
-| Prompt injection | [Trust levels](#trust-levels), [How a source's events start a workflow run](#how-a-sources-events-start-a-workflow-run); taint is RFC-0011's |
-| grantr actions for workflows | RFC 0012 (draft) |
+| Stored workflows' model, tool registry, dry run, atomic proposals, cost and evaluation | [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md), #947, #965; the tool registry is [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s capability registry |
+| Prompt injection | [Trust levels](#trust-levels), [How a source's events start a workflow run](#how-a-sources-events-start-a-workflow-run); taint is [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s |
+| grantr actions for workflows | [RFC-0012](0012-the-six-primitives-and-the-workflow-spec.md) |
 | grantr actions for sources | [The catalog](#the-catalog), [Bindings](#bindings) |
 | The catalog's REST and MCP contract | [The catalog](#the-catalog) |
 
 ## Evidence
 
-Gathered on 2026-10-30, with lattice read at `origin/main` (`a52c5f81`), and RFC-0011 at PR #1217's head.
+Gathered on 2026-10-30, with lattice read at `origin/main` (`a52c5f81`), and [RFC-0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) at PR #1217's head.
 
 | Claim | Where | |
 |---|---|---|

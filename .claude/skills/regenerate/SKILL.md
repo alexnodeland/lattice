@@ -10,6 +10,7 @@ Generated files are committed, and a test fails when one drifts from its source.
 | Changed | Run | Writes |
 |---|---|---|
 | artifactr's or reflexr's protocol models, or their REST router | `moon run artifactr:schema`, `moon run reflexr:schema` | `packages/<pkg>/schemas/` |
+| lattice-core's platform contracts (`capabilities`, `taint`) | `moon run lattice-core:schema` | `packages/lattice-core/schemas/` |
 | grantr's admin router | `moon run grantr:schema` | `packages/grantr/schemas/` |
 | relayr's models or router | `moon run relayr:schema` | `packages/relayr/schemas/` |
 | portalr's router | `moon run portalr:schema` | `packages/portalr/schemas/` |

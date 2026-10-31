@@ -120,3 +120,24 @@ The `litellm` extra.
     options:
       show_root_heading: false
       show_root_toc_entry: false
+
+## lattice_core.capabilities
+
+::: lattice_core.capabilities
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## lattice_core.taint
+
+::: lattice_core.taint
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
+## lattice_core.contracts
+
+::: lattice_core.contracts
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false

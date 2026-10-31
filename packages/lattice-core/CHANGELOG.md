@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.2.0...lattice-core-v0.3.0) (2026-10-31)
+
+
+### Features
+
+* **core:** add the capability registry contract (RFC-0011 phase 1) ([#1241](https://github.com/alexnodeland/lattice/issues/1241)) ([0f29524](https://github.com/alexnodeland/lattice/commit/0f29524a232a89960833b1a544df98deef0d6746)), closes [#940](https://github.com/alexnodeland/lattice/issues/940)
+
 ## [0.2.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.1.0...lattice-core-v0.2.0) (2026-10-29)
 
 

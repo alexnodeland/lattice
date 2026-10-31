@@ -1,6 +1,6 @@
 # RFC-0012: The six primitives and the workflow spec
 
-**Status:** Draft
+**Status:** Discussion
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** [#1225](https://github.com/alexnodeland/lattice/pull/1225)

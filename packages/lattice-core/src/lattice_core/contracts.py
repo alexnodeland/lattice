@@ -15,12 +15,15 @@ from typing import Final
 
 from pydantic import JsonValue
 
-from lattice_core import capabilities
+from lattice_core import approvals, capabilities
 
 __all__ = ["SCHEMAS", "main"]
 
 SCHEMAS: Final[Mapping[str, Callable[[], dict[str, JsonValue]]]] = MappingProxyType(
-    {"capabilities": capabilities.contract_schema}
+    {
+        "approvals": approvals.contract_schema,
+        "capabilities": capabilities.contract_schema,
+    }
 )
 """Each contract's JSON Schema, by the contract's name."""
 

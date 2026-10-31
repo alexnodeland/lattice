@@ -8,7 +8,8 @@ tasks:
   schema:
     description: "Regenerate the platform contracts' JSON Schemas (lattice RFC-0011)"
     script: >-
-      uv run python $workspaceRoot/scripts/generate.py schemas/capabilities.v1.json lattice_core.contracts capabilities
+      uv run python $workspaceRoot/scripts/generate.py schemas/approvals.v1.json lattice_core.contracts approvals
+      && uv run python $workspaceRoot/scripts/generate.py schemas/capabilities.v1.json lattice_core.contracts capabilities
     options:
       cache: false
       runInCI: false

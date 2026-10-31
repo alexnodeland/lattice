@@ -1,0 +1,681 @@
+{
+  "$defs": {
+    "Answer": {
+      "description": "An answer, as the person who gives it gives it.\n\nRaises:\n    ValueError: If the digest isn't a SHA-256.",
+      "properties": {
+        "approved": {
+          "description": "Whether it approves the call.",
+          "title": "Approved",
+          "type": "boolean"
+        },
+        "arguments_digest": {
+          "description": "The digest of the arguments the person was shown; an answer to others is refused.",
+          "title": "Arguments Digest",
+          "type": "string"
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why, in the person's words, if they gave one.",
+          "title": "Reason"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnswerScope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How far it stands beyond its call, from the scopes the request offered, if at all."
+        },
+        "surface": {
+          "description": "The surface it was given on, such as ``portalr``, :data:`CONFIRM_SURFACE` or ``mcp``.",
+          "title": "Surface",
+          "type": "string"
+        }
+      },
+      "required": [
+        "approved",
+        "arguments_digest",
+        "surface"
+      ],
+      "title": "Answer",
+      "type": "object"
+    },
+    "AnswerScope": {
+      "description": "How far an answer stands beyond its own call: for a run or a session, for what patterns.\n\nRaises:\n    ValueError: If it names no pattern.",
+      "properties": {
+        "expires_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "When it stops standing, if before the session or run ends.",
+          "title": "Expires At"
+        },
+        "patterns": {
+          "description": "What it allows, from those the request offered, such as a command's prefix.",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Patterns",
+          "type": "array"
+        },
+        "within": {
+          "description": "How long it stands: the code session's life or the run's.",
+          "enum": [
+            "session",
+            "run"
+          ],
+          "title": "Within",
+          "type": "string"
+        }
+      },
+      "required": [
+        "within",
+        "patterns"
+      ],
+      "title": "AnswerScope",
+      "type": "object"
+    },
+    "Answered": {
+      "description": "An answer as the store records it: who gave it, and when.",
+      "properties": {
+        "approved": {
+          "description": "Whether it approves the call.",
+          "title": "Approved",
+          "type": "boolean"
+        },
+        "arguments_digest": {
+          "description": "The digest of the arguments the person was shown; an answer to others is refused.",
+          "title": "Arguments Digest",
+          "type": "string"
+        },
+        "at": {
+          "description": "When it was answered.",
+          "format": "date-time",
+          "title": "At",
+          "type": "string"
+        },
+        "by": {
+          "$ref": "#/$defs/Subject",
+          "description": "Who answered."
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why, in the person's words, if they gave one.",
+          "title": "Reason"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnswerScope"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How far it stands beyond its call, from the scopes the request offered, if at all."
+        },
+        "surface": {
+          "description": "The surface it was given on, such as ``portalr``, :data:`CONFIRM_SURFACE` or ``mcp``.",
+          "title": "Surface",
+          "type": "string"
+        }
+      },
+      "required": [
+        "approved",
+        "arguments_digest",
+        "surface",
+        "by",
+        "at"
+      ],
+      "title": "Answered",
+      "type": "object"
+    },
+    "Answerers": {
+      "description": "Who may answer an approval.\n\nAnyone who holds ``action`` may answer, or is named in ``subjects``, or is in one of\n``groups``. A person delegates by a grantr grant of the action, with an expiry, not by a\nfield here. A service principal answers only where it is named or holds the action itself,\nand never a ``confirmation``.\n\nRaises:\n    ValueError: If it names no one, ``action`` isn't a grantr action, or a confirmation\n        isn't one subject's alone.",
+      "properties": {
+        "action": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The grantr action whose holders may answer, such as ``grantr:answer_approval``.",
+          "title": "Action"
+        },
+        "confirmation": {
+          "default": false,
+          "description": "Whether it is the caller's own confirmation of an ``admin_high`` call: answered only by\nthe one subject named, on :data:`CONFIRM_SURFACE`, never by the client that called, by\nelicitation or by a push action.",
+          "title": "Confirmation",
+          "type": "boolean"
+        },
+        "different_approver": {
+          "default": false,
+          "description": "Whether the answer must come from someone other than the person who asked.",
+          "title": "Different Approver",
+          "type": "boolean"
+        },
+        "groups": {
+          "default": [],
+          "description": "The ids of the groups whose members may answer.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Groups",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "subjects": {
+          "default": [],
+          "description": "The ids of the subjects who may answer.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Subjects",
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "title": "Answerers",
+      "type": "object"
+    },
+    "Approval": {
+      "description": "An approval, asked: its request, where it stands, and its answer or why it closed.\n\nRaises:\n    ValueError: If its answer or reason doesn't fit its state: an answer exactly when it is\n        approved or denied, agreeing with it, and a reason exactly when it expired or was\n        withdrawn.",
+      "properties": {
+        "answer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Answered"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The answer that settled it, if one did."
+        },
+        "answerers": {
+          "$ref": "#/$defs/Answerers",
+          "description": "Who may answer."
+        },
+        "arguments_digest": {
+          "description": "The digest of the call's arguments (:func:`arguments_digest`), which an answer binds to.",
+          "title": "Arguments Digest",
+          "type": "string"
+        },
+        "asked_at": {
+          "description": "When it was asked.",
+          "format": "date-time",
+          "title": "Asked At",
+          "type": "string"
+        },
+        "asked_by": {
+          "$ref": "#/$defs/Caller",
+          "description": "Who called: a person, or an agent's run or a code session and the person it acts for."
+        },
+        "capability": {
+          "description": "The name of the capability called.",
+          "title": "Capability",
+          "type": "string"
+        },
+        "covers": {
+          "default": [],
+          "description": "The listed actions a plan's approval pre-approves; empty for any other.",
+          "items": {
+            "$ref": "#/$defs/ListedAction"
+          },
+          "title": "Covers",
+          "type": "array"
+        },
+        "deadline": {
+          "description": "When it expires unanswered.",
+          "format": "date-time",
+          "title": "Deadline",
+          "type": "string"
+        },
+        "id": {
+          "$ref": "#/$defs/ApprovalId",
+          "description": "Its id."
+        },
+        "reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Why it expired or was withdrawn.",
+          "title": "Reason"
+        },
+        "rendering": {
+          "$ref": "#/$defs/Rendering",
+          "description": "Exactly what the call would do."
+        },
+        "scope": {
+          "$ref": "#/$defs/Scope",
+          "description": "The tenant's workspace the call is made in."
+        },
+        "scopes_offered": {
+          "default": [],
+          "description": "The patterns an answer's scope may name; empty, so no answer may carry a scope, unless\nthe capability offers some.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Scopes Offered",
+          "type": "array"
+        },
+        "state": {
+          "description": "Where it stands.",
+          "enum": [
+            "pending",
+            "approved",
+            "denied",
+            "expired",
+            "withdrawn"
+          ],
+          "title": "State",
+          "type": "string"
+        },
+        "version": {
+          "description": "The version of the capability called.",
+          "title": "Version",
+          "type": "string"
+        },
+        "via": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Via"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The outside client the call came through, or None for lattice's own surfaces. A\ndifferent approver is never offered it there."
+        }
+      },
+      "required": [
+        "scope",
+        "capability",
+        "version",
+        "rendering",
+        "arguments_digest",
+        "asked_by",
+        "answerers",
+        "deadline",
+        "id",
+        "asked_at",
+        "state"
+      ],
+      "title": "Approval",
+      "type": "object"
+    },
+    "ApprovalId": {
+      "type": "string"
+    },
+    "Caller": {
+      "discriminator": {
+        "mapping": {
+          "person": "#/$defs/PersonCaller",
+          "run": "#/$defs/RunCaller",
+          "session": "#/$defs/SessionCaller"
+        },
+        "propertyName": "kind"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PersonCaller"
+        },
+        {
+          "$ref": "#/$defs/RunCaller"
+        },
+        {
+          "$ref": "#/$defs/SessionCaller"
+        }
+      ]
+    },
+    "JsonObject": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+    },
+    "JsonValue": {},
+    "ListedAction": {
+      "description": "An action a run's plan lists, which the plan's approval pre-approves.\n\n``digest`` covers the step, the capability's whole definition, the target and the calls\nallowed, so a capability that changes (another major, tier or effects) is no longer covered.\nBuild one with :meth:`of`, which computes it.\n\nRaises:\n    ValueError: If the capability's name isn't of :data:`~lattice_core.capabilities.NAME`'s\n        form, or the digest isn't a SHA-256.",
+      "properties": {
+        "capability": {
+          "description": "The capability's name.",
+          "title": "Capability",
+          "type": "string"
+        },
+        "digest": {
+          "description": "The SHA-256 of the step, the capability's definition, the target and ``max_calls``.",
+          "title": "Digest",
+          "type": "string"
+        },
+        "major": {
+          "description": "The capability's major version.",
+          "minimum": 0,
+          "title": "Major",
+          "type": "integer"
+        },
+        "max_calls": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "How many calls a run may make under it, or None for no limit beyond the run's.",
+          "title": "Max Calls"
+        },
+        "step": {
+          "description": "The id of the plan's step that calls it.",
+          "title": "Step",
+          "type": "string"
+        },
+        "target": {
+          "$ref": "#/$defs/JsonValue",
+          "default": null,
+          "description": "The condition the call's arguments must meet, as its JSON (lattice RFC-0012), or None\nfor any arguments."
+        },
+        "tier": {
+          "description": "The capability's tier.",
+          "enum": [
+            "read",
+            "write",
+            "run_code",
+            "outbound"
+          ],
+          "title": "Tier",
+          "type": "string"
+        }
+      },
+      "required": [
+        "step",
+        "capability",
+        "major",
+        "tier",
+        "digest"
+      ],
+      "title": "ListedAction",
+      "type": "object"
+    },
+    "PersonCaller": {
+      "description": "A person calling for themselves, by their identity provider's id.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "person",
+          "default": "person",
+          "title": "Kind",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "PersonCaller",
+      "type": "object"
+    },
+    "Rendering": {
+      "description": "Exactly what a call would do, as a person is shown it before they answer.\n\nRaises:\n    ValueError: If the title is empty, or neither a diff nor the arguments are given.",
+      "properties": {
+        "arguments": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonObject"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The call's arguments, where no diff shows what it does."
+        },
+        "diff": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The change it would make, as a unified diff, where it changes text.",
+          "title": "Diff"
+        },
+        "summary": {
+          "default": "",
+          "description": "More of what it does, where a line isn't enough.",
+          "title": "Summary",
+          "type": "string"
+        },
+        "title": {
+          "description": "What is asked, in a line: \"Send the weekly report to finance@\".",
+          "title": "Title",
+          "type": "string"
+        }
+      },
+      "required": [
+        "title"
+      ],
+      "title": "Rendering",
+      "type": "object"
+    },
+    "RunCaller": {
+      "description": "An agent's run, or a stored workflow's, calling as part of its work.",
+      "properties": {
+        "agent": {
+          "description": "The agent or stored workflow the run runs, whose tier ceiling applies.",
+          "title": "Agent",
+          "type": "string"
+        },
+        "id": {
+          "description": "The run's id.",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "run",
+          "default": "run",
+          "title": "Kind",
+          "type": "string"
+        },
+        "on_behalf_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The id of the person the run acts for, if it acts for one.",
+          "title": "On Behalf Of"
+        }
+      },
+      "required": [
+        "id",
+        "agent",
+        "kind"
+      ],
+      "title": "RunCaller",
+      "type": "object"
+    },
+    "Scope": {
+      "description": "Where capabilities are offered and called: a tenant's workspace.",
+      "properties": {
+        "tenant_id": {
+          "title": "Tenant Id",
+          "type": "string"
+        },
+        "workspace_id": {
+          "title": "Workspace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "tenant_id",
+        "workspace_id"
+      ],
+      "title": "Scope",
+      "type": "object"
+    },
+    "SessionCaller": {
+      "description": "A code session calling as part of its work.",
+      "properties": {
+        "id": {
+          "description": "The session's id.",
+          "title": "Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "session",
+          "default": "session",
+          "title": "Kind",
+          "type": "string"
+        },
+        "on_behalf_of": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "The id of the person the session acts for, if it acts for one.",
+          "title": "On Behalf Of"
+        }
+      },
+      "required": [
+        "id",
+        "kind"
+      ],
+      "title": "SessionCaller",
+      "type": "object"
+    },
+    "Subject": {
+      "description": "Someone who answers: a person, or a service principal, by their grantr id.",
+      "properties": {
+        "groups": {
+          "default": [],
+          "description": "The ids of the groups it is a member of.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Groups",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "id": {
+          "description": "The subject's id.",
+          "title": "Id",
+          "type": "string"
+        },
+        "service": {
+          "default": false,
+          "description": "Whether it is a service principal rather than a person.",
+          "title": "Service",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Subject",
+      "type": "object"
+    },
+    "Via": {
+      "description": "The outside client a call came through (lattice RFC-0014).\n\nA provider builds its actor from it, the client acting for the caller, so grants are the\ncaller's own and audit names the client.",
+      "properties": {
+        "client_name": {
+          "description": "The client's name, as audit shows it: \"Alex via Claude\".",
+          "title": "Client Name",
+          "type": "string"
+        },
+        "connection_id": {
+          "description": "The id of the connection the client called through.",
+          "title": "Connection Id",
+          "type": "string"
+        },
+        "surface": {
+          "description": "The protocol the client called through.",
+          "enum": [
+            "mcp",
+            "acp"
+          ],
+          "title": "Surface",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connection_id",
+        "client_name",
+        "surface"
+      ],
+      "title": "Via",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "lattice's approval contract: `approval` is one call asked of the people who may answer it, with its request, its state and its answer, and `answer` what one of them gives.",
+  "properties": {
+    "answer": {
+      "$ref": "#/$defs/Answer"
+    },
+    "approval": {
+      "$ref": "#/$defs/Approval"
+    }
+  },
+  "title": "lattice.approvals 1.0.0",
+  "type": "object"
+}

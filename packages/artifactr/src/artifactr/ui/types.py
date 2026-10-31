@@ -15,7 +15,8 @@ Register :data:`UI_TYPES` with the application's own types, in ``Workspaces(type
 Their data's JSON Schema, with ``ask_form``'s request's, is :mod:`artifactr.ui.wire`'s.
 """
 
-from typing import Annotated, Final, Literal, Self
+import json
+from typing import Annotated, Final, Literal, Self, override
 
 from pydantic import (
     AfterValidator,
@@ -282,6 +283,21 @@ class App(Artifact, name="app"):
     summary: Annotated[str, Field(max_length=MAX_SUMMARY)]
     html: str
     state: dict[str, JsonValue] = Field(default_factory=dict[str, JsonValue])
+
+    @override
+    def render_for_tool(self) -> str:
+        """Return the app without its HTML, which ``read_app`` gives the agent.
+
+        Only an agent writes an app's HTML, and a page of markup can match the gateway's
+        ``prompt-injection`` word lists; a ``read_artifact`` result that held it would stay in the
+        thread's history and block every later request. ``read_app``'s result is one the gateway
+        leaves unscanned, as it does the model's own tool arguments (ADR-0098).
+        """
+        state = json.dumps(self.state, sort_keys=True) if self.state else "{}"
+        return (
+            f"{self.title}\n\n{self.summary}\n\nIts state: {state}\n\n"
+            "Its HTML isn't shown here: read it with read_app to change it."
+        )
 
     @model_validator(mode="after")
     def _fits(self) -> Self:

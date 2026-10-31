@@ -101,6 +101,8 @@ class Plan(Artifact):
 
 Include the ids the agent needs to pass to your tools, as this rendering does. The capability clips each rendering in the instructions to `max_render_chars` (4,000 by default).
 
+`render_for_tool()` is what the `read_artifact` tool returns, and defaults to `render_for_agent()`. A tool's result is read by the gateway's `prompt-injection` guardrail, and stays in the thread's history; the instructions are not. Override it only for text an agent wrote that the guardrail's word lists can mistake for an attack, as the mini app type does with its HTML, which `read_app` returns instead ([ADR-0098](../adr/0098-a-mini-apps-html-read-by-its-own-tool-whose-results-skip-prompt-injection.md)).
+
 The type's JSON Schema, from Pydantic, is given to the agent once, in the description of the `create_artifact` tool. Field descriptions (`Field(description=...)`) therefore reach the model.
 
 ## Summaries of changes

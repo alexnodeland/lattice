@@ -25,7 +25,7 @@ from typing import Any
 from pydantic import BaseModel, TypeAdapter, ValidationError
 from pydantic_ai import CallDeferred, FunctionToolset, ModelRetry, RunContext, ToolDefinition
 
-from artifactr.agent import Session, describe_outcome
+from artifactr.agent import Session, describe_outcome, follow
 from artifactr.core import CreateArtifact, EditArtifact, diff
 from artifactr.ui._common import MAX_NUMBER, refusal
 from artifactr.ui._html import refused
@@ -215,6 +215,17 @@ def ui_tools(
                 kind=app.kind, data=app.to_json(), thread_id=ctx.deps.thread_id
             )
             return describe_outcome(await ctx.deps.workspace.commit(command))
+
+        @toolset.tool(prepare=on_apps)
+        async def read_app(ctx: RunContext[Session[Any]], id: str) -> str:
+            """Read a mini app's HTML, which read_artifact leaves out, to change it.
+
+            Args:
+                id: The app to read.
+            """
+            current = await ctx.deps.workspace.get(App, id)
+            await follow(ctx, current.id)
+            return f"{current.id} (app, v{current.version})\n\n{current.data.html}"
 
         @toolset.tool(
             prepare=on_apps,

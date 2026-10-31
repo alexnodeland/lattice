@@ -4,12 +4,22 @@
 # what it refuses before anything starts (stackr ADR-0053). moon's `lattice:check-dev` runs it.
 # `check` runs the checks' functions, which shellcheck can't follow.
 # shellcheck disable=SC2329
-set -euo pipefail
+set -Eeuo pipefail
 cd "$(dirname "$0")/.."
 root=$PWD
 status=0
 scratch=$(mktemp -d)
-trap 'rm -rf "$scratch"' EXIT
+# A command that fails outside a check ends the script (set -e): the ERR trap, which -E carries
+# into functions, keeps which and where, and the EXIT trap says it, so no exit is ever silent.
+# The trap's own cleanup reports a failure instead of changing the exit status.
+trap 'stopped="line $LINENO: $BASH_COMMAND (exit $?)"' ERR
+finish() {
+  local rc=$?
+  [[ $rc == 0 || -z ${stopped:-} ]] || echo "FAIL: check-dev stopped outside a check, at $stopped"
+  rm -rf "$scratch" || echo "check-dev: couldn't remove $scratch" >&2
+  exit "$rc"
+}
+trap finish EXIT
 # The made-up commit below has an author whatever this machine's git says.
 export GIT_AUTHOR_NAME=check-dev GIT_AUTHOR_EMAIL=check-dev@localhost
 export GIT_COMMITTER_NAME=check-dev GIT_COMMITTER_EMAIL=check-dev@localhost
@@ -117,7 +127,9 @@ if [[ \$1 == for-each-ref ]]; then
   [[ \$3 == "\${UNPUSHED:-}" ]] || echo "origin/main"
   exit 0
 fi
-exec "$(command -v git)" "\$@"
+# No maintenance after a commit, which git runs detached, still writing in the application's
+# .git after scripts/dev has returned and while this script removes it.
+exec "$(command -v git)" -c maintenance.auto=false -c gc.auto=0 "\$@"
 FAKE
 chmod +x "$scratch/bin/"*
 

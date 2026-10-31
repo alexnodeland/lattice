@@ -102,5 +102,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0096](0096-a-run-counts-each-model-request-exactly-live-and-at-its-end.md) | A run counts each model request exactly, live and at its end | Accepted |
 | [0097](0097-a-message-chooses-the-model-of-the-turn-it-starts.md) | A message chooses the model of the turn it starts | Accepted |
 | [0098](0098-a-mini-apps-html-read-by-its-own-tool-whose-results-skip-prompt-injection.md) | A mini app's HTML read by its own tool, whose results skip prompt-injection | Accepted |
+| [0099](0099-artifactrs-tools-as-capabilities-called-through-the-enforcer-whose-policy-asks-approval.md) | artifactr's tools as capabilities, called through the enforcer, whose policy asks approval | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

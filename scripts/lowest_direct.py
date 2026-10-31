@@ -32,10 +32,16 @@ PACKAGES = {
 }
 """Each package that ships a wheel, by its directory, and the module it installs, in release order.
 stackr ships none."""
-EXPECTED: dict[str, tuple[str, str]] = {}
+EXPECTED: dict[str, tuple[str, str]] = {
+    "artifactr": (
+        "its provider and connected apps' tiers import lattice_core.capabilities, which"
+        " lattice-core-ai 0.2.0, the newest on PyPI, lacks: its floor rises to 0.3.0 once that"
+        " is published",
+        "No module named 'lattice_core.capabilities'",
+    ),
+}
 """The packages whose floors are known to be too low: why, and what the import says when it fails
-so. Empty: every floor passes. A package goes on it, and comes off as its floor is raised
-(lattice ADR-0029)."""
+so. A package goes on it, and comes off as its floor is raised (lattice ADR-0029)."""
 CHECK = """
 import importlib, pkgutil, sys
 

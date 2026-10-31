@@ -10,6 +10,7 @@ These are the root project's tests: repository-wide invariants, not any package'
 - `test_moon.py`: each project's `dependsOn` in `moon.yml` matches what its `pyproject.toml` or `package.json` requires.
 - `test_affected.py`, `test_release_*.py`, `test_pypi.py`, `test_tlc.py`, `test_craft.py`, `test_check_spec.py`: tests for [scripts/](../scripts/).
 - `test_stackr_*.py`, `test_portalr_*.py`, `test_grantr_*.py`, `test_font_notices.py` and others: invariants across files that no single package's tests can see.
+- `test_enforcement_suite.py`: lattice RFC-0011's one suite for every capability provider. It runs tiers, grants, limits, taint, approvals and audit against a fake provider of each kind and against each library's real provider. A library's new provider joins its `SUBJECTS`.
 - `fixtures/` holds their inputs.
 
 ## Running them

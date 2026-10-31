@@ -18,10 +18,13 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Final, Literal, NamedTuple
 
+from lattice_core.capabilities import Tier
+
 __all__ = [
     "BLENDER",
     "FREECAD",
     "PROTECTED",
+    "TIERS",
     "UNSET",
     "ConnectedServer",
     "Risk",
@@ -35,6 +38,13 @@ Risk = Literal["read", "edit", "code", "network", "host"]
 PROTECTED: Final[frozenset[Risk]] = frozenset({"code", "network"})
 """The risks offered only when the operator allows the tool, the workspace's code key is on and
 the person holds the action, and run only once a person who holds it approves the call."""
+
+TIERS: Final[Mapping[Risk, Tier | None]] = MappingProxyType(
+    {"read": "read", "edit": "write", "code": "run_code", "network": "outbound", "host": None}
+)
+"""Each risk's capability tier (lattice RFC-0011): a `read` tool reads, an `edit` tool writes, a
+`code` tool runs code, and a `network` tool reaches outside the deployment. A `host` tool has no
+tier, since it is never offered (artifactr ADR-0099)."""
 
 
 class Vetted(NamedTuple):

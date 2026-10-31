@@ -137,8 +137,14 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {*INNER, "artifactr.connect"},
         {
             *("pydantic_ai", "pydantic_core", "mcp", "anyio"),
-            *("lattice_core.integrations", "lattice_core.settings"),
+            *("lattice_core.integrations", "lattice_core.settings", "lattice_core.capabilities"),
         },
+    ),
+    # artifactr's provider (lattice RFC-0011): its artifact tools as capabilities, on the agent's
+    # and the workspace's public API, against lattice-core's capabilities contract.
+    "capabilities": (
+        {*INNER, "artifactr.capabilities"},
+        {"pydantic", "lattice_core.capabilities"},
     ),
     # Native files, the files extra (lattice RFC-0003 and ADR-0026): built on the public API of
     # core and the workspace, with its SQL stores in the sql extra and the apps' adapters on the

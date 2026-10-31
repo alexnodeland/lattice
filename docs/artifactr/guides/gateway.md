@@ -64,6 +64,8 @@ async def guardrails(tenant_id: str, workspace_id: str) -> list[str]:
     return ["presidio-pii", "prompt-injection"] if await is_regulated(tenant_id) else []
 ```
 
+A guardrail that reads only tool results, `prompt-injection` as stackr configures it, is left out of a request whose every tool result came from a tool that only repeats what a model wrote: `read_app`, a mini app's HTML ([ADR-0098](../adr/0098-a-mini-apps-html-read-by-its-own-tool-whose-results-skip-prompt-injection.md)). Every tool result in the request counts, the history's too, so one from any other tool keeps it. `echo_tools` and `tool_result_guardrails` name others (`ECHO_TOOLS` and `TOOL_RESULT_GUARDRAILS` by default).
+
 When a guardrail blocks a request, the proxy answers HTTP 400. The gateway turns that into a `GuardrailBlocked` error, a `RunFailure` ([ADR-0042](../adr/0042-typed-run-failures.md)). The run ends `failed` with the reason `guardrail_blocked`, and a message that names the guardrail but never repeats what was blocked:
 
 ```json

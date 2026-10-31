@@ -75,7 +75,7 @@ def artifact_tools(
         """
         artifact = await ctx.deps.workspace.artifact(artifact_id)
         await follow(ctx, artifact.id)
-        return artifact_text(artifact)
+        return artifact_text(artifact, as_tool_result=True)
 
     @toolset.tool(
         description=f"Create an artifact of one of these kinds, whose data must match its "
@@ -188,11 +188,18 @@ async def list_artifacts_text(
     )
 
 
-def artifact_text(artifact: Versioned[Artifact]) -> str:
-    """Render an artifact for a model: a header line, then its ``render_for_agent`` text."""
+def artifact_text(artifact: Versioned[Artifact], *, as_tool_result: bool = False) -> str:
+    """Render an artifact for a model: a header line, then its text.
+
+    Args:
+        artifact: The artifact.
+        as_tool_result: Whether the text is an agent's tool result, which the gateway's
+            guardrails read: its ``render_for_tool`` text rather than its ``render_for_agent``.
+    """
     state = " (archived)" if artifact.archived else ""
     header = f"{artifact.id} ({artifact.kind}, v{artifact.version}){state}"
-    return f"{header}\n\n{artifact.data.render_for_agent()}"
+    data = artifact.data
+    return f"{header}\n\n{data.render_for_tool() if as_tool_result else data.render_for_agent()}"
 
 
 async def submit(

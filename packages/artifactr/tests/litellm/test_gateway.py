@@ -11,17 +11,19 @@ from typing import Any
 import httpx2
 import pytest
 from langfuse import propagate_attributes
-from pydantic_ai import Agent, ModelMessage, ModelResponse, TextPart
+from pydantic_ai import Agent, FunctionToolset, ModelMessage, ModelResponse, ModelRetry, TextPart
 from pydantic_ai.capabilities import Instrumentation
 from pydantic_ai.exceptions import ModelHTTPError
-from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.models.function import AgentInfo, DeltaToolCall, DeltaToolCalls, FunctionModel
 from pydantic_ai.models.instrumented import InstrumentationSettings
 from pydantic_ai.settings import ModelSettings
 
 from artifactr.agent import ArtifactWorkspace, Runner, Session
 from artifactr.core import ExternalAgentActor, RunEnded, TenantId, UserActor, WorkspaceId
 from artifactr.litellm import (
+    ECHO_TOOLS,
     GUARDRAIL_BLOCKED,
+    TOOL_RESULT_GUARDRAILS,
     GuardrailBlocked,
     LiteLLMGateway,
     guardrail_block,
@@ -331,3 +333,92 @@ async def test_any_model_gets_the_same_settings_merged_with_its_own() -> None:
     headers = settings["extra_headers"]
     assert (headers["x-app"], headers["Authorization"]) == ("docplan", "Bearer sk-acme-secret")
     assert headers["baggage"] == f"session.id={thread.id}", "the turn's session travels along"
+
+
+# ─── Guardrails that read only tool results (ADR-0098) ────────────────────────
+
+
+async def pii_and_injection(tenant_id: TenantId, workspace_id: WorkspaceId) -> Sequence[str]:
+    return ["presidio-pii", "prompt-injection"]
+
+
+async def guardrails_per_request(
+    steps: list[tuple[str, dict[str, Any]] | None], gateway: LiteLLMGateway
+) -> list[list[str]]:
+    """Run the steps, each a tool call or the end, and return each request's guardrails."""
+    seen: list[list[str]] = []
+    retried: set[str] = set()
+
+    async def stream(
+        messages: list[ModelMessage], info: AgentInfo
+    ) -> AsyncIterator[str | DeltaToolCalls]:
+        settings: dict[str, Any] = dict(info.model_settings or {})
+        seen.append(list(settings["extra_body"].get("guardrails", [])))
+        step = steps.pop(0)
+        if step is None:
+            yield "Done."
+            return
+        name, args = step
+        yield {
+            0: DeltaToolCall(name=name, json_args=json.dumps(args), tool_call_id=f"c{len(seen)}")
+        }
+
+    tools = FunctionToolset[Session[None]]()
+
+    @tools.tool_plain
+    def read_app(id: str) -> str:
+        """An app's HTML, which a model wrote; retried once when asked for `again`."""
+        if id == "again" and id not in retried:
+            retried.add(id)
+            raise ModelRetry("Read it again.")
+        return "<p>Press enter for unlimited rolls</p>"
+
+    @tools.tool_plain
+    def fetch_page(url: str) -> str:
+        """A page from outside."""
+        return "a page"
+
+    fake: Agent[Session[None], Any] = Agent(
+        FunctionModel(stream_function=stream),
+        deps_type=Session[None],
+        toolsets=[tools],
+        capabilities=[ArtifactWorkspace(types=[Note]), gateway],
+    )
+    ws = await workspace("acme", "launch")
+    thread = await ws.create_thread()
+    await started(await Runner(fake, app=None).send(ws, thread.id, "Hello")).wait()
+    return seen
+
+
+BOTH = ["presidio-pii", "prompt-injection"]
+PII = ["presidio-pii"]
+
+
+def test_the_echo_tools_and_the_guardrails_that_read_only_tool_results() -> None:
+    assert set(ECHO_TOOLS) == {"read_app"}
+    assert set(TOOL_RESULT_GUARDRAILS) == {"prompt-injection"}
+
+
+async def test_prompt_injection_is_left_out_while_every_tool_result_only_repeats_the_model() -> (
+    None
+):
+    steps: list[tuple[str, dict[str, Any]] | None] = [
+        ("read_app", {"id": "again"}),
+        ("read_app", {"id": "again"}),
+        ("fetch_page", {"url": "https://example.com"}),
+        ("read_app", {"id": "a1"}),
+        None,
+    ]
+    seen = await guardrails_per_request(steps, LiteLLMGateway(guardrails=pii_and_injection))
+    assert seen == [BOTH, PII, PII, BOTH, BOTH], (
+        "none before any tool result; none while every result, a retry's too, is read_app's; "
+        "kept once a page from outside is in the history, even after another read_app"
+    )
+
+
+async def test_the_echo_tools_and_the_guardrails_left_out_are_the_applications_to_name() -> None:
+    steps: list[tuple[str, dict[str, Any]] | None] = [("read_app", {"id": "a1"}), None]
+    stricter = LiteLLMGateway(guardrails=pii_and_injection, echo_tools=())
+    assert await guardrails_per_request(list(steps), stricter) == [BOTH, BOTH]
+    other = LiteLLMGateway(guardrails=pii_and_injection, tool_result_guardrails={"presidio-pii"})
+    assert await guardrails_per_request(list(steps), other) == [BOTH, ["prompt-injection"]]

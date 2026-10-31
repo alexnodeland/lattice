@@ -56,3 +56,11 @@ Only the smoke test's `make smoke-app` did all of this, and only for itself.
 ## Follow-up
 
 - **Building from a local checkout.** An optional build context for the libraries (Compose `additional_contexts`) would let the application's image install them from the clone, unpushed changes included. That is a change to every library's install in the template, and needs a decision of its own.
+
+## Amendment (2026-10-30)
+
+The owner decided that `make dev` updates the application when lattice has moved, rather than only saying so.
+
+- **When the application was generated from another commit than `DEV_REF`** (default `HEAD`), `up` runs `copier update --quiet --defaults --vcs-ref <DEV_REF's commit>` in it, keeping its answers, then `uv lock` there (an update can change `pyproject.toml`, and the image builds with `uv sync --locked`), and commits the result in the application's repository as `chore: update from template`. The commit must be on origin, as for a new application.
+- **It refuses, before anything starts,** an application with uncommitted changes (they are not mixed into the update), and an update that leaves conflicts, `.rej` files or conflict markers, naming the files. The update's changes are left in the application for a person to resolve and commit.
+- `scripts/check-dev` checks the update, the relock and its commit, the refusal of uncommitted changes, and both kinds of conflict, against its fakes. A real `copier update` is not run there.

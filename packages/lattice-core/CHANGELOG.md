@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.4.0...lattice-core-v0.5.0) (2026-10-31)
+
+
+### Features
+
+* **core:** add the secrets, egress and adapters contracts (RFC-0011 phase 1) ([#1259](https://github.com/alexnodeland/lattice/issues/1259)) ([9091208](https://github.com/alexnodeland/lattice/commit/90912081a6227a2778466abc07473ad48dd526e5))
+
 ## [0.4.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.3.0...lattice-core-v0.4.0) (2026-10-31)
 
 

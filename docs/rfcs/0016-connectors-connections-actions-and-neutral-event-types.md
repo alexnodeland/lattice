@@ -1,6 +1,6 @@
 # RFC-0016: Connectors: connections, actions and neutral event types
 
-**Status:** Draft
+**Status:** Discussion
 **Author:** Alex Nodeland
 **Created:** 2026-10-31
 **Discussion:** the pull request that adds this file

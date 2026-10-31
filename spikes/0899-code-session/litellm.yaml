@@ -1,0 +1,16 @@
+# Spike #899, throwaway LiteLLM config: one route, to the scripted stub model.
+model_list:
+  - model_name: stub
+    litellm_params:
+      model: openai/stub
+      api_base: http://127.0.0.1:47101/v1
+      api_key: unused
+  # The Anthropic Messages route (Claude Code) on a chat-completions provider, so LiteLLM
+  # translates Messages to chat completions instead of to the Responses API.
+  - model_name: stub-chat
+    litellm_params:
+      model: hosted_vllm/stub
+      api_base: http://127.0.0.1:47101/v1
+      api_key: unused
+litellm_settings:
+  drop_params: true

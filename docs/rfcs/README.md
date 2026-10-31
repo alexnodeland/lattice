@@ -17,5 +17,6 @@ Outside this series, an RFC is named as "lattice RFC-0001".
 | [0011](0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md) | The v0.3 platform: capabilities, approvals, secrets, egress and adapters | Accepted |
 | [0012](0012-the-six-primitives-and-the-workflow-spec.md) | The six primitives and the workflow spec | Discussion |
 | [0013](0013-event-sources-stored-workflows-and-reflexrs-catalog.md) | Event sources, stored workflows and reflexr's catalog | Discussion |
+| [0014](0014-portr-the-command-catalog-and-the-mcp-acp-gateway.md) | portr, the command catalog and the MCP/ACP gateway | Discussion |
 
 To propose one, copy [`template.md`](template.md) to the next number. Each package's series uses the same template.

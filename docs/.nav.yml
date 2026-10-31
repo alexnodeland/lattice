@@ -17,6 +17,7 @@ nav:
       - rfcs/0012-the-six-primitives-and-the-workflow-spec.md
       - rfcs/0013-event-sources-stored-workflows-and-reflexrs-catalog.md
       - rfcs/0014-portr-the-command-catalog-and-the-mcp-acp-gateway.md
+      - rfcs/0015-ports-and-adapters-for-code-sessions-forge-coding-agent-ide-and-sandbox.md
       - Template: rfcs/template.md
   - Decisions:
       - adr/README.md

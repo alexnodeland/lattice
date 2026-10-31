@@ -39,7 +39,7 @@ Every agent with the capability gets tools that work for any artifact type. Thei
 | Tool | What it does |
 |---|---|
 | `list_artifacts(kind=None)` | Lists the workspace's artifacts, with their kinds and versions |
-| `read_artifact(artifact_id)` | Returns an artifact's current `render_for_agent()` text, and follows it |
+| `read_artifact(artifact_id)` | Returns an artifact's current `render_for_tool()` text, which is its `render_for_agent()` text unless the type says otherwise (a mini app's leaves out its HTML), and follows it |
 | `create_artifact(kind, data)` | Creates an artifact of one of the capability's types; the description includes each type's JSON Schema |
 | `edit_text(artifact_id, old, new, field="text", summary=None, propose=False, rationale=None)` | Replaces one exact passage of a text field, or proposes the replacement |
 | `archive_artifact(artifact_id)` | Archives an artifact |

@@ -88,6 +88,11 @@ def test_rendering_for_the_agent() -> None:
     assert Note().describe_change(Note()) is None
 
 
+def test_a_tool_result_renders_as_the_agent_sees_it_unless_the_type_says_otherwise() -> None:
+    checklist = Checklist(title="Launch")
+    assert checklist.render_for_tool() == checklist.render_for_agent()
+
+
 def test_edit_diffs_a_mutated_copy() -> None:
     items = {"t1": Item(title="Write docs")}
     stored = Versioned[Checklist](id="c1", version=4, data=Checklist(items=items), updated_by=ALICE)

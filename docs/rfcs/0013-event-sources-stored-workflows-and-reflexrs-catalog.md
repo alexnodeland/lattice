@@ -1,6 +1,6 @@
 # RFC-0013: Event sources, stored workflows and reflexr's catalog
 
-**Status:** Draft
+**Status:** Discussion
 **Author:** Alex Nodeland
 **Created:** 2026-10-30
 **Discussion:** the pull request that adds this file

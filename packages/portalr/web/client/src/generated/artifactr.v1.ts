@@ -264,6 +264,7 @@ export type Type30 = "tool_returned";
  * @minItems 1
  */
 export type Requests = [DeferredRequest, ...DeferredRequest[]];
+export type Approval = string | null;
 export type Kind17 = "question" | "approval";
 export type ToolCallId3 = string;
 export type ToolName2 = string;
@@ -1086,6 +1087,7 @@ export interface RunPaused {
  * via the `definition` "DeferredRequest".
  */
 export interface DeferredRequest {
+  approval?: Approval;
   args?: Args;
   kind: Kind17;
   review?: Review;

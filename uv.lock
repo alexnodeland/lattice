@@ -1527,7 +1527,7 @@ wheels = [
 
 [[package]]
 name = "grantr"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "packages/grantr" }
 dependencies = [
     { name = "lattice-core-ai" },
@@ -2325,7 +2325,7 @@ docs = [
 
 [[package]]
 name = "lattice-core-ai"
-version = "0.7.0"
+version = "0.8.0"
 source = { editable = "packages/lattice-core" }
 dependencies = [
     { name = "pydantic" },
@@ -2334,6 +2334,9 @@ dependencies = [
 [package.optional-dependencies]
 agents = [
     { name = "pydantic-ai-slim" },
+]
+conformance = [
+    { name = "pytest" },
 ]
 langfuse = [
     { name = "langfuse" },
@@ -2409,9 +2412,10 @@ requires-dist = [
     { name = "pydantic-ai-slim", marker = "extra == 'agents'", specifier = ">=2.53" },
     { name = "pydantic-ai-slim", marker = "extra == 'otel'", specifier = ">=2.51" },
     { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'litellm'", specifier = ">=2.51" },
+    { name = "pytest", marker = "extra == 'conformance'", specifier = ">=8.4" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
 ]
-provides-extras = ["sql", "otel", "langfuse", "litellm", "agents"]
+provides-extras = ["sql", "otel", "langfuse", "litellm", "agents", "conformance"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -3455,7 +3459,7 @@ wheels = [
 
 [[package]]
 name = "portalr"
-version = "0.5.0"
+version = "0.6.0"
 source = { editable = "packages/portalr" }
 dependencies = [
     { name = "fastapi" },

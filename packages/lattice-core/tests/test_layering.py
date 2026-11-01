@@ -19,6 +19,7 @@ EXTRAS = {
     "langfuse": {"langfuse", "opentelemetry"},
     "litellm": {"pydantic_ai", "httpx2", "opentelemetry"},
     "agents": {"pydantic_ai"},
+    "conformance": {"pytest"},
 }
 """What each extra's module or subpackage may import beyond the standard library and pydantic."""
 
@@ -31,7 +32,13 @@ LAZY: dict[str, set[str]] = {
 }
 """What each module may import only lazily: inside a function, or under ``TYPE_CHECKING``."""
 
-BASE = {"lattice_core.otel", "lattice_core.otel.contribution"}
+BASE = {
+    "lattice_core.otel",
+    "lattice_core.otel.contribution",
+    # The harness runs from `make validate` too; only its pytest plugin needs the extra.
+    "lattice_core.conformance",
+    "lattice_core.conformance.secrets",
+}
 """The modules inside an extra's subpackage that need no extra (lattice ADR-0020)."""
 
 INSTALLS = {
@@ -42,6 +49,7 @@ INSTALLS = {
     "litellm": {"openai"},
     # pydantic-ai, which otel and litellm install too.
     "agents": set(),
+    "conformance": {"pytest"},
 }
 """What each extra installs that another may not: blocked while the others' modules import.
 pydantic-ai brings httpx2 and OpenTelemetry's API, so those are never blocked for an extra."""
@@ -95,7 +103,10 @@ def test_the_modules_that_need_no_extra_are_found() -> None:
     assert base >= {
         "lattice_core.adapters",
         "lattice_core.approvals",
+        "lattice_core.bindings",
         "lattice_core.capabilities",
+        "lattice_core.conformance",
+        "lattice_core.conformance.secrets",
         "lattice_core.egress",
         "lattice_core.enforcement",
         "lattice_core.logs",

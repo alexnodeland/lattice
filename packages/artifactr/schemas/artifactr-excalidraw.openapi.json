@@ -257,7 +257,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Upload"
+        "summary": "Upload",
+        "x-lattice-command": "artifactr.edit_artifact"
       }
     },
     "/workspaces/{workspace_id}/diagrams/{artifact_id}/images/{sha256}": {
@@ -397,7 +398,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Image"
+        "summary": "Image",
+        "x-lattice-command": "artifactr.read_artifact"
       }
     }
   }

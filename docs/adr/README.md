@@ -47,6 +47,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0039](0039-the-conformance-harness-a-suite-per-port-each-check-on-a-fresh-adapter-in-an-owner-of-its-own.md) | The conformance harness: a suite per port, each check on a fresh adapter, in an owner of its own | Accepted |
 | [0040](0040-bindings-declared-in-lattice-core-stored-by-grantr-beside-the-operators-layer.md) | Bindings declared in lattice-core, stored by grantr beside the operator's layer | Accepted |
 | [0041](0041-the-command-declaration-a-capability-with-its-toolset-exposure-route-and-surfaces-in-a-static-catalog.md) | The command declaration: a capability with its toolset, exposure, route and surfaces, in a static catalog | Accepted |
+| [0042](0042-parity-every-operation-names-its-command-and-one-test-holds-the-catalogs-to-grantr.md) | Parity: every operation names its command, and one test holds the catalogs to grantr | Accepted |
 | [0043](0043-portr-a-package-of-its-own-on-lattice-core-reaching-commands-only-through-the-registry.md) | portr, a package of its own on lattice-core, reaching commands only through the registry | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

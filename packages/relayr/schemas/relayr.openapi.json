@@ -557,7 +557,10 @@
         "summary": "Nudge a tracker project's follower",
         "tags": [
           "relayr"
-        ]
+        ],
+        "x-lattice-command": {
+          "none": "a tracker's webhook, verified by its signature: no person's action"
+        }
       }
     },
     "/relayr/v1/workspaces/{workspace_id}/tracker": {
@@ -631,7 +634,8 @@
         "summary": "How the tracker connector is doing in a workspace",
         "tags": [
           "relayr"
-        ]
+        ],
+        "x-lattice-command": "relayr.tracker_status"
       }
     },
     "/relayr/v1/workspaces/{workspace_id}/tracker/items": {
@@ -705,7 +709,8 @@
         "summary": "The items a workspace's runs filed",
         "tags": [
           "relayr"
-        ]
+        ],
+        "x-lattice-command": "relayr.list_filed_items"
       }
     }
   }

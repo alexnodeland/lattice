@@ -136,7 +136,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {
             *LIBRARY,
             *("artifactr.fastapi", "artifactr.telemetry", "lattice_core.refusals"),
-            "lattice_core.origins",
+            *("lattice_core.commands", "lattice_core.origins"),
             *("fastapi", "starlette", "pydantic", "anyio"),
         },
     ),

@@ -195,6 +195,11 @@ class _Answer(_Approval):
     """The digest of the arguments shown."""
 
 
+class _Restrictions(_Arguments):
+    workspace: str = Field(min_length=1)
+    """The workspace whose restricted threads and artifacts to list."""
+
+
 class _Bind(_Arguments):
     workspace: str = Field(min_length=1)
     """The tenant's workspace the source's events reach."""
@@ -433,6 +438,14 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         _Grant,
         lambda g, a, t, by: _entry(g.revoke(t, a.role, on=a.on, to=a.to, by=by)),
         route=f"{ADMIN}/access/grants",
+    ),
+    _read(
+        "grantr.list_restrictions",
+        "List the threads and artifacts restricted in a workspace.",
+        "grantr:restrict",
+        None,
+        lambda g, a, t, by: _listed(g.restrictions(t, a.workspace, by=by)),
+        arguments=_Restrictions,
     ),
     _Spec(
         "grantr.restrict",

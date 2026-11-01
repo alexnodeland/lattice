@@ -31,6 +31,7 @@ from artifactr.fastapi.presence import LocalPresence, PresenceChannel
 from artifactr.fastapi.stream import RECHECK, Stream
 from artifactr.telemetry import Telemetry, annotate, attribution
 from artifactr.workspace import MAX_COUNT, Workspace, Workspaces
+from lattice_core.commands import calls, carries_frames
 from lattice_core.refusals import Refused, refusals
 
 ResolveActor = Callable[[HTTPConnection], Awaitable[tuple[TenantId, Actor]]]
@@ -51,6 +52,14 @@ STATUS_CODES: dict[str, int] = {
 REFUSALS: Final = refusals(400, 401, 403, 404, 409, 422)
 """The refused responses every route documents: a malformed request, no or a wrong identity, a
 missing thing, a conflict, and a request that does not validate."""
+FRAMES: Final = carries_frames(
+    "command",
+    watch_run="a run's live frames, which the stream alone sends: refused here",
+    watch_artifact="presence with an artifact open, which the stream alone carries: refused here",
+    unwatch_artifact="presence with an artifact open, which the stream alone carries: refused here",
+)
+"""What a command frame calls: the command its ``type`` names the action of, but the stream's
+own subscriptions (lattice ADR-0042)."""
 
 
 Count = Annotated[int, Query(ge=0, le=MAX_COUNT)]
@@ -127,7 +136,7 @@ def artifactr_router(
 
     current_workspace = Depends(workspace_dependency)
 
-    @router.get("/workspaces")
+    @router.get("/workspaces", openapi_extra=calls("artifactr.list_workspaces"))
     async def list_workspaces(
         request: Request, after: str | None = None, limit: Annotated[int, Query(ge=1)] = 100
     ) -> list[WorkspaceId]:
@@ -145,6 +154,7 @@ def artifactr_router(
             status: {"model": CommandResult | Refused, "description": "Refused, or rejected"}
             for status in STATUS_CODES.values()
         },
+        openapi_extra=FRAMES,
     )
     async def post_command(
         frame: CommandFrame, response: Response, workspace: Workspace = current_workspace
@@ -161,7 +171,9 @@ def artifactr_router(
             response.status_code = STATUS_CODES.get(str(result.rejection["type"]), 400)
         return result
 
-    @router.get("/workspaces/{workspace_id}/artifacts")
+    @router.get(
+        "/workspaces/{workspace_id}/artifacts", openapi_extra=calls("artifactr.list_artifacts")
+    )
     async def list_artifacts(
         kind: str | None = None,
         include_archived: bool = False,
@@ -173,7 +185,10 @@ def artifactr_router(
         )
         return JSONResponse([a.model_dump(mode="json") for a in artifacts])
 
-    @router.get("/workspaces/{workspace_id}/artifacts/{artifact_id}")
+    @router.get(
+        "/workspaces/{workspace_id}/artifacts/{artifact_id}",
+        openapi_extra=calls("artifactr.read_artifact"),
+    )
     async def get_artifact(
         artifact_id: PathId, workspace: Workspace = current_workspace
     ) -> JSONResponse:
@@ -181,14 +196,17 @@ def artifactr_router(
         artifact = await _or_http(workspace.artifact(artifact_id))
         return JSONResponse(artifact.model_dump(mode="json"))
 
-    @router.get("/workspaces/{workspace_id}/artifacts/{artifact_id}/revisions")
+    @router.get(
+        "/workspaces/{workspace_id}/artifacts/{artifact_id}/revisions",
+        openapi_extra=calls("artifactr.list_revisions"),
+    )
     async def list_revisions(
         artifact_id: PathId, workspace: Workspace = current_workspace
     ) -> list[Revision]:
         """Return an artifact's revisions, oldest first."""
         return await _or_http(workspace.revisions(artifact_id))
 
-    @router.get("/workspaces/{workspace_id}/events")
+    @router.get("/workspaces/{workspace_id}/events", openapi_extra=calls("artifactr.read_events"))
     async def list_events(
         after_seq: Count = 0,
         before_seq: Count | None = None,
@@ -212,17 +230,22 @@ def artifactr_router(
             )
         )
 
-    @router.get("/workspaces/{workspace_id}/threads")
+    @router.get("/workspaces/{workspace_id}/threads", openapi_extra=calls("artifactr.list_threads"))
     async def list_threads(workspace: Workspace = current_workspace) -> list[Thread]:
         """Return every thread, oldest first."""
         return await _or_http(workspace.threads())
 
-    @router.get("/workspaces/{workspace_id}/threads/{thread_id}")
+    @router.get(
+        "/workspaces/{workspace_id}/threads/{thread_id}",
+        openapi_extra=calls("artifactr.read_thread"),
+    )
     async def get_thread(thread_id: PathId, workspace: Workspace = current_workspace) -> Thread:
         """Return a thread, with its mode and focus."""
         return await _or_http(workspace.thread(thread_id))
 
-    @router.get("/workspaces/{workspace_id}/proposals")
+    @router.get(
+        "/workspaces/{workspace_id}/proposals", openapi_extra=calls("artifactr.list_proposals")
+    )
     async def list_proposals(
         status: Literal["pending", "accepted", "rejected"] | None = "pending",
         workspace: Workspace = current_workspace,
@@ -230,7 +253,9 @@ def artifactr_router(
         """Return proposals with a status, pending by default."""
         return await _or_http(workspace.proposals(status=status))
 
-    @router.get("/workspaces/{workspace_id}/runs/{run_id}")
+    @router.get(
+        "/workspaces/{workspace_id}/runs/{run_id}", openapi_extra=calls("artifactr.read_run")
+    )
     async def get_run(run_id: PathId, workspace: Workspace = current_workspace) -> Run:
         """Return a run, with any requests it is paused on."""
         return await _or_http(workspace.run(run_id))

@@ -92,6 +92,11 @@ class Session[AppDepsT]:
     """The artifacts the run segment's tools made as the person it acts for, which its watcher
     doesn't tell it of as the person's: a tool adds an id before it commits."""
 
+    asked: set[str] = field(default_factory=set[str], init=False, repr=False, compare=False)
+    """The approvals lattice's enforcer asked for the run segment's calls, by id, as its bridge
+    deferred them: a segment stopped or failed before it paused on them withdraws them
+    (ADR-0102)."""
+
     @property
     def on_behalf_of(self) -> UserActor | ExternalAgentActor | None:
         """Whom the run segment acts for: its agent's ``on_behalf_of``.

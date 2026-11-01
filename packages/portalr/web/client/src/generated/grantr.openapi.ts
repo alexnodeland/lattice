@@ -674,7 +674,7 @@ export interface components {
         };
         /**
          * ApprovalAsked
-         * @description A call was deferred for a person's approval (lattice ADR-0035, grantr ADR-0035).
+         * @description A call was deferred for a person's approval (lattice ADR-0035, grantr ADR-0038).
          */
         ApprovalAsked: {
             /** Approval */

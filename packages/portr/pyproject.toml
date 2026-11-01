@@ -1,6 +1,6 @@
 [project]
 name = "portr-ai"
-version = "0.0.0"
+version = "0.1.0"
 description = "One gateway that serves lattice's commands to outside clients over MCP and ACP, each call through the enforcer."
 readme = "README.md"
 license = "MIT"

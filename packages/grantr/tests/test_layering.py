@@ -30,6 +30,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             "lattice_core.settings",
             "lattice_core.approvals",
             "lattice_core.capabilities",
+            "lattice_core.enforcement",
         },
     ),
     "telemetry": ({"grantr.core", "grantr.telemetry"}, {"opentelemetry", *OTEL_API}),

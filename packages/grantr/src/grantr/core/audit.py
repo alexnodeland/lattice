@@ -242,6 +242,63 @@ class ApprovalClosed(BaseModel):
     reason: str
 
 
+class CapabilityStep(BaseModel):
+    """A step of the enforcement path a call passed, or was stopped at (lattice ADR-0037)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    name: str
+    """The step, such as ``grant`` or ``approval``."""
+
+    passed: bool
+    note: str = ""
+    """What it decided, in words, where there is more to say: a taint verdict, an approval's id."""
+
+
+class CapabilityCalled(BaseModel):
+    """A capability was called through lattice-core's enforcer: never its arguments or output.
+
+    Every call leaves one, refused, pending, failed or called (lattice ADR-0037, grantr
+    ADR-0039).
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["capability_called"] = "capability_called"
+    capability: str
+    """The name asked for, such as ``artifactr.edit_text``."""
+
+    version: str | None
+    """The version called, or None if no capability of the name was offered."""
+
+    workspace: WorkspaceId
+    tenant: str | None = None
+    """The tenant the call named, in the deployment's log alone: one that doesn't exist."""
+
+    caller: str
+    """Who called, as ``kind:id``, such as ``run:run_1``."""
+
+    client: str | None = None
+    """The outside client it came through, by name and connection, if any."""
+
+    correlation_id: str
+    """The id of the turn, run or session that made it."""
+
+    surface: str
+    arguments_digest: str
+    """The digest of its arguments, which an approval binds to."""
+
+    steps: tuple[CapabilityStep, ...]
+    """Each step it passed, and the one that stopped it, in order."""
+
+    outcome: Literal["called", "failed", "refused", "pending"]
+    approval: str | None = None
+    """The approval that let it go ahead, or that it waits for."""
+
+    called_at: datetime
+    """When it was called, by the enforcer's clock; the entry's own time is when it was recorded."""
+
+
 type AuditEvent = Annotated[
     TenantCreated
     | DeploymentTenantCreated
@@ -262,10 +319,12 @@ type AuditEvent = Annotated[
     | SettingSet
     | ApprovalAsked
     | ApprovalAnswered
-    | ApprovalClosed,
+    | ApprovalClosed
+    | CapabilityCalled,
     Field(discriminator="type"),
 ]
-"""A change to access, to an integration's setting, to a setting, or to an approval."""
+"""A change to access, to an integration's setting, to a setting, or to an approval, or a call
+of a capability."""
 
 
 class AuditEntry(BaseModel):
@@ -307,6 +366,7 @@ type AuditType = Literal[
     "approval_asked",
     "approval_answered",
     "approval_closed",
+    "capability_called",
 ]
 """An audit event's ``type``: what a read of the log may keep."""
 

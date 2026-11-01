@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.7.0...grantr-v0.8.0) (2026-11-01)
+
+
+### Features
+
+* **grantr:** grantr's commands, every action on access, and their provider (RFC-0014 phase 1) ([#1332](https://github.com/alexnodeland/lattice/issues/1332)) ([f883c5d](https://github.com/alexnodeland/lattice/commit/f883c5d14cedc5ac02747d841052df7f33714f21))
+
 ## [0.7.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.6.0...grantr-v0.7.0) (2026-11-01)
 
 

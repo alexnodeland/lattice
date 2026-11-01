@@ -1,5 +1,6 @@
 import {
   AppShell,
+  ButtonLink,
   type Glyph,
   glyphs,
   PageHeader,
@@ -16,10 +17,10 @@ import { AppAccount } from "../../../../analytics";
 
 /**
  * The workspaces the caller can open in the tenant, as grantr lists them, in order, in the app's
- * frame: each a row whose name opens its threads, and a compact track of its areas, each a link
- * with its glyph, its word beside it from the small breakpoint and its name alone below it, so
- * five fit a phone's row (portalr ADR-0085). Nothing is read per workspace; the frame's
- * switcher names the tenant alone.
+ * frame, with the way to the approvals waiting for the reader in any of them: each a row whose
+ * name opens its threads, and a compact track of its areas, each a link with its glyph, its word
+ * beside it from the small breakpoint and its name alone below it, so five fit a phone's row
+ * (portalr ADR-0085). Nothing is read per workspace; the frame's switcher names the tenant alone.
  */
 export const Route = createFileRoute("/_signed/t/$tenant/")({
   head: ({ params, match }) => ({
@@ -72,7 +73,17 @@ function Workspaces() {
       }
       account={<AppAccount />}
     >
-      <PageHeader title={tenant} />
+      <PageHeader
+        title={tenant}
+        actions={
+          <ButtonLink
+            variant="secondary"
+            render={<Link to="/t/$tenant/approvals" params={{ tenant }} />}
+          >
+            Approvals
+          </ButtonLink>
+        }
+      />
       {workspaces.length === 0 ? (
         <p>There is no workspace here you can open.</p>
       ) : (

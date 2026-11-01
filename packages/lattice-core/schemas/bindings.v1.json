@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "BindingId": {
+      "type": "string"
+    },
+    "JsonObject": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+    },
+    "JsonValue": {}
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "lattice's bindings contract: which of a source's events, on one of its connections, reach one workspace of a tenant, and the trust it lowers them to.",
+  "properties": {
+    "bound_at": {
+      "description": "When it was bound: there is no history before it.",
+      "format": "date-time",
+      "title": "Bound At",
+      "type": "string"
+    },
+    "by": {
+      "description": "Who bound it: the operator, or the grantr subject who did, such as ``user:alice``.",
+      "minLength": 1,
+      "title": "By",
+      "type": "string"
+    },
+    "connection": {
+      "description": "The id of the source's connection it binds, such as a tracker's project or an\ninstallation.",
+      "minLength": 1,
+      "title": "Connection",
+      "type": "string"
+    },
+    "id": {
+      "$ref": "#/$defs/BindingId",
+      "description": "Its id, opaque."
+    },
+    "options": {
+      "$ref": "#/$defs/JsonObject",
+      "description": "The source's own options, such as a tracker's default labels."
+    },
+    "select": {
+      "$ref": "#/$defs/JsonObject",
+      "description": "What it selects by, in the source's declared selectors, such as ``{\"repository\":\n\"acme/api\"}``: validated against the source's select schema; empty selects everything."
+    },
+    "source": {
+      "description": "The source's name, as its spec names it: ``tracker``, ``alertmanager``, ``forge``.",
+      "title": "Source",
+      "type": "string"
+    },
+    "tenant_id": {
+      "description": "The tenant whose workspace it reaches.",
+      "minLength": 1,
+      "title": "Tenant Id",
+      "type": "string"
+    },
+    "trust": {
+      "anyOf": [
+        {
+          "enum": [
+            "untrusted",
+            "authenticated",
+            "internal"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The level it lowers the source's to here, never raising it; None keeps the source's.",
+      "title": "Trust"
+    },
+    "types": {
+      "anyOf": [
+        {
+          "items": {
+            "type": "string"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The event types it receives; None receives every type the source has.",
+      "title": "Types"
+    },
+    "workspace_id": {
+      "description": "The workspace the events reach.",
+      "minLength": 1,
+      "title": "Workspace Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "tenant_id",
+    "workspace_id",
+    "source",
+    "connection",
+    "bound_at",
+    "by"
+  ],
+  "title": "lattice.bindings 1.0.0",
+  "type": "object"
+}

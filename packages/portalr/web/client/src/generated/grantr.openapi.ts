@@ -656,6 +656,61 @@ export interface components {
             kind: "agent";
         };
         /**
+         * ApprovalAnswered
+         * @description An approval was answered: the first answer, which settled it.
+         */
+        ApprovalAnswered: {
+            /** Approval */
+            approval: string;
+            /** Approved */
+            approved: boolean;
+            /** Surface */
+            surface: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "approval_answered";
+        };
+        /**
+         * ApprovalAsked
+         * @description A call was deferred for a person's approval (lattice ADR-0035, grantr ADR-0038).
+         */
+        ApprovalAsked: {
+            /** Approval */
+            approval: string;
+            /** Caller */
+            caller: string;
+            /** Capability */
+            capability: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "approval_asked";
+            workspace: components["schemas"]["WorkspaceId"];
+        };
+        /**
+         * ApprovalClosed
+         * @description A pending approval closed unanswered: past its deadline, or withdrawn.
+         */
+        ApprovalClosed: {
+            /** Approval */
+            approval: string;
+            /** Reason */
+            reason: string;
+            /**
+             * State
+             * @enum {string}
+             */
+            state: "expired" | "withdrawn";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "approval_closed";
+        };
+        /**
          * AuditEntry
          * @description An event in the audit log, with its place in it.
          */
@@ -671,9 +726,9 @@ export interface components {
             seq: number;
             tenant: components["schemas"]["TenantId"] | null;
         };
-        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"] | components["schemas"]["IntegrationSet"] | components["schemas"]["SettingSet"];
+        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"] | components["schemas"]["IntegrationSet"] | components["schemas"]["SettingSet"] | components["schemas"]["ApprovalAsked"] | components["schemas"]["ApprovalAnswered"] | components["schemas"]["ApprovalClosed"];
         /** @enum {string} */
-        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted" | "integration_set" | "setting_set";
+        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted" | "integration_set" | "setting_set" | "approval_asked" | "approval_answered" | "approval_closed";
         /**
          * BuiltInRole
          * @description A built-in role a tenant's admins grant, and the kinds of resource it may be granted on.

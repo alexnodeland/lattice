@@ -38,10 +38,11 @@ GRANTR_ACTIONS: Final = frozenset(
         "manage_settings",
         "read_audit",
         "grant_operator",
+        "answer_approval",
     )
 )
-"""grantr's own catalog: the actions that change access and switch integrations, and read its
-audit log."""
+"""grantr's own catalog: the actions that change access and switch integrations, read its audit
+log, and answer the approvals that name it."""
 
 OPERATOR: Final = frozenset({"grantr:create_tenant", "grantr:grant_operator"})
 """grantr's actions the deployment's operators hold, and no one else."""
@@ -56,11 +57,23 @@ MANAGE_SETTINGS: Final = "grantr:manage_settings"
 """Narrowing settings, on the tenant or in a workspace, and reading how they are (lattice
 ADR-0030)."""
 
+ANSWER_APPROVAL: Final = "grantr:answer_approval"
+"""Answering an approval whose answerers name this action, in a workspace: a person delegates
+answering by granting it (lattice RFC-0011, grantr ADR-0038)."""
+
 WORKSPACE_GRANTS: Final = frozenset(
-    {"grantr:grant", "grantr:revoke", "grantr:restrict", MANAGE_INTEGRATIONS, MANAGE_SETTINGS}
+    {
+        "grantr:grant",
+        "grantr:revoke",
+        "grantr:restrict",
+        MANAGE_INTEGRATIONS,
+        MANAGE_SETTINGS,
+        ANSWER_APPROVAL,
+    }
 )
 """grantr's actions a workspace's admins hold within it: granting, restricting, switching its
-integrations and narrowing its settings."""
+integrations, narrowing its settings, and answering the approvals that name
+``grantr:answer_approval``."""
 
 FEEDBACK: Final = frozenset({"artifactr:give_feedback", "reflexr:give_feedback"})
 """The commands a viewer may send: feedback on what they read."""

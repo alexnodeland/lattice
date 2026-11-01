@@ -14,6 +14,104 @@
         "title": "Agent",
         "type": "object"
       },
+      "ApprovalAnswered": {
+        "description": "An approval was answered: the first answer, which settled it.",
+        "properties": {
+          "approval": {
+            "title": "Approval",
+            "type": "string"
+          },
+          "approved": {
+            "title": "Approved",
+            "type": "boolean"
+          },
+          "surface": {
+            "title": "Surface",
+            "type": "string"
+          },
+          "type": {
+            "const": "approval_answered",
+            "default": "approval_answered",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval",
+          "approved",
+          "surface"
+        ],
+        "title": "ApprovalAnswered",
+        "type": "object"
+      },
+      "ApprovalAsked": {
+        "description": "A call was deferred for a person's approval (lattice ADR-0035, grantr ADR-0038).",
+        "properties": {
+          "approval": {
+            "title": "Approval",
+            "type": "string"
+          },
+          "caller": {
+            "title": "Caller",
+            "type": "string"
+          },
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "type": {
+            "const": "approval_asked",
+            "default": "approval_asked",
+            "title": "Type",
+            "type": "string"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          }
+        },
+        "required": [
+          "approval",
+          "workspace",
+          "capability",
+          "caller"
+        ],
+        "title": "ApprovalAsked",
+        "type": "object"
+      },
+      "ApprovalClosed": {
+        "description": "A pending approval closed unanswered: past its deadline, or withdrawn.",
+        "properties": {
+          "approval": {
+            "title": "Approval",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "expired",
+              "withdrawn"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "type": {
+            "const": "approval_closed",
+            "default": "approval_closed",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approval",
+          "state",
+          "reason"
+        ],
+        "title": "ApprovalClosed",
+        "type": "object"
+      },
       "AuditEntry": {
         "description": "An event in the audit log, with its place in it.",
         "properties": {
@@ -63,6 +161,9 @@
       "AuditEvent": {
         "discriminator": {
           "mapping": {
+            "approval_answered": "#/components/schemas/ApprovalAnswered",
+            "approval_asked": "#/components/schemas/ApprovalAsked",
+            "approval_closed": "#/components/schemas/ApprovalClosed",
             "deployment_tenant_created": "#/components/schemas/DeploymentTenantCreated",
             "granted": "#/components/schemas/Granted",
             "group_defined": "#/components/schemas/GroupDefined",
@@ -134,6 +235,15 @@
           },
           {
             "$ref": "#/components/schemas/SettingSet"
+          },
+          {
+            "$ref": "#/components/schemas/ApprovalAsked"
+          },
+          {
+            "$ref": "#/components/schemas/ApprovalAnswered"
+          },
+          {
+            "$ref": "#/components/schemas/ApprovalClosed"
           }
         ]
       },
@@ -155,7 +265,10 @@
           "restricted",
           "unrestricted",
           "integration_set",
-          "setting_set"
+          "setting_set",
+          "approval_asked",
+          "approval_answered",
+          "approval_closed"
         ],
         "type": "string"
       },

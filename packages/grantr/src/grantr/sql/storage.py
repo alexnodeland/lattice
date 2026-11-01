@@ -46,6 +46,7 @@ from grantr.core import (
 )
 from grantr.sql.tables import (
     DEPLOYMENT,
+    ApprovalRow,
     AuditRow,
     GrantRow,
     GroupMemberRow,
@@ -57,6 +58,7 @@ from grantr.sql.tables import (
     SettingRowRecord,
     TenantRow,
 )
+from lattice_core.approvals import Approval, ApprovalId
 from lattice_core.sql.sessions import awaited_to_the_end, lock_row, to_the_end
 from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 
@@ -287,6 +289,33 @@ class _Reads:
         return {row.key: IntegrationSetting.model_validate(row.setting) for row in rows}
 
     @awaited_to_the_end
+    async def approval(self, tenant: TenantId, id: ApprovalId) -> Approval | None:
+        row = await self._session.get(ApprovalRow, (tenant, id))
+        return None if row is None else Approval.model_validate(row.approval)
+
+    @awaited_to_the_end
+    async def approvals(
+        self,
+        tenant: TenantId,
+        *,
+        workspace: WorkspaceId | None = None,
+        due: datetime | None = None,
+    ) -> list[Approval]:
+        query = select(ApprovalRow).where(
+            ApprovalRow.tenant_id == tenant, ApprovalRow.state == "pending"
+        )
+        if workspace is not None:
+            query = query.where(ApprovalRow.workspace == workspace)
+        found = [
+            Approval.model_validate(row.approval) for row in await self._session.scalars(query)
+        ]
+        # The deadline and the time asked are compared as times, not as each database's text.
+        return sorted(
+            (a for a in found if due is None or a.deadline <= due),
+            key=lambda approval: (approval.asked_at, approval.id),
+        )
+
+    @awaited_to_the_end
     async def settings(
         self, tenant: TenantId, workspace: WorkspaceId | None = None
     ) -> dict[str, SettingRow]:
@@ -359,6 +388,7 @@ class _Transaction(_Reads):
             ResourceRow,
             IntegrationRow,
             SettingRowRecord,
+            ApprovalRow,
         ):
             await self._session.execute(delete(model).where(model.tenant_id == tenant))
         await self._session.execute(
@@ -491,6 +521,18 @@ class _Transaction(_Reads):
                 workspace=workspace or "",
                 key=key,
                 setting=setting.model_dump(mode="json"),
+            )
+        )
+
+    @awaited_to_the_end
+    async def put_approval(self, approval: Approval) -> None:
+        await self._session.merge(
+            ApprovalRow(
+                tenant_id=approval.scope.tenant_id,
+                id=approval.id,
+                workspace=approval.scope.workspace_id,
+                state=approval.state,
+                approval=approval.model_dump(mode="json"),
             )
         )
 
@@ -735,6 +777,22 @@ class SqlStorage:
     ) -> dict[str, SettingRow]:
         """The settings stored on a tenant, with None, or in one of its workspaces, by key."""
         return await self._read(tenant, lambda reads: reads.settings(tenant, workspace))
+
+    async def approval(self, tenant: TenantId, id: ApprovalId) -> Approval | None:
+        """One of the tenant's approvals, as it stands; None if it has no such approval."""
+        return await self._read(tenant, lambda reads: reads.approval(tenant, id))
+
+    async def approvals(
+        self,
+        tenant: TenantId,
+        *,
+        workspace: WorkspaceId | None = None,
+        due: datetime | None = None,
+    ) -> list[Approval]:
+        """The tenant's pending approvals, oldest first: in one workspace, or those due."""
+        return await self._read(
+            tenant, lambda reads: reads.approvals(tenant, workspace=workspace, due=due)
+        )
 
     async def keys(self, tenant: TenantId) -> list[Key]:
         """A tenant's keys."""

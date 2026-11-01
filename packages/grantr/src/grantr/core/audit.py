@@ -198,6 +198,50 @@ class SettingSet(BaseModel):
     """The level's version of the setting once changed: one more than before."""
 
 
+class ApprovalAsked(BaseModel):
+    """A call was deferred for a person's approval (lattice ADR-0035, grantr ADR-0038)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["approval_asked"] = "approval_asked"
+    approval: str
+    """The approval's id."""
+
+    workspace: WorkspaceId
+    capability: str
+    """The capability the call would call."""
+
+    caller: str
+    """Who called, as ``kind:id``, such as ``run:run_1``."""
+
+
+class ApprovalAnswered(BaseModel):
+    """An approval was answered: the first answer, which settled it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["approval_answered"] = "approval_answered"
+    approval: str
+    """The approval's id."""
+
+    approved: bool
+    surface: str
+    """Where it was answered, such as ``portalr``."""
+
+
+class ApprovalClosed(BaseModel):
+    """A pending approval closed unanswered: past its deadline, or withdrawn."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["approval_closed"] = "approval_closed"
+    approval: str
+    """The approval's id."""
+
+    state: Literal["expired", "withdrawn"]
+    reason: str
+
+
 type AuditEvent = Annotated[
     TenantCreated
     | DeploymentTenantCreated
@@ -215,10 +259,13 @@ type AuditEvent = Annotated[
     | Restricted
     | Unrestricted
     | IntegrationSet
-    | SettingSet,
+    | SettingSet
+    | ApprovalAsked
+    | ApprovalAnswered
+    | ApprovalClosed,
     Field(discriminator="type"),
 ]
-"""A change to access, to an integration's setting, or to a setting."""
+"""A change to access, to an integration's setting, to a setting, or to an approval."""
 
 
 class AuditEntry(BaseModel):
@@ -257,6 +304,9 @@ type AuditType = Literal[
     "unrestricted",
     "integration_set",
     "setting_set",
+    "approval_asked",
+    "approval_answered",
+    "approval_closed",
 ]
 """An audit event's ``type``: what a read of the log may keep."""
 

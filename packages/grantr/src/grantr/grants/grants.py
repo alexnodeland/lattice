@@ -11,7 +11,7 @@ import logging
 import time
 from collections.abc import AsyncGenerator, Awaitable, Callable, Collection, Iterable, Mapping
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import datetime, timedelta
 from types import MappingProxyType
 from typing import Final, NamedTuple, Protocol
 
@@ -83,15 +83,13 @@ from grantr.core.grants import held
 from grantr.core.roles import MANAGE_INTEGRATIONS, MANAGE_SETTINGS, RESTRICT, RULE_ROLE
 from grantr.core.settings import state as setting_state
 from grantr.core.settings import wire
+from grantr.grants.approvals import POLL, GrantrApprovals, Record
 from grantr.grants.storage import Reads, Storage, Transaction
 from grantr.telemetry import SLOW_CHECK, Reason, Telemetry
 from lattice_core.integrations import KNOWN, Integration
 from lattice_core.settings import KNOWN_SETTINGS, Setting, Superset, Value, floor, operator_layer
 
 logger = logging.getLogger(__name__)
-
-type Record = Callable[[TenantId | None, Subject | None, AuditEvent], Awaitable[AuditEntry]]
-"""Appends an audit entry in a change's transaction."""
 
 
 class Access(Protocol):
@@ -1118,6 +1116,42 @@ class Grants:
             yield tx, record
         for entry in entries:
             self._telemetry.audited(entry)
+
+    # ─── approvals ───────────────────────────────────────────────────────────
+
+    def approvals(
+        self, *, clock: Callable[[], datetime] | None = None, poll: timedelta = POLL
+    ) -> GrantrApprovals:
+        """The store of approvals, lattice-core's ``Approvals``, over this storage.
+
+        Who may answer is decided by these grants: an approval's action is held as
+        :meth:`check` holds it, on the approval's workspace, but a service principal holds it
+        only by a grant made to it, not to a group it is in (lattice RFC-0011, grantr ADR-0038).
+
+        Args:
+            clock: The time now, for an approval's times and its deadline; the system's, in
+                UTC, if omitted.
+            poll: How often its ``watch`` reads an approval it waits on.
+        """
+        return GrantrApprovals(
+            self._storage,
+            change=self._change,
+            holds=self._answers_by,
+            is_member=self._is_member,
+            clock=clock,
+            poll=poll,
+        )
+
+    async def _answers_by(
+        self, reads: Reads, tenant: TenantId, member: Member, action: str, workspace: WorkspaceId
+    ) -> bool:
+        """Whether a member holds an action on a workspace, as one who answers an approval."""
+        on = Resource(kind="workspace", workspace=workspace)
+        if not isinstance(member, ServicePrincipal):
+            return action in await self._held(reads, tenant, member, on)
+        own = [g for g in await reads.grants(tenant, member, on=on.chain()) if g.to == member]
+        custom = await self._custom(reads, tenant, own)
+        return action in held(own, on, self._catalog, custom, restricted=False)
 
     # ─── the rules a command follows ─────────────────────────────────────────
 

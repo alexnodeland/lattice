@@ -33,6 +33,7 @@ from grantr.core import (
     WorkspaceId,
 )
 from grantr.grants.storage import Transaction
+from lattice_core.approvals import Approval, ApprovalId
 
 Clock = Callable[[], datetime]
 """Returns the current time; injectable so tests control it."""
@@ -66,6 +67,10 @@ class _Data:
         default_factory=dict[tuple[TenantId, WorkspaceId | None, str], SettingRow]
     )
     """Each setting's row, by tenant, workspace (None for the tenant's) and key."""
+    approvals: dict[tuple[TenantId, ApprovalId], Approval] = field(
+        default_factory=dict[tuple[TenantId, ApprovalId], Approval]
+    )
+    """Each approval as it stands, by tenant and id."""
     log: tuple[AuditEntry, ...] = ()
 
 
@@ -142,6 +147,26 @@ class _Reads:
             if (t, w) == (tenant, workspace)
         }
 
+    async def approval(self, tenant: TenantId, id: ApprovalId) -> Approval | None:
+        return self._data.approvals.get((tenant, id))
+
+    async def approvals(
+        self,
+        tenant: TenantId,
+        *,
+        workspace: WorkspaceId | None = None,
+        due: datetime | None = None,
+    ) -> list[Approval]:
+        found = [
+            approval
+            for (t, _), approval in self._data.approvals.items()
+            if t == tenant
+            and approval.state == "pending"
+            and (workspace is None or approval.scope.workspace_id == workspace)
+            and (due is None or approval.deadline <= due)
+        ]
+        return sorted(found, key=lambda approval: (approval.asked_at, approval.id))
+
     async def settings(
         self, tenant: TenantId, workspace: WorkspaceId | None = None
     ) -> dict[str, SettingRow]:
@@ -194,6 +219,7 @@ class _Transaction(_Reads):
                 key: setting for key, setting in data.integrations.items() if key[0] != tenant
             },
             settings={key: row for key, row in data.settings.items() if key[0] != tenant},
+            approvals={key: a for key, a in data.approvals.items() if key[0] != tenant},
         )
 
     async def add_grant(self, grant: Grant) -> None:
@@ -263,6 +289,10 @@ class _Transaction(_Reads):
         self._data = replace(
             self._data, settings={**self._data.settings, (tenant, workspace, key): row}
         )
+
+    async def put_approval(self, approval: Approval) -> None:
+        key = (approval.scope.tenant_id, approval.id)
+        self._data = replace(self._data, approvals={**self._data.approvals, key: approval})
 
     async def add_key(self, key: Key) -> None:
         self._data = replace(self._data, keys={**self._data.keys, key.id: key})

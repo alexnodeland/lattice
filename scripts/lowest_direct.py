@@ -40,9 +40,9 @@ EXPECTED: dict[str, tuple[str, str]] = {
         "No module named 'lattice_core.capabilities'",
     ),
     "grantr": (
-        "its settings carry lattice_core.settings.Superset, which lattice-core-ai 0.2.0, the"
-        " newest on PyPI, lacks: its floor rises with the lattice-core release that first has"
-        " it, once that is published",
+        "its store of approvals imports lattice_core.approvals, and its settings"
+        " lattice_core.settings.Superset, which lattice-core-ai 0.2.0, the newest on PyPI, lacks:"
+        " its floor rises to the first release with both, once that is published",
         "cannot import name 'Superset' from 'lattice_core.settings'",
     ),
 }

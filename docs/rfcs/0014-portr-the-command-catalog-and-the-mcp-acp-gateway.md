@@ -380,14 +380,14 @@ Each is settled in phase 3 or 4, or carried as an exit criterion; items marked "
 
 ## Tracking
 
-- [ ] lattice-core ADR: the command declaration: `Command` as an RFC-0011 `Capability` plus toolset, exposure, route, resource and surfaces; a static catalog per package, bound at the composition root; tool names `<package>_<name>`, a breaking change a new command (P2, P3, P4)
+- [x] lattice-core ADR: the command declaration: `Command` as an RFC-0011 `Capability` plus toolset, exposure, route, resource and surfaces; a static catalog per package, bound at the composition root; tool names `<package>_<name>`, a breaking change a new command (P2, P3, P4) ([ADR-0041](../adr/0041-the-command-declaration-a-capability-with-its-toolset-exposure-route-and-surfaces-in-a-static-catalog.md))
 - [ ] lattice ADR: portr, a new package on lattice-core and grantr, reaching commands only through RFC-0011's registry (O7)
 - [ ] lattice ADR: parity's mechanism: `x-lattice-command` on every operation, command frames' `type`, the client's `CommandName` and manifest, root `tests/test_parity.py` (P13)
 - [ ] portr ADR, with the package: the gateway's transport and tokens: MCP 2026-07-28 first and stateless, the access token hook's `aud` and a live connection on every call, Dynamic Client Registration first (P5, P6, P9)
 - [ ] grantr ADR: connections as grantr objects, one tenant each, listed, limited, audited and revoked like keys (P7, O12)
 - [ ] portr ADR, with the package: approvals by form elicitation and never a tool that answers; the ACP client picks only `*_once`; confirmations out of band on portalr's confirm page, and no `admin_high` on a key's word (P11, O8, O13)
 - [ ] portr ADR, with the package: limits per connection, four settings; per client app in 0.3.x (P12)
-- [ ] lattice-core: `commands` and its schema (#916)
+- [x] lattice-core: `commands` and its schema (#916) ([#1314](https://github.com/alexnodeland/lattice/pull/1314))
 - [ ] artifactr, grantr, reflexr, relayr, portalr: their catalogs, providers, `x-lattice-command` and schemas (#916)
 - [ ] portalr's client: `CommandName` and `commands.used.json`; root `tests/test_parity.py` and its fixtures (#916)
 - [ ] portr: the package, the MCP server, tokens, keys and connections, limits, the core toolset, continuity (#917)

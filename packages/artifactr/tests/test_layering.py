@@ -152,6 +152,12 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             *("lattice_core.integrations", "lattice_core.settings", "lattice_core.capabilities"),
         },
     ),
+    # artifactr's static catalog (lattice RFC-0014): commands declared on lattice-core's types,
+    # reading nothing, so the parity test and the schema read it without a workspace.
+    "commands": (
+        {"artifactr.commands"},
+        {"pydantic", "lattice_core.capabilities", "lattice_core.commands"},
+    ),
     # artifactr's provider (lattice RFC-0011): its artifact tools as capabilities, on the agent's
     # and the workspace's public API, against lattice-core's capabilities contract.
     "capabilities": (

@@ -30,7 +30,7 @@ def test_a_schema_is_named_by_its_contracts_major_version() -> None:
     assert SCHEMAS["capabilities"]()["title"] == f"lattice.capabilities {CONTRACT}"
 
 
-@pytest.mark.parametrize("argv", [[], ["taint"], ["capabilities", "approvals"], ["bindings"]])
+@pytest.mark.parametrize("argv", [[], ["taint"], ["capabilities", "approvals"], ["nope"]])
 def test_main_needs_one_contract_it_knows(argv: list[str]) -> None:
     with pytest.raises(SystemExit, match="usage"):
         main(argv)

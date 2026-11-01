@@ -60,6 +60,7 @@ nav:
       - adr/0036-egress-decided-by-one-pure-function-hosts-the-operators-and-internal-destinations-declared-per-purpose.md
       - adr/0037-the-enforcement-path-in-lattice-core-refusals-by-step-approvals-resumed-by-id.md
       - adr/0038-approval-asked-by-tiers-a-union-resolved-setting-names-and-admin-high-confirmed-by-its-caller.md
+      - adr/0040-bindings-declared-in-lattice-core-stored-by-grantr-beside-the-operators-layer.md
       - adr/0041-the-command-declaration-a-capability-with-its-toolset-exposure-route-and-surfaces-in-a-static-catalog.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md

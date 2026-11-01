@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.5.0...grantr-v0.6.0) (2026-11-01)
+
+
+### Features
+
+* **grantr:** list, read and answer approvals over the admin API (RFC-0011 phase 3) ([#1304](https://github.com/alexnodeland/lattice/issues/1304)) ([464682f](https://github.com/alexnodeland/lattice/commit/464682fa7cf8cd786b7cfb3e6828f793880e5c76))
+
 ## [0.5.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.4.0...grantr-v0.5.0) (2026-11-01)
 
 

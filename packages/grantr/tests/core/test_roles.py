@@ -73,7 +73,10 @@ def test_the_tenant_roles_cover_every_catalog_but_the_operators_actions() -> Non
     deployment = {"portalr:read_deployment"}
     assert _role("owner", "tenant") == CATALOG.actions - OPERATOR - BOOKKEEPING - deployment
     assert _role("owner", "tenant") - _role("admin", "tenant") == {"grantr:delete_tenant"}
-    assert _role("member", "tenant") == {"artifactr:read_workspaces"}, "listing what they open"
+    assert _role("member", "tenant") == {
+        "artifactr:read_workspaces",
+        "grantr:read_approvals",
+    }, "listing what they open, and the approvals they may answer"
     assert "artifactr:read_workspaces" in _role("application", "deployment")
     for workspace_role in ("viewer", "editor", "admin"):
         assert "artifactr:read_workspaces" not in _role(workspace_role), "asked of the tenant"

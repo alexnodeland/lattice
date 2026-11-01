@@ -21,6 +21,8 @@ const PAGES: Record<string, { at: string; allowed: boolean }> = {
   "/sign-in": { at: "/sign-in", allowed: false },
   "/t/$tenant": { at: "/t/acme", allowed: false },
   "/t/$tenant/$": { at: "/t/acme/nothing-here", allowed: false },
+  "/t/$tenant/approvals": { at: "/t/acme/approvals", allowed: false },
+  "/t/$tenant/approvals/$approval": { at: "/t/acme/approvals/apr_1", allowed: false },
   "/t/$tenant/w/$workspace": { at: "/t/acme/w/notes", allowed: false },
   "/t/$tenant/w/$workspace/$": { at: "/t/acme/w/notes/nothing-here", allowed: false },
   "/t/$tenant/w/$workspace/artifacts": { at: "/t/acme/w/notes/artifacts", allowed: false },
@@ -54,6 +56,28 @@ const serve = async (request: Request, path: string) => {
         actor: { kind: "user", id: "alice" },
       },
     ]);
+  }
+  if (path === "/grantr/v1/tenants/acme/approvals/apr_1") {
+    return Response.json({
+      id: "apr_1",
+      scope: { tenant_id: "acme", workspace_id: "notes" },
+      capability: "notes.publish",
+      version: "1.0.0",
+      rendering: { title: "Publish the note", summary: "", arguments: { note: "Plan" } },
+      arguments_digest: "a".repeat(64),
+      asked_by: { kind: "person", id: "bob" },
+      answerers: {
+        subjects: ["alice"],
+        groups: [],
+        confirmation: false,
+        different_approver: false,
+      },
+      deadline: "2099-01-01T00:00:00Z",
+      asked_at: "2026-11-01T09:00:00Z",
+      covers: [],
+      scopes_offered: [],
+      state: "pending",
+    });
   }
   return path.startsWith("/grantr/v1/tenants/acme/") ? Response.json([]) : undefined;
 };

@@ -127,6 +127,8 @@ test("every read has its own path", async () => {
     [queries.grantr.roles("acme"), "/grantr/v1/tenants/acme/roles"],
     [queries.grantr.catalog(), "/grantr/v1/catalog"],
     [queries.grantr.keyring("acme"), "/grantr/v1/tenants/acme/keys"],
+    [queries.grantr.approvals("acme"), "/grantr/v1/tenants/acme/approvals"],
+    [queries.grantr.approval("acme", "apr_1"), "/grantr/v1/tenants/acme/approvals/apr_1"],
     [queries.portalr.spend("acme"), "/portalr/v1/spend"],
     [
       queries.portalr.feedback("acme", {

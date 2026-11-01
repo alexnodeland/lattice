@@ -68,5 +68,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0064](0064-the-protocol-schema-names-reflexrs-own-events.md) | The protocol schema names reflexr's own events | Accepted |
 | [0065](0065-an-access-token-redacted-from-span-urls.md) | An access token redacted from the spans' URLs | Accepted, amended by [lattice ADR-0018](../../adr/0018-lattice-core-what-the-libraries-share.md) |
 | [0066](0066-an-epoch-fences-each-attempt.md) | An epoch fences each attempt | Accepted |
+| [0067](0067-reflexrs-commands-every-action-a-command-or-listed-with-its-reason.md) | reflexr's commands: every action a command, or listed with its reason | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

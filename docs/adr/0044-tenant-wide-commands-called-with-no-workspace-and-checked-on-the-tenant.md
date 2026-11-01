@@ -24,12 +24,7 @@ The owner chose on 2026-11-01:
 
 - **`Scope.workspace_id` is optional** (`lattice_core.capabilities`, contract 1.1.0). `None` is the tenant as a whole. `Owner.workspace_id` in `lattice_core.secrets` is already optional the same way.
 - **`Command.tenant_wide`** (`lattice_core.commands`, contract 1.1.0) is false by default. A tenant-wide command is called with a scope that names no workspace, and a surface asks its caller for none. It is refused if its route or its resource names `{workspace}`.
-- **Marked tenant-wide:**
-  - `artifactr.list_workspaces`;
-  - every grantr command;
-  - every portalr command.
-
-  reflexr's and relayr's commands, and the rest of artifactr's, act in a workspace.
+- **Marked tenant-wide:** `artifactr.list_workspaces`, every grantr command and every portalr command. reflexr's and relayr's commands, and the rest of artifactr's, act in a workspace.
 - **The ports resolve a call with no workspace at the tenant:**
   - `Integrations.is_enabled(tenant, None, key)` is the tenant's state: the installation and the tenant's setting, with no workspace below them.
   - `Settings.value(tenant, None, key)` is the tenant's value: the operator's and the tenant's, which no workspace narrows.

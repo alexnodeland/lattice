@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/alexnodeland/lattice/compare/stackr-v0.5.0...stackr-v0.6.0) (2026-11-01)
+
+
+### Features
+
+* **grantr:** connections: grantr objects, one tenant each, read on every call, revoked at once (RFC-0014 P7) ([#1355](https://github.com/alexnodeland/lattice/issues/1355)) ([4bb7559](https://github.com/alexnodeland/lattice/commit/4bb755918dc242ddc8b560b0229b26a2a6033bb7))
+
 ## [0.5.0](https://github.com/alexnodeland/lattice/compare/stackr-v0.4.0...stackr-v0.5.0) (2026-11-01)
 
 

@@ -810,7 +810,10 @@
             "description": "Refused"
           }
         },
-        "summary": "Extend"
+        "summary": "Extend",
+        "x-lattice-command": {
+          "none": "native files' making and check-out come in 0.3.x (#924)"
+        }
       }
     },
     "/workspaces/{workspace_id}/checkouts/{checkout_id}/file": {
@@ -958,7 +961,10 @@
             "description": "Refused"
           }
         },
-        "summary": "Check In"
+        "summary": "Check In",
+        "x-lattice-command": {
+          "none": "native files' making and check-out come in 0.3.x (#924)"
+        }
       }
     },
     "/workspaces/{workspace_id}/files": {
@@ -1151,7 +1157,10 @@
             "description": "Refused"
           }
         },
-        "summary": "Upload"
+        "summary": "Upload",
+        "x-lattice-command": {
+          "none": "native files' making and check-out come in 0.3.x (#924)"
+        }
       }
     },
     "/workspaces/{workspace_id}/files/{artifact_id}": {
@@ -1292,7 +1301,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Get File"
+        "summary": "Get File",
+        "x-lattice-command": "artifactr.read_file"
       }
     },
     "/workspaces/{workspace_id}/files/{artifact_id}/checkouts": {
@@ -1433,7 +1443,10 @@
             "description": "Refused"
           }
         },
-        "summary": "Check Out"
+        "summary": "Check Out",
+        "x-lattice-command": {
+          "none": "native files' making and check-out come in 0.3.x (#924)"
+        }
       }
     },
     "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/content": {
@@ -1580,7 +1593,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Download"
+        "summary": "Download",
+        "x-lattice-command": "artifactr.read_file"
       }
     },
     "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/pages/{page}": {
@@ -1768,7 +1782,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Page"
+        "summary": "Page",
+        "x-lattice-command": "artifactr.read_file"
       }
     },
     "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/text": {
@@ -1915,7 +1930,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Text"
+        "summary": "Text",
+        "x-lattice-command": "artifactr.read_file"
       }
     },
     "/workspaces/{workspace_id}/proposals/{proposal_id}/commands": {
@@ -2056,7 +2072,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Proposed Commands"
+        "summary": "Proposed Commands",
+        "x-lattice-command": "artifactr.list_proposals"
       }
     },
     "/workspaces/{workspace_id}/proposals/{proposal_id}/pages/{page}": {
@@ -2234,7 +2251,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Proposed Page"
+        "summary": "Proposed Page",
+        "x-lattice-command": "artifactr.list_proposals"
       }
     },
     "/workspaces/{workspace_id}/proposals/{proposal_id}/text": {
@@ -2371,7 +2389,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Proposed Text"
+        "summary": "Proposed Text",
+        "x-lattice-command": "artifactr.list_proposals"
       }
     },
     "/workspaces/{workspace_id}/uploads": {
@@ -2502,7 +2521,10 @@
             "description": "Refused"
           }
         },
-        "summary": "Uploads"
+        "summary": "Uploads",
+        "x-lattice-command": {
+          "none": "what the person may upload here, which the upload form reads"
+        }
       }
     }
   }

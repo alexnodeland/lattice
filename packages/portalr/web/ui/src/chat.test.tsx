@@ -374,6 +374,27 @@ test("a call to approve takes the focus, and is approved or denied once", async 
   expect(onAnswer.mock.calls).toEqual([[{ approved: true }]]);
 });
 
+test("a call lattice's enforcer deferred links to its approval's page, which says who may answer", async () => {
+  const request: ArtifactrV1.DeferredRequest = {
+    kind: "approval",
+    tool_call_id: "t1",
+    tool_name: "notes__publish",
+    args: { text: "Weekly update" },
+    approval: "apr_1",
+  };
+  const page = "/portalr/app/t/acme/approvals/apr_1";
+  const screen = await render(
+    <Request request={request} onAnswer={sent()} approval={<a href={page} />} />,
+  );
+  const card = screen.getByRole("region", { name: "Approve notes__publish?" });
+  const link = card.getByRole("link", { name: "Who may answer it" });
+  await expect.element(link).toHaveAttribute("href", page);
+  await expect.element(card.getByRole("button", { name: "Approve" })).toHaveFocus();
+  // One the thread answers itself, as a connected app's, links nowhere.
+  screen.rerender(<Request request={{ ...request, approval: null }} onAnswer={sent()} />);
+  await expect.element(card.getByRole("link")).not.toBeInTheDocument();
+});
+
 test("a connected app's code is shown whole, with what it runs as and what a scan found", async () => {
   const onAnswer = sent();
   const code = "import os\nos.listdir('.')\n";

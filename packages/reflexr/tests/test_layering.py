@@ -27,7 +27,14 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     "fastapi": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.fastapi"},
-        {"pydantic", "opentelemetry", "fastapi", "starlette", "lattice_core.refusals"},
+        {
+            "pydantic",
+            "opentelemetry",
+            "fastapi",
+            "starlette",
+            "lattice_core.refusals",
+            "lattice_core.commands",
+        },
     ),
     "mcp": (
         {"reflexr.core", "reflexr.telemetry", "reflexr.workspace", "reflexr.mcp"},

@@ -71,7 +71,14 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # workspace each span read.
     "fastapi": (
         {"relayr.ledger", "relayr.telemetry", "relayr.trackers", "relayr.fastapi"},
-        {"fastapi", "lattice_core.refusals", "opentelemetry", "pydantic", "reflexr"},
+        {
+            "fastapi",
+            "lattice_core.commands",
+            "lattice_core.refusals",
+            "opentelemetry",
+            "pydantic",
+            "reflexr",
+        },
     ),
     "plane": ({"relayr.trackers", "relayr.plane"}, {"httpx", "pydantic"}),
     "vikunja": ({"relayr.trackers", "relayr.vikunja"}, {"httpx", "pydantic"}),

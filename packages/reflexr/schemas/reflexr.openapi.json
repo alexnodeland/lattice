@@ -3135,7 +3135,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Rules"
+        "summary": "List Rules",
+        "x-lattice-command": "reflexr.list_rules"
       }
     },
     "/schedules": {
@@ -3218,7 +3219,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Schedules"
+        "summary": "List Schedules",
+        "x-lattice-command": "reflexr.schedule_status"
       }
     },
     "/workspaces/{workspace_id}/commands": {
@@ -3359,7 +3361,11 @@
             "description": "Refused, or rejected"
           }
         },
-        "summary": "Post Command"
+        "summary": "Post Command",
+        "x-lattice-command": {
+          "frames": "command",
+          "none": {}
+        }
       }
     },
     "/workspaces/{workspace_id}/dead-letters": {
@@ -3470,7 +3476,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Dead Letters"
+        "summary": "List Dead Letters",
+        "x-lattice-command": "reflexr.list_dead_letters"
       }
     },
     "/workspaces/{workspace_id}/events": {
@@ -3650,7 +3657,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Events"
+        "summary": "List Events",
+        "x-lattice-command": "reflexr.read_events"
       },
       "post": {
         "description": "Publish one event, or a batch in order: all of them, or none.",
@@ -3761,7 +3769,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Post Events"
+        "summary": "Post Events",
+        "x-lattice-command": "reflexr.publish_event"
       }
     },
     "/workspaces/{workspace_id}/rules": {
@@ -3856,7 +3865,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Rule Status"
+        "summary": "List Rule Status",
+        "x-lattice-command": "reflexr.rule_status"
       }
     },
     "/workspaces/{workspace_id}/rules/{rule}": {
@@ -3957,7 +3967,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Get Rule"
+        "summary": "Get Rule",
+        "x-lattice-command": "reflexr.get_rule"
       }
     },
     "/workspaces/{workspace_id}/rules/{rule}/history": {
@@ -4062,7 +4073,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Get Rule History"
+        "summary": "Get Rule History",
+        "x-lattice-command": "reflexr.rule_history"
       }
     },
     "/workspaces/{workspace_id}/runs": {
@@ -4232,7 +4244,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Runs"
+        "summary": "List Runs",
+        "x-lattice-command": "reflexr.list_runs"
       }
     },
     "/workspaces/{workspace_id}/runs/{run_id}": {
@@ -4333,7 +4346,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Get Run"
+        "summary": "Get Run",
+        "x-lattice-command": "reflexr.get_run"
       }
     },
     "/workspaces/{workspace_id}/schedules": {
@@ -4428,7 +4442,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Schedule Status"
+        "summary": "List Schedule Status",
+        "x-lattice-command": "reflexr.schedule_status"
       }
     }
   }

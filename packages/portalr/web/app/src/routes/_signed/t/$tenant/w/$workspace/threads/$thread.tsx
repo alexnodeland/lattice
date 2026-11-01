@@ -435,6 +435,16 @@ function Chat() {
       <Request
         request={request}
         {...(by !== undefined && { answeredBy: by })}
+        // A call lattice's enforcer deferred links to its approval's page, which says who may
+        // answer it (portalr ADR-0095).
+        {...(request.approval != null && {
+          approval: (
+            <Link
+              to="/t/$tenant/approvals/$approval"
+              params={{ tenant, approval: request.approval }}
+            />
+          ),
+        })}
         // The newest request waiting takes the focus if it arrived while the page was
         // open, never one already answered, nor one waiting when the page was shown.
         focus={request === latestRequest && arrived}

@@ -14,7 +14,16 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import pytest
-from pydantic_ai import Agent, DeferredToolRequests, RunContext
+from pydantic_ai import (
+    Agent,
+    ApprovalRequired,
+    DeferredToolRequests,
+    FunctionToolset,
+    ModelResponse,
+    RunContext,
+)
+from pydantic_ai.messages import ToolCallPart
+from pydantic_ai.toolsets import AbstractToolset
 
 from artifactr.agent import ArtifactWorkspace, Session
 from artifactr.core import (
@@ -42,6 +51,7 @@ from lattice_core.approvals import (
     ApprovalRequest,
     FakeApprovals,
     NoCoverage,
+    NotPending,
     Subject,
     arguments_digest,
 )
@@ -164,12 +174,21 @@ class World:
     async def marked(self, _ctx: RunContext[Session[Gate]], _taint: Taint) -> None:
         return None
 
-    def agent(self, script: Script, *, ask: bool = False) -> Agent[Session[Gate], Any]:
+    def agent(
+        self,
+        script: Script,
+        *,
+        ask: bool = False,
+        tools: FunctionToolset[Session[Gate]] | None = None,
+    ) -> Agent[Session[Gate], Any]:
+        offered: list[AbstractToolset[Session[Gate]]] = [
+            toolset(self.enforcer, self.context, self.marked)
+        ]
         return Agent(
             script.model,
             deps_type=Session[Gate],
             output_type=[str, DeferredToolRequests],
-            toolsets=[toolset(self.enforcer, self.context, self.marked)],
+            toolsets=offered if tools is None else [*offered, tools],
             capabilities=[ArtifactWorkspace(types=[Note, Checklist], ask=ask)],
         )
 
@@ -576,3 +595,153 @@ async def test_a_follower_that_fails_is_logged(
 
         await _until(logged)
     assert (await ws.run(run_id)).status == "paused"
+
+
+# ─── withdrawn when its run ends before it pauses (ADR-0102) ─────────────────────────────────
+
+
+def _alongside(
+    then: Callable[[RunContext[Session[Gate]]], Awaitable[str]],
+) -> FunctionToolset[Session[Gate]]:
+    """A tool called beside the deferred one, which waits until its approval is asked, then
+    does ``then``: the window in which a run stops or fails before it pauses."""
+    tools = FunctionToolset[Session[Gate]]()
+
+    @tools.tool
+    async def beside(ctx: RunContext[Session[Gate]]) -> str:
+        async def asked() -> bool:
+            return bool(ctx.deps.asked)
+
+        await _until(asked)
+        return await then(ctx)
+
+    return tools
+
+
+def _both() -> Script:
+    """A model that calls the deferred tool and :func:`_alongside`'s in one response."""
+    return Script(
+        ModelResponse(
+            parts=[
+                ToolCallPart(tool_name=TOOL, args=ARGS, tool_call_id="a1"),
+                ToolCallPart(tool_name="beside", args={}, tool_call_id="b1"),
+            ]
+        ),
+        say("Unreached."),
+    )
+
+
+async def _stopped_while_asked(
+    store: FakeApprovals, ws: Workspace, thread: Thread, runners: MakeRunner, **options: Any
+) -> RunId:
+    """Start a run whose approval is asked, and stop it before it pauses."""
+    asked = asyncio.Event()
+
+    async def hold(_ctx: RunContext[Session[Gate]]) -> str:
+        asked.set()
+        await asyncio.Event().wait()
+        return "never"
+
+    runner = runners(World(store).agent(_both(), tools=_alongside(hold)), **options)
+    handle = (await runner.send(ws, thread.id, "Publish the weekly note")).run
+    assert handle is not None
+    await asyncio.wait_for(asked.wait(), 5)
+    assert await runner.stop(handle.run_id)
+    return handle.run_id
+
+
+async def test_a_run_stopped_before_it_pauses_withdraws_the_approval_it_asked(
+    ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    store = Store()
+    run_id = await _stopped_while_asked(store, ws, thread, runners, approvals=store)
+    assert (await ws.run(run_id)).status == "stopped"
+    [approval] = store.all()
+    assert (approval.state, approval.reason) == ("withdrawn", "its run was stopped")
+    assert approval.answer is None, "no one answered it: nothing would have taken it"
+
+
+async def test_a_run_that_fails_before_it_pauses_withdraws_the_approval_it_asked(
+    ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    store = Store()
+
+    async def fail(_ctx: RunContext[Session[Gate]]) -> str:
+        raise RuntimeError("the disk is full")
+
+    runner = runners(World(store).agent(_both(), tools=_alongside(fail)), approvals=store)
+    handle = (await runner.send(ws, thread.id, "Publish the weekly note")).run
+    assert handle is not None
+    with pytest.raises(RuntimeError, match="the disk is full"):
+        await handle.wait()
+    assert (await ws.run(handle.run_id)).status == "failed"
+    [approval] = store.all()
+    assert (approval.state, approval.reason) == ("withdrawn", "its run failed")
+
+
+async def test_one_answered_before_its_run_stopped_is_left_as_it_was_answered(
+    ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    class AnsweredFirst(Store):
+        """A store in which bob approves an approval just before its run withdraws it."""
+
+        async def withdraw(self, id: ApprovalId, reason: str, /) -> Approval:
+            await self.answer(id, _answer(True), subject=Subject(id="bob"))
+            return await super().withdraw(id, reason)
+
+    store = AnsweredFirst()
+    await _stopped_while_asked(store, ws, thread, runners, approvals=store)
+    [approval] = store.all()
+    assert approval.state == "approved", "the answer came first; the withdrawal is refused"
+    with pytest.raises(NotPending):
+        await store.withdraw(approval.id, "again")
+
+
+async def test_a_store_that_fails_to_withdraw_one_is_logged_and_it_expires_at_its_deadline(
+    ws: Workspace, thread: Thread, runners: MakeRunner, caplog: pytest.LogCaptureFixture
+) -> None:
+    class Failing(Store):
+        async def withdraw(self, id: ApprovalId, reason: str, /) -> Approval:
+            raise ConnectionError("the store is down")
+
+    store = Failing()
+    with caplog.at_level(logging.ERROR, logger="artifactr.agent"):
+        run_id = await _stopped_while_asked(store, ws, thread, runners, approvals=store)
+    assert (await ws.run(run_id)).status == "stopped", "the run ends all the same"
+    [approval] = store.all()
+    assert approval.state == "pending"
+    assert any(
+        f"withdrawing approval {approval.id} of run {run_id} failed" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+async def test_a_runner_given_no_store_leaves_one_its_run_asked(
+    ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    store = Store()  # the enforcer's, which the application didn't give the Runner
+    await _stopped_while_asked(store, ws, thread, runners)
+    [approval] = store.all()
+    assert approval.state == "pending", "it expires at its deadline"
+
+
+async def test_a_tools_own_approval_names_none_and_leaves_the_store_alone(
+    ws: Workspace, thread: Thread, runners: MakeRunner
+) -> None:
+    store = Store()
+    tools = FunctionToolset[Session[Gate]]()
+
+    @tools.tool
+    async def confirm(ctx: RunContext[Session[Gate]]) -> str:
+        if not ctx.tool_call_approved:
+            raise ApprovalRequired  # the application's own, which artifactr's thread answers
+        return "confirmed"
+
+    script = Script(call("confirm", call_id="c1"), say("Done."))
+    runner = runners(World(store).agent(script, tools=tools), approvals=store)
+    handle = (await runner.send(ws, thread.id, "Confirm it")).run
+    assert handle is not None
+    assert isinstance((await handle.wait()).output, DeferredToolRequests)
+    [request] = (await ws.run(handle.run_id)).pending
+    assert (request.kind, request.approval) == ("approval", None)
+    assert store.all() == (), "nothing was asked of the store, so nothing is withdrawn"

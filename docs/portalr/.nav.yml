@@ -106,6 +106,7 @@ nav:
   - adr/0092-a-thread-uses-its-height-one-tray-for-what-waits-one-strip-for-a-turn.md
   - adr/0093-approvals-on-their-own-page-and-a-confirmation-on-admins-confirm-page-alone.md
   - adr/0094-portalrs-commands-its-admins-reads-and-the-tenant-and-member-it-makes.md
+  - adr/0095-a-threads-approval-card-links-its-approvals-page-which-says-who-may-answer-it.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

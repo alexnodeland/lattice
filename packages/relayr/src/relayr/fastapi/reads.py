@@ -18,6 +18,7 @@ from fastapi import APIRouter, HTTPException, Path, Request
 from opentelemetry import trace
 from pydantic import BaseModel, ConfigDict, Field
 
+from lattice_core.commands import calls
 from lattice_core.refusals import refusals
 from reflexr.core import Rejection
 from reflexr.fastapi import STATUS_CODES, ResolveActor, Unauthorized
@@ -176,6 +177,7 @@ def tracker_reads_router(
     @router.get(
         "/relayr/v1/workspaces/{workspace_id}/tracker/items",
         summary="The items a workspace's runs filed",
+        openapi_extra=calls("relayr.list_filed_items"),
     )
     async def filed(workspace_id: PathId, request: Request) -> Filed:
         """Each item the workspace's runs filed in its tracker, with its link and its chains."""
@@ -187,6 +189,7 @@ def tracker_reads_router(
     @router.get(
         "/relayr/v1/workspaces/{workspace_id}/tracker",
         summary="How the tracker connector is doing in a workspace",
+        openapi_extra=calls("relayr.tracker_status"),
     )
     async def following(workspace_id: PathId, request: Request) -> Following:
         """The workspace's binding, how far its follower read, and what it couldn't publish."""

@@ -144,6 +144,7 @@ nav:
     - adr/0099-artifactrs-tools-as-capabilities-called-through-the-enforcer-whose-policy-asks-approval.md
     - adr/0100-artifactrs-commands-every-action-a-command-or-listed-with-its-reason.md
     - adr/0101-a-run-paused-on-an-enforcers-approval-names-it-and-is-answered-in-its-store.md
+    - adr/0102-an-approval-a-run-asked-is-withdrawn-when-the-run-ends-before-it-pauses-on-it.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

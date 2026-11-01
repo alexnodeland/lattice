@@ -1361,7 +1361,7 @@
         "type": "object"
       },
       "SettingKind": {
-        "description": "What a setting's value is: a whole number within bounds, or some of a set of names.",
+        "description": "What a setting's value is: a whole number within bounds, or some of a set of names.\n\nA ``subset``'s names are what a layer allows, so a lower layer may only take names out; a\n``superset``'s are what a layer asks for, so a lower layer may only add names (lattice\nADR-0038).",
         "properties": {
           "high": {
             "anyOf": [
@@ -1402,7 +1402,8 @@
           "type": {
             "enum": [
               "int_range",
-              "subset"
+              "subset",
+              "superset"
             ],
             "title": "Type",
             "type": "string"

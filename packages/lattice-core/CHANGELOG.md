@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.6.0...lattice-core-v0.6.1) (2026-11-01)
+
+
+### Bug Fixes
+
+* **core:** let an approval through only for the call that asked it ([#1283](https://github.com/alexnodeland/lattice/issues/1283)) ([713403b](https://github.com/alexnodeland/lattice/commit/713403bc3365e60c840e90a2056888089da61ae1))
+
 ## [0.6.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.5.0...lattice-core-v0.6.0) (2026-10-31)
 
 

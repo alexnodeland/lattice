@@ -18,6 +18,11 @@ This module declares the contract: the types, the ports a store (:class:`Approva
 :class:`FakeApprovals` is an in-memory store for tests, with the same semantics, and
 :class:`NoCoverage` the coverage of an application without plans.
 
+:class:`SettingsPolicy` is lattice's policy: it asks a person for the tiers the ``approve:tiers``
+setting names, the caller's own confirmation for an ``admin_high`` capability, and a different
+approver where the gate, a tainted outbound call, or :func:`admin_high_approvers`' setting says so
+(lattice ADR-0038).
+
 The contract's version is :data:`CONTRACT`, and its JSON Schema, which :func:`contract_schema`
 returns, is checked in at ``schemas/approvals.v1.json``: regenerate it with ``moon run
 lattice-core:schema`` (:mod:`lattice_core.contracts`).
@@ -48,8 +53,12 @@ from lattice_core.capabilities import (
     Tier,
     Via,
 )
+from lattice_core.settings import APPROVE_TIERS, Setting, Settings, Superset, Value
+from lattice_core.taint import Tainted
 
 __all__ = [
+    "ADMIN_HIGH_DIFFERENT",
+    "ANSWER_APPROVAL",
     "CONFIRM_SURFACE",
     "CONTRACT",
     "DIGEST",
@@ -76,9 +85,11 @@ __all__ = [
     "NotPending",
     "Rendering",
     "ScopeNotOffered",
+    "SettingsPolicy",
     "State",
     "Subject",
     "UnknownApproval",
+    "admin_high_approvers",
     "arguments_digest",
     "contract_schema",
 ]
@@ -597,6 +608,96 @@ class NoCoverage:
     ) -> ApprovalId | None:
         """Return None: nothing is covered."""
         return None
+
+
+ANSWER_APPROVAL: Final = "grantr:answer_approval"
+"""The grantr action whose holders :class:`SettingsPolicy` asks by default: tenant owners and
+admins, and a workspace's admins within it (grantr ADR-0038)."""
+
+ADMIN_HIGH_DIFFERENT: Final = "admin-high:different-approver"
+"""The setting that names the ``admin_high`` capabilities that need a different approver (lattice
+RFC-0011's O15, ADR-0038)."""
+
+
+def admin_high_approvers(capabilities: Iterable[Capability]) -> Setting:
+    """``admin-high:different-approver``, for the settings registry, over the capabilities.
+
+    It names the registered ``admin_high`` capabilities whose calls need someone other than the
+    caller to approve them, beyond the caller's own confirmation. None does by default; the
+    operator's value names those that do everywhere, and a tenant's admins may add others, never
+    take one away, as for every :class:`~lattice_core.settings.Superset`.
+
+    Args:
+        capabilities: The application's capabilities; only the ``admin_high`` ones are named.
+    """
+    names = frozenset(c.name for c in capabilities if c.risk_class == "admin_high")
+    return Setting(
+        ADMIN_HIGH_DIFFERENT,
+        Superset(names),
+        default=(),
+        lowest="tenant",
+        description=(
+            "Which admin actions need a second person's approval, beyond the caller's own"
+            " confirmation; a tenant may add actions, never take one away."
+        ),
+    )
+
+
+def _names(key: str, value: Value) -> frozenset[str]:
+    """A setting of names' value.
+
+    Raises:
+        TypeError: If it holds a number, which refuses the call.
+    """
+    if not isinstance(value, tuple):
+        raise TypeError(f"{key} holds names")
+    return frozenset(value)
+
+
+class SettingsPolicy:
+    """lattice's :class:`ApprovalPolicy`: who approves a call, from the settings (ADR-0038).
+
+    - An ``admin_high`` capability asks the caller's own confirmation, on
+      :data:`CONFIRM_SURFACE`. It asks a different approver, any holder of ``action`` but the
+      caller, where its gate says so or ``admin-high:different-approver`` names it, and where
+      the caller acts for no person who could confirm.
+    - Any other capability asks a person only where ``approve:tiers`` names its tier: whoever
+      holds ``action``, or the person the call acts for. It asks a different approver where its
+      gate says so, or where it reaches outside and the caller is tainted.
+
+    A setting it can't read raises, which refuses the call; grantr's settings answer a setting's
+    floor when their store can't be read, which asks a person on every tier.
+
+    Args:
+        settings: Where the two settings are read, each call.
+        action: The grantr action whose holders may answer; :data:`ANSWER_APPROVAL` if omitted.
+    """
+
+    def __init__(self, settings: Settings, *, action: str = ANSWER_APPROVAL) -> None:
+        self._settings = settings
+        self._action = action
+
+    async def needed(self, capability: Capability, context: CallContext, /) -> Answerers | None:
+        """Return who must approve the call, or None if it needs no approval."""
+        tenant, workspace = context.scope.tenant_id, context.scope.workspace_id
+        person = _person(context.caller)
+        if capability.risk_class == "admin_high":
+            listed = await self._settings.value(tenant, workspace, ADMIN_HIGH_DIFFERENT)
+            different = capability.gate.different_approver or (
+                capability.name in _names(ADMIN_HIGH_DIFFERENT, listed)
+            )
+            if person is not None and not different:
+                return Answerers(subjects=frozenset({person}), confirmation=True)
+            return Answerers(action=self._action, different_approver=different)
+        tiers = await self._settings.value(tenant, workspace, APPROVE_TIERS)
+        if capability.tier not in _names(APPROVE_TIERS, tiers):
+            return None
+        tainted_outbound = capability.tier == "outbound" and isinstance(context.taint, Tainted)
+        if capability.gate.different_approver or tainted_outbound:
+            return Answerers(action=self._action, different_approver=True)
+        return Answerers(
+            action=self._action, subjects=frozenset() if person is None else frozenset({person})
+        )
 
 
 @runtime_checkable

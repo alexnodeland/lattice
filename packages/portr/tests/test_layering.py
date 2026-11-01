@@ -1,7 +1,8 @@
 """The layering in portr's architecture, enforced (lattice RFC-0014, Decision O7).
 
 portr reaches the libraries' commands only through lattice-core's registry: it never imports
-artifactr, reflexr, evalr or relayr. The core imports no MCP SDK and does no I/O.
+artifactr, reflexr, evalr or relayr. The core imports no MCP SDK and does no I/O; the MCP server,
+behind the mcp extra, adds the SDK and the enforcer.
 """
 
 import ast
@@ -18,6 +19,16 @@ LIBRARIES = {"artifactr", "reflexr", "evalr", "relayr", "portalr"}
 LAYERS: dict[str, tuple[set[str], set[str]]] = {
     # layer: (portr packages it may import, third-party modules it may import)
     "core": ({"portr.core"}, {"pydantic", "lattice_core.capabilities", "lattice_core.commands"}),
+    # The MCP server, the mcp extra: the core's offer over the MCP SDK, each call through
+    # lattice-core's enforcer.
+    "mcp": (
+        {"portr.core", "portr.mcp"},
+        {
+            *("pydantic", "mcp", "starlette"),
+            *("lattice_core.capabilities", "lattice_core.commands"),
+            *("lattice_core.enforcement", "lattice_core.taint"),
+        },
+    ),
 }
 
 

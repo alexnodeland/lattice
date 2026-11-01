@@ -1,6 +1,6 @@
 # ADR-0030: Settings: typed, declared in lattice-core, and only narrowed below the operator
 
-**Status:** Accepted
+**Status:** Accepted, amended by [ADR-0038](0038-approval-asked-by-tiers-a-union-resolved-setting-names-and-admin-high-confirmed-by-its-caller.md)
 **Date:** 2026-10-22
 **Deciders:** Alex Nodeland
 **Beside:** [ADR-0027](0027-integrations-switched-per-workspace-through-one-port.md), integrations, which stay switches

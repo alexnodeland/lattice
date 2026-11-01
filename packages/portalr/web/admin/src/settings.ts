@@ -21,7 +21,7 @@ export interface SettingRow {
   /** What applies at this level, said, and as it is. */
   readonly effective: string;
   readonly effectiveValue: Value;
-  /** How far this level may go, and which layer says so. */
+  /** How far this level may go, and which layer says so: at most, or a superset's at least. */
   readonly ceiling: string;
   readonly ceilingValue: Value;
   /** Who sets the ceiling, for a choice it leaves out: "the operator", "the tenant". */
@@ -59,6 +59,8 @@ const LABELS: Readonly<Record<string, string>> = {
   "connect-tools:freecad": "FreeCAD's tools",
   "connect-tools:blender": "Blender's tools",
   "agent-writes:direct": "Kinds the agent edits directly in Auto",
+  "approve:tiers": "Tiers that need approval",
+  "admin-high:different-approver": "Admin actions a second person approves",
 };
 
 /** A setting's name: its label, or, for one this admin doesn't know yet, its sentence. */
@@ -66,15 +68,22 @@ export const nameOf = (state: SettingState): string => LABELS[state.key] ?? stat
 
 /**
  * Why what is set here doesn't apply: the settings now allow no less than it, or a layer above,
- * or the settings, allow no more.
+ * or the settings, allow no more, or, for a superset, a layer above asks for more.
  */
 function clampedOf(state: SettingState, value: Value): string {
   const low = state.kind.low;
   if (typeof value === "number" && low != null && value < low) {
     return `The settings now allow at least ${low}: ${said(state.effective)} applies.`;
   }
+  if (state.kind.type === "superset") {
+    return `What is set here doesn't apply: ${said(state.effective)} does, as more is asked for now.`;
+  }
   return `What is set here doesn't apply: ${said(state.effective)} does, as no more is allowed now.`;
 }
+
+/** How far a level may go: at most the layer above's, or, for a superset, at least it. */
+const boundOf = (state: SettingState): string =>
+  `${state.kind.type === "superset" ? "At least" : "At most"} ${said(state.ceiling)}: ${SETTERS[state.ceiling_set_by]}.`;
 
 /** Each setting at a level as the page shows it, with who set it there named as `names` does. */
 export function settingRowsOf(
@@ -91,7 +100,7 @@ export function settingRowsOf(
       kind: state.kind,
       effective: said(state.effective),
       effectiveValue: state.effective,
-      ceiling: `At most ${said(state.ceiling)}: ${SETTERS[state.ceiling_set_by]}.`,
+      ceiling: boundOf(state),
       ceilingValue: state.ceiling,
       ceilingBy: { default: "the deployment", operator: "the operator", tenant: "the tenant" }[
         state.ceiling_set_by

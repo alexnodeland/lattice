@@ -1,16 +1,19 @@
 """Settings: typed values a deployment, a tenant and a workspace each may only narrow.
 
 A setting is named by a key of the integrations' form, such as ``connect-per-hour:freecad``, and
-declared once, in a registry, with its kind (a whole number within bounds, or a subset of known
-names), its default, the lowest tier that may set it and a sentence that says what it is:
+declared once, in a registry, with its kind (a whole number within bounds, or some of a set of
+known names), its default, the lowest tier that may set it and a sentence that says what it is:
 :data:`KNOWN_SETTINGS` is lattice's, and an application that adds its own passes
 :func:`registry` one more :class:`Setting` (lattice ADR-0030).
 
 A value is resolved through four layers: the registry's default, the operator's value in the
 deployment's configuration, which replaces it, then the tenant's and the workspace's, each of
 which may only narrow the one above it: a number may only be lowered, a subset only shrunk. A
-value that would widen its layer is refused where it is written, and clamped where it is read,
-so an operator who lowers a ceiling later wins over every stored value at once.
+:class:`Superset` is the one kind narrowed the other way: its names are what each layer asks for,
+such as the tiers that need a person's approval, so a lower layer may only add to them, and the
+layers resolve as their union (lattice ADR-0038). A value that would widen its layer is refused
+where it is written, and clamped where it is read, so an operator who lowers a ceiling later wins
+over every stored value at once.
 
 Before a package acts on a setting, it asks a :class:`Settings`. grantr's adapter answers from
 its store; without one, :class:`Defaults` answers the default, or the operator's value. A
@@ -22,9 +25,11 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Final, Literal, Protocol, cast
 
+from lattice_core.capabilities import TIERS as CAPABILITY_TIERS
 from lattice_core.integrations import KEY
 
 __all__ = [
+    "APPROVE_TIERS",
     "CONNECTED_TOOLS",
     "CONNECTED_TOOL_RISKS",
     "KNOWN_SETTINGS",
@@ -36,6 +41,7 @@ __all__ = [
     "Settings",
     "SettingsDefaults",
     "Subset",
+    "Superset",
     "Tier",
     "Value",
     "floor",
@@ -102,14 +108,7 @@ class Subset:
         Raises:
             ValueError: Saying why it isn't.
         """
-        if not isinstance(given, list | tuple):
-            raise ValueError("a list of names")
-        names: list[object] = list(cast("list[object] | tuple[object, ...]", given))
-        if not all(isinstance(name, str) for name in names) or len(set(names)) != len(names):
-            raise ValueError("a list of names, each once")
-        if unknown := sorted(str(name) for name in names if name not in self.universe):
-            raise ValueError(f"names it knows, not {', '.join(n[:64] for n in unknown[:5])}")
-        return tuple(sorted(str(name) for name in names))
+        return _names_given(self.universe, given)
 
     def narrow(self, above: tuple[str, ...], below: tuple[str, ...]) -> tuple[str, ...]:
         """The narrower of two values: the names in both."""
@@ -120,7 +119,51 @@ class Subset:
         return set(value) <= set(ceiling)
 
 
-Kind = IntRange | Subset
+@dataclass(frozen=True)
+class Superset:
+    """Some of a set of known names that each tier asks for, which a lower tier may only add to.
+
+    Its names are requirements, such as the capability tiers that need a person's approval: a
+    layer narrows what may happen by asking more, so the layers resolve as their union, and the
+    layer above's value is the least a lower one may set (lattice ADR-0038).
+    """
+
+    universe: frozenset[str]
+
+    def value(self, given: object) -> tuple[str, ...]:
+        """The names given, sorted, if each is known and none is given twice.
+
+        Raises:
+            ValueError: Saying why it isn't.
+        """
+        return _names_given(self.universe, given)
+
+    def narrow(self, above: tuple[str, ...], below: tuple[str, ...]) -> tuple[str, ...]:
+        """The narrower of two values: the names in either, since each asks for more."""
+        return tuple(sorted(set(above) | set(below)))
+
+    def within(self, value: tuple[str, ...], ceiling: tuple[str, ...]) -> bool:
+        """Whether a value is no wider than the layer above's: it keeps every name of it."""
+        return set(value) >= set(ceiling)
+
+
+def _names_given(universe: frozenset[str], given: object) -> tuple[str, ...]:
+    """The names given, sorted, if each is in the universe and none is given twice.
+
+    Raises:
+        ValueError: Saying why they aren't.
+    """
+    if not isinstance(given, list | tuple):
+        raise ValueError("a list of names")
+    names: list[object] = list(cast("list[object] | tuple[object, ...]", given))
+    if not all(isinstance(name, str) for name in names) or len(set(names)) != len(names):
+        raise ValueError("a list of names, each once")
+    if unknown := sorted(str(name) for name in names if name not in universe):
+        raise ValueError(f"names it knows, not {', '.join(n[:64] for n in unknown[:5])}")
+    return tuple(sorted(str(name) for name in names))
+
+
+Kind = IntRange | Subset | Superset
 """What a setting's value is, and how a lower tier narrows it."""
 
 
@@ -143,15 +186,15 @@ class Setting:
     """One sentence, for the admin who sets it."""
 
     labels: Mapping[str, str] = field(default_factory=dict[str, str])
-    """What each of a subset's names is, in words, for the admin who chooses them: such as a
-    tool's risk. Each label names one of its universe's names."""
+    """What each of a subset's or superset's names is, in words, for the admin who chooses them:
+    such as a tool's risk. Each label names one of its universe's names."""
 
     def __post_init__(self) -> None:
         if not KEY.fullmatch(self.key):
             raise ValueError(f"a setting's key is a name or family:name, not {self.key!r}")
         if not self.description.strip():
             raise ValueError(f"{self.key} needs a description")
-        if isinstance(self.kind, Subset) and (
+        if isinstance(self.kind, Subset | Superset) and (
             stray := sorted(set(self.labels) - self.kind.universe)
         ):
             raise ValueError(f"{self.key} labels names it doesn't have: {', '.join(stray)}")
@@ -169,7 +212,10 @@ class Setting:
         return self.kind.value(given)
 
     def narrow(self, above: Value, below: Value | None) -> Value:
-        """A layer's value, narrowed by the one below it; unset below leaves it as it is."""
+        """A layer's value, narrowed by the one below it; unset below leaves it as it is.
+
+        A number is the lower, a subset's names those in both, and a superset's those in either.
+        """
         if below is None:
             return above
         if isinstance(self.kind, IntRange):
@@ -177,7 +223,11 @@ class Setting:
         return self.kind.narrow(_names(above), _names(below))
 
     def within(self, value: Value, ceiling: Value) -> bool:
-        """Whether a value narrows its ceiling, or equals it: never wider."""
+        """Whether a value narrows the layer above's, or equals it: never wider.
+
+        The layer above's value is a ceiling for a number and a subset, and the least a superset
+        may hold.
+        """
         if isinstance(self.kind, IntRange):
             return self.kind.within(_int(value), _int(ceiling))
         return self.kind.within(_names(value), _names(ceiling))
@@ -187,8 +237,9 @@ class Setting:
 
         A number is clamped into today's bounds: above them it is lowered to the highest, and
         below them raised to the lowest, which is a registry's deliberate widening; names this
-        registry doesn't know are dropped; a value of another type isn't read at all, and is the
-        setting's floor. An admin's read flags each such value as clamped.
+        registry doesn't know are dropped, from a superset too, since none can be asked for; a
+        value of another type isn't read at all, and is the setting's floor. An admin's read
+        flags each such value as clamped.
         """
         if isinstance(self.kind, IntRange):
             if isinstance(stored, bool) or not isinstance(stored, int):
@@ -216,7 +267,7 @@ def _int(value: Value) -> int:
 
 def _names(value: Value) -> tuple[str, ...]:
     if not isinstance(value, tuple):
-        raise TypeError("a subset's setting holds names")
+        raise TypeError("a setting of names holds names")
     return value
 
 
@@ -315,14 +366,37 @@ def _tools(app: str, title: str) -> Setting:
     )
 
 
+APPROVE_TIERS: Final = "approve:tiers"
+"""The setting that names the capability tiers whose calls need a person's approval (lattice
+RFC-0011's O5, ADR-0038)."""
+
+_APPROVE_TIERS = Setting(
+    APPROVE_TIERS,
+    Superset(frozenset(CAPABILITY_TIERS)),
+    default=("outbound", "run_code"),
+    lowest="workspace",
+    description=(
+        "Which tiers of capability need a person's approval before an agent's call goes ahead;"
+        " a tenant or workspace may add tiers, never take one away."
+    ),
+    labels={
+        "read": "reads",
+        "write": "writes",
+        "run_code": "runs code",
+        "outbound": "reaches outside",
+    },
+)
+
 KNOWN_SETTINGS: Final = registry(
     _per_hour("freecad", "FreeCAD"),
     _per_hour("blender", "Blender"),
     _tools("freecad", "FreeCAD"),
     _tools("blender", "Blender"),
+    _APPROVE_TIERS,
 )
 """lattice's settings. A connected app vetted later adds its own ``connect-per-hour:<app>`` and
-``connect-tools:<app>``."""
+``connect-tools:<app>``; an application with ``admin_high`` capabilities adds
+:func:`lattice_core.approvals.admin_high_approvers`'s."""
 
 
 def operator_layer(
@@ -349,7 +423,8 @@ class Settings(Protocol):
     """A setting's value in a tenant's workspace: the port its package asks, each time it acts.
 
     An implementation that can't read its store answers the narrowest value a setting may have,
-    its kind's lowest number or no names, so a failure never widens what a workspace may do. Its
+    :func:`floor`'s: its kind's lowest number, no names of a subset, or every name of a superset,
+    so a failure never widens what a workspace may do. Its
     arguments are positional, so an implementation names them as it likes.
 
     Raises:
@@ -387,5 +462,11 @@ class SettingsDefaults:
 
 
 def floor(setting: Setting) -> Value:
-    """The narrowest value a setting may have: what an unreadable store answers."""
-    return setting.kind.low if isinstance(setting.kind, IntRange) else ()
+    """The narrowest value a setting may have: what an unreadable store answers.
+
+    A number's lowest, a subset's no names, and a superset's every name: an unreadable store
+    asks for everything.
+    """
+    if isinstance(setting.kind, IntRange):
+        return setting.kind.low
+    return tuple(sorted(setting.kind.universe)) if isinstance(setting.kind, Superset) else ()

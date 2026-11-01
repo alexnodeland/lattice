@@ -190,8 +190,8 @@ function focusWithin(form: HTMLFormElement | null, target: Element | null) {
 }
 
 /** A field's first control: the number's box, or the first box that may be checked. */
-function controlOf(form: HTMLFormElement | null, field: string, subset: boolean) {
-  return subset
+function controlOf(form: HTMLFormElement | null, field: string, names: boolean) {
+  return names
     ? (form?.querySelector('[role="checkbox"]:not([data-disabled])') ?? null)
     : document.getElementById(field);
 }
@@ -203,13 +203,18 @@ type Sent = number | readonly string[] | null;
 type Draft = string | readonly string[];
 
 /**
- * What a row's field starts from: what is set here, or, unset, what applies. A setting of names
- * starts from those the layer above still offers, so none is checked that can't be unchecked.
+ * What a row's field starts from: what is set here, or, unset, what applies. A subset starts from
+ * those the layer above still offers, so none is checked that can't be unchecked; a superset
+ * starts with those the layer above asks for, which stay checked (lattice ADR-0038).
  */
 function draftOf(row: SettingRow): Draft {
   const value = row.here?.value ?? row.effectiveValue;
   if (Array.isArray(value)) {
-    const offered = new Set(Array.isArray(row.ceilingValue) ? row.ceilingValue : []);
+    const above = Array.isArray(row.ceilingValue) ? row.ceilingValue : [];
+    if (row.kind.type === "superset") {
+      return [...new Set([...value, ...above])].sort();
+    }
+    const offered = new Set(above);
     return value.filter((name) => offered.has(name));
   }
   return row.here === null ? "" : said(row.here.value);
@@ -257,7 +262,7 @@ function Setting({
   const field = useId();
   const warning = useRef<HTMLDivElement>(null);
   const form = useRef<HTMLFormElement>(null);
-  const subset = row.kind.type === "subset";
+  const names = row.kind.type !== "int_range";
   useEffect(() => {
     if (stale) {
       focusWithin(form.current, warning.current);
@@ -265,9 +270,9 @@ function Setting({
   }, [stale]);
   useEffect(() => {
     if (refusals > 0) {
-      focusWithin(form.current, controlOf(form.current, field, subset));
+      focusWithin(form.current, controlOf(form.current, field, names));
     }
-  }, [refusals, field, subset]);
+  }, [refusals, field, names]);
 
   /** Send a value, or unset with null, at the version read, once, and say what came of it. */
   async function send(value: Sent) {
@@ -294,7 +299,7 @@ function Setting({
       setDone(`${row.name}: ${said(answer.result.effective)} applies.`);
       if (value === null) {
         // Its unset button goes once nothing is set here: the field keeps the focus instead.
-        focusWithin(form.current, controlOf(form.current, field, subset));
+        focusWithin(form.current, controlOf(form.current, field, names));
       }
     } else if (answer.status === 409) {
       const tried = draft;
@@ -335,7 +340,8 @@ function Setting({
     void send(read.value);
   };
 
-  const allowed = new Set(Array.isArray(row.ceilingValue) ? row.ceilingValue : []);
+  const above = new Set(Array.isArray(row.ceilingValue) ? row.ceilingValue : []);
+  const superset = row.kind.type === "superset";
   return (
     <Row
       name={row.name}
@@ -376,18 +382,26 @@ function Setting({
           ) : (
             <CheckboxGroup
               legend={row.name}
-              hint={`Checked tools are offered here. A tool ${row.ceilingBy} doesn't offer can't be checked.`}
+              hint={
+                superset
+                  ? `Checked ones are asked for here. One ${row.ceilingBy} asks for can't be unchecked.`
+                  : `Checked tools are offered here. A tool ${row.ceilingBy} doesn't offer can't be checked.`
+              }
               value={draft}
               onValueChange={setDraft}
               error={error}
               choices={(row.kind.universe ?? []).map((name) => {
-                const risk = row.kind.labels?.[name];
+                const label = row.kind.labels?.[name];
+                // A subset's name outside the layer above can't be checked; a superset's inside it
+                // can't be unchecked.
+                const fixed = superset ? above.has(name) : !above.has(name);
+                const why = superset
+                  ? `Asked for by ${row.ceilingBy}`
+                  : `Not offered by ${row.ceilingBy}`;
                 return {
                   value: name,
-                  label: risk === undefined ? name : `${name} (${risk})`,
-                  ...(allowed.has(name)
-                    ? {}
-                    : { disabled: true, description: `Not offered by ${row.ceilingBy}` }),
+                  label: label === undefined ? name : `${name} (${label})`,
+                  ...(fixed ? { disabled: true, description: why } : {}),
                 };
               })}
             />

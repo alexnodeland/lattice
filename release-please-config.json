@@ -131,9 +131,9 @@
           "type": "toml",
           "path": "/uv.lock",
           "jsonpath": "$.package[?(@.name.value=='grantr')].version"
-          }
-        ]
-      },
+        }
+      ]
+    },
     "packages/portalr": {
       "release-type": "python",
       "package-name": "portalr",
@@ -142,6 +142,17 @@
           "type": "toml",
           "path": "/uv.lock",
           "jsonpath": "$.package[?(@.name.value=='portalr')].version"
+        }
+      ]
+    },
+    "packages/portr": {
+      "release-type": "python",
+      "package-name": "portr",
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "/uv.lock",
+          "jsonpath": "$.package[?(@.name.value=='portr-ai')].version"
         }
       ]
     }

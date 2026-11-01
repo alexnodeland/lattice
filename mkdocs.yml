@@ -128,6 +128,7 @@ plugins:
           - relayr/index.md: relayr, events from artifactr and task trackers to reflexr
           - grantr/index.md: grantr, identity and access
           - portalr/index.md: portalr, the portal
+          - portr/index.md: portr, lattice's commands for outside clients
           - stackr/index.md: stackr, the stack and the application template
           - lattice-core/index.md: lattice-core, what the libraries share
         Guides:

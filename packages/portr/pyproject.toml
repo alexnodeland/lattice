@@ -1,0 +1,105 @@
+[project]
+name = "portr-ai"
+version = "0.0.0"
+description = "One gateway that serves lattice's commands to outside clients over MCP and ACP, each call through the enforcer."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Alex Nodeland", email = "alex@ournature.studio" }]
+requires-python = ">=3.12"
+keywords = ["agents", "llm", "mcp", "acp", "gateway", "collaboration"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Framework :: Pydantic :: 2",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Typing :: Typed",
+]
+dependencies = [
+    "lattice-core-ai>=0.2.0",
+    "pydantic>=2.13",
+]
+
+[project.urls]
+Homepage = "https://lattice.alexnodeland.com/portr/"
+Documentation = "https://lattice.alexnodeland.com/portr/"
+Repository = "https://github.com/alexnodeland/lattice"
+Issues = "https://github.com/alexnodeland/lattice/issues"
+Changelog = "https://github.com/alexnodeland/lattice/blob/main/packages/portr/CHANGELOG.md"
+
+[dependency-groups]
+test = [
+    "pytest>=9.1",
+    "pytest-asyncio>=1.4",
+    "pytest-cov>=7.1",
+    "pytest-timeout>=2.4",
+]
+lint = ["ruff>=0.16", "pyright>=1.1.414"]
+dev = [
+    { include-group = "test" },
+    { include-group = "lint" },
+]
+
+# In lattice, lattice-core is the checkout's. A built wheel keeps the ranges in [project] alone.
+[tool.uv.sources]
+lattice-core-ai = { workspace = true }
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+# Distributed as portr-ai; imported as portr.
+[tool.uv.build-backend]
+module-name = "portr"
+
+# ─── dependencies ─────────────────────────────────────────────────────────────
+
+# deptry can't tell from the workspace's editable install which module a distribution named
+# apart from its module provides.
+[tool.deptry.package_module_name_map]
+lattice-core-ai = "lattice_core"
+
+# ─── types ────────────────────────────────────────────────────────────────────
+
+[tool.pyright]
+include = ["src", "tests"]
+strict = ["src"]
+typeCheckingMode = "standard"
+pythonVersion = "3.12"
+venvPath = "../.."
+venv = ".venv"
+
+# ─── tests and coverage ───────────────────────────────────────────────────────
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["--strict-markers", "--strict-config", "-ra"]
+# A test that runs for a minute is stuck: fail it with its stack, as a failure of its own, by
+# SIGALRM (lattice ADR-0007, ADR-0028).
+timeout = 60
+timeout_method = "signal"
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+filterwarnings = ["error"]
+
+[tool.coverage.run]
+branch = true
+source = ["src/portr"]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "@overload",
+    "assert_never\\(",
+    "raise NotImplementedError",
+    "^\\s*\\.\\.\\.$",
+    "class .*\\(Protocol.*\\):",
+]

@@ -4,7 +4,7 @@
 
 ## What lattice is
 
-lattice is one repository: eight packages, two reference implementations, and one set of tools that checks, releases and documents them. It holds the packages, and changes nothing about what they are downstream. Each keeps its name, `pyproject.toml`, version, dependencies, extras, tests, 100% coverage gate, ADRs, RFCs, changelog and releases, and each installs on its own.
+lattice is one repository: nine packages, two reference implementations, and one set of tools that checks, releases and documents them. It holds the packages, and changes nothing about what they are downstream. Each keeps its name, `pyproject.toml`, version, dependencies, extras, tests, 100% coverage gate, ADRs, RFCs, changelog and releases, and each installs on its own.
 
 ### Goals
 
@@ -29,6 +29,7 @@ lattice/
 │   ├── grantr/          grantr: src/, tests/, schemas/, compose.yaml, moon.yml, pyproject.toml, README.md, CHANGELOG.md, LICENSE
 │   ├── stackr/          the stack and the application template: compose.yaml, supabase/, deploy/, scripts/, template/, copier.yml, versions.env, Makefile
 │   ├── portalr/         the portal: its Python package, and web/ (client, ui, app, admin), the Bun workspace's packages
+│   ├── portr/           portr-ai: the gateway that serves lattice's commands to outside clients
 │   └── lattice-core/    lattice-core-ai: what the libraries share and must keep identical (ADR-0018)
 ├── examples/
 │   ├── docplan/         artifactr's reference implementation, and its image
@@ -72,6 +73,7 @@ moon knows fifteen projects: the fourteen below, and `lattice`, the root, which 
 | grantr | `packages/grantr` | Identity and access for artifactr and reflexr, in stackr's template ([its plan](grantr/rfcs/0001-v0.1-implementation-plan.md)) | Library | lattice-core |
 | stackr | `packages/stackr` | The stack the libraries run on, and the application template | Tool (shell), ships no wheel | artifactr, reflexr, evalr, grantr |
 | portalr | `packages/portalr` | The portal: the router that serves the app and admin UIs, and reads the stack's tools for one tenant ([its architecture](portalr/architecture.md)) | Library | grantr, lattice-core |
+| portr | `packages/portr` | The gateway that serves lattice's commands to outside clients over MCP and ACP, through the enforcer; distributed as `portr-ai` ([ADR-0043](adr/0043-portr-a-package-of-its-own-on-lattice-core-reaching-commands-only-through-the-registry.md)) | Library | lattice-core |
 | client | `packages/portalr/web/client` | `@portalr/client`, the only code in the UIs that talks to the server | Library (TypeScript) | |
 | ui | `packages/portalr/web/ui` | `@portalr/ui`, the kit app and admin build from | Library (TypeScript) | |
 | app | `packages/portalr/web/app` | The people's UI, a single-page app | Application (TypeScript) | ui |

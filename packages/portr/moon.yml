@@ -1,0 +1,6 @@
+# portr, distributed as portr-ai: the gateway that serves lattice's commands to outside clients.
+language: 'python'
+layer: 'library'
+tags: ['distribution']
+dependsOn:
+  - 'lattice-core'

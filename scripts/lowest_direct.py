@@ -29,6 +29,7 @@ PACKAGES = {
     "reflexr": "reflexr",
     "relayr": "relayr",
     "portalr": "portalr",
+    "portr": "portr",
 }
 """Each package that ships a wheel, by its directory, and the module it installs, in release order.
 stackr ships none."""
@@ -50,6 +51,12 @@ EXPECTED: dict[str, tuple[str, str]] = {
         "its catalog of commands imports lattice_core.capabilities and lattice_core.commands,"
         " which lattice-core-ai 0.2.0, the newest on PyPI, lacks: its floor rises to the first"
         " release with both, once that is published",
+        "No module named 'lattice_core.capabilities'",
+    ),
+    "portr": (
+        "its core imports lattice_core.capabilities and lattice_core.commands, which"
+        " lattice-core-ai 0.2.0, the newest on PyPI, lacks: its floor rises to the first release"
+        " with both, once that is published",
         "No module named 'lattice_core.capabilities'",
     ),
     "reflexr": (

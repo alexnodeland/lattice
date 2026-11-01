@@ -98,5 +98,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0090](0090-a-native-files-editor-takes-a-phones-whole-window.md) | A native file's editor takes a phone's whole window | Accepted |
 | [0091](0091-a-native-files-proposal-opens-on-its-first-changed-page.md) | A native file's proposal opens on its first changed page | Accepted |
 | [0092](0092-a-thread-uses-its-height-one-tray-for-what-waits-one-strip-for-a-turn.md) | A thread uses its height: one tray for what waits, one strip for a turn | Accepted |
+| [0093](0093-approvals-on-their-own-page-and-a-confirmation-on-admins-confirm-page-alone.md) | Approvals on their own page, and a confirmation on admin's confirm page alone | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

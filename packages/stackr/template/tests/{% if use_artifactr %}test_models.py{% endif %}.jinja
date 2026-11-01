@@ -89,7 +89,7 @@ async def test_the_narrowing_asks_the_applications_authorize_too() -> None:
 
 async def test_a_setting_that_isnt_names_is_refused_not_trusted() -> None:
     class Numbers:
-        async def value(self, _tenant: str, _workspace: str, _key: str, /) -> int:
+        async def value(self, _tenant: str, _workspace: str | None, _key: str, /) -> int:
             return 3
 
     models = Models(offered())

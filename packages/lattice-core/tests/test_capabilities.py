@@ -97,7 +97,7 @@ def test_the_vocabularies_are_listed() -> None:
     assert TIERS == ("read", "write", "run_code", "outbound")
     assert EFFECTS == ("reads_private", "reads_untrusted", "sends_out")
     assert len(PROVIDER_KINDS) == 6
-    assert capabilities.CONTRACT == "1.0.0"
+    assert capabilities.CONTRACT == "1.1.0"
     assert GROUP == "lattice.capabilities"
 
 
@@ -343,3 +343,8 @@ def test_discovery_refuses_what_isnt_a_provider(installed: list[EntryPoint]) -> 
     installed.append(EntryPoint("broken", "installed_capabilities:nothing", GROUP))
     with pytest.raises(TypeError, match="broken = 'installed_capabilities:nothing'"):
         discover()
+
+
+def test_a_scope_names_a_workspace_or_none_for_the_tenant_as_a_whole() -> None:
+    assert Scope(tenant_id="acme").workspace_id is None
+    assert Scope(tenant_id="acme", workspace_id="docs").workspace_id == "docs"

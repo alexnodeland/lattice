@@ -36,7 +36,7 @@ PNG = b"\x89PNG\r\n\x1a\nimage"
 class On:
     """Integrations where diagrams are on, as an application turns them on."""
 
-    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
+    async def is_enabled(self, tenant_id: str, workspace_id: str | None, key: str, /) -> bool:
         return True
 
 

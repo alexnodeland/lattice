@@ -108,7 +108,7 @@ def test_a_diagrams_images_have_their_routes(script: Script) -> None:
 class On:
     """Diagrams on in every workspace."""
 
-    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
+    async def is_enabled(self, tenant_id: str, workspace_id: str | None, key: str, /) -> bool:
         return True
 
 

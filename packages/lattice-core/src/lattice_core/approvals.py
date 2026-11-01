@@ -94,7 +94,7 @@ __all__ = [
     "contract_schema",
 ]
 
-CONTRACT: Final = "1.0.0"
+CONTRACT: Final = "1.1.0"
 """The contract's version. A removed field or a changed meaning is a major version; an optional
 field is a minor one, and a consumer treats a value it doesn't know as the strictest."""
 

@@ -38,6 +38,10 @@ def test_both_are_reads_of_the_runs_page_in_automations() -> None:
         assert command.route == "/portalr/app/t/{tenant}/w/{workspace}/runs"
 
 
+def test_each_is_called_in_a_workspace() -> None:
+    assert not any(command.tenant_wide for command in COMMANDS.values())
+
+
 def test_the_committed_catalog_is_current() -> None:
     assert json.loads(DOCUMENT.read_text()) == catalog_document(), "run `moon run relayr:schema`"
 

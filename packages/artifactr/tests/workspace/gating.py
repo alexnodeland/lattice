@@ -17,7 +17,7 @@ class Switch:
         self.calls: list[str] = []
         """What it was asked, in order, with whatever a test records beside it."""
 
-    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
+    async def is_enabled(self, tenant_id: str, workspace_id: str | None, key: str, /) -> bool:
         self.calls.append(f"is_enabled {key}")
         return (tenant_id, workspace_id, key) not in self.off
 

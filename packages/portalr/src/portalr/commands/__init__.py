@@ -251,7 +251,10 @@ def _command(spec: _Spec) -> Command:
             "gate": Gate(integration=None, action=spec.action),
         }
     )
-    return Command(capability=capability, toolset="admin", exposure="tool", route=spec.route)
+    # Admin's reads and changes are the tenant's or the deployment's, in no workspace.
+    return Command(
+        capability=capability, toolset="admin", exposure="tool", route=spec.route, tenant_wide=True
+    )
 
 
 class PortalrCommands:

@@ -853,7 +853,7 @@ class Grants:
 
     # ─── integrations ────────────────────────────────────────────────────────
 
-    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
+    async def is_enabled(self, tenant_id: str, workspace_id: str | None, key: str, /) -> bool:
         """Whether an integration is on in a tenant's workspace: the application's port.
 
         It checks no one, as :meth:`hidden` doesn't: the package that asks it is about to act
@@ -861,8 +861,9 @@ class Grants:
         know, is off, and so is every key while the store can't be read. ``Grants`` is
         lattice-core's ``Integrations``, and a bound ``is_enabled`` is relayr's ``Enabled``.
         An id that names no tenant, or an empty one that names no workspace, has everything off.
+        With no workspace, a tenant-wide command's, it is the tenant's state (lattice ADR-0044).
         """
-        if key not in self._installed or not TENANT_ID.fullmatch(tenant_id) or not workspace_id:
+        if key not in self._installed or not TENANT_ID.fullmatch(tenant_id) or workspace_id == "":
             return False
         try:
             on_tenant, in_workspace = await self._settings(self._storage, tenant_id, workspace_id)
@@ -968,7 +969,7 @@ class Grants:
 
     # ─── settings ────────────────────────────────────────────────────────────
 
-    async def value(self, tenant_id: str, workspace_id: str, key: str, /) -> Value:
+    async def value(self, tenant_id: str, workspace_id: str | None, key: str, /) -> Value:
         """A setting's value in a tenant's workspace: lattice-core's ``Settings`` port.
 
         It checks no one, as :meth:`is_enabled` doesn't. It reads the store each time, with no
@@ -976,17 +977,22 @@ class Grants:
         store can't be read, and for a malformed tenant id or an empty workspace id, it answers
         the narrowest value the setting may have, so a failure never widens what a workspace
         may do (lattice ADR-0030). A well-formed id that names no tenant has nothing stored,
-        and answers the operator's value, or the default.
+        and answers the operator's value, or the default. With no workspace, a tenant-wide
+        command's, it is the tenant's value, which no workspace narrows (lattice ADR-0044).
 
         Raises:
             KeyError: For a key no setting declares.
         """
         setting = self._settings_known[key]
-        if not TENANT_ID.fullmatch(tenant_id) or not workspace_id:
+        if not TENANT_ID.fullmatch(tenant_id) or workspace_id == "":
             return floor(setting)
         try:
             on_tenant = await self._storage.settings(tenant_id)
-            in_workspace = await self._storage.settings(tenant_id, workspace_id)
+            in_workspace = (
+                {}
+                if workspace_id is None
+                else await self._storage.settings(tenant_id, workspace_id)
+            )
         except Exception:
             logger.warning("%s is at its floor: the store can't be read", key, exc_info=True)
             return floor(setting)
@@ -995,7 +1001,7 @@ class Grants:
             operator=self._operator.get(key),
             tenant=on_tenant.get(key),
             workspace=in_workspace.get(key),
-            in_workspace=True,
+            in_workspace=workspace_id is not None,
         )
         return setting.value(state.effective)
 
@@ -1137,8 +1143,9 @@ class Grants:
         """lattice-core's ``Authorize``: whether a call's caller holds an action in its workspace.
 
         The enforcer asks it for the capability's gate (lattice ADR-0037). It is :meth:`check` on
-        the call's workspace, as the subject the call is checked as; a call that names an id no
-        tenant can have holds nothing (grantr ADR-0039).
+        the call's workspace, as the subject the call is checked as, or on the tenant for a call
+        that names no workspace, a tenant-wide command's (lattice ADR-0044); a call that names an
+        id no tenant can have holds nothing (grantr ADR-0039).
 
         Args:
             subject_of: The subject a call is checked as: the person it is or acts for, or the
@@ -1149,8 +1156,9 @@ class Grants:
             tenant = context.scope.tenant_id
             if not TENANT_ID.fullmatch(tenant):
                 return False
-            workspace = Resource(kind="workspace", workspace=context.scope.workspace_id)
-            return await self.check(tenant, subject_of(context), action, workspace)
+            workspace = context.scope.workspace_id
+            on = TENANT if workspace is None else Resource(kind="workspace", workspace=workspace)
+            return await self.check(tenant, subject_of(context), action, on)
 
         return authorize
 
@@ -1213,10 +1221,19 @@ class Grants:
         )
 
     async def _answers_by(
-        self, reads: Reads, tenant: TenantId, member: Member, action: str, workspace: WorkspaceId
+        self,
+        reads: Reads,
+        tenant: TenantId,
+        member: Member,
+        action: str,
+        workspace: WorkspaceId | None,
     ) -> bool:
-        """Whether a member holds an action on a workspace, as one who answers an approval."""
-        on = Resource(kind="workspace", workspace=workspace)
+        """Whether a member holds an action on a workspace, as one who answers an approval.
+
+        A tenant-wide call's approval names no workspace: the action is held on the tenant
+        (lattice ADR-0044).
+        """
+        on = TENANT if workspace is None else Resource(kind="workspace", workspace=workspace)
         if not isinstance(member, ServicePrincipal):
             return action in await self._held(reads, tenant, member, on)
         own = [g for g in await reads.grants(tenant, member, on=on.chain()) if g.to == member]

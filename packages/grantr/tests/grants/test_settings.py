@@ -69,6 +69,7 @@ async def test_a_setting_narrows_down_each_level(storage: Storage) -> None:
     assert (state.effective, state.ceiling, state.ceiling_set_by) == (10, 40, "tenant")
     assert await grants.value("acme", "w1", KEY) == 10
     assert await grants.value("acme", "w2", KEY) == 40, "the workspace's alone"
+    assert await grants.value("acme", None, KEY) == 40, "a tenant-wide call's: the tenant's"
     assert await grants.value("globex", "w1", KEY) == 60, "the tenant's alone"
     unset = await grants.set_setting("acme", KEY, None, workspace="w1", by=BOB)
     assert unset.workspace is None
@@ -432,3 +433,14 @@ async def test_an_unreadable_store_asks_approval_on_every_tier() -> None:
         "run_code",
         "write",
     )
+
+
+async def test_a_tenant_wide_call_has_the_tenants_integrations(storage: Storage) -> None:
+    """lattice ADR-0044: a call that names no workspace is checked at the tenant."""
+    grants = await _grants(storage, installed=frozenset({"excalidraw"}))
+    await grants.set_integration("acme", "excalidraw", True, by=ALICE)
+    await grants.set_integration("acme", "excalidraw", False, workspace="w1", by=BOB)
+    assert await grants.is_enabled("acme", None, "excalidraw"), "the tenant's, not w1's"
+    assert not await grants.is_enabled("acme", "w1", "excalidraw")
+    assert not await grants.is_enabled("acme", "", "excalidraw"), "an empty id names nothing"
+    assert await grants.value("acme", "", KEY) == 0, "nor has any setting but its floor"

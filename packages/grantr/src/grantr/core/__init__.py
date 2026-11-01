@@ -4,6 +4,9 @@
 """
 
 from grantr.core.audit import (
+    ApprovalAnswered,
+    ApprovalAsked,
+    ApprovalClosed,
     AuditEntry,
     AuditEvent,
     AuditFilter,
@@ -81,6 +84,9 @@ __all__ = [
     "TENANT",
     "TENANT_ID",
     "Agent",
+    "ApprovalAnswered",
+    "ApprovalAsked",
+    "ApprovalClosed",
     "AuditEntry",
     "AuditEvent",
     "AuditFilter",

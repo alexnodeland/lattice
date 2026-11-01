@@ -1,8 +1,10 @@
 """The layering in grantr's architecture, enforced.
 
 The core has no I/O and imports only pydantic; grants imports the core, and lattice-core's
-registry of integrations. grantr imports neither artifactr nor reflexr, nor any sibling but
-lattice-core: the libraries' types reach it structurally.
+registry of integrations, its settings, and its approvals and capabilities, the contract the
+store of approvals implements; sql imports lattice-core's approvals too, which it stores. grantr
+imports neither artifactr nor reflexr, nor any sibling but lattice-core: the libraries' types
+reach it structurally.
 """
 
 import ast
@@ -22,7 +24,13 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "core": ({"grantr.core"}, {"pydantic", "lattice_core.settings"}),
     "grants": (
         {"grantr.core", "grantr.grants", "grantr.telemetry"},
-        {*OTEL_API, "lattice_core.integrations", "lattice_core.settings"},
+        {
+            *OTEL_API,
+            "lattice_core.integrations",
+            "lattice_core.settings",
+            "lattice_core.approvals",
+            "lattice_core.capabilities",
+        },
     ),
     "telemetry": ({"grantr.core", "grantr.telemetry"}, {"opentelemetry", *OTEL_API}),
     "testing": ({"grantr.core", "grantr.testing"}, set()),
@@ -32,7 +40,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     "sql": (
         {"grantr.core", "grantr.sql"},
-        {"pydantic", "sqlalchemy", "alembic", "lattice_core.sql"},
+        {"pydantic", "sqlalchemy", "alembic", "lattice_core.sql", "lattice_core.approvals"},
     ),
 }
 

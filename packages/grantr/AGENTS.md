@@ -36,8 +36,8 @@ uv run pytest packages/grantr/tests/grants -n0
 `tests/test_layering.py` enforces it:
 
 - `core` imports pydantic and `lattice_core.settings` only, and no I/O modules of the standard library (`asyncio`, `os`, `pathlib`, `logging`, `sqlite3`, ...).
-- `grants` imports `core`, `telemetry`, the OpenTelemetry API and `lattice_core.integrations`/`settings`.
-- `sql` and `fastapi` import `core` (and `fastapi` also `grants`), never each other.
+- `grants` imports `core`, `telemetry`, the OpenTelemetry API and `lattice_core.integrations`/`settings`/`approvals`/`capabilities`.
+- `sql` and `fastapi` import `core` (and `fastapi` also `grants`, `sql` also `lattice_core.sql`/`approvals`), never each other.
 - grantr imports no sibling but lattice-core: never artifactr, reflexr or portalr. Their types reach it structurally; action catalogs are passed in.
 - A new package under `src/grantr/` needs an entry in `LAYERS`.
 

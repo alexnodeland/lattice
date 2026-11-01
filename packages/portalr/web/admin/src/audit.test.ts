@@ -107,6 +107,33 @@ test("each type of change reads as a sentence", () => {
       },
       "unset connect-per-hour:freecad in the tenant",
     ],
+    [
+      {
+        type: "approval_asked",
+        approval: "apr~acme~1",
+        workspace: "notes",
+        capability: "artifactr.edit_text",
+        caller: "run:run_1",
+      },
+      "asked approval apr~acme~1 to call artifactr.edit_text in workspace notes, as run:run_1",
+    ],
+    [
+      { type: "approval_answered", approval: "apr~acme~1", approved: true, surface: "portalr" },
+      "approved apr~acme~1 on portalr",
+    ],
+    [
+      { type: "approval_answered", approval: "apr~acme~1", approved: false, surface: "mcp" },
+      "denied apr~acme~1 on mcp",
+    ],
+    [
+      {
+        type: "approval_closed",
+        approval: "apr~acme~1",
+        state: "expired",
+        reason: "past its deadline unanswered",
+      },
+      "closed apr~acme~1, expired: past its deadline unanswered",
+    ],
   ];
   for (const [event, sentence] of cases) {
     expect(said(event)).toBe(sentence);
@@ -114,7 +141,7 @@ test("each type of change reads as a sentence", () => {
 });
 
 test("the filter offers every type, and reads one back from the address", () => {
-  expect(TYPES).toHaveLength(17);
+  expect(TYPES).toHaveLength(20);
   expect(TYPES.find((type) => type.value === "tenant_created")?.label).toBe("Tenant created");
   expect(filterOf({ type: "granted" })).toEqual({ type: "granted" });
   expect(filterOf({ type: "nonsense" })).toEqual({});

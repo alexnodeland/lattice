@@ -124,6 +124,25 @@ class IntegrationRow(Base):
     setting: Mapped[dict[str, Any]] = mapped_column(JSON)
 
 
+class ApprovalRow(Base):
+    """An approval as it stands, in its tenant: its state and workspace, and the whole as JSON.
+
+    A read of the pending approvals filters by the state and the workspace (grantr ADR-0038).
+    """
+
+    __tablename__ = "grantr_approvals"
+    __table_args__ = (Index("ix_grantr_approvals_state", "tenant_id", "state", "workspace"),)
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    id: Mapped[str] = mapped_column(primary_key=True)
+    workspace: Mapped[str]
+    state: Mapped[str]
+    """Its ``state``: pending, approved, denied, expired or withdrawn."""
+
+    approval: Mapped[dict[str, Any]] = mapped_column(JSON)
+    """The approval, its request, answer and whether it was taken, as JSON."""
+
+
 class SettingRowRecord(Base):
     """A setting on a tenant, with an empty workspace, or in one of its workspaces.
 

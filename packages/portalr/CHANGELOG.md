@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.10.0](https://github.com/alexnodeland/lattice/compare/portalr-v0.9.0...portalr-v0.10.0) (2026-11-01)
+
+
+### Features
+
+* **client:** CommandName, every command the catalogs declare, generated (RFC-0014) ([#1370](https://github.com/alexnodeland/lattice/issues/1370)) ([d938822](https://github.com/alexnodeland/lattice/commit/d9388221020388ea1d57e5d8b99865bca237a815))
+* **client:** every request names its command, and commands.used.json lists what the UIs send (RFC-0014) ([#1374](https://github.com/alexnodeland/lattice/issues/1374)) ([563c539](https://github.com/alexnodeland/lattice/commit/563c53915390d5b61260a7debedd0cd2a71e0f88))
+* **core:** parity: every operation names its command, and one test holds the catalogs to grantr (RFC-0014 P13) ([#1366](https://github.com/alexnodeland/lattice/issues/1366)) ([0138269](https://github.com/alexnodeland/lattice/commit/013826911c9cb515ef3c45ad49c0afb396f876de))
+* **portalr:** a thread's approval card links its approval's page, which says who may answer it (RFC-0011) ([#1365](https://github.com/alexnodeland/lattice/issues/1365)) ([f90d151](https://github.com/alexnodeland/lattice/commit/f90d1519cfa6f5c8f007a1f4bec105ba716bfb4f))
+
 ## [0.9.0](https://github.com/alexnodeland/lattice/compare/portalr-v0.8.0...portalr-v0.9.0) (2026-11-01)
 
 

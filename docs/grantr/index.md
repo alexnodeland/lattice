@@ -45,6 +45,7 @@ stackr's template wires it in by default. [RFC-0001](rfcs/0001-v0.1-implementati
 | Choose roles, define your own, and review who may do what | [Roles and grants](guides/roles-and-grants.md), and the [permission matrix](guides/matrix.md) |
 | Keep a thread or artifact to some of a workspace's members | [Restricted threads and artifacts](guides/restricted-items.md) |
 | Turn an integration on or off for a tenant or one workspace | [Integrations, switched per workspace](guides/integrations.md) |
+| Store the approvals a call asks, and choose who may answer them | [Approvals, answered by the people grantr names](guides/approvals.md) |
 | Give an integration a key | [Service principals and keys](guides/keys.md) |
 | Have PostgreSQL keep tenants apart under grantr | [Row-level security](guides/row-level-security.md) |
 | See how it is built | The [architecture](architecture.md), and the [reference](reference.md) |

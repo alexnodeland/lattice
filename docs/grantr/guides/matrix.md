@@ -38,6 +38,7 @@ An application's own, with its custom roles, is in its `access.md` ([Roles and g
 | `artifactr:stop_run` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `artifactr:use_model` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |
 | `grantr:add_member` |  |  | ✓ | ✓ |  |  |  |  |  |
+| `grantr:answer_approval` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
 | `grantr:create_tenant` | ✓ |  |  |  |  |  |  |  |  |
 | `grantr:define_role` |  |  | ✓ | ✓ |  |  |  |  |  |
 | `grantr:delete_tenant` |  |  | ✓ |  |  |  |  |  |  |

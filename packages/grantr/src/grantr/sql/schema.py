@@ -26,6 +26,7 @@ TENANT_COLUMNS: Final = {
     "grantr_audit": "tenant_id",
     "grantr_integrations": "tenant_id",
     "grantr_settings": "tenant_id",
+    "grantr_approvals": "tenant_id",
 }
 """Each table, and the column that names its tenant."""
 

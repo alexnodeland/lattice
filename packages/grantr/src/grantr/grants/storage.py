@@ -14,6 +14,7 @@ tenant is known, and the last lists them for operators.
 
 from collections.abc import Collection
 from contextlib import AbstractAsyncContextManager
+from datetime import datetime
 from typing import Protocol
 
 from grantr.core import (
@@ -35,6 +36,7 @@ from grantr.core import (
     UserId,
     WorkspaceId,
 )
+from lattice_core.approvals import Approval, ApprovalId
 
 
 class Reads(Protocol):
@@ -118,6 +120,27 @@ class Reads(Protocol):
         """The settings stored on a tenant, with None, or in one of its workspaces, by key."""
         ...
 
+    async def approval(self, tenant: TenantId, id: ApprovalId) -> Approval | None:
+        """One of the tenant's approvals, as it stands; None if it has no such approval."""
+        ...
+
+    async def approvals(
+        self,
+        tenant: TenantId,
+        *,
+        workspace: WorkspaceId | None = None,
+        due: datetime | None = None,
+    ) -> list[Approval]:
+        """The tenant's pending approvals, oldest first.
+
+        Args:
+            tenant: The tenant.
+            workspace: Only those asked in this workspace; in every one if None.
+            due: Only those whose deadline is at or before this time; whatever their deadline
+                if None.
+        """
+        ...
+
 
 class Transaction(Reads, Protocol):
     """One atomic change to access, serialized with every other in its tenant.
@@ -130,7 +153,7 @@ class Transaction(Reads, Protocol):
         ...
 
     async def delete_tenant(self, tenant: TenantId) -> None:
-        """Remove a tenant and everything in it, but its audit log."""
+        """Remove a tenant and everything in it, its approvals too, but its audit log."""
         ...
 
     async def add_grant(self, grant: Grant) -> None:
@@ -179,6 +202,10 @@ class Transaction(Reads, Protocol):
         self, tenant: TenantId, workspace: WorkspaceId | None, key: str, row: SettingRow
     ) -> None:
         """Store a setting's row on a tenant, with None, or in a workspace, replacing its last."""
+        ...
+
+    async def put_approval(self, approval: Approval) -> None:
+        """Store an approval in its scope's tenant, or replace it as it now stands."""
         ...
 
     async def add_key(self, key: Key) -> None:

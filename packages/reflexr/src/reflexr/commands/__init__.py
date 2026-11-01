@@ -509,7 +509,8 @@ class ReflexrProvider(ReflexrCommands):
         """Run a command in the call's workspace, as the call's actor, and answer JSON text.
 
         Raises:
-            ValueError: If the capability isn't one of reflexr's commands.
+            ValueError: If the capability isn't one of reflexr's commands, or one called in a
+                workspace names none.
             pydantic.ValidationError: If the arguments aren't the command's.
             reflexr.core.Rejection: If the workspace refuses the actor or the command.
         """
@@ -521,6 +522,8 @@ class ReflexrProvider(ReflexrCommands):
         if spec.name == "reflexr.list_rules":
             rules = await self._workspaces.rules_for(scope.tenant_id, actor=actor)
             return ToolResult(output=_listed(rules))
+        if scope.workspace_id is None:
+            raise ValueError(f"{spec.name} is called in a workspace, and names none")
         workspace = await self._workspaces.open(scope.tenant_id, scope.workspace_id, actor=actor)
         return ToolResult(output=await self._run(workspace, spec.name, given))
 

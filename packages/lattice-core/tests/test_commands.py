@@ -97,6 +97,14 @@ def test_a_read_may_be_a_resource_and_a_command_may_be_no_tool() -> None:
         ({"resource": "artifactr://{tenant}"}, "so it is exposed as one"),
         ({"surfaces": frozenset()}, "is offered on some surface"),
         ({"toolset": "everything"}, "'core', 'automations'"),
+        (
+            {"tenant_wide": True, "route": "/portalr/app/t/{tenant}/w/{workspace}"},
+            "is tenant-wide, so its route and resource name no workspace",
+        ),
+        (
+            {"tenant_wide": True, "exposure": "both", "resource": "x://{tenant}/{workspace}/y"},
+            "is tenant-wide, so its route and resource name no workspace",
+        ),
     ],
 )
 def test_a_command_is_refused_unless_well_formed(changes: dict[str, Any], says: str) -> None:
@@ -110,6 +118,14 @@ def test_a_command_is_refused_unless_well_formed(changes: dict[str, Any], says: 
             }
             | changes
         )
+
+
+def test_a_command_is_called_in_a_workspace_unless_it_is_tenant_wide() -> None:
+    assert not command("artifactr.post_message").tenant_wide
+    listing = command(
+        "artifactr.list_workspaces", tenant_wide=True, route="/portalr/app/t/{tenant}"
+    )
+    assert listing.tenant_wide, "a route that names the tenant alone"
 
 
 def test_a_not_exposed_command_says_why() -> None:
@@ -187,5 +203,5 @@ async def test_a_bound_provider_watches_its_resources() -> None:
 
 def test_the_contracts_schema_is_a_commands() -> None:
     schema = contract_schema()
-    assert schema["title"] == "lattice.commands 1.0.0"
+    assert schema["title"] == "lattice.commands 1.1.0"
     assert schema["required"] == ["capability", "toolset", "exposure", "route"]

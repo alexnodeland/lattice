@@ -37,8 +37,9 @@ class Layered:
     def __init__(self, values: Mapping[str, Value]) -> None:
         self._values = values
 
-    async def value(self, _tenant_id: str, workspace_id: str, key: str, /) -> Value:
+    async def value(self, _tenant_id: str, workspace_id: str | None, key: str, /) -> Value:
         assert key == DIRECT_WRITES
+        assert workspace_id is not None, "artifactr reads its settings in a workspace"
         return SETTING.narrow(SETTING.default, self._values.get(workspace_id))
 
 
@@ -104,7 +105,7 @@ def test_a_layer_below_cant_put_back_what_one_above_took_out() -> None:
 
 async def test_a_value_that_isnt_names_fails_the_write() -> None:
     class Numbers:
-        async def value(self, *_: str) -> Value:
+        async def value(self, *_: str | None) -> Value:
             return 3
 
     workspaces = Workspaces(InMemoryStorage(), direct_writes=direct_writes_from(Numbers()))

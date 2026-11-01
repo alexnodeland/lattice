@@ -51,6 +51,11 @@ def test_the_providers_tools_are_commands_of_their_names() -> None:
     assert all(COMMANDS[name].capability.provider == "command" for name in PROVIDED)
 
 
+def test_listing_the_workspaces_alone_is_tenant_wide() -> None:
+    tenant_wide = {name for name, command in COMMANDS.items() if command.tenant_wide}
+    assert tenant_wide == {"artifactr.list_workspaces"}, "a client finds a workspace with it"
+
+
 def test_the_committed_catalog_is_current() -> None:
     assert json.loads(DOCUMENT.read_text()) == catalog_document(), "run `moon run artifactr:schema`"
 

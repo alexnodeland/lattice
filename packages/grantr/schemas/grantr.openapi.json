@@ -293,7 +293,14 @@
             "type": "string"
           },
           "workspace": {
-            "$ref": "#/components/schemas/WorkspaceId"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceId"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -1009,7 +1016,14 @@
             "title": "Version"
           },
           "workspace": {
-            "$ref": "#/components/schemas/WorkspaceId"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WorkspaceId"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -2395,20 +2409,27 @@
         "type": "object"
       },
       "Scope": {
-        "description": "Where capabilities are offered and called: a tenant's workspace.",
+        "description": "Where capabilities are offered and called: a tenant's workspace, or the tenant as a whole.\n\nA tenant-wide command, such as listing a tenant's workspaces, is called with no workspace\n(lattice ADR-0044); everything else is called in one.",
         "properties": {
           "tenant_id": {
             "title": "Tenant Id",
             "type": "string"
           },
           "workspace_id": {
-            "title": "Workspace Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The workspace, or None for the tenant as a whole.",
+            "title": "Workspace Id"
           }
         },
         "required": [
-          "tenant_id",
-          "workspace_id"
+          "tenant_id"
         ],
         "title": "Scope",
         "type": "object"

@@ -56,7 +56,7 @@ async def _grants(storage: Storage) -> Grants:
 
 
 def _context(
-    caller: Caller, *, tenant: str = "acme", workspace: str = "w1", via: Via | None = None
+    caller: Caller, *, tenant: str = "acme", workspace: str | None = "w1", via: Via | None = None
 ) -> CallContext:
     return CallContext(
         scope=Scope(tenant_id=tenant, workspace_id=workspace),
@@ -94,6 +94,13 @@ async def test_authorize_checks_the_gate_in_the_calls_workspace(storage: Storage
     assert not await authorize(_context(RunCaller(id="run_2", agent="nightly")), EDIT)
     assert not await authorize(_context(PersonCaller(id="dave")), EDIT), "no member"
     assert not await authorize(_context(PersonCaller(id="carol")), "artifactr:nope")
+
+
+async def test_a_tenant_wide_call_is_checked_on_the_tenant(storage: Storage) -> None:
+    authorize = (await _grants(storage)).authorize()
+    assert await authorize(_context(PersonCaller(id="alice"), workspace=None), EDIT), "the owner"
+    carol = _context(PersonCaller(id="carol"), workspace=None)
+    assert not await authorize(carol, EDIT), "carol holds it in w1 alone, not on the tenant"
 
 
 async def test_a_call_naming_no_tenant_holds_nothing(storage: Storage) -> None:
@@ -159,6 +166,10 @@ async def test_every_call_is_audited_in_its_tenant(storage: Storage) -> None:
     assert entry.by == Agent(), "an agent acting for no one"
     assert isinstance(entry.event, CapabilityCalled)
     assert (entry.event.client, entry.event.outcome) == ("Claude (conn_1)", "refused")
+    await audit.record(_called(scope=Scope(tenant_id="acme")))
+    entry = (await grants.audit("acme", by=ALICE, keep=CALLS))[-1]
+    assert isinstance(entry.event, CapabilityCalled)
+    assert entry.event.workspace is None, "a tenant-wide call's, in no workspace"
 
 
 async def test_a_call_naming_a_tenant_that_doesnt_exist_is_the_deployments(

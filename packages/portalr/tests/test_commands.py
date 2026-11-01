@@ -46,6 +46,10 @@ def test_each_is_an_admin_tool_and_what_emails_someone_sends_out() -> None:
     assert all(COMMANDS[n].capability.effects == {"reads_private"} for n in reads)
 
 
+def test_every_one_is_tenant_wide() -> None:
+    assert all(command.tenant_wide for command in COMMANDS.values())
+
+
 def test_a_reads_arguments_are_its_routes_query() -> None:
     schema = json.loads(json.dumps(COMMANDS["portalr.list_traces"].capability.input_schema))
     assert schema["properties"] == TraceQuery.model_json_schema()["properties"]

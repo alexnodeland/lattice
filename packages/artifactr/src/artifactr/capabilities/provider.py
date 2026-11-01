@@ -275,7 +275,8 @@ class ArtifactrProvider:
         """Call one of the capabilities in the call's workspace, as the call's actor.
 
         Raises:
-            ValueError: If the capability isn't one of artifactr's.
+            ValueError: If the capability isn't one of artifactr's, or the call names no
+                workspace.
             pydantic.ValidationError: If the arguments aren't the capability's.
             artifactr.core.Rejection: If the workspace refuses the call or its command.
         """
@@ -283,6 +284,8 @@ class ArtifactrProvider:
             raise ValueError(f"{capability.name} isn't one of artifactr's capabilities")
         given = _ARGUMENTS[capability.name].model_validate(arguments)
         scope = context.scope
+        if scope.workspace_id is None:
+            raise ValueError(f"{capability.name} is called in a workspace, and names none")
         workspace = await self._workspaces.open(
             scope.tenant_id, scope.workspace_id, actor=self._actor(context)
         )

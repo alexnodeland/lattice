@@ -579,7 +579,7 @@ class _Transaction(_Reads):
             ApprovalRow(
                 tenant_id=approval.scope.tenant_id,
                 id=approval.id,
-                workspace=approval.scope.workspace_id,
+                workspace=approval.scope.workspace_id or "",
                 state=approval.state,
                 approval=approval.model_dump(mode="json"),
             )

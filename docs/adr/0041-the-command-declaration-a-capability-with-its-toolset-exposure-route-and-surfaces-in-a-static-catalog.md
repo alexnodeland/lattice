@@ -53,3 +53,7 @@ The parity test, the schemas and the docs must read every package's commands wit
 1. [x] `lattice_core.commands` and its schema, tested.
 2. [ ] grantr's and artifactr's catalogs, `grantr.commands` and `artifactr.commands`, with their schemas.
 3. [ ] The parity test, `tests/test_parity.py`, and `x-lattice-command` on every operation (RFC-0014's P13).
+
+## Amendment (2026-11-01)
+
+`Command` gains `tenant_wide`, false by default, and `lattice_core.commands` moves to contract 1.1.0 ([ADR-0044](0044-tenant-wide-commands-called-with-no-workspace-and-checked-on-the-tenant.md)). A tenant-wide command, such as `artifactr.list_workspaces` or any of grantr's, is called with a scope that names no workspace and is checked on the tenant. It is refused if its route or its resource names `{workspace}`.

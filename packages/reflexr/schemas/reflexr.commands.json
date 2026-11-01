@@ -68,6 +68,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.cancel_run": {
@@ -124,6 +125,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.get_rule": {
@@ -169,6 +171,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.get_run": {
@@ -214,6 +217,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.give_feedback": {
@@ -361,6 +365,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "feedback"
     },
     "reflexr.install_rule": {
@@ -998,6 +1003,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.list_dead_letters": {
@@ -1048,6 +1054,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.list_rules": {
@@ -1084,6 +1091,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.list_runs": {
@@ -1183,6 +1191,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.publish_event": {
@@ -1253,6 +1262,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.read_events": {
@@ -1357,6 +1367,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.replay_rule": {
@@ -1417,6 +1428,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.retry_run": {
@@ -1460,6 +1472,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.rule_history": {
@@ -1505,6 +1518,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.rule_status": {
@@ -1541,6 +1555,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.schedule_status": {
@@ -1577,6 +1592,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.skip_run": {
@@ -1633,6 +1649,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "reflexr.update_rule": {
@@ -2284,6 +2301,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     }
   },

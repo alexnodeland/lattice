@@ -200,6 +200,7 @@ class _Spec:
     surfaces: frozenset[Surface] = field(
         default_factory=lambda: frozenset[Surface]({"portalr", "mcp", "acp", "webmcp"})
     )
+    tenant_wide: bool = False
 
 
 def _read(
@@ -224,6 +225,7 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr:read_workspaces",
         _Page,
         route=APP,
+        tenant_wide=True,
     ),
     _read(
         "artifactr.list_threads",
@@ -432,6 +434,7 @@ def _command(spec: _Spec) -> Command:
         route=spec.route,
         resource=spec.resource,
         surfaces=spec.surfaces,
+        tenant_wide=spec.tenant_wide,
     )
 
 

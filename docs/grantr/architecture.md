@@ -101,6 +101,7 @@ An admin reads each list with the action of the command that changes it ([ADR-00
 
 - **The registry and the installation are configuration.** `Grants(integrations=...)` takes the integrations a tenant's admins switch, lattice-core's `KNOWN` if omitted, and `installed=...` the keys the deployment installs, every one if omitted.
 - **Three levels decide:** an integration is on in a workspace only if the deployment installs it and the tenant hasn't turned it off; then the workspace's setting decides, or, unset, the tenant's, or, unset too, its default. `grantr.core.effective` is the rule.
+- **A tenant-wide command's call names no workspace,** so `is_enabled(tenant_id, None, key)` is the tenant's state, and the settings port's `value(tenant_id, None, key)` the tenant's value, which no workspace narrows ([lattice ADR-0044](../adr/0044-tenant-wide-commands-called-with-no-workspace-and-checked-on-the-tenant.md)). An empty workspace id is still refused: everything is off, and a setting is at its floor.
 - **A key it doesn't know, or doesn't install, is off,** and so is every key while the store can't be read, with a warning.
 - **`integrations` and `set_integration`** read and change a level's settings with `grantr:manage_integrations` there, which a tenant's owners and admins hold everywhere in it, and a workspace's admin in that workspace. `set_integration` records an `integration_set` entry for a real change only: setting what is set already records nothing.
 - **`integrations_enabled`** answers every key for whoever can open the workspace, for the client that hides what is off.
@@ -114,7 +115,7 @@ An admin reads each list with the action of the command that changes it ([ADR-00
 - **The first answer wins.** `answer` reads the approval pending and settles it in its tenant's transaction, with its audit entry; every other change to the tenant waits. The other answers get `AlreadyAnswered`, carrying the first. `take` does the same for the one call an approved approval lets through.
 - **grantr decides who may answer,** from its own members, groups and grants, never from the groups an answerer claims:
   - only a member of the tenant answers;
-  - a member answers if the approval names it, or a group it is in, or if it holds the approval's action on the approval's workspace;
+  - a member answers if the approval names it, or a group it is in, or if it holds the approval's action on the approval's workspace, or on the tenant for a tenant-wide call's approval, which names none;
   - a different approver is never the person who asked;
   - a confirmation is its one named person's, on `portalr:confirm`;
   - a service principal answers only by holding the action through a grant made to it, not to its groups: the subjects and groups an approval names are people, since a principal's id may be a person's too. It never answers a confirmation.
@@ -145,7 +146,7 @@ An admin reads each list with the action of the command that changes it ([ADR-00
 
 lattice-core's enforcer asks grantr two things on every call ([ADR-0039](adr/0039-the-enforcers-gate-and-audit-answered-by-grantr-each-call-as-the-person-it-is-for.md), [lattice ADR-0037](../adr/0037-the-enforcement-path-in-lattice-core-refusals-by-step-approvals-resumed-by-id.md)).
 
-- **`Grants.authorize()`** is its `Authorize`: `check` of the capability's action on the call's workspace. A person is checked as their `User`, through an outside client too; an agent's run or a code session acting for a person, as that person; one acting for no one, as the agent, which holds nothing. A call naming an id no tenant can have holds nothing. An application may pass its own `subject_of`.
+- **`Grants.authorize()`** is its `Authorize`: `check` of the capability's action on the call's workspace, or on the tenant for a tenant-wide command's call, which names none ([lattice ADR-0044](../adr/0044-tenant-wide-commands-called-with-no-workspace-and-checked-on-the-tenant.md)): a role held on one workspace doesn't allow it. A person is checked as their `User`, through an outside client too; an agent's run or a code session acting for a person, as that person; one acting for no one, as the agent, which holds nothing. A call naming an id no tenant can have holds nothing. An application may pass its own `subject_of`.
 - **`Grants.capability_audit()`** is its `Audit`: each call is one `capability_called` entry in its tenant's log, made by the person it was for or the agent. It holds the steps, the outcome and the approval, never the arguments or the output. A call naming a tenant that doesn't exist is recorded in the deployment's log with the tenant it named, and recording never refuses.
 
 ## Keys

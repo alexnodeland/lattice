@@ -146,7 +146,7 @@ class Broken:
     async def count(self, _key: str, _context: CallContext, /) -> int:
         raise ConnectionError("down")
 
-    async def value(self, _t: str, _w: str, _key: str, /) -> int:
+    async def value(self, _t: str, _w: str | None, _key: str, /) -> int:
         raise ConnectionError("down")
 
 
@@ -269,6 +269,14 @@ async def test_an_integration_off_is_not_enabled_before_any_grant_is_asked() -> 
     assert built.steps() == [("integration", False), ("audit", True)]
     on = Built(capability(gate=Gate(integration="wiki", action="wiki:edit")))
     assert await on.call()
+
+
+async def test_a_tenant_wide_call_is_checked_at_the_tenant() -> None:
+    """lattice ADR-0044: integrations and settings answer for the tenant, given no workspace."""
+    tenant = Scope(tenant_id=HERE.tenant_id)
+    built = Built(capability(gate=Gate(integration="wiki", action="wiki:edit")))
+    assert await built.call(scope=tenant)
+    assert built.steps()[0] == ("integration", True)
 
 
 async def test_a_caller_without_the_grant_is_forbidden() -> None:

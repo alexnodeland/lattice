@@ -174,7 +174,7 @@ async def test_a_custom_action_names_who_answers() -> None:
 class Numbers:
     """A store whose every setting holds a number: never what a setting of names holds."""
 
-    async def value(self, _tenant_id: str, _workspace_id: str, _key: str, /) -> Value:
+    async def value(self, _tenant_id: str, _workspace_id: str | None, _key: str, /) -> Value:
         return 3
 
 
@@ -184,7 +184,7 @@ class Undeclared:
     def __init__(self) -> None:
         self._known: dict[str, Setting] = dict(KNOWN_SETTINGS)
 
-    async def value(self, _tenant_id: str, _workspace_id: str, key: str, /) -> Value:
+    async def value(self, _tenant_id: str, _workspace_id: str | None, key: str, /) -> Value:
         return self._known[key].default
 
 

@@ -7,8 +7,8 @@
  * (portalr ADR-0010).
  */
 
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { readdir, readFile, writeFile } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { compile } from "json-schema-to-typescript";
 import openapiTS, { astToString } from "openapi-typescript";
 
@@ -122,13 +122,118 @@ export function commands(catalogs: readonly string[]): string {
   );
 }
 
+/** Each REST surface's name in the client, by its generated file. */
+const SURFACES: Readonly<Record<keyof typeof OPENAPI, string>> = {
+  "artifactr.openapi.ts": "artifactr",
+  "files.openapi.ts": "files",
+  "diagrams.openapi.ts": "diagrams",
+  "reflexr.openapi.ts": "reflexr",
+  "grantr.openapi.ts": "grantr",
+  "portalr.openapi.ts": "portalr",
+  "relayr.openapi.ts": "relayr",
+};
+
+/** The methods an operation is called by. */
+const METHODS = new Set(["get", "put", "post", "delete", "patch"]);
+
+/**
+ * What one operation's `x-lattice-command` says it calls, as a type: its command, the commands a
+ * caller picks one of, `null` for one that calls none, or `"frames"` where its body carries
+ * command frames, each named by its `type` (lattice ADR-0042).
+ */
+export function called(extension: unknown, at: string): string {
+  if (typeof extension === "string") {
+    return JSON.stringify(extension);
+  }
+  if (Array.isArray(extension) && extension.every((name) => typeof name === "string")) {
+    return extension.map((name) => JSON.stringify(name)).join(" | ");
+  }
+  if (typeof extension === "object" && extension !== null && "frames" in extension) {
+    return '"frames"';
+  }
+  if (typeof extension === "object" && extension !== null && "none" in extension) {
+    return "null";
+  }
+  throw new Error(`${at}: x-lattice-command is ${JSON.stringify(extension)}`);
+}
+
+/** What each surface's operations call, by path and method, as one interface. */
+export function calls(documents: Readonly<Record<string, unknown>>): string {
+  const surfaces = Object.entries(documents).map(([surface, document]) => {
+    const paths = (document as { paths: Record<string, Record<string, unknown>> }).paths;
+    const entries = Object.entries(paths).map(([path, operations]) => {
+      const methods = Object.entries(operations)
+        .filter(([method]) => METHODS.has(method))
+        .map(([method, operation]) => {
+          const extension = (operation as Record<string, unknown>)["x-lattice-command"];
+          return `${method}: ${called(extension, `${surface} ${method.toUpperCase()} ${path}`)};`;
+        });
+      return `    ${JSON.stringify(path)}: { ${methods.join(" ")} };\n`;
+    });
+    return `  ${surface}: {\n${entries.join("")}  };\n`;
+  });
+  return (
+    `${HEADER}${Object.entries(OPENAPI)
+      .map(([, source]) => `// ${source}\n`)
+      .join("")}\n` +
+    "/**\n" +
+    " * What each operation calls, by surface, path and method, as its document's `x-lattice-command`\n" +
+    " * names it: its command, the commands a caller picks one of, `null` for one that calls none, or\n" +
+    ' * `"frames"` where its body carries command frames, each named by its `type` (lattice ADR-0042).\n' +
+    " */\n" +
+    `export interface Calls {\n${surfaces.join("")}}\n`
+  );
+}
+
+/** The web packages whose requests `commands.used.json` lists, from the workspace's root. */
+const SENDERS = ["client/src", "app/src", "admin/src", "ui/src"] as const;
+
+/** Where `commands.used.json` is written: beside this package's `src`. */
+export const USED = join(import.meta.dirname, "..", "commands.used.json");
+
+/** A request, up to the path it is sent to: its command, as the request names it, is in between. */
+const REQUEST = /\.(GET|PUT|POST|DELETE|PATCH)\(([^`"]*(?:"[^"/][^"]*"[^`"]*)*)[`"]\//g;
+
+/** The commands a source file's requests name: a literal, or each of a conditional's. */
+export function named(source: string, at: string): string[] {
+  return [...source.matchAll(REQUEST)].flatMap(([request, , before = ""]) => {
+    const names = [...before.matchAll(/"([a-z]+\.[a-z_]+)"/g)].map(([, name = ""]) => name);
+    if (names.length === 0 && !/\bnull\b|"frames"/.test(before)) {
+      throw new Error(`${at}: ${request.trim()} names no command with a literal`);
+    }
+    return names;
+  });
+}
+
+/** Every command portalr's UIs send over REST, sorted, as `commands.used.json` lists them. */
+export async function used(): Promise<string> {
+  const web = join(import.meta.dirname, "..", "..");
+  const names = new Set<string>();
+  for (const sender of SENDERS) {
+    const entries = await readdir(join(web, sender), { recursive: true });
+    for (const entry of entries.sort()) {
+      if (!/\.tsx?$/.test(entry) || /\.test\.tsx?$/.test(entry) || entry.startsWith("generated")) {
+        continue;
+      }
+      const file = join(web, sender, entry);
+      for (const name of named(await readFile(file, "utf8"), relative(web, file))) {
+        names.add(name);
+      }
+    }
+  }
+  return `${JSON.stringify([...names].sort(), null, 2)}\n`;
+}
+
 /** Every generated file, by name, as it should read. */
 export async function generate(): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
-  for (const [name, source] of Object.entries(OPENAPI)) {
+  const documents: Record<string, unknown> = {};
+  for (const [name, source] of Object.entries(OPENAPI) as [keyof typeof OPENAPI, string][]) {
     const document = JSON.parse(await readFile(join(root, source), "utf8"));
     files[name] = `${HEADER}// ${source}\n\n${astToString(await openapiTS(document))}`;
+    documents[SURFACES[name]] = document;
   }
+  files["calls.ts"] = calls(documents);
   for (const [name, source] of Object.entries(SCHEMAS)) {
     const schema = bareRefs(JSON.parse(await readFile(join(root, source), "utf8")));
     const types = await compile(schema as Parameters<typeof compile>[0], name.replace(".ts", ""), {
@@ -152,4 +257,5 @@ if (import.meta.main) {
   for (const [name, text] of Object.entries(await generate())) {
     await writeFile(join(out, name), text);
   }
+  await writeFile(USED, await used());
 }

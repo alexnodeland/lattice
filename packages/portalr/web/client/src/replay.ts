@@ -12,7 +12,7 @@ import type { Api } from "./rest";
  * @throws Error if the relay can't be read, as `readConsent` does.
  */
 export async function readReplayConsent(api: Api): Promise<Consent> {
-  const { data, response } = await api.portalr.GET("/portalr/v1/analytics/replay/consent");
+  const { data, response } = await api.portalr.GET(null, "/portalr/v1/analytics/replay/consent");
   if (data === undefined) {
     throw new Error(`the answer couldn't be read (${response.status})`);
   }
@@ -26,7 +26,7 @@ export async function readReplayConsent(api: Api): Promise<Consent> {
  * @throws Error if the relay didn't record it, as `answerConsent` does.
  */
 export async function answerReplayConsent(api: Api, given: boolean): Promise<Answered> {
-  const { data, response } = await api.portalr.PUT("/portalr/v1/analytics/replay/consent", {
+  const { data, response } = await api.portalr.PUT(null, "/portalr/v1/analytics/replay/consent", {
     body: { given },
   });
   if (data === undefined) {

@@ -101,5 +101,6 @@ ADR-0001 to ADR-0006 record the decisions P1 to P6 of [lattice RFC-0002](../../r
 | [0093](0093-approvals-on-their-own-page-and-a-confirmation-on-admins-confirm-page-alone.md) | Approvals on their own page, and a confirmation on admin's confirm page alone | Accepted |
 | [0094](0094-portalrs-commands-its-admins-reads-and-the-tenant-and-member-it-makes.md) | portalr's commands: its admin's reads, and the tenant and member it makes | Accepted |
 | [0095](0095-a-threads-approval-card-links-its-approvals-page-which-says-who-may-answer-it.md) | A thread's approval card links its approval's page, which says who may answer it | Accepted |
+| [0096](0096-every-request-portalrs-client-sends-names-its-command.md) | Every request portalr's client sends names its command | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

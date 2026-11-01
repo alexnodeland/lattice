@@ -17,7 +17,7 @@ const MODELS = [
 /** An API whose models' read answers `listed`, or refuses; and the workspaces it was asked of. */
 function api(listed: readonly (typeof MODELS)[number][] | null) {
   const asked: unknown[] = [];
-  const GET = vi.fn(async (_path: string, init: unknown) => {
+  const GET = vi.fn(async (_command: null, _path: string, init: unknown) => {
     asked.push(init);
     return listed === null ? { data: undefined } : { data: { models: listed } };
   });

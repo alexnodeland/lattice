@@ -13,18 +13,22 @@ let close = () => {};
 afterEach(() => close());
 
 async function publish(ws: string, n: number): Promise<void> {
-  const { data } = await api.reflexr.POST("/workspaces/{workspace_id}/events", {
-    params: { path: { workspace_id: ws } },
-    body: {
-      id: `evt_portalr_${n}`,
-      event: {
-        type: "oncall:alert.fired",
-        service: "checkout",
-        severity: 3,
-        message: `alert ${n}`,
+  const { data } = await api.reflexr.POST(
+    "reflexr.publish_event",
+    "/workspaces/{workspace_id}/events",
+    {
+      params: { path: { workspace_id: ws } },
+      body: {
+        id: `evt_portalr_${n}`,
+        event: {
+          type: "oncall:alert.fired",
+          service: "checkout",
+          severity: 3,
+          message: `alert ${n}`,
+        },
       },
     },
-  });
+  );
   expect(data?.[0]?.duplicate).toBe(false);
 }
 
@@ -44,9 +48,13 @@ test("a client resumes oncall's stream across a dropped connection, losing and r
   await publish(ws, 3);
   store.open();
 
-  const { data: log } = await api.reflexr.GET("/workspaces/{workspace_id}/events", {
-    params: { path: { workspace_id: ws } },
-  });
+  const { data: log } = await api.reflexr.GET(
+    "reflexr.read_events",
+    "/workspaces/{workspace_id}/events",
+    {
+      params: { path: { workspace_id: ws } },
+    },
+  );
   const head = Math.max(...(log ?? []).map((envelope) => envelope.seq));
   await until(store, (s) => s.status === "live" && s.seq >= head);
   expect(seqs.slice(0, head)).toEqual(every(head));

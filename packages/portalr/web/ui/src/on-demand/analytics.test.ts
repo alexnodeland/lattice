@@ -17,7 +17,11 @@ const stale = new Set<string>();
 /** The relay, as the portal's client reaches it: a session, and batches of events. */
 const api = {
   portalr: {
-    POST: async (path: string, init?: { headers?: Record<string, string>; body?: unknown }) => {
+    POST: async (
+      _command: null,
+      path: string,
+      init?: { headers?: Record<string, string>; body?: unknown },
+    ) => {
       sent.push({ path, tenant: init?.headers?.["X-Tenant"], body: init?.body ?? null });
       if (down) {
         return { data: undefined, response: new Response(null, { status: 503 }) };
@@ -129,7 +133,7 @@ test("closed, as the person says no, what waits is dropped and nothing is sent a
 test("a batch the relay refuses outright is dropped, and never fails the page", async () => {
   const refusing = {
     portalr: {
-      POST: async (path: string) => {
+      POST: async (_command: null, path: string) => {
         if (path === "/portalr/v1/events") {
           throw new Error("the relay is down");
         }

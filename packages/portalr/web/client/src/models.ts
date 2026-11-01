@@ -21,7 +21,7 @@ export const models = (api: Api, tenant: string, workspace: string) =>
     queryKey: ["portalr", tenant, "models", workspace] as const,
     queryFn: async () => {
       // The tenant named as every read names it, with no helper the first page would carry.
-      const { data } = await api.portalr.GET("/portalr/v1/models", {
+      const { data } = await api.portalr.GET(null, "/portalr/v1/models", {
         headers: { "X-Tenant": tenant },
         params: { query: { workspace } },
       });

@@ -1,7 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { expect, expectTypeOf, test } from "vitest";
-import { bareRefs, commands, GENERATED, generate } from "../scripts/generate";
+import {
+  bareRefs,
+  called,
+  calls,
+  commands,
+  GENERATED,
+  generate,
+  named,
+  USED,
+  used,
+} from "../scripts/generate";
 import { COMMANDS, type CommandName } from "./generated/commands";
 
 // The types are the packages' committed documents, as openapi-typescript and
@@ -35,4 +45,60 @@ test("every command's name is a constant and a union, sorted, from the catalogs"
   // A name the catalogs declare is a `CommandName`; one they don't fails `tsc`.
   expectTypeOf<"grantr.revoke_key">().toExtend<CommandName>();
   expectTypeOf<"grantr.revoke_everything">().not.toExtend<CommandName>();
+});
+
+test("what each operation calls is its extension's command, a choice, none, or its frames", () => {
+  expect(called("grantr.list_keys", "x")).toBe('"grantr.list_keys"');
+  expect(called(["grantr.grant", "grantr.grant_on_tenant"], "x")).toBe(
+    '"grantr.grant" | "grantr.grant_on_tenant"',
+  );
+  expect(called({ none: "config" }, "x")).toBe("null");
+  expect(called({ frames: "command", none: { watch_run: "the stream's" } }, "x")).toBe('"frames"');
+  expect(() => called(undefined, "grantr GET /keys")).toThrow(
+    "grantr GET /keys: x-lattice-command is undefined",
+  );
+  const document = {
+    paths: {
+      "/keys": {
+        parameters: [],
+        get: { "x-lattice-command": "grantr.list_keys" },
+        post: { "x-lattice-command": { none: "why" } },
+      },
+    },
+  };
+  expect(calls({ grantr: document })).toContain(
+    '  grantr: {\n    "/keys": { get: "grantr.list_keys"; post: null; };\n  };\n',
+  );
+});
+
+test("each request names its command before its path, or fails the manifest", () => {
+  const source = `
+    api.grantr.GET("grantr.list_keys", "/grantr/v1/tenants/{tenant}/keys", init);
+    api.grantr.POST(
+      kind === "tenant" ? "grantr.grant_on_tenant" : "grantr.grant",
+      "/grantr/v1/tenants/{tenant}/grants",
+    );
+    api.grantr.DELETE("grantr.remove_member", \`/members/\${kind}/{member_id}\`);
+    client.GET(null, "/portalr/config.json");
+    api.artifactr.POST("frames", "/workspaces/{workspace_id}/commands", init);
+  `;
+  expect(named(source, "x.ts")).toEqual([
+    "grantr.list_keys",
+    "grantr.grant_on_tenant",
+    "grantr.grant",
+    "grantr.remove_member",
+  ]);
+  expect(() => named('api.grantr.GET(command, "/keys")', "y.ts")).toThrow(
+    'y.ts: .GET(command, "/ names no command with a literal',
+  );
+});
+
+// What portalr's UIs send over REST, read from their requests: `moon run client:types` rewrites it.
+test("commands.used.json lists every command the UIs' requests name", async () => {
+  expect(await readFile(USED, "utf8")).toBe(await used());
+  const listed = JSON.parse(await readFile(USED, "utf8")) as string[];
+  expect(listed).toContain("grantr.revoke_key");
+  for (const name of listed) {
+    expect(COMMANDS, name).toContain(name);
+  }
 });

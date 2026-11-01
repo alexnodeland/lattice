@@ -36,6 +36,7 @@ GRANTR_ACTIONS: Final = frozenset(
         "restrict",
         "manage_integrations",
         "manage_settings",
+        "manage_bindings",
         "read_audit",
         "grant_operator",
         "answer_approval",
@@ -61,6 +62,10 @@ ADR-0030)."""
 READ_APPROVALS: Final = "grantr:read_approvals"
 """Listing and reading the approvals one may answer, or was asked for: every member of a tenant
 holds it (lattice RFC-0014, grantr ADR-0042)."""
+
+MANAGE_BINDINGS: Final = "grantr:manage_bindings"
+"""Binding a source's connections to the tenant's workspaces, and reading its bindings: a
+tenant's owners and admins hold it, never a workspace's (lattice ADR-0040)."""
 
 ANSWER_APPROVAL: Final = "grantr:answer_approval"
 """Answering an approval whose answerers name this action, in a workspace: a person delegates

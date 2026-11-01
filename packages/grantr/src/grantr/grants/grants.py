@@ -84,9 +84,11 @@ from grantr.core.roles import MANAGE_INTEGRATIONS, MANAGE_SETTINGS, RESTRICT, RU
 from grantr.core.settings import state as setting_state
 from grantr.core.settings import wire
 from grantr.grants.approvals import POLL, GrantrApprovals, Record
+from grantr.grants.bindings import GrantrBindings
 from grantr.grants.calls import CallAudit, subject_of_call
 from grantr.grants.storage import Reads, Storage, Transaction
 from grantr.telemetry import SLOW_CHECK, Reason, Telemetry
+from lattice_core.bindings import Binding
 from lattice_core.capabilities import CallContext
 from lattice_core.integrations import KNOWN, Integration
 from lattice_core.settings import KNOWN_SETTINGS, Setting, Superset, Value, floor, operator_layer
@@ -166,10 +168,13 @@ class Grants:
             :data:`~lattice_core.settings.KNOWN_SETTINGS`, if omitted.
         operator_settings: The operator's values, by key, which replace the settings' defaults
             and are the ceiling every tenant narrows; checked as the deployment starts.
+        operator_bindings: The operator's bindings, from the deployment's configuration, which
+            no tenant changes (lattice ADR-0040).
 
     Raises:
         ValueError: If it installs an integration that ``integrations`` doesn't declare, or the
-            operator sets a setting ``settings`` doesn't declare, or a value of the wrong kind.
+            operator sets a setting ``settings`` doesn't declare, or a value of the wrong kind,
+            or binds one id twice.
     """
 
     def __init__(
@@ -185,6 +190,7 @@ class Grants:
         installed: Collection[str] | None = None,
         settings: Mapping[str, Setting] = KNOWN_SETTINGS,
         operator_settings: Mapping[str, object] = MappingProxyType({}),
+        operator_bindings: Iterable[Binding] = (),
     ) -> None:
         if installed is not None and (unknown := sorted(set(installed) - set(integrations))):
             raise ValueError(f"installs integrations it doesn't declare: {', '.join(unknown)}")
@@ -197,6 +203,9 @@ class Grants:
         self._application = application
         self._telemetry = Telemetry(
             tracer_provider=tracer_provider, meter_provider=meter_provider, slow_check=slow_check
+        )
+        self._bindings = GrantrBindings(
+            storage, change=self._change, require=self._require, operator=operator_bindings
         )
 
     # ─── checks ──────────────────────────────────────────────────────────────
@@ -1151,6 +1160,16 @@ class Grants:
         it names a tenant that doesn't exist (grantr ADR-0039).
         """
         return CallAudit(self._storage, change=self._change)
+
+    # ─── bindings ────────────────────────────────────────────────────────────
+
+    def bindings(self) -> GrantrBindings:
+        """The bindings, lattice-core's ``Bindings``, and the commands that change a tenant's.
+
+        Two layers: the operator's, given to the constructor, and each tenant's, which its owners
+        and admins change with ``grantr:manage_bindings`` (lattice ADR-0040, grantr ADR-0041).
+        """
+        return self._bindings
 
     # ─── approvals ───────────────────────────────────────────────────────────
 

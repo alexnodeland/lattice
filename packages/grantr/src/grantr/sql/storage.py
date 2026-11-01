@@ -48,6 +48,7 @@ from grantr.sql.tables import (
     DEPLOYMENT,
     ApprovalRow,
     AuditRow,
+    BindingRow,
     GrantRow,
     GroupMemberRow,
     GroupRow,
@@ -59,6 +60,7 @@ from grantr.sql.tables import (
     TenantRow,
 )
 from lattice_core.approvals import Approval, ApprovalId
+from lattice_core.bindings import Binding, BindingId
 from lattice_core.sql.sessions import awaited_to_the_end, lock_row, to_the_end
 from lattice_core.sql.tenancy import TENANT_KEY, TenantSession
 
@@ -316,6 +318,25 @@ class _Reads:
         )
 
     @awaited_to_the_end
+    async def bindings(
+        self,
+        tenant: TenantId,
+        *,
+        workspace: WorkspaceId | None = None,
+        source: str | None = None,
+        connection: str | None = None,
+    ) -> list[Binding]:
+        query = select(BindingRow).where(BindingRow.tenant_id == tenant)
+        if workspace is not None:
+            query = query.where(BindingRow.workspace == workspace)
+        if source is not None:
+            query = query.where(BindingRow.source == source)
+        if connection is not None:
+            query = query.where(BindingRow.connection == connection)
+        found = [Binding.model_validate(row.binding) for row in await self._session.scalars(query)]
+        return sorted(found, key=lambda binding: (binding.bound_at, binding.id))
+
+    @awaited_to_the_end
     async def settings(
         self, tenant: TenantId, workspace: WorkspaceId | None = None
     ) -> dict[str, SettingRow]:
@@ -389,6 +410,7 @@ class _Transaction(_Reads):
             IntegrationRow,
             SettingRowRecord,
             ApprovalRow,
+            BindingRow,
         ):
             await self._session.execute(delete(model).where(model.tenant_id == tenant))
         await self._session.execute(
@@ -535,6 +557,29 @@ class _Transaction(_Reads):
                 approval=approval.model_dump(mode="json"),
             )
         )
+
+    @awaited_to_the_end
+    async def put_binding(self, binding: Binding) -> None:
+        self._session.add(
+            BindingRow(
+                tenant_id=binding.tenant_id,
+                id=binding.id,
+                workspace=binding.workspace_id,
+                source=binding.source,
+                connection=binding.connection,
+                binding=binding.model_dump(mode="json"),
+            )
+        )
+        await self._session.flush()
+
+    @awaited_to_the_end
+    async def delete_binding(self, tenant: TenantId, id: BindingId) -> Binding | None:
+        row = await self._session.get(BindingRow, (tenant, id))
+        if row is None:
+            return None
+        await self._session.delete(row)
+        await self._session.flush()
+        return Binding.model_validate(row.binding)
 
     @awaited_to_the_end
     async def set_setting(
@@ -792,6 +837,22 @@ class SqlStorage:
         """The tenant's pending approvals, oldest first: in one workspace, or those due."""
         return await self._read(
             tenant, lambda reads: reads.approvals(tenant, workspace=workspace, due=due)
+        )
+
+    async def bindings(
+        self,
+        tenant: TenantId,
+        *,
+        workspace: WorkspaceId | None = None,
+        source: str | None = None,
+        connection: str | None = None,
+    ) -> list[Binding]:
+        """The tenant's bindings, oldest first: reaching a workspace, or of a connection."""
+        return await self._read(
+            tenant,
+            lambda reads: reads.bindings(
+                tenant, workspace=workspace, source=source, connection=connection
+            ),
         )
 
     async def keys(self, tenant: TenantId) -> list[Key]:

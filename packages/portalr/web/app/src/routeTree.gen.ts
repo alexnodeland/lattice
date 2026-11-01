@@ -9,6 +9,9 @@ import { Route as SignedIndexRouteImport } from './routes/_signed/index'
 import { Route as SignedTTenantRouteImport } from './routes/_signed/t/$tenant'
 import { Route as SignedTTenantIndexRouteImport } from './routes/_signed/t/$tenant/index'
 import { Route as SignedTTenantSplatRouteImport } from './routes/_signed/t/$tenant/$'
+import { Route as SignedTTenantApprovalsRouteImport } from './routes/_signed/t/$tenant/approvals'
+import { Route as SignedTTenantApprovalsIndexRouteImport } from './routes/_signed/t/$tenant/approvals/index'
+import { Route as SignedTTenantApprovalsApprovalRouteImport } from './routes/_signed/t/$tenant/approvals/$approval'
 import { Route as SignedTTenantWWorkspaceRouteImport } from './routes/_signed/t/$tenant/w/$workspace'
 import { Route as SignedTTenantWWorkspaceIndexRouteImport } from './routes/_signed/t/$tenant/w/$workspace/index'
 import { Route as SignedTTenantWWorkspaceSplatRouteImport } from './routes/_signed/t/$tenant/w/$workspace/$'
@@ -49,6 +52,23 @@ const SignedTTenantSplatRoute = SignedTTenantSplatRouteImport.update({
   path: '/$',
   getParentRoute: () => SignedTTenantRoute,
 } as any)
+const SignedTTenantApprovalsRoute = SignedTTenantApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
+  getParentRoute: () => SignedTTenantRoute,
+} as any)
+const SignedTTenantApprovalsIndexRoute =
+  SignedTTenantApprovalsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => SignedTTenantApprovalsRoute,
+  } as any)
+const SignedTTenantApprovalsApprovalRoute =
+  SignedTTenantApprovalsApprovalRouteImport.update({
+    id: '/$approval',
+    path: '/$approval',
+    getParentRoute: () => SignedTTenantApprovalsRoute,
+  } as any)
 const SignedTTenantWWorkspaceRoute = SignedTTenantWWorkspaceRouteImport.update({
   id: '/w/$workspace',
   path: '/w/$workspace',
@@ -114,8 +134,11 @@ export interface FileRoutesByFullPath {
   '/sign-in': typeof SignInRoute
   '/t/$tenant': typeof SignedTTenantRouteWithChildren
   '/t/$tenant/$': typeof SignedTTenantSplatRoute
+  '/t/$tenant/approvals': typeof SignedTTenantApprovalsRouteWithChildren
   '/t/$tenant/': typeof SignedTTenantIndexRoute
+  '/t/$tenant/approvals/$approval': typeof SignedTTenantApprovalsApprovalRoute
   '/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceRouteWithChildren
+  '/t/$tenant/approvals/': typeof SignedTTenantApprovalsIndexRoute
   '/t/$tenant/w/$workspace/$': typeof SignedTTenantWWorkspaceSplatRoute
   '/t/$tenant/w/$workspace/proposals': typeof SignedTTenantWWorkspaceProposalsRoute
   '/t/$tenant/w/$workspace/runs': typeof SignedTTenantWWorkspaceRunsRoute
@@ -131,6 +154,8 @@ export interface FileRoutesByTo {
   '/': typeof SignedIndexRoute
   '/t/$tenant/$': typeof SignedTTenantSplatRoute
   '/t/$tenant': typeof SignedTTenantIndexRoute
+  '/t/$tenant/approvals/$approval': typeof SignedTTenantApprovalsApprovalRoute
+  '/t/$tenant/approvals': typeof SignedTTenantApprovalsIndexRoute
   '/t/$tenant/w/$workspace/$': typeof SignedTTenantWWorkspaceSplatRoute
   '/t/$tenant/w/$workspace/proposals': typeof SignedTTenantWWorkspaceProposalsRoute
   '/t/$tenant/w/$workspace/runs': typeof SignedTTenantWWorkspaceRunsRoute
@@ -148,8 +173,11 @@ export interface FileRoutesById {
   '/_signed/': typeof SignedIndexRoute
   '/_signed/t/$tenant': typeof SignedTTenantRouteWithChildren
   '/_signed/t/$tenant/$': typeof SignedTTenantSplatRoute
+  '/_signed/t/$tenant/approvals': typeof SignedTTenantApprovalsRouteWithChildren
   '/_signed/t/$tenant/': typeof SignedTTenantIndexRoute
+  '/_signed/t/$tenant/approvals/$approval': typeof SignedTTenantApprovalsApprovalRoute
   '/_signed/t/$tenant/w/$workspace': typeof SignedTTenantWWorkspaceRouteWithChildren
+  '/_signed/t/$tenant/approvals/': typeof SignedTTenantApprovalsIndexRoute
   '/_signed/t/$tenant/w/$workspace/$': typeof SignedTTenantWWorkspaceSplatRoute
   '/_signed/t/$tenant/w/$workspace/proposals': typeof SignedTTenantWWorkspaceProposalsRoute
   '/_signed/t/$tenant/w/$workspace/runs': typeof SignedTTenantWWorkspaceRunsRoute
@@ -167,8 +195,11 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/t/$tenant'
     | '/t/$tenant/$'
+    | '/t/$tenant/approvals'
     | '/t/$tenant/'
+    | '/t/$tenant/approvals/$approval'
     | '/t/$tenant/w/$workspace'
+    | '/t/$tenant/approvals/'
     | '/t/$tenant/w/$workspace/$'
     | '/t/$tenant/w/$workspace/proposals'
     | '/t/$tenant/w/$workspace/runs'
@@ -184,6 +215,8 @@ export interface FileRouteTypes {
     | '/'
     | '/t/$tenant/$'
     | '/t/$tenant'
+    | '/t/$tenant/approvals/$approval'
+    | '/t/$tenant/approvals'
     | '/t/$tenant/w/$workspace/$'
     | '/t/$tenant/w/$workspace/proposals'
     | '/t/$tenant/w/$workspace/runs'
@@ -200,8 +233,11 @@ export interface FileRouteTypes {
     | '/_signed/'
     | '/_signed/t/$tenant'
     | '/_signed/t/$tenant/$'
+    | '/_signed/t/$tenant/approvals'
     | '/_signed/t/$tenant/'
+    | '/_signed/t/$tenant/approvals/$approval'
     | '/_signed/t/$tenant/w/$workspace'
+    | '/_signed/t/$tenant/approvals/'
     | '/_signed/t/$tenant/w/$workspace/$'
     | '/_signed/t/$tenant/w/$workspace/proposals'
     | '/_signed/t/$tenant/w/$workspace/runs'
@@ -261,6 +297,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/t/$tenant/$'
       preLoaderRoute: typeof SignedTTenantSplatRouteImport
       parentRoute: typeof SignedTTenantRoute
+    }
+    '/_signed/t/$tenant/approvals': {
+      id: '/_signed/t/$tenant/approvals'
+      path: '/approvals'
+      fullPath: '/t/$tenant/approvals'
+      preLoaderRoute: typeof SignedTTenantApprovalsRouteImport
+      parentRoute: typeof SignedTTenantRoute
+    }
+    '/_signed/t/$tenant/approvals/': {
+      id: '/_signed/t/$tenant/approvals/'
+      path: '/'
+      fullPath: '/t/$tenant/approvals/'
+      preLoaderRoute: typeof SignedTTenantApprovalsIndexRouteImport
+      parentRoute: typeof SignedTTenantApprovalsRoute
+    }
+    '/_signed/t/$tenant/approvals/$approval': {
+      id: '/_signed/t/$tenant/approvals/$approval'
+      path: '/$approval'
+      fullPath: '/t/$tenant/approvals/$approval'
+      preLoaderRoute: typeof SignedTTenantApprovalsApprovalRouteImport
+      parentRoute: typeof SignedTTenantApprovalsRoute
     }
     '/_signed/t/$tenant/w/$workspace': {
       id: '/_signed/t/$tenant/w/$workspace'
@@ -335,6 +392,22 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface SignedTTenantApprovalsRouteChildren {
+  SignedTTenantApprovalsApprovalRoute: typeof SignedTTenantApprovalsApprovalRoute
+  SignedTTenantApprovalsIndexRoute: typeof SignedTTenantApprovalsIndexRoute
+}
+
+const SignedTTenantApprovalsRouteChildren: SignedTTenantApprovalsRouteChildren =
+  {
+    SignedTTenantApprovalsApprovalRoute: SignedTTenantApprovalsApprovalRoute,
+    SignedTTenantApprovalsIndexRoute: SignedTTenantApprovalsIndexRoute,
+  }
+
+const SignedTTenantApprovalsRouteWithChildren =
+  SignedTTenantApprovalsRoute._addFileChildren(
+    SignedTTenantApprovalsRouteChildren,
+  )
+
 interface SignedTTenantWWorkspaceRouteChildren {
   SignedTTenantWWorkspaceSplatRoute: typeof SignedTTenantWWorkspaceSplatRoute
   SignedTTenantWWorkspaceProposalsRoute: typeof SignedTTenantWWorkspaceProposalsRoute
@@ -373,12 +446,14 @@ const SignedTTenantWWorkspaceRouteWithChildren =
 
 interface SignedTTenantRouteChildren {
   SignedTTenantSplatRoute: typeof SignedTTenantSplatRoute
+  SignedTTenantApprovalsRoute: typeof SignedTTenantApprovalsRouteWithChildren
   SignedTTenantIndexRoute: typeof SignedTTenantIndexRoute
   SignedTTenantWWorkspaceRoute: typeof SignedTTenantWWorkspaceRouteWithChildren
 }
 
 const SignedTTenantRouteChildren: SignedTTenantRouteChildren = {
   SignedTTenantSplatRoute: SignedTTenantSplatRoute,
+  SignedTTenantApprovalsRoute: SignedTTenantApprovalsRouteWithChildren,
   SignedTTenantIndexRoute: SignedTTenantIndexRoute,
   SignedTTenantWWorkspaceRoute: SignedTTenantWWorkspaceRouteWithChildren,
 }

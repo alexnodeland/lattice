@@ -136,6 +136,13 @@ export const keys = {
      */
     catalog: () => ["grantr", "~catalog"] as const,
     keyring: (tenant: string) => [...keys.grantr.access(tenant), "keys"] as const,
+    /** Every approval read in a tenant, which an answer there makes stale. */
+    approvals: (tenant: string) => [...keys.grantr.tenant(tenant), "approvals"] as const,
+    /** The approvals pending in a tenant that the reader may answer. */
+    approvalList: (tenant: string) => [...keys.grantr.approvals(tenant), "list"] as const,
+    /** One approval, as it stands, for one who may answer it or the person it was asked for. */
+    approval: (tenant: string, id: string) =>
+      [...keys.grantr.approvals(tenant), "detail", id] as const,
     /** The deployment's audit log, as the signed-in operator, `user`, reads it. */
     deploymentAudit: (user: string) => ["grantr", "deployment", "audit", user] as const,
     /** A tenant's audit log, as a filter keeps it: a change to access there adds to it. */
@@ -850,6 +857,36 @@ export function createQueries(api: Api) {
               api.grantr.GET("/grantr/v1/tenants/{tenant}/keys", {
                 ...named(tenant),
                 params: { path: { tenant } },
+              }),
+            ),
+        }),
+      /**
+       * The approvals pending in the tenant that the caller may answer, oldest first, from every
+       * workspace: those whose answerers they are among (grantr ADR-0040).
+       */
+      approvals: (tenant: string) =>
+        queryOptions({
+          queryKey: keys.grantr.approvalList(tenant),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/approvals", {
+                ...named(tenant),
+                params: { path: { tenant } },
+              }),
+            ),
+        }),
+      /**
+       * One approval as it stands, whatever its state, for one who may answer it or the person
+       * it was asked for; to anyone else, and in another tenant, it isn't there (404).
+       */
+      approval: (tenant: string, id: string) =>
+        queryOptions({
+          queryKey: keys.grantr.approval(tenant, id),
+          queryFn: () =>
+            body(
+              api.grantr.GET("/grantr/v1/tenants/{tenant}/approvals/{approval}", {
+                ...named(tenant),
+                params: { path: { tenant, approval: id } },
               }),
             ),
         }),

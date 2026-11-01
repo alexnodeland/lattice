@@ -27,6 +27,7 @@ from lattice_core.capabilities import (
     Scope,
     SessionCaller,
     ToolResult,
+    Via,
 )
 from lattice_core.enforcement import (
     STEPS,
@@ -435,6 +436,34 @@ async def test_an_approval_for_another_call_is_refused() -> None:
         await built.call(approval="apr_1", arguments={"to": "everyone@example.com"})
     with pytest.raises(WrongApproval):
         await built.call("mail.draft", approval="apr_1")
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"scope": Scope(tenant_id="globex", workspace_id="docs")},
+        {"scope": Scope(tenant_id="acme", workspace_id="ops")},
+        {"caller": RunCaller(id="run_2", agent="mailer", on_behalf_of="alex")},
+        {"caller": PersonCaller(id="alex")},
+        {"via": Via(connection_id="con_1", client_name="Claude", surface="mcp")},
+    ],
+    ids=["another tenant", "another workspace", "another run", "the person", "a client"],
+)
+async def test_an_approval_asked_by_another_caller_lets_nothing_through(
+    changes: dict[str, Any],
+) -> None:
+    sam = Answerers(subjects=frozenset({"sam"}))
+    built = Built(capability(), approvals=Policy(sam), results={"mail.send": ToolResult()})
+    with pytest.raises(ApprovalPending):
+        await built.call()
+    yes = Answer(approved=True, arguments_digest=arguments_digest(ARGUMENTS), surface="portalr")
+    await built.store.answer("apr_1", yes, subject=Subject(id="sam"))
+    with pytest.raises(WrongApproval, match="apr_1 was asked by another caller"):
+        await built.call(approval="apr_1", **changes)
+    assert built.provider.calls == []
+    assert (await built.store.get("apr_1")).taken_at is None, "still there for its own call"
+    await built.call(approval="apr_1")
+    assert len(built.provider.calls) == 1
 
 
 async def test_a_plan_that_covers_the_call_lets_it_go_ahead_without_asking() -> None:

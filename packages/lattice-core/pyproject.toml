@@ -44,6 +44,8 @@ litellm = ["pydantic-ai-slim[openai]>=2.51", "httpx2>=2.7", "opentelemetry-api>=
 # The agents bridge offers capabilities as a toolset rebuilt at each run step, and defers a call for
 # an approval with ApprovalRequired's metadata, given back as the call resumes.
 agents = ["pydantic-ai-slim>=2.53"]
+# The conformance harness under pytest, for an adapter's own CI: a parametrized case per check.
+conformance = ["pytest>=8.4"]
 
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/lattice-core/"

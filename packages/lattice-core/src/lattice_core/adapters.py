@@ -12,7 +12,7 @@ The operator chooses which installed adapter answers each port; the application 
 integrations an adapter adds with :data:`~lattice_core.integrations.KNOWN` through
 :func:`integrations`, so they exist only while it is installed, and refuses at startup an
 adapter whose ``implements`` doesn't cover the port's version (:func:`require`). The
-conformance harness that checks an adapter against its port is not declared here yet.
+conformance harness that checks an adapter against its port is :mod:`lattice_core.conformance`.
 
 The contract's version is :data:`CONTRACT`. Its JSON Schema is an :class:`AdapterManifest`'s,
 the declarative part of a spec that portalr's admin shows, which :func:`contract_schema`

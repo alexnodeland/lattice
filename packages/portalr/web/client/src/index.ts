@@ -8,6 +8,16 @@
 
 export { changedAccess } from "./access";
 export { allowedIn, workspaceOf } from "./allowed";
+export {
+  type Approval,
+  answeredBy,
+  approvalPage,
+  askedBy,
+  askedFor,
+  changedApprovals,
+  confirmPage,
+  peopleIn,
+} from "./approvals";
 export type * as Artifactr from "./artifactr";
 export { type ArtifactrStream, artifactr } from "./artifactr";
 export { type Answer, createCommands, orThrow, type Refusal, refusal } from "./commands";

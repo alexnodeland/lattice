@@ -7,6 +7,7 @@ import { Route as SignedRouteImport } from './routes/_signed'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SignedIndexRouteImport } from './routes/_signed/index'
 import { Route as SignedDeploymentRouteImport } from './routes/_signed/deployment'
+import { Route as SignedConfirmApprovalRouteImport } from './routes/_signed/confirm/$approval'
 import { Route as SignedDeploymentIndexRouteImport } from './routes/_signed/deployment/index'
 import { Route as SignedDeploymentAuditRouteImport } from './routes/_signed/deployment/audit'
 import { Route as SignedDeploymentTenantsRouteImport } from './routes/_signed/deployment/tenants'
@@ -49,6 +50,11 @@ const SignedIndexRoute = SignedIndexRouteImport.update({
 const SignedDeploymentRoute = SignedDeploymentRouteImport.update({
   id: '/deployment',
   path: '/deployment',
+  getParentRoute: () => SignedRoute,
+} as any)
+const SignedConfirmApprovalRoute = SignedConfirmApprovalRouteImport.update({
+  id: '/confirm/$approval',
+  path: '/confirm/$approval',
   getParentRoute: () => SignedRoute,
 } as any)
 const SignedDeploymentIndexRoute = SignedDeploymentIndexRouteImport.update({
@@ -184,6 +190,7 @@ export interface FileRoutesByFullPath {
   '/': typeof SignedIndexRoute
   '/sign-in': typeof SignInRoute
   '/deployment': typeof SignedDeploymentRouteWithChildren
+  '/confirm/$approval': typeof SignedConfirmApprovalRoute
   '/deployment/audit': typeof SignedDeploymentAuditRoute
   '/deployment/tenants': typeof SignedDeploymentTenantsRoute
   '/deployment/tools': typeof SignedDeploymentToolsRoute
@@ -212,6 +219,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/sign-in': typeof SignInRoute
   '/': typeof SignedIndexRoute
+  '/confirm/$approval': typeof SignedConfirmApprovalRoute
   '/deployment/audit': typeof SignedDeploymentAuditRoute
   '/deployment/tenants': typeof SignedDeploymentTenantsRoute
   '/deployment/tools': typeof SignedDeploymentToolsRoute
@@ -241,6 +249,7 @@ export interface FileRoutesById {
   '/sign-in': typeof SignInRoute
   '/_signed/deployment': typeof SignedDeploymentRouteWithChildren
   '/_signed/': typeof SignedIndexRoute
+  '/_signed/confirm/$approval': typeof SignedConfirmApprovalRoute
   '/_signed/deployment/audit': typeof SignedDeploymentAuditRoute
   '/_signed/deployment/tenants': typeof SignedDeploymentTenantsRoute
   '/_signed/deployment/tools': typeof SignedDeploymentToolsRoute
@@ -272,6 +281,7 @@ export interface FileRouteTypes {
     | '/'
     | '/sign-in'
     | '/deployment'
+    | '/confirm/$approval'
     | '/deployment/audit'
     | '/deployment/tenants'
     | '/deployment/tools'
@@ -300,6 +310,7 @@ export interface FileRouteTypes {
   to:
     | '/sign-in'
     | '/'
+    | '/confirm/$approval'
     | '/deployment/audit'
     | '/deployment/tenants'
     | '/deployment/tools'
@@ -328,6 +339,7 @@ export interface FileRouteTypes {
     | '/sign-in'
     | '/_signed/deployment'
     | '/_signed/'
+    | '/_signed/confirm/$approval'
     | '/_signed/deployment/audit'
     | '/_signed/deployment/tenants'
     | '/_signed/deployment/tools'
@@ -387,6 +399,13 @@ declare module '@tanstack/react-router' {
       path: '/deployment'
       fullPath: '/deployment'
       preLoaderRoute: typeof SignedDeploymentRouteImport
+      parentRoute: typeof SignedRoute
+    }
+    '/_signed/confirm/$approval': {
+      id: '/_signed/confirm/$approval'
+      path: '/confirm/$approval'
+      fullPath: '/confirm/$approval'
+      preLoaderRoute: typeof SignedConfirmApprovalRouteImport
       parentRoute: typeof SignedRoute
     }
     '/_signed/deployment/': {
@@ -637,12 +656,14 @@ const SignedTTenantRouteWithChildren = SignedTTenantRoute._addFileChildren(
 interface SignedRouteChildren {
   SignedDeploymentRoute: typeof SignedDeploymentRouteWithChildren
   SignedIndexRoute: typeof SignedIndexRoute
+  SignedConfirmApprovalRoute: typeof SignedConfirmApprovalRoute
   SignedTTenantRoute: typeof SignedTTenantRouteWithChildren
 }
 
 const SignedRouteChildren: SignedRouteChildren = {
   SignedDeploymentRoute: SignedDeploymentRouteWithChildren,
   SignedIndexRoute: SignedIndexRoute,
+  SignedConfirmApprovalRoute: SignedConfirmApprovalRoute,
   SignedTTenantRoute: SignedTTenantRouteWithChildren,
 }
 

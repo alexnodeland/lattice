@@ -26,6 +26,8 @@ type CreatedTenant = Portalr["schemas"]["CreatedTenant"];
 type IntegrationState = Grantr["schemas"]["IntegrationState"];
 type SettingState = Grantr["schemas"]["SettingState"];
 type Checkout = Files["schemas"]["Checkout"];
+type Approval = Grantr["schemas"]["ApprovalView"];
+type ApprovalSurface = Grantr["schemas"]["ApprovalAnswer"]["surface"];
 
 /** A command's answer: carried out, with what the server answered, or refused, with each reason. */
 export type Answer<R = Result> = { readonly outcome: "done"; readonly result: R } | Refusal;
@@ -257,6 +259,29 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
         answer(
           api.grantr.DELETE("/grantr/v1/tenants/{tenant}/keys/{key_id}", {
             ...inTenant(tenant, { key_id: key }),
+          }),
+        ),
+      /**
+       * Answer an approval as the caller, on the page it is answered on: `portalr`, its own page,
+       * or `portalr:confirm`, admin's confirm page (grantr ADR-0040). The answer binds to the
+       * arguments the person was shown, by their digest, so it is refused if the call's were
+       * others (409). The answer is the approval after it, settled.
+       */
+      answerApproval: (
+        tenant: string,
+        approval: Approval,
+        given: { readonly approved: boolean; readonly reason?: string | undefined },
+        surface: ApprovalSurface,
+      ): Promise<Answer<Approval>> =>
+        answer(
+          api.grantr.POST("/grantr/v1/tenants/{tenant}/approvals/{approval}/answer", {
+            ...inTenant(tenant, { approval: approval.id }),
+            body: {
+              approved: given.approved,
+              arguments_digest: approval.arguments_digest,
+              reason: given.reason?.trim() || null,
+              surface,
+            },
           }),
         ),
     },

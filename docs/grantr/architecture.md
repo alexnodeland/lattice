@@ -119,7 +119,8 @@ An admin reads each list with the action of the command that changes it ([ADR-00
 - **`grantr:answer_approval`** is the action a policy names. Tenant owners and admins hold it, and a workspace's admins in their workspace. A person delegates answering by granting it, or a custom role that holds it.
 - **The checks an answer passes,** after who: an answer to other arguments than those shown is refused, and so is any scoped answer, since nothing offers a scope yet. An approval past its deadline takes no answer.
 - **`expire_due()` is the sweep:** in each tenant, in a transaction of its own, it expires every pending approval past its deadline.
-- **`withdraw`** closes a pending one when its run stops. **`pending(scope, subject)`** lists what a subject may answer in a workspace, oldest first. **`watch`** reads an approval every `poll` until it is settled.
+- **`withdraw`** closes a pending one when its run stops. **`pending(scope, subject)`** lists what a subject may answer in a workspace, oldest first, and **`answerable(tenant, subject)`** in every workspace of the tenant. **`watch`** reads an approval every `poll` until it is settled.
+- **`shown(id, subject)`** is an approval as it stands, whatever its state, to whoever may answer it and to the person it was asked for, while each is a member of its tenant; to anyone else it is unknown ([ADR-0040](adr/0040-approvals-over-the-admin-api-read-by-who-may-answer-them-answered-on-portalrs-pages.md)).
 
 ## Bindings
 
@@ -199,9 +200,10 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 | `GET /tenants/{tenant}/integrations`, `PUT /tenants/{tenant}/integrations/{key}` | Every integration as it is set on the tenant, and setting one with `{"on": true, false or null}`, `null` to unset; with `grantr:manage_integrations` on the tenant |
 | `GET /tenants/{tenant}/workspaces/{workspace}/integrations`, `PUT .../integrations/{key}` | The same in a workspace, with `grantr:manage_integrations` on it |
 | `GET /tenants/{tenant}/workspaces/{workspace}/enabled-integrations` | Whether each integration is on in the workspace, for whoever can open it |
+| `GET /tenants/{tenant}/approvals`, `GET .../approvals/{id}`, `POST .../approvals/{id}/answer` | The pending approvals the caller may answer, in every workspace or one (`workspace=`); one approval, for whoever may answer it or the person it was asked for; and an answer, `{approved, arguments_digest, reason, surface}`, on `portalr` or `portalr:confirm` ([ADR-0040](adr/0040-approvals-over-the-admin-api-read-by-who-may-answer-them-answered-on-portalrs-pages.md)) |
 | `GET`, `POST /tenants/{tenant}/bindings`; `DELETE /tenants/{tenant}/bindings/{id}` | The bindings reaching the tenant's workspaces, the operator's first (`workspace=` for one); binding a source's connection, `{workspace, source, connection, select, types, trust, options}`; and removing one; with `grantr:manage_bindings` on the tenant ([ADR-0041](adr/0041-bindings-stored-per-tenant-beside-the-operators-read-across-tenants-for-the-intake.md)) |
 
-Refusals keep the libraries' shapes, `{"type", "message"}`: 401 `unauthorized` without a caller, 403 `forbidden`, 422 `invalid`, and 400 `tenant_required` when a caller in several tenants names none. Its OpenAPI document is committed in `packages/grantr/schemas/grantr.openapi.json`; `moon run grantr:schema` regenerates it, and a test fails when it drifts.
+Refusals keep the libraries' shapes, `{"type", "message"}`: 401 `unauthorized` without a caller, 403 `forbidden`, 404 `not_found` for an approval the caller may not see, 409 `version_conflict` and `invalid_state`, 422 `invalid`, and 400 `tenant_required` when a caller in several tenants names none. Its OpenAPI document is committed in `packages/grantr/schemas/grantr.openapi.json`; `moon run grantr:schema` regenerates it, and a test fails when it drifts.
 
 ## In stackr's template
 

@@ -162,6 +162,74 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/grantr/v1/tenants/{tenant}/approvals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Approvals
+         * @description The approvals pending in the tenant that the caller may answer, oldest first.
+         */
+        get: operations["list_approvals_grantr_v1_tenants__tenant__approvals_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grantr/v1/tenants/{tenant}/approvals/{approval}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Approval
+         * @description An approval as it stands, for one who may answer it or the person it was asked for.
+         *
+         *     Anyone else is told it isn't there.
+         */
+        get: operations["read_approval_grantr_v1_tenants__tenant__approvals__approval__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grantr/v1/tenants/{tenant}/approvals/{approval}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer Approval
+         * @description Answer a pending approval as the caller, and return it settled.
+         *
+         *     The first answer wins: a later one, or one past the deadline, is a 409 (`invalid_state`),
+         *     and the approval, read again, shows the first. An answer to other arguments than the
+         *     approval's is a 409 (`version_conflict`). A caller who may see it but not answer it, or
+         *     not on that surface, is refused; a caller's own confirmation is answered on
+         *     `portalr:confirm` alone.
+         */
+        post: operations["answer_approval_grantr_v1_tenants__tenant__approvals__approval__answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/grantr/v1/tenants/{tenant}/audit": {
         parameters: {
             query?: never;
@@ -702,6 +770,131 @@ export interface components {
             kind: "agent";
         };
         /**
+         * AnswerGiven
+         * @description An approval's answer as grantr recorded it: who gave it, and when.
+         */
+        AnswerGiven: {
+            /**
+             * Approved
+             * @description Whether it approves the call.
+             */
+            approved: boolean;
+            /**
+             * Arguments Digest
+             * @description The digest of the arguments the person was shown; an answer to others is refused.
+             */
+            arguments_digest: string;
+            /**
+             * At
+             * Format: date-time
+             * @description When it was answered.
+             */
+            at: string;
+            /** @description Who answered. */
+            by: components["schemas"]["ApprovalAnswerer"];
+            /**
+             * Reason
+             * @description Why, in the person's words, if they gave one.
+             */
+            reason?: string | null;
+            /** @description How far it stands beyond its call, from the scopes the request offered, if at all. */
+            scope?: components["schemas"]["AnswerScope"] | null;
+            /**
+             * Surface
+             * @description The surface it was given on, such as ``portalr``, :data:`CONFIRM_SURFACE` or ``mcp``.
+             */
+            surface: string;
+        };
+        /**
+         * AnswerScope
+         * @description How far an answer stands beyond its own call: for a run or a session, for what patterns.
+         *
+         *     Raises:
+         *         ValueError: If it names no pattern.
+         */
+        AnswerScope: {
+            /**
+             * Expires At
+             * @description When it stops standing, if before the session or run ends.
+             */
+            expires_at?: string | null;
+            /**
+             * Patterns
+             * @description What it allows, from those the request offered, such as a command's prefix.
+             */
+            patterns: string[];
+            /**
+             * Within
+             * @description How long it stands: the code session's life or the run's.
+             * @enum {string}
+             */
+            within: "session" | "run";
+        };
+        /**
+         * Answerers
+         * @description Who may answer an approval.
+         *
+         *     Anyone who holds ``action`` may answer, or is named in ``subjects``, or is in one of
+         *     ``groups``. A person delegates by a grantr grant of the action, with an expiry, not by a
+         *     field here. A service principal answers only where it is named or holds the action itself,
+         *     and never a ``confirmation``.
+         *
+         *     Raises:
+         *         ValueError: If it names no one, ``action`` isn't a grantr action, or a confirmation
+         *             isn't one subject's alone.
+         */
+        Answerers: {
+            /**
+             * Action
+             * @description The grantr action whose holders may answer, such as ``grantr:answer_approval``.
+             */
+            action?: string | null;
+            /**
+             * Confirmation
+             * @description Whether it is the caller's own confirmation of an ``admin_high`` call: answered only by
+             *     the one subject named, on :data:`CONFIRM_SURFACE`, never by the client that called, by
+             *     elicitation or by a push action.
+             * @default false
+             */
+            confirmation: boolean;
+            /**
+             * Different Approver
+             * @description Whether the answer must come from someone other than the person who asked.
+             * @default false
+             */
+            different_approver: boolean;
+            /**
+             * Groups
+             * @description The ids of the groups whose members may answer.
+             * @default []
+             */
+            groups: string[];
+            /**
+             * Subjects
+             * @description The ids of the subjects who may answer.
+             * @default []
+             */
+            subjects: string[];
+        };
+        /**
+         * ApprovalAnswer
+         * @description An answer to an approval, as a person gives it in portalr.
+         */
+        ApprovalAnswer: {
+            /** Approved */
+            approved: boolean;
+            /** Arguments Digest */
+            arguments_digest: string;
+            /** Reason */
+            reason?: string | null;
+            /**
+             * Surface
+             * @default portalr
+             * @enum {string}
+             */
+            surface: "portalr" | "portalr:confirm";
+        };
+        /**
          * ApprovalAnswered
          * @description An approval was answered: the first answer, which settled it.
          */
@@ -717,6 +910,31 @@ export interface components {
              * @enum {string}
              */
             type: "approval_answered";
+        };
+        /**
+         * ApprovalAnswerer
+         * @description Who answered an approval: a person, or a service principal, by their grantr id.
+         *
+         *     lattice-core's answerer, named apart from grantr's own subjects in the API's document.
+         */
+        ApprovalAnswerer: {
+            /**
+             * Groups
+             * @description The ids of the groups it is a member of.
+             * @default []
+             */
+            groups: string[];
+            /**
+             * Id
+             * @description The subject's id.
+             */
+            id: string;
+            /**
+             * Service
+             * @description Whether it is a service principal rather than a person.
+             * @default false
+             */
+            service: boolean;
         };
         /**
          * ApprovalAsked
@@ -755,6 +973,89 @@ export interface components {
              * @enum {string}
              */
             type: "approval_closed";
+        };
+        ApprovalId: string;
+        /**
+         * ApprovalView
+         * @description An approval as it stands: lattice-core's ``Approval``, as the API's document names it.
+         *
+         *     Its fields are the approval's, which a test holds equal; only its answerer's model is named
+         *     apart from grantr's own subjects.
+         */
+        ApprovalView: {
+            /** @description The answer that settled it, if one did. */
+            answer?: components["schemas"]["AnswerGiven"] | null;
+            /** @description Who may answer. */
+            answerers: components["schemas"]["Answerers"];
+            /**
+             * Arguments Digest
+             * @description The digest of the call's arguments (:func:`arguments_digest`), which an answer binds to.
+             */
+            arguments_digest: string;
+            /**
+             * Asked At
+             * Format: date-time
+             * @description When it was asked.
+             */
+            asked_at: string;
+            /** @description Who called: a person, or an agent's run or a code session and the person it acts for. */
+            asked_by: components["schemas"]["Caller"];
+            /**
+             * Capability
+             * @description The name of the capability called.
+             */
+            capability: string;
+            /**
+             * Covers
+             * @description The listed actions a plan's approval pre-approves; empty for any other.
+             * @default []
+             */
+            covers: components["schemas"]["ListedAction"][];
+            /**
+             * Deadline
+             * Format: date-time
+             * @description When it expires unanswered.
+             */
+            deadline: string;
+            /** @description Its id. */
+            id: components["schemas"]["ApprovalId"];
+            /**
+             * Reason
+             * @description Why it expired or was withdrawn.
+             */
+            reason?: string | null;
+            /** @description Exactly what the call would do. */
+            rendering: components["schemas"]["Rendering"];
+            /** @description The tenant's workspace the call is made in. */
+            scope: components["schemas"]["Scope"];
+            /**
+             * Scopes Offered
+             * @description The patterns an answer's scope may name; empty, so no answer may carry a scope, unless
+             *     the capability offers some.
+             * @default []
+             */
+            scopes_offered: string[];
+            /**
+             * State
+             * @description Where it stands.
+             * @enum {string}
+             */
+            state: "pending" | "approved" | "denied" | "expired" | "withdrawn";
+            /**
+             * Taken At
+             * @description When the one call it lets through went ahead, if one has.
+             */
+            taken_at?: string | null;
+            /**
+             * Version
+             * @description The version of the capability called.
+             */
+            version: string;
+            /**
+             * @description The outside client the call came through, or None for lattice's own surfaces. A
+             *     different approver is never offered it there.
+             */
+            via?: components["schemas"]["Via"] | null;
         };
         /**
          * AuditEntry
@@ -887,6 +1188,7 @@ export interface components {
             /** Name */
             name: string;
         };
+        Caller: components["schemas"]["PersonCaller"] | components["schemas"]["RunCaller"] | components["schemas"]["SessionCaller"];
         /**
          * CapabilityCalled
          * @description A capability was called through lattice-core's enforcer: never its arguments or output.
@@ -1184,6 +1486,56 @@ export interface components {
             principal: components["schemas"]["ServicePrincipal"];
         };
         /**
+         * ListedAction
+         * @description An action a run's plan lists, which the plan's approval pre-approves.
+         *
+         *     ``digest`` covers the step, the capability's whole definition, the target and the calls
+         *     allowed, so a capability that changes (another major, tier or effects) is no longer covered.
+         *     Build one with :meth:`of`, which computes it.
+         *
+         *     Raises:
+         *         ValueError: If the capability's name isn't of :data:`~lattice_core.capabilities.NAME`'s
+         *             form, or the digest isn't a SHA-256.
+         */
+        ListedAction: {
+            /**
+             * Capability
+             * @description The capability's name.
+             */
+            capability: string;
+            /**
+             * Digest
+             * @description The SHA-256 of the step, the capability's definition, the target and ``max_calls``.
+             */
+            digest: string;
+            /**
+             * Major
+             * @description The capability's major version.
+             */
+            major: number;
+            /**
+             * Max Calls
+             * @description How many calls a run may make under it, or None for no limit beyond the run's.
+             */
+            max_calls?: number | null;
+            /**
+             * Step
+             * @description The id of the plan's step that calls it.
+             */
+            step: string;
+            /**
+             * @description The condition the call's arguments must meet, as its JSON (lattice RFC-0012), or None
+             *     for any arguments.
+             */
+            target?: components["schemas"]["JsonValue"];
+            /**
+             * Tier
+             * @description The capability's tier.
+             * @enum {string}
+             */
+            tier: "read" | "write" | "run_code" | "outbound";
+        };
+        /**
          * Me
          * @description The caller in one tenant: their roles on it, and the workspaces they can open.
          */
@@ -1288,7 +1640,47 @@ export interface components {
             owner: components["schemas"]["UserId"];
             tenant: components["schemas"]["TenantId"];
         };
+        /**
+         * PersonCaller
+         * @description A person calling for themselves, by their identity provider's id.
+         */
+        PersonCaller: {
+            /** Id */
+            id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "person";
+        };
         PrincipalId: string;
+        /**
+         * Rendering
+         * @description Exactly what a call would do, as a person is shown it before they answer.
+         *
+         *     Raises:
+         *         ValueError: If the title is empty, or neither a diff nor the arguments are given.
+         */
+        Rendering: {
+            /** @description The call's arguments, where no diff shows what it does. */
+            arguments?: components["schemas"]["JsonObject"] | null;
+            /**
+             * Diff
+             * @description The change it would make, as a unified diff, where it changes text.
+             */
+            diff?: string | null;
+            /**
+             * Summary
+             * @description More of what it does, where a line isn't enough.
+             * @default
+             */
+            summary: string;
+            /**
+             * Title
+             * @description What is asked, in a line: "Send the weekly report to finance@".
+             */
+            title: string;
+        };
         /**
          * Resource
          * @description A resource, by its kind, its workspace if it is in one, and its id if it is an item.
@@ -1395,6 +1787,42 @@ export interface components {
             workspace: components["schemas"]["WorkspaceId"];
         };
         /**
+         * RunCaller
+         * @description An agent's run, or a stored workflow's, calling as part of its work.
+         */
+        RunCaller: {
+            /**
+             * Agent
+             * @description The agent or stored workflow the run runs, whose tier ceiling applies.
+             */
+            agent: string;
+            /**
+             * Id
+             * @description The run's id.
+             */
+            id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "run";
+            /**
+             * On Behalf Of
+             * @description The id of the person the run acts for, if it acts for one.
+             */
+            on_behalf_of?: string | null;
+        };
+        /**
+         * Scope
+         * @description Where capabilities are offered and called: a tenant's workspace.
+         */
+        Scope: {
+            /** Tenant Id */
+            tenant_id: string;
+            /** Workspace Id */
+            workspace_id: string;
+        };
+        /**
          * ServicePrincipal
          * @description A tenant's non-human principal: an integration, an MCP client or the application.
          */
@@ -1405,6 +1833,27 @@ export interface components {
              * @enum {string}
              */
             kind: "service_principal";
+        };
+        /**
+         * SessionCaller
+         * @description A code session calling as part of its work.
+         */
+        SessionCaller: {
+            /**
+             * Id
+             * @description The session's id.
+             */
+            id: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "session";
+            /**
+             * On Behalf Of
+             * @description The id of the person the session acts for, if it acts for one.
+             */
+            on_behalf_of?: string | null;
         };
         /**
          * SettingChange
@@ -1577,6 +2026,31 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /**
+         * Via
+         * @description The outside client a call came through (lattice RFC-0014).
+         *
+         *     A provider builds its actor from it, the client acting for the caller, so grants are the
+         *     caller's own and audit names the client.
+         */
+        Via: {
+            /**
+             * Client Name
+             * @description The client's name, as audit shows it: "Alex via Claude".
+             */
+            client_name: string;
+            /**
+             * Connection Id
+             * @description The id of the connection the client called through.
+             */
+            connection_id: string;
+            /**
+             * Surface
+             * @description The protocol the client called through.
+             * @enum {string}
+             */
+            surface: "mcp" | "acp";
         };
         Wire: number | string[];
         WorkspaceId: string;
@@ -1850,6 +2324,108 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_approvals_grantr_v1_tenants__tenant__approvals_get: {
+        parameters: {
+            query?: {
+                /** @description Only those asked in this workspace; in every one if omitted. */
+                workspace?: components["schemas"]["WorkspaceId"] | null;
+            };
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalView"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_approval_grantr_v1_tenants__tenant__approvals__approval__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+                approval: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalView"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_approval_grantr_v1_tenants__tenant__approvals__approval__answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+                approval: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApprovalAnswer"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApprovalView"];
                 };
             };
             /** @description Validation Error */

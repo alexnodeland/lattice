@@ -60,6 +60,7 @@ const LABELS: Readonly<Record<string, string>> = {
   "connect-tools:blender": "Blender's tools",
   "agent-writes:direct": "Kinds the agent edits directly in Auto",
   "approve:tiers": "Tiers that need approval",
+  "approve-within": "Minutes an approval waits for an answer",
   "admin-high:different-approver": "Admin actions a second person approves",
 };
 

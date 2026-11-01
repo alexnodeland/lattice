@@ -36,9 +36,17 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     "telemetry": ({"grantr.core", "grantr.telemetry"}, {"opentelemetry", *OTEL_API}),
     "testing": ({"grantr.core", "grantr.testing"}, set()),
+    # The API reads and answers lattice-core's approvals, as the store keeps them.
     "fastapi": (
         {"grantr.core", "grantr.grants", "grantr.fastapi"},
-        {"fastapi", "starlette", "pydantic", "lattice_core.bindings"},
+        {
+            "fastapi",
+            "starlette",
+            "pydantic",
+            "lattice_core.approvals",
+            "lattice_core.bindings",
+            "lattice_core.capabilities",
+        },
     ),
     "sql": (
         {"grantr.core", "grantr.sql"},

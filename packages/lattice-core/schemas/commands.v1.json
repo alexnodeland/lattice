@@ -1,0 +1,279 @@
+{
+  "$defs": {
+    "Capability": {
+      "description": "A tool an agent can call, as its provider declares it.\n\nRaises:\n    ValueError: If the name isn't of :data:`NAME`'s form, the version isn't of\n        :data:`VERSION`'s, the description is empty, or a limit isn't a setting's key.",
+      "properties": {
+        "description": {
+          "description": "What it does, for the agent that picks it and the person who approves it.",
+          "title": "Description",
+          "type": "string"
+        },
+        "effects": {
+          "description": "What a call does that taint reads.",
+          "items": {
+            "enum": [
+              "reads_private",
+              "reads_untrusted",
+              "sends_out"
+            ],
+            "type": "string"
+          },
+          "title": "Effects",
+          "type": "array",
+          "uniqueItems": true
+        },
+        "gate": {
+          "$ref": "#/$defs/Gate",
+          "description": "The integration and the grantr action that gate it."
+        },
+        "input_schema": {
+          "$ref": "#/$defs/JsonObject",
+          "description": "The JSON Schema of its arguments."
+        },
+        "limits": {
+          "default": [],
+          "description": "The keys of the settings that limit it (lattice ADR-0030), such as\n``calls-per-hour:mcp-github``.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Limits",
+          "type": "array"
+        },
+        "name": {
+          "description": "Its provider, a dot and its tool: ``artifactr.edit_text``, ``mcp.github.create_issue``.",
+          "title": "Name",
+          "type": "string"
+        },
+        "output_schema": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/JsonObject"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The JSON Schema of its output, or None if it declares none."
+        },
+        "provider": {
+          "description": "The kind of provider that offers it.",
+          "enum": [
+            "command",
+            "connector_action",
+            "mcp_tool",
+            "code_session",
+            "workflow",
+            "builtin"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "reversibility": {
+          "description": "Whether a call can be undone.",
+          "enum": [
+            "none",
+            "undoable",
+            "compensable",
+            "irreversible"
+          ],
+          "title": "Reversibility",
+          "type": "string"
+        },
+        "risk_class": {
+          "anyOf": [
+            {
+              "const": "admin_high",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "A risk class beyond its tier, if it has one.",
+          "title": "Risk Class"
+        },
+        "tier": {
+          "description": "Its capability tier.",
+          "enum": [
+            "read",
+            "write",
+            "run_code",
+            "outbound"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "version": {
+          "description": "The tool's own semantic version: a new input field is a minor version.",
+          "title": "Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "description",
+        "input_schema",
+        "output_schema",
+        "provider",
+        "tier",
+        "effects",
+        "reversibility",
+        "gate"
+      ],
+      "title": "Capability",
+      "type": "object"
+    },
+    "Gate": {
+      "description": "What gates a capability: the integration it needs on, and the grantr action it needs.\n\nRaises:\n    ValueError: If ``integration`` isn't an integration key, or ``action`` isn't of\n        :data:`ACTION`'s form.",
+      "properties": {
+        "action": {
+          "description": "The grantr action the caller must hold, such as ``artifactr:edit_artifact``.",
+          "title": "Action",
+          "type": "string"
+        },
+        "different_approver": {
+          "default": false,
+          "description": "Whether an approval of a call must come from someone other than the caller.",
+          "title": "Different Approver",
+          "type": "boolean"
+        },
+        "integration": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "An integration's key (lattice ADR-0027), or None for a capability always installed.",
+          "title": "Integration"
+        }
+      },
+      "required": [
+        "integration",
+        "action"
+      ],
+      "title": "Gate",
+      "type": "object"
+    },
+    "JsonObject": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "type": "object"
+    },
+    "JsonValue": {},
+    "NotExposed": {
+      "description": "A command no outside client reaches, and why: what the parity test asks of it.\n\nRaises:\n    ValueError: If the reason is empty.",
+      "properties": {
+        "reason": {
+          "description": "Why it isn't a tool or a resource: \"approvals come from a person\".",
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
+      ],
+      "title": "NotExposed",
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "lattice's commands contract: an action a person can take in portalr, as an RFC-0011 capability with the toolset, exposure, route, resource and surfaces every surface offers it by.",
+  "properties": {
+    "capability": {
+      "$ref": "#/$defs/Capability",
+      "description": "The capability it is: its name, version, schemas, tier, effects, reversibility, gate,\nlimits and risk class (lattice RFC-0011). Its description is written for a model choosing a\ntool."
+    },
+    "exposure": {
+      "anyOf": [
+        {
+          "enum": [
+            "tool",
+            "resource",
+            "both"
+          ],
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/NotExposed"
+        }
+      ],
+      "description": "How an outside client reaches it, or why none does.",
+      "title": "Exposure"
+    },
+    "resource": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The URI template of a read exposed as a resource, such as\n``artifactr://{tenant}/{workspace}/artifacts/{artifact_id}``.",
+      "title": "Resource"
+    },
+    "route": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "portalr's path for a link to what it acts on, such as\n``/t/{tenant}/w/{workspace}/threads/{thread_id}``, or None for none.",
+      "title": "Route"
+    },
+    "surfaces": {
+      "default": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "description": "The surfaces it is offered on: every one, unless it is portalr's alone or the like.",
+      "items": {
+        "enum": [
+          "portalr",
+          "mcp",
+          "acp",
+          "webmcp"
+        ],
+        "type": "string"
+      },
+      "title": "Surfaces",
+      "type": "array",
+      "uniqueItems": true
+    },
+    "toolset": {
+      "description": "The one toolset it is offered in.",
+      "enum": [
+        "core",
+        "automations",
+        "research",
+        "code",
+        "files",
+        "feedback",
+        "admin"
+      ],
+      "title": "Toolset",
+      "type": "string"
+    }
+  },
+  "required": [
+    "capability",
+    "toolset",
+    "exposure",
+    "route"
+  ],
+  "title": "lattice.commands 1.0.0",
+  "type": "object"
+}

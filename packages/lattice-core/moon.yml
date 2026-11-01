@@ -12,6 +12,7 @@ tasks:
       && uv run python $workspaceRoot/scripts/generate.py schemas/approvals.v1.json lattice_core.contracts approvals
       && uv run python $workspaceRoot/scripts/generate.py schemas/bindings.v1.json lattice_core.contracts bindings
       && uv run python $workspaceRoot/scripts/generate.py schemas/capabilities.v1.json lattice_core.contracts capabilities
+      && uv run python $workspaceRoot/scripts/generate.py schemas/commands.v1.json lattice_core.contracts commands
       && uv run python $workspaceRoot/scripts/generate.py schemas/egress.v1.json lattice_core.contracts egress
       && uv run python $workspaceRoot/scripts/generate.py schemas/secrets.v1.json lattice_core.contracts secrets
     options:

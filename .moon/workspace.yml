@@ -12,6 +12,7 @@ projects:
   grantr: 'packages/grantr'
   stackr: 'packages/stackr'
   portalr: 'packages/portalr'
+  portr: 'packages/portr'
   client: 'packages/portalr/web/client'
   notices: 'packages/portalr/web/notices'
   ui: 'packages/portalr/web/ui'

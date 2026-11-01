@@ -43,7 +43,7 @@ STAGES: Final[tuple[tuple[str, ...], ...]] = (
     ("packages/lattice-core", "packages/evalr"),
     ("packages/artifactr", "packages/reflexr", "packages/grantr"),
     ("packages/relayr",),
-    ("packages/portalr",),
+    ("packages/portalr", "packages/portr"),
 )
 """The packages that ship a wheel, in the order they are published: each stage after the ones its
 packages require, and within a stage in any order."""

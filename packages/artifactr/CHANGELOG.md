@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.6.0...artifactr-v0.7.0) (2026-11-01)
+
+
+### Features
+
+* **artifactr:** a run paused on an enforcer's approval names it, and is answered in its store (RFC-0011) ([#1334](https://github.com/alexnodeland/lattice/issues/1334)) ([c2d6124](https://github.com/alexnodeland/lattice/commit/c2d61249bfb42738ad30d514757c859f6ab8384f))
+
 ## [0.6.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.5.0...artifactr-v0.6.0) (2026-11-01)
 
 

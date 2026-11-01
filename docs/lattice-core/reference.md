@@ -191,6 +191,13 @@ The `litellm` extra.
       show_root_heading: false
       show_root_toc_entry: false
 
+## lattice_core.bindings
+
+::: lattice_core.bindings
+    options:
+      show_root_heading: false
+      show_root_toc_entry: false
+
 ## lattice_core.taint
 
 ::: lattice_core.taint

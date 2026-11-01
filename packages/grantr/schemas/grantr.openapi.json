@@ -14,6 +14,202 @@
         "title": "Agent",
         "type": "object"
       },
+      "AnswerGiven": {
+        "description": "An approval's answer as grantr recorded it: who gave it, and when.",
+        "properties": {
+          "approved": {
+            "description": "Whether it approves the call.",
+            "title": "Approved",
+            "type": "boolean"
+          },
+          "arguments_digest": {
+            "description": "The digest of the arguments the person was shown; an answer to others is refused.",
+            "title": "Arguments Digest",
+            "type": "string"
+          },
+          "at": {
+            "description": "When it was answered.",
+            "format": "date-time",
+            "title": "At",
+            "type": "string"
+          },
+          "by": {
+            "$ref": "#/components/schemas/ApprovalAnswerer",
+            "description": "Who answered."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why, in the person's words, if they gave one.",
+            "title": "Reason"
+          },
+          "scope": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerScope"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How far it stands beyond its call, from the scopes the request offered, if at all."
+          },
+          "surface": {
+            "description": "The surface it was given on, such as ``portalr``, :data:`CONFIRM_SURFACE` or ``mcp``.",
+            "title": "Surface",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approved",
+          "arguments_digest",
+          "surface",
+          "by",
+          "at"
+        ],
+        "title": "AnswerGiven",
+        "type": "object"
+      },
+      "AnswerScope": {
+        "description": "How far an answer stands beyond its own call: for a run or a session, for what patterns.\n\nRaises:\n    ValueError: If it names no pattern.",
+        "properties": {
+          "expires_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it stops standing, if before the session or run ends.",
+            "title": "Expires At"
+          },
+          "patterns": {
+            "description": "What it allows, from those the request offered, such as a command's prefix.",
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Patterns",
+            "type": "array"
+          },
+          "within": {
+            "description": "How long it stands: the code session's life or the run's.",
+            "enum": [
+              "session",
+              "run"
+            ],
+            "title": "Within",
+            "type": "string"
+          }
+        },
+        "required": [
+          "within",
+          "patterns"
+        ],
+        "title": "AnswerScope",
+        "type": "object"
+      },
+      "Answerers": {
+        "description": "Who may answer an approval.\n\nAnyone who holds ``action`` may answer, or is named in ``subjects``, or is in one of\n``groups``. A person delegates by a grantr grant of the action, with an expiry, not by a\nfield here. A service principal answers only where it is named or holds the action itself,\nand never a ``confirmation``.\n\nRaises:\n    ValueError: If it names no one, ``action`` isn't a grantr action, or a confirmation\n        isn't one subject's alone.",
+        "properties": {
+          "action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The grantr action whose holders may answer, such as ``grantr:answer_approval``.",
+            "title": "Action"
+          },
+          "confirmation": {
+            "default": false,
+            "description": "Whether it is the caller's own confirmation of an ``admin_high`` call: answered only by\nthe one subject named, on :data:`CONFIRM_SURFACE`, never by the client that called, by\nelicitation or by a push action.",
+            "title": "Confirmation",
+            "type": "boolean"
+          },
+          "different_approver": {
+            "default": false,
+            "description": "Whether the answer must come from someone other than the person who asked.",
+            "title": "Different Approver",
+            "type": "boolean"
+          },
+          "groups": {
+            "default": [],
+            "description": "The ids of the groups whose members may answer.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Groups",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "subjects": {
+            "default": [],
+            "description": "The ids of the subjects who may answer.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Subjects",
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "title": "Answerers",
+        "type": "object"
+      },
+      "ApprovalAnswer": {
+        "description": "An answer to an approval, as a person gives it in portalr.",
+        "properties": {
+          "approved": {
+            "title": "Approved",
+            "type": "boolean"
+          },
+          "arguments_digest": {
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Arguments Digest",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "surface": {
+            "default": "portalr",
+            "enum": [
+              "portalr",
+              "portalr:confirm"
+            ],
+            "title": "Surface",
+            "type": "string"
+          }
+        },
+        "required": [
+          "approved",
+          "arguments_digest"
+        ],
+        "title": "ApprovalAnswer",
+        "type": "object"
+      },
       "ApprovalAnswered": {
         "description": "An approval was answered: the first answer, which settled it.",
         "properties": {
@@ -42,6 +238,37 @@
           "surface"
         ],
         "title": "ApprovalAnswered",
+        "type": "object"
+      },
+      "ApprovalAnswerer": {
+        "description": "Who answered an approval: a person, or a service principal, by their grantr id.\n\nlattice-core's answerer, named apart from grantr's own subjects in the API's document.",
+        "properties": {
+          "groups": {
+            "default": [],
+            "description": "The ids of the groups it is a member of.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Groups",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "id": {
+            "description": "The subject's id.",
+            "title": "Id",
+            "type": "string"
+          },
+          "service": {
+            "default": false,
+            "description": "Whether it is a service principal rather than a person.",
+            "title": "Service",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "title": "ApprovalAnswerer",
         "type": "object"
       },
       "ApprovalAsked": {
@@ -110,6 +337,153 @@
           "reason"
         ],
         "title": "ApprovalClosed",
+        "type": "object"
+      },
+      "ApprovalId": {
+        "type": "string"
+      },
+      "ApprovalView": {
+        "description": "An approval as it stands: lattice-core's ``Approval``, as the API's document names it.\n\nIts fields are the approval's, which a test holds equal; only its answerer's model is named\napart from grantr's own subjects.",
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerGiven"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The answer that settled it, if one did."
+          },
+          "answerers": {
+            "$ref": "#/components/schemas/Answerers",
+            "description": "Who may answer."
+          },
+          "arguments_digest": {
+            "description": "The digest of the call's arguments (:func:`arguments_digest`), which an answer binds to.",
+            "title": "Arguments Digest",
+            "type": "string"
+          },
+          "asked_at": {
+            "description": "When it was asked.",
+            "format": "date-time",
+            "title": "Asked At",
+            "type": "string"
+          },
+          "asked_by": {
+            "$ref": "#/components/schemas/Caller",
+            "description": "Who called: a person, or an agent's run or a code session and the person it acts for."
+          },
+          "capability": {
+            "description": "The name of the capability called.",
+            "title": "Capability",
+            "type": "string"
+          },
+          "covers": {
+            "default": [],
+            "description": "The listed actions a plan's approval pre-approves; empty for any other.",
+            "items": {
+              "$ref": "#/components/schemas/ListedAction"
+            },
+            "title": "Covers",
+            "type": "array"
+          },
+          "deadline": {
+            "description": "When it expires unanswered.",
+            "format": "date-time",
+            "title": "Deadline",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/ApprovalId",
+            "description": "Its id."
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Why it expired or was withdrawn.",
+            "title": "Reason"
+          },
+          "rendering": {
+            "$ref": "#/components/schemas/Rendering",
+            "description": "Exactly what the call would do."
+          },
+          "scope": {
+            "$ref": "#/components/schemas/Scope",
+            "description": "The tenant's workspace the call is made in."
+          },
+          "scopes_offered": {
+            "default": [],
+            "description": "The patterns an answer's scope may name; empty, so no answer may carry a scope, unless\nthe capability offers some.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Scopes Offered",
+            "type": "array"
+          },
+          "state": {
+            "description": "Where it stands.",
+            "enum": [
+              "pending",
+              "approved",
+              "denied",
+              "expired",
+              "withdrawn"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "taken_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the one call it lets through went ahead, if one has.",
+            "title": "Taken At"
+          },
+          "version": {
+            "description": "The version of the capability called.",
+            "title": "Version",
+            "type": "string"
+          },
+          "via": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Via"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The outside client the call came through, or None for lattice's own surfaces. A\ndifferent approver is never offered it there."
+          }
+        },
+        "required": [
+          "scope",
+          "capability",
+          "version",
+          "rendering",
+          "arguments_digest",
+          "asked_by",
+          "answerers",
+          "deadline",
+          "id",
+          "asked_at",
+          "state"
+        ],
+        "title": "ApprovalView",
         "type": "object"
       },
       "AuditEntry": {
@@ -298,6 +672,27 @@
         ],
         "title": "BuiltInRole",
         "type": "object"
+      },
+      "Caller": {
+        "discriminator": {
+          "mapping": {
+            "person": "#/components/schemas/PersonCaller",
+            "run": "#/components/schemas/RunCaller",
+            "session": "#/components/schemas/SessionCaller"
+          },
+          "propertyName": "kind"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/components/schemas/PersonCaller"
+          },
+          {
+            "$ref": "#/components/schemas/RunCaller"
+          },
+          {
+            "$ref": "#/components/schemas/SessionCaller"
+          }
+        ]
       },
       "CapabilityCalled": {
         "description": "A capability was called through lattice-core's enforcer: never its arguments or output.\n\nEvery call leaves one, refused, pending, failed or called (lattice ADR-0037, grantr\nADR-0039).",
@@ -871,6 +1266,13 @@
         "title": "IssuedKey",
         "type": "object"
       },
+      "JsonObject": {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+      },
+      "JsonValue": {},
       "KeyIssued": {
         "description": "A key was issued to a service principal.",
         "properties": {
@@ -935,6 +1337,69 @@
           "principal"
         ],
         "title": "KeyView",
+        "type": "object"
+      },
+      "ListedAction": {
+        "description": "An action a run's plan lists, which the plan's approval pre-approves.\n\n``digest`` covers the step, the capability's whole definition, the target and the calls\nallowed, so a capability that changes (another major, tier or effects) is no longer covered.\nBuild one with :meth:`of`, which computes it.\n\nRaises:\n    ValueError: If the capability's name isn't of :data:`~lattice_core.capabilities.NAME`'s\n        form, or the digest isn't a SHA-256.",
+        "properties": {
+          "capability": {
+            "description": "The capability's name.",
+            "title": "Capability",
+            "type": "string"
+          },
+          "digest": {
+            "description": "The SHA-256 of the step, the capability's definition, the target and ``max_calls``.",
+            "title": "Digest",
+            "type": "string"
+          },
+          "major": {
+            "description": "The capability's major version.",
+            "minimum": 0.0,
+            "title": "Major",
+            "type": "integer"
+          },
+          "max_calls": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "How many calls a run may make under it, or None for no limit beyond the run's.",
+            "title": "Max Calls"
+          },
+          "step": {
+            "description": "The id of the plan's step that calls it.",
+            "title": "Step",
+            "type": "string"
+          },
+          "target": {
+            "$ref": "#/components/schemas/JsonValue",
+            "description": "The condition the call's arguments must meet, as its JSON (lattice RFC-0012), or None\nfor any arguments."
+          },
+          "tier": {
+            "description": "The capability's tier.",
+            "enum": [
+              "read",
+              "write",
+              "run_code",
+              "outbound"
+            ],
+            "title": "Tier",
+            "type": "string"
+          }
+        },
+        "required": [
+          "step",
+          "capability",
+          "major",
+          "tier",
+          "digest"
+        ],
+        "title": "ListedAction",
         "type": "object"
       },
       "Me": {
@@ -1106,9 +1571,74 @@
         "title": "NewTenant",
         "type": "object"
       },
+      "PersonCaller": {
+        "description": "A person calling for themselves, by their identity provider's id.",
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "person",
+            "default": "person",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind"
+        ],
+        "title": "PersonCaller",
+        "type": "object"
+      },
       "PrincipalId": {
         "pattern": "^[^:~\\s]+$",
         "type": "string"
+      },
+      "Rendering": {
+        "description": "Exactly what a call would do, as a person is shown it before they answer.\n\nRaises:\n    ValueError: If the title is empty, or neither a diff nor the arguments are given.",
+        "properties": {
+          "arguments": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JsonObject"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The call's arguments, where no diff shows what it does."
+          },
+          "diff": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The change it would make, as a unified diff, where it changes text.",
+            "title": "Diff"
+          },
+          "summary": {
+            "default": "",
+            "description": "More of what it does, where a line isn't enough.",
+            "title": "Summary",
+            "type": "string"
+          },
+          "title": {
+            "description": "What is asked, in a line: \"Send the weekly report to finance@\".",
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title"
+        ],
+        "title": "Rendering",
+        "type": "object"
       },
       "Resource": {
         "description": "A resource, by its kind, its workspace if it is in one, and its id if it is an item.",
@@ -1314,6 +1844,65 @@
         "title": "RulePrincipal",
         "type": "object"
       },
+      "RunCaller": {
+        "description": "An agent's run, or a stored workflow's, calling as part of its work.",
+        "properties": {
+          "agent": {
+            "description": "The agent or stored workflow the run runs, whose tier ceiling applies.",
+            "title": "Agent",
+            "type": "string"
+          },
+          "id": {
+            "description": "The run's id.",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "run",
+            "default": "run",
+            "title": "Kind",
+            "type": "string"
+          },
+          "on_behalf_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The id of the person the run acts for, if it acts for one.",
+            "title": "On Behalf Of"
+          }
+        },
+        "required": [
+          "id",
+          "agent",
+          "kind"
+        ],
+        "title": "RunCaller",
+        "type": "object"
+      },
+      "Scope": {
+        "description": "Where capabilities are offered and called: a tenant's workspace.",
+        "properties": {
+          "tenant_id": {
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "workspace_id": {
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tenant_id",
+          "workspace_id"
+        ],
+        "title": "Scope",
+        "type": "object"
+      },
       "ServicePrincipal": {
         "description": "A tenant's non-human principal: an integration, an MCP client or the application.",
         "properties": {
@@ -1331,6 +1920,40 @@
           "id"
         ],
         "title": "ServicePrincipal",
+        "type": "object"
+      },
+      "SessionCaller": {
+        "description": "A code session calling as part of its work.",
+        "properties": {
+          "id": {
+            "description": "The session's id.",
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "const": "session",
+            "default": "session",
+            "title": "Kind",
+            "type": "string"
+          },
+          "on_behalf_of": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The id of the person the session acts for, if it acts for one.",
+            "title": "On Behalf Of"
+          }
+        },
+        "required": [
+          "id",
+          "kind"
+        ],
+        "title": "SessionCaller",
         "type": "object"
       },
       "SettingChange": {
@@ -1792,6 +2415,37 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "Via": {
+        "description": "The outside client a call came through (lattice RFC-0014).\n\nA provider builds its actor from it, the client acting for the caller, so grants are the\ncaller's own and audit names the client.",
+        "properties": {
+          "client_name": {
+            "description": "The client's name, as audit shows it: \"Alex via Claude\".",
+            "title": "Client Name",
+            "type": "string"
+          },
+          "connection_id": {
+            "description": "The id of the connection the client called through.",
+            "title": "Connection Id",
+            "type": "string"
+          },
+          "surface": {
+            "description": "The protocol the client called through.",
+            "enum": [
+              "mcp",
+              "acp"
+            ],
+            "title": "Surface",
+            "type": "string"
+          }
+        },
+        "required": [
+          "connection_id",
+          "client_name",
+          "surface"
+        ],
+        "title": "Via",
         "type": "object"
       },
       "Wire": {
@@ -2317,6 +2971,179 @@
           }
         },
         "summary": "Delete Tenant"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/approvals": {
+      "get": {
+        "description": "The approvals pending in the tenant that the caller may answer, oldest first.",
+        "operationId": "list_approvals_grantr_v1_tenants__tenant__approvals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only those asked in this workspace; in every one if omitted.",
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/WorkspaceId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only those asked in this workspace; in every one if omitted.",
+              "title": "Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ApprovalView"
+                  },
+                  "title": "Response List Approvals Grantr V1 Tenants  Tenant  Approvals Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Approvals"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/approvals/{approval}": {
+      "get": {
+        "description": "An approval as it stands, for one who may answer it or the person it was asked for.\n\nAnyone else is told it isn't there.",
+        "operationId": "read_approval_grantr_v1_tenants__tenant__approvals__approval__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "approval",
+            "required": true,
+            "schema": {
+              "title": "Approval",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Approval"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/approvals/{approval}/answer": {
+      "post": {
+        "description": "Answer a pending approval as the caller, and return it settled.\n\nThe first answer wins: a later one, or one past the deadline, is a 409 (`invalid_state`),\nand the approval, read again, shows the first. An answer to other arguments than the\napproval's is a 409 (`version_conflict`). A caller who may see it but not answer it, or\nnot on that surface, is refused; a caller's own confirmation is answered on\n`portalr:confirm` alone.",
+        "operationId": "answer_approval_grantr_v1_tenants__tenant__approvals__approval__answer_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "approval",
+            "required": true,
+            "schema": {
+              "title": "Approval",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApprovalAnswer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApprovalView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer Approval"
       }
     },
     "/grantr/v1/tenants/{tenant}/audit": {

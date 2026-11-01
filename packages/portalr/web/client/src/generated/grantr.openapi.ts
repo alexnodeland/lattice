@@ -726,9 +726,9 @@ export interface components {
             seq: number;
             tenant: components["schemas"]["TenantId"] | null;
         };
-        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"] | components["schemas"]["IntegrationSet"] | components["schemas"]["SettingSet"] | components["schemas"]["ApprovalAsked"] | components["schemas"]["ApprovalAnswered"] | components["schemas"]["ApprovalClosed"];
+        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"] | components["schemas"]["IntegrationSet"] | components["schemas"]["SettingSet"] | components["schemas"]["ApprovalAsked"] | components["schemas"]["ApprovalAnswered"] | components["schemas"]["ApprovalClosed"] | components["schemas"]["CapabilityCalled"];
         /** @enum {string} */
-        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted" | "integration_set" | "setting_set" | "approval_asked" | "approval_answered" | "approval_closed";
+        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted" | "integration_set" | "setting_set" | "approval_asked" | "approval_answered" | "approval_closed" | "capability_called";
         /**
          * BuiltInRole
          * @description A built-in role a tenant's admins grant, and the kinds of resource it may be granted on.
@@ -738,6 +738,66 @@ export interface components {
             kinds: components["schemas"]["ResourceKind"][];
             /** Name */
             name: string;
+        };
+        /**
+         * CapabilityCalled
+         * @description A capability was called through lattice-core's enforcer: never its arguments or output.
+         *
+         *     Every call leaves one, refused, pending, failed or called (lattice ADR-0037, grantr
+         *     ADR-0039).
+         */
+        CapabilityCalled: {
+            /** Approval */
+            approval?: string | null;
+            /** Arguments Digest */
+            arguments_digest: string;
+            /**
+             * Called At
+             * Format: date-time
+             */
+            called_at: string;
+            /** Caller */
+            caller: string;
+            /** Capability */
+            capability: string;
+            /** Client */
+            client?: string | null;
+            /** Correlation Id */
+            correlation_id: string;
+            /**
+             * Outcome
+             * @enum {string}
+             */
+            outcome: "called" | "failed" | "refused" | "pending";
+            /** Steps */
+            steps: components["schemas"]["CapabilityStep"][];
+            /** Surface */
+            surface: string;
+            /** Tenant */
+            tenant?: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "capability_called";
+            /** Version */
+            version: string | null;
+            workspace: components["schemas"]["WorkspaceId"];
+        };
+        /**
+         * CapabilityStep
+         * @description A step of the enforcement path a call passed, or was stopped at (lattice ADR-0037).
+         */
+        CapabilityStep: {
+            /** Name */
+            name: string;
+            /**
+             * Note
+             * @default
+             */
+            note: string;
+            /** Passed */
+            passed: boolean;
         };
         /**
          * CatalogView

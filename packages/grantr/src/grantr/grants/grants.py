@@ -84,8 +84,10 @@ from grantr.core.roles import MANAGE_INTEGRATIONS, MANAGE_SETTINGS, RESTRICT, RU
 from grantr.core.settings import state as setting_state
 from grantr.core.settings import wire
 from grantr.grants.approvals import POLL, GrantrApprovals, Record
+from grantr.grants.calls import CallAudit, subject_of_call
 from grantr.grants.storage import Reads, Storage, Transaction
 from grantr.telemetry import SLOW_CHECK, Reason, Telemetry
+from lattice_core.capabilities import CallContext
 from lattice_core.integrations import KNOWN, Integration
 from lattice_core.settings import KNOWN_SETTINGS, Setting, Value, floor, operator_layer
 
@@ -1114,6 +1116,39 @@ class Grants:
             yield tx, record
         for entry in entries:
             self._telemetry.audited(entry)
+
+    # ─── the enforcer's ports ────────────────────────────────────────────────
+
+    def authorize(
+        self, subject_of: Callable[[CallContext], Subject] = subject_of_call
+    ) -> Callable[[CallContext, str], Awaitable[bool]]:
+        """lattice-core's ``Authorize``: whether a call's caller holds an action in its workspace.
+
+        The enforcer asks it for the capability's gate (lattice ADR-0037). It is :meth:`check` on
+        the call's workspace, as the subject the call is checked as; a call that names an id no
+        tenant can have holds nothing (grantr ADR-0039).
+
+        Args:
+            subject_of: The subject a call is checked as: the person it is or acts for, or the
+                agent, by default.
+        """
+
+        async def authorize(context: CallContext, action: str) -> bool:
+            tenant = context.scope.tenant_id
+            if not TENANT_ID.fullmatch(tenant):
+                return False
+            workspace = Resource(kind="workspace", workspace=context.scope.workspace_id)
+            return await self.check(tenant, subject_of(context), action, workspace)
+
+        return authorize
+
+    def capability_audit(self) -> CallAudit:
+        """lattice-core's ``Audit``: every call through the enforcer, in grantr's audit log.
+
+        Each is a ``capability_called`` entry in its tenant's log, or in the deployment's where
+        it names a tenant that doesn't exist (grantr ADR-0039).
+        """
+        return CallAudit(self._storage, change=self._change)
 
     # ─── approvals ───────────────────────────────────────────────────────────
 

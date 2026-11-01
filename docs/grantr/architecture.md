@@ -16,6 +16,7 @@ grantr decides who may do what in a tenant. artifactr and reflexr ask it, throug
 | `grantr.sql` | `SqlStorage`, its tables and Alembic migrations, and `create_sqlite_engine`. The `sql`, `sqlite` and `postgres` extras | `grantr.core`, pydantic, SQLAlchemy, Alembic, lattice-core's `approvals`, whose approvals it stores, and its `sql`, which holds the SQLite engine, the tenant session and the session helpers the libraries share ([lattice ADR-0018](../adr/0018-lattice-core-what-the-libraries-share.md)) |
 | `grantr.testing` | `matrix`, every role against every action, as a table to commit | `grantr.core` |
 | `grantr.fastapi` | `grantr_router`, the admin API, and its OpenAPI document. The `fastapi` extra | `grantr.core`, `grantr.grants`, FastAPI |
+| `grantr.commands` | `CATALOG`, every action on access as a lattice-core command, its document, and `provider(grants)`, which runs each as the person a call is for ([ADR-0042](adr/0042-grantrs-commands-every-action-on-access-a-command-called-as-the-person-it-is-for.md)) | `grantr.core`, `grantr.grants`, pydantic, and lattice-core's `commands`, `capabilities` and `approvals` |
 
 `tests/test_layering.py` holds each package to its column, and keeps I/O out of the core.
 
@@ -173,6 +174,16 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 - **Approvals are `grantr_approvals`,** by tenant and id, with the state and the workspace as columns, indexed after the tenant for the reads of pending approvals, and the approval as JSON. Migration 0008 creates it, with the tenant policy ([ADR-0038](adr/0038-approvals-stored-per-tenant-answered-by-grantrs-subjects-groups-and-grants.md)).
 - **Every database call is awaited to its end,** even when its caller is cancelled, as in the libraries' SQL storage.
 - **Row-level security is an option** ([ADR-0026](adr/0026-row-level-security-under-the-scoping.md)). With `row_level_security=True`, each transaction names its tenant, or `~deployment`, in `lattice.tenant_id`, and the policies migration 0003 creates on PostgreSQL keep every command to its tenant's rows, and let it read the deployment's grants and group members besides. `migrate(application_role=...)` grants a role that owns nothing the tables. `tenant_grants`, `key` and `tenants`, which span tenants, go to `across_tenants`, an engine as the tables' owner, and nothing else does.
+
+## Commands
+
+`grantr.commands.CATALOG` declares every action on access as a lattice-core command (lattice [ADR-0041](../adr/0041-the-command-declaration-a-capability-with-its-toolset-exposure-route-and-surfaces-in-a-static-catalog.md), [ADR-0042](adr/0042-grantrs-commands-every-action-on-access-a-command-called-as-the-person-it-is-for.md)), named `grantr.<name>`, which portalr, outside clients and other libraries' agents reach through the enforcer.
+
+- **Each is gated by the action grantr's own method asks,** a list by the action that manages it, and every grantr action but `grantr:create_tenant` (portalr's) is some command's gate. Each is in the `admin` toolset, but the approvals' reads, in `core`, and links to its page in portalr's admin.
+- **`admin_high`:** `grantr.delete_tenant`, `grantr.revoke_key`, `grantr.grant_on_tenant` (granting on a workspace or item is `grantr.grant`), `grantr.define_role` and `grantr.grant_operator`, each confirmed by its caller.
+- **Not exposed:** `grantr.answer_approval` and `grantr.issue_key`, portalr's alone.
+- **`grantr:read_approvals`** gates `grantr.list_approvals` and `grantr.read_approval`, and every member holds it.
+- **`provider(grants)`** is lattice-core's `Provider`: each call runs as the person it is for (`subject_of_call`), in its tenant, so grantr checks it again, and answers JSON text. The catalog is `schemas/grantr.commands.json`, which `grantr:schema` regenerates.
 
 ## The admin API
 

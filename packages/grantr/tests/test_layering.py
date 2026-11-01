@@ -34,6 +34,16 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
     ),
     "telemetry": ({"grantr.core", "grantr.telemetry"}, {"opentelemetry", *OTEL_API}),
+    # The catalog declares lattice-core's commands, and its provider calls Grants.
+    "commands": (
+        {"grantr.core", "grantr.grants", "grantr.commands"},
+        {
+            "pydantic",
+            "lattice_core.approvals",
+            "lattice_core.capabilities",
+            "lattice_core.commands",
+        },
+    ),
     "testing": ({"grantr.core", "grantr.testing"}, set()),
     # The API reads and answers lattice-core's approvals, as the store keeps them.
     "fastapi": (

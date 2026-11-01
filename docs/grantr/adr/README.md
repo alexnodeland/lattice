@@ -46,5 +46,6 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0038](0038-approvals-stored-per-tenant-answered-by-grantrs-subjects-groups-and-grants.md) | Approvals stored per tenant, answered by grantr's subjects, groups and grants | Accepted |
 | [0039](0039-the-enforcers-gate-and-audit-answered-by-grantr-each-call-as-the-person-it-is-for.md) | The enforcer's gate and audit answered by grantr, each call as the person it is for | Accepted |
 | [0040](0040-approvals-over-the-admin-api-read-by-who-may-answer-them-answered-on-portalrs-pages.md) | Approvals over the admin API, read by who may answer them, answered on portalr's pages | Accepted |
+| [0042](0042-grantrs-commands-every-action-on-access-a-command-called-as-the-person-it-is-for.md) | grantr's commands: every action on access a command, called as the person it is for | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

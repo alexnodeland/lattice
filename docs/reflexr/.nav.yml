@@ -102,6 +102,8 @@ nav:
     - adr/0063-a-stored-rules-history.md
     - adr/0064-the-protocol-schema-names-reflexrs-own-events.md
     - adr/0065-an-access-token-redacted-from-span-urls.md
+    - adr/0066-an-epoch-fences-each-attempt.md
+    - adr/0067-reflexrs-commands-every-action-a-command-or-listed-with-its-reason.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

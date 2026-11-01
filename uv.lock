@@ -2325,7 +2325,7 @@ docs = [
 
 [[package]]
 name = "lattice-core-ai"
-version = "0.6.0"
+version = "0.6.1"
 source = { editable = "packages/lattice-core" }
 dependencies = [
     { name = "pydantic" },
@@ -4167,7 +4167,7 @@ wheels = [
 
 [[package]]
 name = "reflexr"
-version = "0.2.1"
+version = "0.2.2"
 source = { editable = "packages/reflexr" }
 dependencies = [
     { name = "cronsim" },

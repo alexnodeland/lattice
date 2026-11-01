@@ -521,7 +521,7 @@ class Enforcer:
     ) -> ApprovalId | None:
         """Step 6: an approval answered, a plan that covers the call, or a new approval."""
         if approval is not None:
-            await self._answered(approval, capability, digest)
+            await self._answered(approval, capability, digest, context)
             steps.append(Step(name="approval", passed=True, note=approval))
             return approval
         answerers = await self._approvals.needed(capability, context)
@@ -556,11 +556,24 @@ class Enforcer:
         )
         raise ApprovalPending(asked.id)
 
-    async def _answered(self, id: ApprovalId, capability: Capability, digest: str) -> None:
-        """Check that an approval given is this call's and approved, and take it for the call."""
+    async def _answered(
+        self, id: ApprovalId, capability: Capability, digest: str, context: CallContext
+    ) -> None:
+        """Check that an approval given is this call's and approved, and take it for the call.
+
+        This call's is one asked for this capability and these arguments, in this scope, by this
+        caller, through this client: an id from another tenant's, another person's or another
+        client's call lets nothing through, however it was answered.
+        """
         approval = await self._store.get(id)
         if approval.capability != capability.name or approval.arguments_digest != digest:
             raise WrongApproval("approval", f"approval {id} is for another call")
+        if (approval.scope, approval.asked_by, approval.via) != (
+            context.scope,
+            context.caller,
+            context.via,
+        ):
+            raise WrongApproval("approval", f"approval {id} was asked by another caller")
         if approval.state == "pending":
             raise ApprovalPending(id)
         try:

@@ -24,6 +24,7 @@ from typing import Any, override
 from pydantic import ValidationError
 from pydantic_ai import (
     AgentRunResult,
+    ApprovalRequired,
     DeferredToolRequests,
     FunctionToolset,
     ModelResponse,
@@ -381,13 +382,21 @@ class ArtifactWorkspace(AbstractCapability[Session[Any]]):
         args: ValidatedToolArgs,
         handler: WrapToolExecuteHandler,
     ) -> Any:
-        """Record a tool's own ``ModelRetry`` or ``ToolFailed``, which skip the error hook."""
+        """Record a tool's own ``ModelRetry`` or ``ToolFailed``, which skip the error hook.
+
+        A call lattice's enforcer deferred is noted in the session by its approval's id, which
+        the Runner withdraws if the run segment ends before it pauses on it (ADR-0102).
+        """
         attributes = _attribution(ctx.deps)
         if isinstance(artifact_id := args.get("artifact_id"), str):
             attributes[ARTIFACT_ID] = artifact_id
         annotate(attributes)
         try:
             return await handler(args)
+        except ApprovalRequired as deferred:
+            if (approval := _approval_id(deferred.metadata or {})) is not None:
+                ctx.deps.asked.add(approval)
+            raise
         except (ToolRetryError, ToolFailedError) as error:
             status = "retry" if isinstance(error, ToolRetryError) else "error"
             why = redacted(str(error))

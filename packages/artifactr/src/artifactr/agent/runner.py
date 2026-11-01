@@ -191,6 +191,12 @@ A form is answered with its values, which the application's check holds to the f
 so free text from the chat never answers one: the run waits for the form's own answer.
 """
 
+_STOPPED: Final = "its run was stopped"
+"""Why an approval a run asked is withdrawn when the run is stopped before it pauses on it."""
+
+_FAILED: Final = "its run failed"
+"""Why an approval a run asked is withdrawn when the run fails before it pauses on it."""
+
 _ABANDONED = "the run was abandoned: its claim lapsed"
 """The error recorded for a run whose claim lapsed before it ended, whether its process stopped
 or lived on."""
@@ -1204,11 +1210,13 @@ class Runner[AppDepsT]:
                         )
                 except asyncio.CancelledError:
                     outcome = "stopped"
+                    await self._withdraw(session, _STOPPED)
                     raise
                 except Exception as error:
                     span.record_exception(error)
                     span.set_status(StatusCode.ERROR, str(error))
                     span.set_attribute(ERROR_TYPE, type(error).__qualname__)
+                    await self._withdraw(session, _FAILED)
                     raise
                 else:
                     paused = isinstance(result.output, DeferredToolRequests)
@@ -1223,6 +1231,29 @@ class Runner[AppDepsT]:
                     self._submit(EndedTurn(session, outcome, span.get_span_context()), span)
         finally:
             otel_context.detach(detached)
+
+    async def _withdraw(self, session: Session[Any], reason: str) -> None:
+        """Withdraw each approval a run segment asked and won't pause on, as it stopped or failed.
+
+        Nothing would take one, so it is withdrawn from the store rather than left for an
+        approver to answer (lattice RFC-0011, ADR-0102). One settled already, as answered on
+        another surface meanwhile, or that the store doesn't know, is left as it is; one the
+        store fails to withdraw is logged, and expires at its deadline.
+        """
+        store = self._approvals
+        if store is None:
+            return
+        for approval in sorted(session.asked):
+            try:
+                await store.withdraw(approval, reason)
+            except (NotPending, UnknownApproval):
+                pass
+            except Exception:
+                logger.exception(
+                    "withdrawing approval %s of run %s failed; it expires at its deadline",
+                    approval,
+                    session.run_id,
+                )
 
     def _submit(self, turn: EndedTurn, span: Span) -> None:
         """Hand an ended turn to each evaluator; a failing one is recorded, never raised."""

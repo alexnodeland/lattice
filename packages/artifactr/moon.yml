@@ -64,9 +64,10 @@ tasks:
       - 'src/artifactr/core/rules.py'
 
   schema:
-    description: "Regenerate the protocol JSON Schema, the REST surfaces' OpenAPI documents, the forms' and the diagrams' wire schemas, and the diagrams' image routes"
+    description: "Regenerate the protocol JSON Schema, the REST surfaces' OpenAPI documents, the forms' and the diagrams' wire schemas, the diagrams' image routes, and the catalog of commands"
     script: >-
       uv run python $workspaceRoot/scripts/generate.py schemas/artifactr.v1.json artifactr.core.schema
+      && uv run python $workspaceRoot/scripts/generate.py schemas/artifactr.commands.json artifactr.commands.schema
       && uv run python $workspaceRoot/scripts/generate.py schemas/artifactr.openapi.json artifactr.fastapi.openapi
       && uv run python $workspaceRoot/scripts/generate.py schemas/artifactr-files.openapi.json artifactr.files.fastapi.openapi
       && uv run python $workspaceRoot/scripts/generate.py schemas/artifactr_ui.v1.json artifactr.ui.wire

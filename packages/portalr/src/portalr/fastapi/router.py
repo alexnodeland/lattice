@@ -39,6 +39,7 @@ from grantr.core import (
 )
 from grantr.fastapi import STATUS_CODES, Caller, ResolveActor, Unauthorized
 from grantr.grants import Grants
+from lattice_core.commands import calls, calls_none
 from lattice_core.refusals import Refused, refusals
 from portalr.access import record_links
 from portalr.actions import READ_DEPLOYMENT, READ_SPEND, READ_TELEMETRY
@@ -270,6 +271,8 @@ class Links(BaseModel):
 REFUSALS: Final = refusals(400, 401, 403, 422)
 """The refused responses every route under ``/v1`` documents: no route of portalr's answers 404 or
 409, which artifactr's and reflexr's document."""
+OWN: Final = calls_none("a person's own analytics consent and session, gated by no action")
+"""What a person's own analytics routes call: no command (lattice ADR-0042)."""
 
 
 TenantHeader = Annotated[TenantId | None, Header(alias="X-Tenant")]
@@ -347,7 +350,9 @@ def portalr_router(
 
     operating = Depends(operator)
 
-    @router.get("/config.json")
+    @router.get(
+        "/config.json", openapi_extra=calls_none("the UIs' configuration, which anyone may read")
+    )
     async def config() -> Config:
         """What the UIs need of this deployment: Supabase, the surfaces, and the tools it runs."""
         return Config(
@@ -367,7 +372,11 @@ def portalr_router(
             and await relay.umami.replay_enabled(),
         )
 
-    @api.get("/v1/traces", response_model=reading(list[TraceSummary]))
+    @api.get(
+        "/v1/traces",
+        response_model=reading(list[TraceSummary]),
+        openapi_extra=calls("portalr.list_traces"),
+    )
     async def traces(
         query: Annotated[TraceQuery, Query()], tenant: Tenant = telemetry, who: Caller = current
     ) -> Ok[list[TraceSummary]] | Unavailable | Unconfigured:
@@ -379,7 +388,11 @@ def portalr_router(
             raise _refusal("forbidden", "only operators find traces by analytics session")
         return await readers.tempo.search(tenant, query) if readers.tempo else Unconfigured()
 
-    @api.get("/v1/traces/{trace_id}", response_model=reading(Trace | None))
+    @api.get(
+        "/v1/traces/{trace_id}",
+        response_model=reading(Trace | None),
+        openapi_extra=calls("portalr.read_trace"),
+    )
     async def trace(
         trace_id: Id,
         response: Response,
@@ -412,7 +425,7 @@ def portalr_router(
             return Ok(data=for_tenant(read.data))
         return read
 
-    @api.get("/v1/logs", response_model=reading(Logs))
+    @api.get("/v1/logs", response_model=reading(Logs), openapi_extra=calls("portalr.read_logs"))
     async def logs(
         query: Annotated[LogQuery, Query()], tenant: Tenant = telemetry
     ) -> Ok[Logs] | Unavailable | Unconfigured:
@@ -423,7 +436,11 @@ def portalr_router(
         """
         return await readers.loki.logs(tenant, query) if readers.loki else Unconfigured()
 
-    @api.get("/v1/logs/{record_id}", response_model=reading(LogRecord | None))
+    @api.get(
+        "/v1/logs/{record_id}",
+        response_model=reading(LogRecord | None),
+        openapi_extra=calls("portalr.read_log_line"),
+    )
     async def log_line(
         record_id: Annotated[str, PathParam(pattern=RECORD_ID)],
         response: Response,
@@ -435,7 +452,11 @@ def portalr_router(
         response.headers["Cache-Control"] = "no-store"
         return await readers.loki.record(tenant, record_id)
 
-    @api.get("/v1/metrics", response_model=reading(list[Point]))
+    @api.get(
+        "/v1/metrics",
+        response_model=reading(list[Point]),
+        openapi_extra=calls("portalr.read_metrics"),
+    )
     async def metrics(
         query: Annotated[MetricQuery, Query()], tenant: Tenant = telemetry
     ) -> Ok[list[Point]] | Unavailable | Unconfigured:
@@ -444,14 +465,20 @@ def portalr_router(
             return Unconfigured()
         return await readers.prometheus.series(tenant, query)
 
-    @api.get("/v1/scores", response_model=reading(Scores))
+    @api.get(
+        "/v1/scores", response_model=reading(Scores), openapi_extra=calls("portalr.read_scores")
+    )
     async def scores(
         window: Annotated[Window, Query()], tenant: Tenant = telemetry
     ) -> Ok[Scores] | Unavailable | Unconfigured:
         """The tenant's feedback and evaluation scores, from Langfuse, and whether that's all."""
         return await readers.langfuse.scores(tenant, window) if readers.langfuse else Unconfigured()
 
-    @api.get("/v1/feedback", response_model=reading(Feedback))
+    @api.get(
+        "/v1/feedback",
+        response_model=reading(Feedback),
+        openapi_extra=calls("portalr.read_feedback"),
+    )
     async def feedback(
         query: Annotated[FeedbackQuery, Query()], tenant: Tenant = telemetry
     ) -> Ok[Feedback] | Unavailable | Unconfigured:
@@ -464,12 +491,14 @@ def portalr_router(
             return Unconfigured()
         return await read_feedback(readers.langfuse, tenant, query)
 
-    @api.get("/v1/spend", response_model=reading(Spend | None))
+    @api.get(
+        "/v1/spend", response_model=reading(Spend | None), openapi_extra=calls("portalr.read_spend")
+    )
     async def spend(tenant: Tenant = spending) -> Ok[Spend | None] | Unavailable | Unconfigured:
         """The tenant's usage and spend, against its budget, from its LiteLLM team."""
         return await readers.litellm.spend(tenant) if readers.litellm else Unconfigured()
 
-    @api.get("/v1/usage", response_model=reading(Usage))
+    @api.get("/v1/usage", response_model=reading(Usage), openapi_extra=calls("portalr.read_usage"))
     async def usage(
         query: Annotated[UsageQuery, Query()], tenant: Tenant = spending
     ) -> Ok[Usage] | Unavailable | Unconfigured:
@@ -482,7 +511,11 @@ def portalr_router(
             return Unconfigured()
         return await read_usage(readers.litellm, tenant, query)
 
-    @api.get("/v1/adoption", response_model=reading(Adoption))
+    @api.get(
+        "/v1/adoption",
+        response_model=reading(Adoption),
+        openapi_extra=calls("portalr.read_adoption"),
+    )
     async def adoption(
         query: Annotated[AdoptionQuery, Query()], tenant: Tenant = telemetry
     ) -> Ok[Adoption] | Unavailable | Unconfigured:
@@ -497,14 +530,14 @@ def portalr_router(
             return Unconfigured()
         return await readers.analytics.adoption(tenant, query)
 
-    @api.get("/v1/deployment/tenants")
+    @api.get("/v1/deployment/tenants", openapi_extra=calls("portalr.list_deployment_tenants"))
     async def deployment_tenants(by: Subject = operating) -> DeploymentTenants:
         """Every tenant, with its spend from one LiteLLM team list, for operators."""
         tenants = await grants.tenants(by=by)
         spent = await readers.litellm.every_tenant() if readers.litellm else Unconfigured()
         return DeploymentTenants(tenants=tenants, spend=spent)
 
-    @api.get("/v1/deployment/links")
+    @api.get("/v1/deployment/links", openapi_extra=calls("portalr.deployment_links"))
     async def links(
         trace_id: Id | None = None,
         session_id: Id | None = None,
@@ -600,7 +633,13 @@ async def _visible(
 
 
 def _naming(router: APIRouter, grants: Grants, people: People, current: Any) -> None:
-    @router.get("/v1/people", response_model=Names)
+    @router.get(
+        "/v1/people",
+        response_model=Names,
+        openapi_extra=calls_none(
+            "the emails of people the caller may see, for portalr's UI to name them"
+        ),
+    )
     async def names(
         response: Response,
         id: Annotated[list[Id], Query(min_length=1, max_length=MAX_PEOPLE)],
@@ -625,7 +664,11 @@ USE_MODEL: Final = "artifactr:use_model"
 
 
 def _choosing(router: APIRouter, grants: Grants, models: Models, current: Any) -> None:
-    @router.get("/v1/models", response_model=OfferedModels)
+    @router.get(
+        "/v1/models",
+        response_model=OfferedModels,
+        openapi_extra=calls_none("the models a person may choose for a turn, gated as the turn is"),
+    )
     async def offered(
         response: Response,
         workspace: Annotated[Id, Query()],
@@ -666,6 +709,7 @@ def _tenant_creation(router: APIRouter, grants: Grants, invite: Invite, operatin
         status_code=201,
         responses={502: failed},
         response_model=CreatedTenant,
+        openapi_extra=calls("portalr.create_tenant"),
     )
     async def create_tenant(
         body: Annotated[NewTenant, Body()], by: Subject = operating
@@ -715,7 +759,12 @@ def _invitations(
         "description": "Supabase Auth didn't invite or find the person: `invite_failed`",
     }
 
-    @router.post("/v1/invites", status_code=201, responses={502: failed})
+    @router.post(
+        "/v1/invites",
+        status_code=201,
+        responses={502: failed},
+        openapi_extra=calls("portalr.invite_member"),
+    )
     async def invite_member(
         body: Annotated[NewInvite, Body()],
         background: BackgroundTasks,
@@ -786,7 +835,7 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any, ui
     signed_in = Depends(person)
     answering_person = Depends(answering)
 
-    @router.get("/v1/analytics/consent", responses={429: TOO_FAST})
+    @router.get("/v1/analytics/consent", responses={429: TOO_FAST}, openapi_extra=OWN)
     async def read_consent(user: str = signed_in) -> Consented:
         """The person's answer to product analytics: no until they say yes.
 
@@ -799,7 +848,7 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any, ui
             deleting=await relay.consent.owes(user) is not None,
         )
 
-    @router.put("/v1/analytics/consent")
+    @router.put("/v1/analytics/consent", openapi_extra=OWN)
     async def answer(body: Annotated[Answer, Body()], user: str = Depends(answering)) -> Answered:
         """Record the person's answer. Taking a yes back deletes their events at once.
 
@@ -810,7 +859,7 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any, ui
         """
         return await relay.answer(user, yes=body.given)
 
-    @router.post("/v1/analytics/session", responses={429: TOO_FAST})
+    @router.post("/v1/analytics/session", responses={429: TOO_FAST}, openapi_extra=OWN)
     async def session(user: str = signed_in) -> Session:
         """A session id signed for the person, which their browser sends with its events."""
         return Session(session=relay.sign(user))
@@ -820,10 +869,11 @@ def _analytics(router: APIRouter, grants: Grants, relay: Relay, current: Any, ui
         status_code=202,
         responses={413: TOO_LARGE, 422: INVALID, 429: TOO_FAST},
         openapi_extra={
+            **calls_none("a browser's analytics events, relayed to ClickHouse"),
             "requestBody": {
                 "required": True,
                 "content": {"application/json": {"schema": _inlined(Batch.model_json_schema())}},
-            }
+            },
         },
     )
     async def events(
@@ -867,14 +917,14 @@ def _replay(
         sheet.name: sheet.read_text(encoding="utf-8") for sheet in (ui / "app").glob("assets/*.css")
     }
 
-    @router.get("/v1/analytics/replay/consent", responses={429: TOO_FAST})
+    @router.get("/v1/analytics/replay/consent", responses={429: TOO_FAST}, openapi_extra=OWN)
     async def read_replay_consent(user: str = signed_in) -> Consented:
         """The person's answer to session replay: no until they say yes, apart from analytics'."""
         return Consented(
             given=await replay.given(user), deleting=await replay.owes(user) is not None
         )
 
-    @router.put("/v1/analytics/replay/consent")
+    @router.put("/v1/analytics/replay/consent", openapi_extra=OWN)
     async def answer_replay(body: Annotated[Answer, Body()], user: str = answering) -> Answered:
         """Record the person's answer to replay. Taking a yes back deletes their replays at once.
 
@@ -890,12 +940,13 @@ def _replay(
         status_code=202,
         responses={413: REPLAY_TOO_LARGE, 422: INVALID, 429: REPLAY_TOO_FAST},
         openapi_extra={
+            **OWN,
             "requestBody": {
                 "required": True,
                 "content": {
                     "application/json": {"schema": _inlined(ReplayBatch.model_json_schema())}
                 },
-            }
+            },
         },
     )
     async def replays(

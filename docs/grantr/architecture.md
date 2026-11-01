@@ -204,11 +204,14 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 - **`admin_high`:** `grantr.delete_tenant`, `grantr.revoke_key`, `grantr.grant_on_tenant` (granting on a workspace or item is `grantr.grant`), `grantr.define_role`, `grantr.grant_operator` and `grantr.revoke_member_connection`, each confirmed by its caller.
 - **Not exposed:** `grantr.answer_approval` and `grantr.issue_key`, portalr's alone.
 - **`grantr:read_approvals`** gates `grantr.list_approvals` and `grantr.read_approval`, and every member holds it.
+- **`grantr.list_restrictions`** reads a workspace's restricted threads and artifacts, with `grantr:restrict`, as its route does: lattice's parity test found the route had no command (lattice [ADR-0042](../adr/0042-parity-every-operation-names-its-command-and-one-test-holds-the-catalogs-to-grantr.md)).
 - **`grantr:manage_bindings`** gates `grantr.list_bindings`, `grantr.bind` and `grantr.unbind`, which no admin page links to yet.
 - **Connections:** `grantr:read_connections` gates `grantr.list_connections`, and `grantr:revoke_connection` both `grantr.revoke_connection`, one's own, and `grantr.revoke_member_connection`, another member's, which is `admin_high` ([ADR-0043](adr/0043-connections-grantr-objects-one-tenant-each-read-on-every-call-revoked-at-once.md)).
 - **`provider(grants)`** is lattice-core's `Provider`: each call runs as the person it is for (`subject_of_call`), in its tenant, so grantr checks it again, and answers JSON text. The catalog is `schemas/grantr.commands.json`, which `grantr:schema` regenerates.
 
 ## The admin API
+
+Each route says the command it calls in the document's `x-lattice-command`, or why it calls none, which lattice's parity test holds to the catalogs (lattice [ADR-0042](../adr/0042-parity-every-operation-names-its-command-and-one-test-holds-the-catalogs-to-grantr.md)).
 
 `grantr_router(grants, resolve_actor=...)` is the admin API, mounted at `/grantr/v1` ([ADR-0017](adr/0017-the-admin-api.md)). `resolve_actor` returns a `Caller`: the subject, and, for a key, its one tenant, which the router holds every request to.
 

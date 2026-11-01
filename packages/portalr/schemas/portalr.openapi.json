@@ -2069,7 +2069,10 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Config"
+        "summary": "Config",
+        "x-lattice-command": {
+          "none": "the UIs' configuration, which anyone may read"
+        }
       }
     },
     "/portalr/v1/adoption": {
@@ -2185,7 +2188,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Adoption"
+        "summary": "Adoption",
+        "x-lattice-command": "portalr.read_adoption"
       }
     },
     "/portalr/v1/analytics/consent": {
@@ -2254,7 +2258,10 @@
             "description": "Past the person's pace: `too_fast`"
           }
         },
-        "summary": "Read Consent"
+        "summary": "Read Consent",
+        "x-lattice-command": {
+          "none": "a person's own analytics consent and session, gated by no action"
+        }
       },
       "put": {
         "description": "Record the person's answer. Taking a yes back deletes their events at once.\n\nA deletion ClickHouse can't take stays owed, and is tried again on the person's next\nrequest, and by a background pass every few minutes: ``deleted`` says whether it is\ndone. A yes later doesn't cancel it. It is never refused for the person's pace: a\nwithdrawal always lands.",
@@ -2321,7 +2328,10 @@
             "description": "Refused"
           }
         },
-        "summary": "Answer"
+        "summary": "Answer",
+        "x-lattice-command": {
+          "none": "a person's own analytics consent and session, gated by no action"
+        }
       }
     },
     "/portalr/v1/analytics/replay": {
@@ -2452,7 +2462,10 @@
             "description": "Past the person's pace in bytes of replay: `too_fast`"
           }
         },
-        "summary": "Replays"
+        "summary": "Replays",
+        "x-lattice-command": {
+          "none": "a person's own analytics consent and session, gated by no action"
+        }
       }
     },
     "/portalr/v1/analytics/replay/consent": {
@@ -2521,7 +2534,10 @@
             "description": "Past the person's pace: `too_fast`"
           }
         },
-        "summary": "Read Replay Consent"
+        "summary": "Read Replay Consent",
+        "x-lattice-command": {
+          "none": "a person's own analytics consent and session, gated by no action"
+        }
       },
       "put": {
         "description": "Record the person's answer to replay. Taking a yes back deletes their replays at once.\n\nA yes needs the person's yes to analytics first; a no is never refused.",
@@ -2588,7 +2604,10 @@
             "description": "Refused"
           }
         },
-        "summary": "Answer Replay"
+        "summary": "Answer Replay",
+        "x-lattice-command": {
+          "none": "a person's own analytics consent and session, gated by no action"
+        }
       }
     },
     "/portalr/v1/analytics/session": {
@@ -2657,7 +2676,10 @@
             "description": "Past the person's pace: `too_fast`"
           }
         },
-        "summary": "Session"
+        "summary": "Session",
+        "x-lattice-command": {
+          "none": "a person's own analytics consent and session, gated by no action"
+        }
       }
     },
     "/portalr/v1/deployment/links": {
@@ -2782,7 +2804,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Links"
+        "summary": "Links",
+        "x-lattice-command": "portalr.deployment_links"
       }
     },
     "/portalr/v1/deployment/tenants": {
@@ -2841,7 +2864,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Deployment Tenants"
+        "summary": "Deployment Tenants",
+        "x-lattice-command": "portalr.list_deployment_tenants"
       },
       "post": {
         "description": "Create a tenant, with its first owner invited, or found, by email, for operators.\n\nOnly operators, who may create tenants, get past the checks, which come before Supabase is\nasked about anyone: a tenant that exists is refused without an invitation, so a repeated\nrequest invites no one again and creates nothing twice. The email is never logged or\nanswered with: the answer names the tenant and the owner's user id.",
@@ -2918,7 +2942,8 @@
             "description": "Supabase Auth didn't invite or find the owner: `invite_failed`"
           }
         },
-        "summary": "Create Tenant"
+        "summary": "Create Tenant",
+        "x-lattice-command": "portalr.create_tenant"
       }
     },
     "/portalr/v1/events": {
@@ -3086,7 +3111,10 @@
             "description": "Past the person's pace: `too_fast`"
           }
         },
-        "summary": "Events"
+        "summary": "Events",
+        "x-lattice-command": {
+          "none": "a browser's analytics events, relayed to ClickHouse"
+        }
       }
     },
     "/portalr/v1/feedback": {
@@ -3218,7 +3246,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Feedback"
+        "summary": "Feedback",
+        "x-lattice-command": "portalr.read_feedback"
       }
     },
     "/portalr/v1/invites": {
@@ -3315,7 +3344,8 @@
             "description": "Supabase Auth didn't invite or find the person: `invite_failed`"
           }
         },
-        "summary": "Invite Member"
+        "summary": "Invite Member",
+        "x-lattice-command": "portalr.invite_member"
       }
     },
     "/portalr/v1/logs": {
@@ -3475,7 +3505,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Logs"
+        "summary": "Logs",
+        "x-lattice-command": "portalr.read_logs"
       }
     },
     "/portalr/v1/logs/{record_id}": {
@@ -3581,7 +3612,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Log Line"
+        "summary": "Log Line",
+        "x-lattice-command": "portalr.read_log_line"
       }
     },
     "/portalr/v1/metrics": {
@@ -3729,7 +3761,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Metrics"
+        "summary": "Metrics",
+        "x-lattice-command": "portalr.read_metrics"
       }
     },
     "/portalr/v1/models": {
@@ -3814,7 +3847,10 @@
             "description": "Refused"
           }
         },
-        "summary": "Offered"
+        "summary": "Offered",
+        "x-lattice-command": {
+          "none": "the models a person may choose for a turn, gated as the turn is"
+        }
       }
     },
     "/portalr/v1/people": {
@@ -3905,7 +3941,10 @@
             "description": "Refused"
           }
         },
-        "summary": "Names"
+        "summary": "Names",
+        "x-lattice-command": {
+          "none": "the emails of people the caller may see, for portalr's UI to name them"
+        }
       }
     },
     "/portalr/v1/scores": {
@@ -4033,7 +4072,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Scores"
+        "summary": "Scores",
+        "x-lattice-command": "portalr.read_scores"
       }
     },
     "/portalr/v1/spend": {
@@ -4129,7 +4169,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Spend"
+        "summary": "Spend",
+        "x-lattice-command": "portalr.read_spend"
       }
     },
     "/portalr/v1/traces": {
@@ -4306,7 +4347,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Traces"
+        "summary": "Traces",
+        "x-lattice-command": "portalr.list_traces"
       }
     },
     "/portalr/v1/traces/{trace_id}": {
@@ -4438,7 +4480,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Trace"
+        "summary": "Trace",
+        "x-lattice-command": "portalr.read_trace"
       }
     },
     "/portalr/v1/usage": {
@@ -4567,7 +4610,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Usage"
+        "summary": "Usage",
+        "x-lattice-command": "portalr.read_usage"
       }
     }
   }

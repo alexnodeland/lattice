@@ -27,6 +27,7 @@ from artifactr.files.blobs import Blobs, OverQuota, TooLarge
 from artifactr.files.native.pace import Pace
 from artifactr.telemetry import annotate, attribution
 from artifactr.workspace import Access, Scope, Workspace, Workspaces
+from lattice_core.commands import calls
 from lattice_core.integrations import Defaults, Integrations
 from lattice_core.refusals import refusals
 
@@ -104,10 +105,11 @@ def diagrams_router(
         "/workspaces/{workspace_id}/diagrams/{artifact_id}/images",
         status_code=201,
         openapi_extra={
+            **calls("artifactr.edit_artifact"),
             "requestBody": {
                 "required": True,
                 "content": {media: {} for media in SIGNATURES},
-            }
+            },
         },
     )
     async def upload(
@@ -156,6 +158,7 @@ def diagrams_router(
         "/workspaces/{workspace_id}/diagrams/{artifact_id}/images/{sha256}",
         response_class=Response,
         responses={200: {"content": {media: {} for media in SIGNATURES}}},
+        openapi_extra=calls("artifactr.read_artifact"),
     )
     async def image(
         artifact_id: PathId, sha256: Digest, ws: Workspace = current_workspace

@@ -80,6 +80,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             "starlette",
             "pydantic",
             "pydantic_ai",
+            "lattice_core.commands",
             "lattice_core.refusals",
             *OTEL_API,
         },
@@ -133,7 +134,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {
             *("pydantic", "pydantic_ai", "httpx", "anyio", "fastapi", "starlette"),
-            *("lattice_core.integrations", "lattice_core.refusals"),
+            *("lattice_core.commands", "lattice_core.integrations", "lattice_core.refusals"),
         },
     ),
     # The evalr adapter: a feedback source, experiment tasks, a TurnEvaluator and measures.
@@ -182,7 +183,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             *("pydantic", "pydantic_ai", "sqlalchemy", "alembic", "mcp", "anyio"),
             *("fastapi", "starlette", "uvicorn", "httpx"),
             *("lattice_core.sql", "lattice_core.integrations", "lattice_core.refusals"),
-            "lattice_core.origins",
+            *("lattice_core.commands", "lattice_core.origins"),
             *("FreeCAD", "Part", "Sketcher", "TechDraw", "PIL"),
             *("zstandard", "bpy", "bmesh", "mathutils"),
         },

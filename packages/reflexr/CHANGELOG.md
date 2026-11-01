@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0](https://github.com/alexnodeland/lattice/compare/reflexr-v0.3.0...reflexr-v0.4.0) (2026-11-01)
+
+
+### Features
+
+* **reflexr:** reflexr's provider: each call in its workspace, as its actor (RFC-0014) ([#1352](https://github.com/alexnodeland/lattice/issues/1352)) ([6298a0f](https://github.com/alexnodeland/lattice/commit/6298a0f96851b4fd4709d242a2648faaa76b0b4b))
+
 ## [0.3.0](https://github.com/alexnodeland/lattice/compare/reflexr-v0.2.2...reflexr-v0.3.0) (2026-11-01)
 
 

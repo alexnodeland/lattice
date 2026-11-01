@@ -269,7 +269,7 @@ wheels = [
 
 [[package]]
 name = "artifactr-ai"
-version = "0.6.0"
+version = "0.7.0"
 source = { editable = "packages/artifactr" }
 dependencies = [
     { name = "jsonpatch" },
@@ -3459,7 +3459,7 @@ wheels = [
 
 [[package]]
 name = "portalr"
-version = "0.8.0"
+version = "0.9.0"
 source = { editable = "packages/portalr" }
 dependencies = [
     { name = "fastapi" },
@@ -4171,7 +4171,7 @@ wheels = [
 
 [[package]]
 name = "reflexr"
-version = "0.3.0"
+version = "0.4.0"
 source = { editable = "packages/reflexr" }
 dependencies = [
     { name = "cronsim" },
@@ -4437,7 +4437,7 @@ wheels = [
 
 [[package]]
 name = "relayr-ai"
-version = "0.2.1"
+version = "0.3.0"
 source = { editable = "packages/relayr" }
 dependencies = [
     { name = "artifactr-ai" },

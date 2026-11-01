@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.9.0](https://github.com/alexnodeland/lattice/compare/portalr-v0.8.0...portalr-v0.9.0) (2026-11-01)
+
+
+### Features
+
+* **artifactr:** a run paused on an enforcer's approval names it, and is answered in its store (RFC-0011) ([#1334](https://github.com/alexnodeland/lattice/issues/1334)) ([c2d6124](https://github.com/alexnodeland/lattice/commit/c2d61249bfb42738ad30d514757c859f6ab8384f))
+* **portalr:** portalr's commands, its admin's reads and the tenant and member it makes (RFC-0014 phase 1) ([#1342](https://github.com/alexnodeland/lattice/issues/1342)) ([be9e038](https://github.com/alexnodeland/lattice/commit/be9e0388e5f9bb6deb5009df99f5e450812cea5d))
+
 ## [0.8.0](https://github.com/alexnodeland/lattice/compare/portalr-v0.7.0...portalr-v0.8.0) (2026-11-01)
 
 

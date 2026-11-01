@@ -938,7 +938,7 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         """Remove one of the tenant's bindings; the operator's are the deployment's to change."""
         return await _or_http(grants.bindings().unbind(tenant, binding, by=by(tenant, who)))
 
-    @router.get("/tenants/{tenant}/connections")
+    @router.get("/tenants/{tenant}/connections", openapi_extra=calls("grantr.list_connections"))
     async def list_connections(
         tenant: TenantId,
         user: Annotated[
@@ -955,7 +955,10 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         listed = grants.connections().listed(tenant, by=by(tenant, who), user=user)
         return await _or_http(listed)
 
-    @router.delete("/tenants/{tenant}/connections/{connection}")
+    @router.delete(
+        "/tenants/{tenant}/connections/{connection}",
+        openapi_extra=calls("grantr.revoke_connection", "grantr.revoke_member_connection"),
+    )
     async def revoke_connection(
         tenant: TenantId, connection: str, who: Caller = current
     ) -> AuditEntry:

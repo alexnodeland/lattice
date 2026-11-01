@@ -4092,7 +4092,8 @@
             "description": "Validation Error"
           }
         },
-        "summary": "List Connections"
+        "summary": "List Connections",
+        "x-lattice-command": "grantr.list_connections"
       }
     },
     "/grantr/v1/tenants/{tenant}/connections/{connection}": {
@@ -4142,7 +4143,11 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Revoke Connection"
+        "summary": "Revoke Connection",
+        "x-lattice-command": [
+          "grantr.revoke_connection",
+          "grantr.revoke_member_connection"
+        ]
       }
     },
     "/grantr/v1/tenants/{tenant}/grants": {

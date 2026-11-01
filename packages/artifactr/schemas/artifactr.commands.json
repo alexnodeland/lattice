@@ -1,0 +1,1263 @@
+{
+  "commands": {
+    "artifactr.answer_deferred": {
+      "capability": {
+        "description": "Answer a deferred tool's call.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:answer_deferred",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "approved": {
+              "description": "Whether to let it go ahead.",
+              "title": "Approved",
+              "type": "boolean"
+            },
+            "call_id": {
+              "description": "The deferred call.",
+              "title": "Call Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "call_id",
+            "approved"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.answer_deferred",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": {
+        "reason": "a deferred call is answered by a person, never a model"
+      },
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/threads/{thread_id}",
+      "surfaces": [
+        "portalr"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.archive_artifact": {
+      "capability": {
+        "description": "Archive an artifact that is no longer needed. It stays readable, and can't be unarchived.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:archive_artifact",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "description": "The artifact.",
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "artifact_id"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.archive_artifact",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "irreversible",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/artifacts/{artifact_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.create_artifact": {
+      "capability": {
+        "description": "Create an artifact of a kind the workspace has, whose data must match its JSON Schema.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:create_artifact",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "data": {
+              "additionalProperties": true,
+              "description": "Its data, which must match its kind's JSON Schema.",
+              "title": "Data",
+              "type": "object"
+            },
+            "kind": {
+              "description": "The kind of artifact to create: one the application registers.",
+              "title": "Kind",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "data"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.create_artifact",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/artifacts/{artifact_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.create_thread": {
+      "capability": {
+        "description": "Start an empty thread in the workspace.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:create_thread",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "title": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Its title; one is made from its first message if omitted.",
+              "title": "Title"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.create_thread",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/threads/{thread_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.edit_artifact": {
+      "capability": {
+        "description": "Change an artifact's data with JSON Patch operations.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:edit_artifact",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "description": "The artifact.",
+              "title": "Artifact Id",
+              "type": "string"
+            },
+            "operations": {
+              "description": "JSON Patch operations on the artifact's data.",
+              "items": {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              "minItems": 1,
+              "title": "Operations",
+              "type": "array"
+            },
+            "summary": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "A short description of the change, shown to others.",
+              "title": "Summary"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "operations"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.edit_artifact",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/artifacts/{artifact_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.edit_text": {
+      "capability": {
+        "description": "Replace one exact passage of an artifact's text field.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:edit_artifact",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "description": "The artifact.",
+              "title": "Artifact Id",
+              "type": "string"
+            },
+            "field": {
+              "default": "text",
+              "description": "The text field to edit.",
+              "title": "Field",
+              "type": "string"
+            },
+            "new": {
+              "description": "The replacement text.",
+              "title": "New",
+              "type": "string"
+            },
+            "old": {
+              "description": "Text that occurs exactly once in the field now; an empty string writes an empty field.",
+              "title": "Old",
+              "type": "string"
+            },
+            "summary": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "A short description of the change, shown to others.",
+              "title": "Summary"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.edit_text",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/artifacts/{artifact_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.give_feedback": {
+      "capability": {
+        "description": "Rate a message, run or artifact, with a comment if you have one.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:give_feedback",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "comment": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "What you would say about it.",
+              "title": "Comment"
+            },
+            "rating": {
+              "description": "-1, 0 or 1.",
+              "maximum": 1,
+              "minimum": -1,
+              "title": "Rating",
+              "type": "integer"
+            },
+            "target_id": {
+              "description": "The message, run or artifact the feedback is on.",
+              "title": "Target Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "target_id",
+            "rating"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.give_feedback",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": null,
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "feedback"
+    },
+    "artifactr.list_artifacts": {
+      "capability": {
+        "description": "List the artifacts in the workspace, optionally of one kind, one per line.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "artifactr:read_artifacts",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Only list artifacts of this kind.",
+              "title": "Kind"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.list_artifacts",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/artifacts",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.list_files": {
+      "capability": {
+        "description": "List the workspace's native files.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "artifactr:read_artifacts",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.list_files",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/artifacts",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.list_proposals": {
+      "capability": {
+        "description": "List the workspace's proposals waiting for an answer.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "artifactr:read_proposals",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.list_proposals",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/proposals",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.list_revisions": {
+      "capability": {
+        "description": "List an artifact's revisions, oldest first, with who made each and why.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "artifactr:read_history",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "description": "The artifact.",
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "artifact_id"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.list_revisions",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/artifacts/{artifact_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.list_threads": {
+      "capability": {
+        "description": "List the workspace's threads you can open, newest first.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "artifactr:read_threads",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.list_threads",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.list_workspaces": {
+      "capability": {
+        "description": "List the workspaces you can open in the tenant, a page at a time.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "artifactr:read_workspaces",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "after": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Read after this id, from the last page.",
+              "title": "After"
+            },
+            "limit": {
+              "default": 100,
+              "description": "How many to read.",
+              "maximum": 500,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.list_workspaces",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.post_message": {
+      "capability": {
+        "description": "Post a message in a thread, or start one with it; the thread's agent answers it.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:post_message",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "text": {
+              "description": "The message.",
+              "minLength": 1,
+              "title": "Text",
+              "type": "string"
+            },
+            "thread_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The thread to post in; a new one is started if omitted.",
+              "title": "Thread Id"
+            }
+          },
+          "required": [
+            "text"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.post_message",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "irreversible",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/threads/{thread_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.propose_text": {
+      "capability": {
+        "description": "Propose replacing one exact passage of an artifact's text field, for a person to accept or reject. Nothing changes until they accept it.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:propose_change",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "description": "The artifact.",
+              "title": "Artifact Id",
+              "type": "string"
+            },
+            "field": {
+              "default": "text",
+              "description": "The text field to edit.",
+              "title": "Field",
+              "type": "string"
+            },
+            "new": {
+              "description": "The replacement text.",
+              "title": "New",
+              "type": "string"
+            },
+            "old": {
+              "description": "Text that occurs exactly once in the field now; an empty string writes an empty field.",
+              "title": "Old",
+              "type": "string"
+            },
+            "rationale": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Why you propose it, shown to the person who reviews it.",
+              "title": "Rationale"
+            },
+            "summary": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "A short description of the change, shown to others.",
+              "title": "Summary"
+            }
+          },
+          "required": [
+            "artifact_id",
+            "old",
+            "new"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.propose_text",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "undoable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/proposals",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.read_artifact": {
+      "capability": {
+        "description": "Read an artifact's current version.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "artifactr:read_artifacts",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "description": "The artifact.",
+              "title": "Artifact Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "artifact_id"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.read_artifact",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "both",
+      "resource": "artifactr://{tenant}/{workspace}/artifacts/{artifact_id}",
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/artifacts/{artifact_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.read_events": {
+      "capability": {
+        "description": "Read the workspace's events after a sequence number, oldest first.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "artifactr:read_events",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "after_seq": {
+              "default": 0,
+              "description": "Read the workspace's events after this sequence number.",
+              "minimum": 0,
+              "title": "After Seq",
+              "type": "integer"
+            },
+            "limit": {
+              "default": 100,
+              "description": "How many to read.",
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.read_events",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": null,
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "automations"
+    },
+    "artifactr.read_file": {
+      "capability": {
+        "description": "Read a native file's text, a page at a time.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "artifactr:read_artifacts",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "description": "The artifact.",
+              "title": "Artifact Id",
+              "type": "string"
+            },
+            "page": {
+              "default": 1,
+              "description": "The page to read, of a file read a page at a time.",
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "artifact_id"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.read_file",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/artifacts/{artifact_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.read_run": {
+      "capability": {
+        "description": "Read a run as it stands: its status, steps and outcome.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "artifactr:read_runs",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "run_id": {
+              "description": "The run.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "run_id"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.read_run",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/runs",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.read_thread": {
+      "capability": {
+        "description": "Read a thread's messages and runs, or what came since a sequence number.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "artifactr:read_threads",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "after_seq": {
+              "default": 0,
+              "description": "Read the thread's events after this sequence number, to read what came since.",
+              "minimum": 0,
+              "title": "After Seq",
+              "type": "integer"
+            },
+            "thread_id": {
+              "description": "The thread.",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "thread_id"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.read_thread",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "both",
+      "resource": "artifactr://{tenant}/{workspace}/threads/{thread_id}",
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/threads/{thread_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.respond_to_proposal": {
+      "capability": {
+        "description": "Accept a proposal, applying its change, or reject it.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:respond_to_proposal",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "accept": {
+              "description": "Whether to accept it, applying its change, or reject it.",
+              "title": "Accept",
+              "type": "boolean"
+            },
+            "proposal_id": {
+              "description": "The proposal.",
+              "title": "Proposal Id",
+              "type": "string"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Why, shown to whoever proposed it.",
+              "title": "Reason"
+            }
+          },
+          "required": [
+            "proposal_id",
+            "accept"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.respond_to_proposal",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/proposals",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.set_focus": {
+      "capability": {
+        "description": "Set what is open beside a thread.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:set_focus",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "artifact_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "What is open; none if omitted.",
+              "title": "Artifact Id"
+            }
+          },
+          "required": [
+            "artifact_id"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.set_focus",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": {
+        "reason": "the focus is what a person has open in portalr"
+      },
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/threads/{thread_id}",
+      "surfaces": [
+        "portalr"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.set_thread_mode": {
+      "capability": {
+        "description": "Set a thread's mode, which says how its agent acts on artifacts.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:set_thread_mode",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "description": "The thread's mode, as its runner offers them.",
+              "title": "Mode",
+              "type": "string"
+            },
+            "thread_id": {
+              "description": "The thread.",
+              "title": "Thread Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "thread_id",
+            "mode"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.set_thread_mode",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/threads/{thread_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "artifactr.stop_run": {
+      "capability": {
+        "description": "Stop a run that is going; what it did stays done.",
+        "effects": [],
+        "gate": {
+          "action": "artifactr:stop_run",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "run_id": {
+              "description": "The run.",
+              "title": "Run Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "run_id"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "artifactr.stop_run",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "irreversible",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/runs",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    }
+  },
+  "listed": {
+    "artifactr:claim_thread": "the runner's own bookkeeping: claiming a thread's turn",
+    "artifactr:create_native_file": "native files' making and check-out come in 0.3.x (#924)",
+    "artifactr:open": "asked before every command in a workspace, never on its own",
+    "artifactr:read_cursors": "the log's consumers' bookkeeping",
+    "artifactr:record": "a run's own steps, recorded by the runner",
+    "artifactr:run_connected_code": "connected apps' commands come in 0.3.x (#924)",
+    "artifactr:save_cursor": "the log's consumers' bookkeeping",
+    "artifactr:use_model": "a run's model calls, made by the runner"
+  },
+  "title": "artifactr's commands"
+}

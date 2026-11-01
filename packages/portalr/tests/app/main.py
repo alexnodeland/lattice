@@ -26,7 +26,7 @@ import asyncio
 import os
 from collections.abc import AsyncIterator, Awaitable, Callable, Collection
 from contextlib import asynccontextmanager
-from datetime import timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import httpx
@@ -49,6 +49,8 @@ from artifactr.workspace import ACTIONS as ARTIFACTR_ACTIONS
 from grantr.core import Resource, User
 from grantr.fastapi import Caller, Unauthorized, grantr_router
 from grantr.grants import Grants, InMemoryStorage
+from lattice_core.approvals import Answerers, ApprovalRequest, Rendering, arguments_digest
+from lattice_core.capabilities import JsonObject, PersonCaller, RunCaller, Scope, Via
 from portalr.actions import ACTIONS
 from portalr.analytics import InMemoryConsent, InMemoryRateLimiter, Relay, Umami
 from portalr.fastapi import UI, Site, Surfaces, portalr_router
@@ -107,6 +109,43 @@ async def seed(grants: Grants) -> None:
     for tenant, owner in (("acme", ALICE), ("globex", CAROL)):
         await grants.add_member(tenant, OLGA, by=owner)
         await grants.grant(tenant, "admin", on=Resource(kind="tenant"), to=OLGA, by=owner)
+    await ask_alice(grants)
+
+
+async def ask_alice(grants: Grants) -> None:
+    """Two approvals waiting for alice in acme's notes (lattice RFC-0011): bob's agent's call, which
+    she may answer on its page, and her own admin action through Claude, which she confirms on
+    admin's confirm page alone."""
+    approvals = grants.approvals()
+    notes = Scope(tenant_id="acme", workspace_id="notes")
+    week = datetime.now(UTC) + timedelta(days=7)
+    note: JsonObject = {"note": "Weekly"}
+    await approvals.ask(
+        ApprovalRequest(
+            scope=notes,
+            capability="notes.publish",
+            version="1.0.0",
+            rendering=Rendering(title="Publish the weekly note", arguments=note),
+            arguments_digest=arguments_digest(note),
+            asked_by=RunCaller(id="run_weekly", agent="notes", on_behalf_of=BOB.id),
+            answerers=Answerers(subjects=frozenset({ALICE.id})),
+            deadline=week,
+        )
+    )
+    key: JsonObject = {"key": "key_ci"}
+    await approvals.ask(
+        ApprovalRequest(
+            scope=notes,
+            capability="grantr.revoke_key",
+            version="1.0.0",
+            rendering=Rendering(title="Revoke the key ci", arguments=key),
+            arguments_digest=arguments_digest(key),
+            asked_by=PersonCaller(id=ALICE.id),
+            via=Via(connection_id="con_claude", client_name="Claude", surface="mcp"),
+            answerers=Answerers(subjects=frozenset({ALICE.id}), confirmation=True),
+            deadline=week,
+        )
+    )
 
 
 def signed_in(token: str) -> User:

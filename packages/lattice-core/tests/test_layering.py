@@ -96,6 +96,7 @@ def test_the_modules_that_need_no_extra_are_found() -> None:
         "lattice_core.adapters",
         "lattice_core.approvals",
         "lattice_core.capabilities",
+        "lattice_core.commands",
         "lattice_core.egress",
         "lattice_core.enforcement",
         "lattice_core.logs",

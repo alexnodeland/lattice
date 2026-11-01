@@ -32,6 +32,51 @@ let held: Promise<void> | null = null;
 let sameValueRace = false;
 /** Whether grantr lists a setting of names too. */
 let names = false;
+/** Whether grantr lists the tiers that need approval: a superset (lattice ADR-0038). */
+let tiersListed = false;
+/** What a workspace has set of the tiers, if anything. */
+const tiers = new Map<string, { value: string[] | null; version: number }>();
+/** The tiers the tenant asks approval of, which a workspace may only add to. */
+const ASKED = ["outbound", "run_code"];
+/** The tiers that need approval, as grantr lists them at a workspace: a union down the layers. */
+function tiersOf(workspace: string | null) {
+  const here = tiers.get(workspace ?? "") ?? null;
+  const value = here?.value ?? null;
+  return {
+    key: "approve:tiers",
+    description: "Which tiers of capability need a person's approval before an agent's call.",
+    kind: {
+      type: "superset",
+      low: null,
+      high: null,
+      universe: ["outbound", "read", "run_code", "write"],
+      labels: {
+        outbound: "reaches outside",
+        read: "reads",
+        run_code: "runs code",
+        write: "writes",
+      },
+    },
+    default: ASKED,
+    lowest: "workspace",
+    operator: null,
+    tenant: null,
+    workspace:
+      value === null
+        ? null
+        : {
+            value,
+            version: here?.version ?? 0,
+            by: { kind: "user", id: "alice" },
+            at,
+            clamped: false,
+          },
+    version: here?.version ?? 0,
+    ceiling: ASKED,
+    ceiling_set_by: "tenant",
+    effective: [...new Set([...ASKED, ...(value ?? [])])].sort(),
+  };
+}
 /** Whether the tenant has 120 workspaces, past the 99 one read of grantr's checks asks about. */
 let many = false;
 const WORKSPACES = ["notes", "plans"];
@@ -138,6 +183,12 @@ async function grantr(request: Request, path: string): Promise<Response | undefi
     const tag = request.headers.get("If-Match");
     sent.push(`${workspace ?? "tenant"} ${tag} ${body}`);
     await held;
+    if (key === "approve:tiers") {
+      const name = workspace ?? "";
+      const { value } = JSON.parse(body) as { value: string[] | null };
+      tiers.set(name, { value, version: (tiers.get(name)?.version ?? 0) + 1 });
+      return Response.json(tiersOf(workspace));
+    }
     if (key === "connect-tools:freecad") {
       const name = workspace ?? "";
       if (racingTools) {
@@ -189,7 +240,11 @@ async function grantr(request: Request, path: string): Promise<Response | undefi
     });
     return Response.json(stateOf(workspace));
   }
-  const listed = names ? [stateOf(workspace), toolsOf(workspace)] : [stateOf(workspace)];
+  const listed = [
+    stateOf(workspace),
+    ...(names ? [toolsOf(workspace)] : []),
+    ...(tiersListed ? [tiersOf(workspace)] : []),
+  ];
   return Response.json({ settings: listed, unknown });
 }
 
@@ -208,6 +263,8 @@ afterEach(() => {
   held = null;
   sameValueRace = false;
   names = false;
+  tiersListed = false;
+  tiers.clear();
   many = false;
   tools.clear();
   refusingTools = false;
@@ -443,6 +500,32 @@ test("a workspace's tools are checked, each with its risk, and those the tenant 
   await expect.element(group.getByRole("checkbox", { name: "get_objects (reads)" })).toHaveFocus();
   await expect.element(view).toBeChecked();
   expect(sent.at(-1)).toBe('notes "1" {"value":null}');
+});
+
+test("a workspace adds tiers that need approval, and can't take out those the tenant asks for", async () => {
+  tiersListed = true;
+  const { screen } = await open("/t/acme/settings?workspace=notes");
+  const group = screen.getByRole("group", { name: "Tiers that need approval" });
+  await expect
+    .element(group)
+    .toHaveAccessibleDescription(
+      "Checked ones are asked for here. One the tenant asks for can't be unchecked.",
+    );
+  const outbound = group.getByRole("checkbox", { name: "outbound (reaches outside)" });
+  await expect.element(outbound).toBeChecked();
+  await expect.element(outbound).toBeDisabled();
+  await expect.element(outbound).toHaveAccessibleDescription("Asked for by the tenant");
+  const write = group.getByRole("checkbox", { name: "write (writes)" });
+  await expect.element(write).not.toBeChecked();
+  await write.click();
+  await screen.getByRole("button", { name: "Save Tiers that need approval" }).click();
+  await expect
+    .element(screen.getByText("Tiers that need approval: outbound, run_code, write applies."))
+    .toBeVisible();
+  expect(sent).toEqual(['notes "0" {"value":["outbound","run_code","write"]}']);
+  await expect
+    .element(screen.getByText("At least outbound, run_code: the tenant's value.", { exact: false }))
+    .toBeVisible();
 });
 
 test("a tool set here that the tenant no longer offers isn't checked, and is left out on save", async () => {

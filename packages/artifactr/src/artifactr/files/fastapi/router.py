@@ -47,6 +47,7 @@ from artifactr.files.native import (
 )
 from artifactr.telemetry import annotate, attribution
 from artifactr.workspace import Access, ArtifactLease, Workspace, Workspaces
+from lattice_core.commands import calls, calls_none
 from lattice_core.refusals import refusals
 
 logger = logging.getLogger("artifactr.files")
@@ -122,6 +123,8 @@ BODY: Final[dict[str, Any]] = {
     "requestBody": {"required": True, "content": {"application/octet-stream": {}, "*/*": {}}}
 }
 """A file's bytes as a request's whole body, of any `Content-Type`."""
+LATER: Final = calls_none("native files' making and check-out come in 0.3.x (#924)")
+"""What making a native file and its check-out call: no command yet (lattice ADR-0042)."""
 
 
 class Lease(BaseModel):
@@ -280,7 +283,10 @@ def files_router(
 
     current_workspace = Depends(workspace_of)
 
-    @router.get("/workspaces/{workspace_id}/uploads")
+    @router.get(
+        "/workspaces/{workspace_id}/uploads",
+        openapi_extra=calls_none("what the person may upload here, which the upload form reads"),
+    )
     async def uploads(ws: Workspace = current_workspace) -> Uploads:
         """What the person may upload here: whether at all, how large, and of which types."""
 
@@ -299,7 +305,9 @@ def files_router(
 
         return await _answered(offered())
 
-    @router.post("/workspaces/{workspace_id}/files", status_code=201, openapi_extra=BODY)
+    @router.post(
+        "/workspaces/{workspace_id}/files", status_code=201, openapi_extra={**BODY, **LATER}
+    )
     async def upload(
         request: Request,
         response: Response,
@@ -395,7 +403,9 @@ def files_router(
             )
         return Uploaded(outcome="unchanged", artifact_id=artifact_id)
 
-    @router.get("/workspaces/{workspace_id}/files/{artifact_id}")
+    @router.get(
+        "/workspaces/{workspace_id}/files/{artifact_id}", openapi_extra=calls("artifactr.read_file")
+    )
     async def get_file(artifact_id: PathId, ws: Workspace = current_workspace) -> FileStatus:
         """A native file's head, who has it checked out, and whether it can be."""
 
@@ -419,17 +429,25 @@ def files_router(
 
         return await _answered(status())
 
-    @router.post("/workspaces/{workspace_id}/files/{artifact_id}/checkouts", status_code=201)
+    @router.post(
+        "/workspaces/{workspace_id}/files/{artifact_id}/checkouts",
+        status_code=201,
+        openapi_extra=LATER,
+    )
     async def check_out(artifact_id: PathId, ws: Workspace = current_workspace) -> Checkout:
         """Check the file out to the actor, holding its lease; then download its head."""
         return await _answered(files.check_out(ws, artifact_id))
 
-    @router.post("/workspaces/{workspace_id}/checkouts/{checkout_id}/extension")
+    @router.post(
+        "/workspaces/{workspace_id}/checkouts/{checkout_id}/extension", openapi_extra=LATER
+    )
     async def extend(checkout_id: PathId, ws: Workspace = current_workspace) -> Checkout:
         """Extend a check-out by its whole length again, from now."""
         return await _answered(files.extend(ws, checkout_id))
 
-    @router.put("/workspaces/{workspace_id}/checkouts/{checkout_id}/file", openapi_extra=BODY)
+    @router.put(
+        "/workspaces/{workspace_id}/checkouts/{checkout_id}/file", openapi_extra={**BODY, **LATER}
+    )
     async def check_in(
         checkout_id: PathId, request: Request, ws: Workspace = current_workspace
     ) -> CheckedIn:
@@ -457,6 +475,7 @@ def files_router(
         "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/content",
         response_class=Response,
         responses={200: {"content": {"application/octet-stream": {}}}},
+        openapi_extra=calls("artifactr.read_file"),
     )
     async def download(
         artifact_id: PathId, version: Version, ws: Workspace = current_workspace
@@ -484,6 +503,7 @@ def files_router(
         "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/text",
         response_class=Response,
         responses={200: {"content": {TEXT: {}}}},
+        openapi_extra=calls("artifactr.read_file"),
     )
     async def text(
         artifact_id: PathId, version: Version, ws: Workspace = current_workspace
@@ -496,6 +516,7 @@ def files_router(
         "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/pages/{page}",
         response_class=Response,
         responses=PAGE_RESPONSES,
+        openapi_extra=calls("artifactr.read_file"),
     )
     async def page(
         artifact_id: PathId,
@@ -513,13 +534,17 @@ def files_router(
         "/workspaces/{workspace_id}/proposals/{proposal_id}/text",
         response_class=Response,
         responses={200: {"content": {TEXT: {}}}},
+        openapi_extra=calls("artifactr.list_proposals"),
     )
     async def proposed_text(proposal_id: PathId, ws: Workspace = current_workspace) -> Response:
         """The words a proposal would give a native file, as the app read them: its diff."""
         words = await _answered(files.proposed(ws, proposal_id, part="text"))
         return Response(words, media_type=TEXT, headers=DOWNLOAD)
 
-    @router.get("/workspaces/{workspace_id}/proposals/{proposal_id}/commands")
+    @router.get(
+        "/workspaces/{workspace_id}/proposals/{proposal_id}/commands",
+        openapi_extra=calls("artifactr.list_proposals"),
+    )
     async def proposed_commands(
         proposal_id: PathId, ws: Workspace = current_workspace
     ) -> ProposalDescription:
@@ -533,6 +558,7 @@ def files_router(
         "/workspaces/{workspace_id}/proposals/{proposal_id}/pages/{page}",
         response_class=Response,
         responses=PAGE_RESPONSES,
+        openapi_extra=calls("artifactr.list_proposals"),
     )
     async def proposed_page(
         proposal_id: PathId,

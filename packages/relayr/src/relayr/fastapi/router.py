@@ -13,6 +13,7 @@ from typing import Annotated, Final
 from fastapi import APIRouter, Path, Request, Response
 from fastapi.responses import JSONResponse
 
+from lattice_core.commands import calls_none
 from lattice_core.refusals import Refused, refusals
 from relayr.trackers import TrackerFollowers
 
@@ -34,6 +35,9 @@ def tracker_router(followers: TrackerFollowers) -> APIRouter:
         "/relayr/v1/trackers/{tenant}/{tracker}",
         status_code=204,
         summary="Nudge a tracker project's follower",
+        openapi_extra=calls_none(
+            "a tracker's webhook, verified by its signature: no person's action"
+        ),
     )
     async def nudge(tenant: PathId, tracker: PathId, request: Request) -> Response:
         """Verify a tracker's webhook, and make the followers of the project it names poll now."""

@@ -106,7 +106,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
         id: string = crypto.randomUUID(),
       ): Promise<Answer> =>
         answer(
-          api.reflexr.POST("/workspaces/{workspace_id}/commands", {
+          api.reflexr.POST("frames", "/workspaces/{workspace_id}/commands", {
             ...named(tenant),
             params: { path: { workspace_id: ws } },
             body: { type: "command", command_id: id, command },
@@ -118,15 +118,19 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       /** Grant a role on a resource, such as a thread, to a member of the tenant. */
       grant: (tenant: string, request: GrantRequest): Promise<Answer<AuditEntry>> =>
         answer(
-          api.grantr.POST("/grantr/v1/tenants/{tenant}/grants", {
-            ...inTenant(tenant, {}),
-            body: request,
-          }),
+          api.grantr.POST(
+            // A role on the whole tenant asks the caller's confirmation (grantr ADR-0042).
+            request.on.kind === "tenant" || request.on.kind === "deployment"
+              ? "grantr.grant_on_tenant"
+              : "grantr.grant",
+            "/grantr/v1/tenants/{tenant}/grants",
+            { ...inTenant(tenant, {}), body: request },
+          ),
         ),
       /** Take a grant back. */
       revoke: (tenant: string, request: GrantRequest): Promise<Answer<AuditEntry>> =>
         answer(
-          api.grantr.POST("/grantr/v1/tenants/{tenant}/revocations", {
+          api.grantr.POST("grantr.revoke", "/grantr/v1/tenants/{tenant}/revocations", {
             ...inTenant(tenant, {}),
             body: request,
           }),
@@ -134,7 +138,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       /** Restrict a thread or artifact to those granted a role on it, or lift that. */
       restrict: (tenant: string, restriction: Restriction): Promise<Answer<AuditEntry>> =>
         answer(
-          api.grantr.POST("/grantr/v1/tenants/{tenant}/restrictions", {
+          api.grantr.POST("grantr.restrict", "/grantr/v1/tenants/{tenant}/restrictions", {
             ...inTenant(tenant, {}),
             body: restriction,
           }),
@@ -142,7 +146,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       /** Add a user or a service principal to the tenant: a service principal is made so. */
       addMember: (tenant: string, member: Member): Promise<Answer<AuditEntry>> =>
         answer(
-          api.grantr.POST("/grantr/v1/tenants/{tenant}/members", {
+          api.grantr.POST("grantr.add_member", "/grantr/v1/tenants/{tenant}/members", {
             ...inTenant(tenant, {}),
             body: { member },
           }),
@@ -150,9 +154,11 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       /** Remove a member, with their grants, their places in groups, and their keys. */
       removeMember: (tenant: string, member: Member): Promise<Answer<AuditEntry>> =>
         answer(
-          api.grantr.DELETE(`/grantr/v1/tenants/{tenant}/members/${member.kind}/{member_id}`, {
-            ...inTenant(tenant, { member_id: member.id }),
-          }),
+          api.grantr.DELETE(
+            "grantr.remove_member",
+            `/grantr/v1/tenants/{tenant}/members/${member.kind}/{member_id}`,
+            { ...inTenant(tenant, { member_id: member.id }) },
+          ),
         ),
       /** Create a group, or replace its members. */
       defineGroup: (
@@ -161,7 +167,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
         members: readonly Member[],
       ): Promise<Answer<AuditEntry>> =>
         answer(
-          api.grantr.PUT("/grantr/v1/tenants/{tenant}/groups/{group}", {
+          api.grantr.PUT("grantr.define_group", "/grantr/v1/tenants/{tenant}/groups/{group}", {
             ...inTenant(tenant, { group }),
             body: { members: [...members] },
           }),
@@ -169,7 +175,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       /** Delete a group, with its grants. */
       deleteGroup: (tenant: string, group: string): Promise<Answer<AuditEntry>> =>
         answer(
-          api.grantr.DELETE("/grantr/v1/tenants/{tenant}/groups/{group}", {
+          api.grantr.DELETE("grantr.delete_group", "/grantr/v1/tenants/{tenant}/groups/{group}", {
             ...inTenant(tenant, { group }),
           }),
         ),
@@ -180,7 +186,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
         actions: readonly string[],
       ): Promise<Answer<AuditEntry>> =>
         answer(
-          api.grantr.PUT("/grantr/v1/tenants/{tenant}/roles/{name}", {
+          api.grantr.PUT("grantr.define_role", "/grantr/v1/tenants/{tenant}/roles/{name}", {
             ...inTenant(tenant, { name }),
             body: { actions: [...actions] },
           }),
@@ -188,14 +194,14 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       /** Delete a custom role, with its grants. */
       deleteRole: (tenant: string, name: string): Promise<Answer<AuditEntry>> =>
         answer(
-          api.grantr.DELETE("/grantr/v1/tenants/{tenant}/roles/{name}", {
+          api.grantr.DELETE("grantr.delete_role", "/grantr/v1/tenants/{tenant}/roles/{name}", {
             ...inTenant(tenant, { name }),
           }),
         ),
       /** Issue a key for a service principal: its secret is in the answer, and nowhere after. */
       issueKey: (tenant: string, principal: string): Promise<Answer<IssuedKey>> =>
         answer(
-          api.grantr.POST("/grantr/v1/tenants/{tenant}/keys", {
+          api.grantr.POST("grantr.issue_key", "/grantr/v1/tenants/{tenant}/keys", {
             ...inTenant(tenant, {}),
             body: { principal },
           }),
@@ -213,11 +219,16 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       ): Promise<Answer<IntegrationState>> =>
         answer(
           workspace === undefined
-            ? api.grantr.PUT("/grantr/v1/tenants/{tenant}/integrations/{key}", {
-                ...inTenant(tenant, { key }),
-                body: { on },
-              })
+            ? api.grantr.PUT(
+                "grantr.set_integration",
+                "/grantr/v1/tenants/{tenant}/integrations/{key}",
+                {
+                  ...inTenant(tenant, { key }),
+                  body: { on },
+                },
+              )
             : api.grantr.PUT(
+                "grantr.set_integration",
                 "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/integrations/{key}",
                 {
                   ...inTenant(tenant, { workspace, key }),
@@ -242,22 +253,26 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
         const header = { "If-Match": `"${version}"` };
         return answer(
           workspace === undefined
-            ? api.grantr.PUT("/grantr/v1/tenants/{tenant}/settings/{key}", {
+            ? api.grantr.PUT("grantr.set_setting", "/grantr/v1/tenants/{tenant}/settings/{key}", {
                 ...named(tenant),
                 params: { path: { tenant, key }, header },
                 body,
               })
-            : api.grantr.PUT("/grantr/v1/tenants/{tenant}/workspaces/{workspace}/settings/{key}", {
-                ...named(tenant),
-                params: { path: { tenant, workspace, key }, header },
-                body,
-              }),
+            : api.grantr.PUT(
+                "grantr.set_setting",
+                "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/settings/{key}",
+                {
+                  ...named(tenant),
+                  params: { path: { tenant, workspace, key }, header },
+                  body,
+                },
+              ),
         );
       },
       /** Revoke a key, by its public id. */
       revokeKey: (tenant: string, key: string): Promise<Answer<AuditEntry>> =>
         answer(
-          api.grantr.DELETE("/grantr/v1/tenants/{tenant}/keys/{key_id}", {
+          api.grantr.DELETE("grantr.revoke_key", "/grantr/v1/tenants/{tenant}/keys/{key_id}", {
             ...inTenant(tenant, { key_id: key }),
           }),
         ),
@@ -274,28 +289,37 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
         surface: ApprovalSurface,
       ): Promise<Answer<Approval>> =>
         answer(
-          api.grantr.POST("/grantr/v1/tenants/{tenant}/approvals/{approval}/answer", {
-            ...inTenant(tenant, { approval: approval.id }),
-            body: {
-              approved: given.approved,
-              arguments_digest: approval.arguments_digest,
-              reason: given.reason?.trim() || null,
-              surface,
+          api.grantr.POST(
+            "grantr.answer_approval",
+            "/grantr/v1/tenants/{tenant}/approvals/{approval}/answer",
+            {
+              ...inTenant(tenant, { approval: approval.id }),
+              body: {
+                approved: given.approved,
+                arguments_digest: approval.arguments_digest,
+                reason: given.reason?.trim() || null,
+                surface,
+              },
             },
-          }),
+          ),
         ),
     },
     portalr: {
       /** Invite someone by email to the tenant, through Supabase Auth, and add them to it. */
       invite: (tenant: string, email: string): Promise<Answer<Invited>> =>
-        answer(api.portalr.POST("/portalr/v1/invites", { ...named(tenant), body: { email } })),
+        answer(
+          api.portalr.POST("portalr.invite_member", "/portalr/v1/invites", {
+            ...named(tenant),
+            body: { email },
+          }),
+        ),
       /**
        * Create a tenant, its first owner invited or found by email, for operators. The answer is
        * the tenant and the owner's user id: the email is not kept, nor answered with.
        */
       createTenant: (tenant: string, ownerEmail: string): Promise<Answer<CreatedTenant>> =>
         answer(
-          api.portalr.POST("/portalr/v1/deployment/tenants", {
+          api.portalr.POST("portalr.create_tenant", "/portalr/v1/deployment/tenants", {
             body: { tenant, owner_email: ownerEmail },
           }),
         ),
@@ -304,7 +328,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       /** Check a native file out to the reader, holding it for them: then download its head. */
       checkOut: (tenant: string, ws: string, artifact: string): Promise<Answer<Checkout>> =>
         answer(
-          api.files.POST("/workspaces/{workspace_id}/files/{artifact_id}/checkouts", {
+          api.files.POST(null, "/workspaces/{workspace_id}/files/{artifact_id}/checkouts", {
             ...named(tenant),
             params: { path: { workspace_id: ws, artifact_id: artifact } },
           }),
@@ -312,7 +336,7 @@ export function createCommands(api: Api, unsigned: () => void = () => {}) {
       /** Extend the reader's check-out by its whole length again, from now. */
       extend: (tenant: string, ws: string, checkout: string): Promise<Answer<Checkout>> =>
         answer(
-          api.files.POST("/workspaces/{workspace_id}/checkouts/{checkout_id}/extension", {
+          api.files.POST(null, "/workspaces/{workspace_id}/checkouts/{checkout_id}/extension", {
             ...named(tenant),
             params: { path: { workspace_id: ws, checkout_id: checkout } },
           }),

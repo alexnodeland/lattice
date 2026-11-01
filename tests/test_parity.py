@@ -13,9 +13,12 @@ the libraries publish, and fails on each gap:
 - **A tool has no grantr check:** each command's gate is an action of grantr's catalog.
 - **A grantr action has no command:** each action is some command's gate, or is listed by its
   library with a reason (claiming threads, keeping cursors, a run's own steps).
+- **portalr's client sends a command no surface of portalr's offers:** each name in
+  ``commands.used.json``, the commands its UIs' requests name (portalr ADR-0096), is a command of
+  the catalogs offered on ``portalr``.
 
-Each gap has a fixture that fails it, run through the same checks. portalr's client's side, that
-it sends nothing without naming a command, and portr's generated tools follow (#916, #917).
+Each gap has a fixture that fails it, run through the same checks. portr's generated tools follow
+(#917).
 """
 
 import json
@@ -52,6 +55,7 @@ from relayr.commands import CATALOG as RELAYR
 from relayr.commands import LISTED as RELAYR_LISTED
 
 ROOT = Path(__file__).parent.parent
+USED = ROOT / "packages/portalr/web/client/commands.used.json"
 METHODS = ("get", "put", "post", "delete", "patch", "head", "options")
 
 type Document = Mapping[str, Any]
@@ -69,6 +73,8 @@ class Composed:
     """Each action no command gates, and why, as its library lists it."""
     documents: Mapping[str, Document]
     """Every OpenAPI document the libraries publish, by its file's name."""
+    used: frozenset[str]
+    """The commands portalr's UIs send over REST, as ``commands.used.json`` lists them."""
 
 
 def composed() -> Composed:
@@ -83,6 +89,7 @@ def composed() -> Composed:
         actions=Catalog.of(ARTIFACTR_ACTIONS, REFLEXR_ACTIONS, PORTALR_ACTIONS).actions,
         listed=MappingProxyType(listed),
         documents=MappingProxyType(documents),
+        used=frozenset(json.loads(USED.read_text())),
     )
 
 
@@ -167,9 +174,24 @@ def action_gaps(world: Composed) -> Iterator[str]:
             yield f"{action} is listed, but is no action"
 
 
+def client_gaps(world: Composed) -> Iterator[str]:
+    """Each command portalr's client sends that no catalog declares, or portalr doesn't offer."""
+    for name in sorted(world.used):
+        command = world.commands.get(name)
+        if command is None:
+            yield f"portalr's client sends {name}, which no catalog declares"
+        elif "portalr" not in command.surfaces:
+            yield f"portalr's client sends {name}, which isn't offered on portalr"
+
+
 def gaps(world: Composed) -> list[str]:
     """Every gap in ``world``."""
-    return [*operation_gaps(world), *command_gaps(world), *action_gaps(world)]
+    return [
+        *operation_gaps(world),
+        *command_gaps(world),
+        *action_gaps(world),
+        *client_gaps(world),
+    ]
 
 
 WORLD = composed()
@@ -183,6 +205,7 @@ def test_every_document_and_every_catalog_is_read() -> None:
     assert len(WORLD.documents) >= 7, "artifactr's three, grantr's, portalr's, reflexr's, relayr's"
     packages = {name.partition(".")[0] for name in WORLD.commands}
     assert packages == {"artifactr", "grantr", "reflexr", "relayr", "portalr"}
+    assert "grantr.revoke_key" in WORLD.used, "portalr's client's requests are read"
 
 
 def _changed(document: str, where: str, change: Callable[[dict[str, Any]], None]) -> Composed:
@@ -305,6 +328,16 @@ COMMANDS = "POST /workspaces/{workspace_id}/commands"
             replace(WORLD, listed=MappingProxyType({**WORLD.listed, "grantr:dance": "why"})),
             "grantr:dance is listed, but is no action",
             id="a listed action that is none",
+        ),
+        pytest.param(
+            replace(WORLD, used=WORLD.used | {"grantr.dance"}),
+            "portalr's client sends grantr.dance, which no catalog declares",
+            id="the client sending a command that is none",
+        ),
+        pytest.param(
+            _with("grantr.revoke_key", surfaces=frozenset({"mcp"})),
+            "portalr's client sends grantr.revoke_key, which isn't offered on portalr",
+            id="the client sending a command portalr doesn't offer",
         ),
     ],
 )

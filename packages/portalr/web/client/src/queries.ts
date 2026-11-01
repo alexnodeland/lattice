@@ -353,23 +353,34 @@ export function createQueries(api: Api) {
       workspaces: (tenant: string) =>
         queryOptions({
           queryKey: keys.artifactr.workspaces(tenant),
-          queryFn: () => body(api.artifactr.GET("/workspaces", named(tenant))),
+          queryFn: () =>
+            body(api.artifactr.GET("artifactr.list_workspaces", "/workspaces", named(tenant))),
         }),
       threads: (tenant: string, ws: string) =>
         queryOptions({
           queryKey: keys.artifactr.threads(tenant, ws),
           queryFn: () =>
-            body(api.artifactr.GET("/workspaces/{workspace_id}/threads", workspace(tenant, ws))),
+            body(
+              api.artifactr.GET(
+                "artifactr.list_threads",
+                "/workspaces/{workspace_id}/threads",
+                workspace(tenant, ws),
+              ),
+            ),
         }),
       thread: (tenant: string, ws: string, thread: string) =>
         queryOptions({
           queryKey: keys.artifactr.thread(tenant, ws, thread),
           queryFn: () =>
             body(
-              api.artifactr.GET("/workspaces/{workspace_id}/threads/{thread_id}", {
-                ...named(tenant),
-                params: { path: { workspace_id: ws, thread_id: thread } },
-              }),
+              api.artifactr.GET(
+                "artifactr.read_thread",
+                "/workspaces/{workspace_id}/threads/{thread_id}",
+                {
+                  ...named(tenant),
+                  params: { path: { workspace_id: ws, thread_id: thread } },
+                },
+              ),
             ),
         }),
       /** A thread's latest events, which a stream then resumes after (artifactr's serving guide). */
@@ -378,7 +389,7 @@ export function createQueries(api: Api) {
           queryKey: keys.artifactr.tail(tenant, ws, thread, last),
           queryFn: () =>
             body(
-              api.artifactr.GET("/workspaces/{workspace_id}/events", {
+              api.artifactr.GET("artifactr.read_events", "/workspaces/{workspace_id}/events", {
                 ...named(tenant),
                 params: { path: { workspace_id: ws }, query: { thread_id: [thread], last } },
               }),
@@ -389,17 +400,27 @@ export function createQueries(api: Api) {
         queryOptions({
           queryKey: keys.artifactr.artifacts(tenant, ws),
           queryFn: () =>
-            body(api.artifactr.GET("/workspaces/{workspace_id}/artifacts", workspace(tenant, ws))),
+            body(
+              api.artifactr.GET(
+                "artifactr.list_artifacts",
+                "/workspaces/{workspace_id}/artifacts",
+                workspace(tenant, ws),
+              ),
+            ),
         }),
       artifact: (tenant: string, ws: string, artifact: string) =>
         queryOptions({
           queryKey: keys.artifactr.artifact(tenant, ws, artifact),
           queryFn: () =>
             body(
-              api.artifactr.GET("/workspaces/{workspace_id}/artifacts/{artifact_id}", {
-                ...named(tenant),
-                params: { path: { workspace_id: ws, artifact_id: artifact } },
-              }),
+              api.artifactr.GET(
+                "artifactr.read_artifact",
+                "/workspaces/{workspace_id}/artifacts/{artifact_id}",
+                {
+                  ...named(tenant),
+                  params: { path: { workspace_id: ws, artifact_id: artifact } },
+                },
+              ),
             ),
         }),
       /** An artifact's versions, oldest first, each with its whole data: the last is now. */
@@ -408,17 +429,27 @@ export function createQueries(api: Api) {
           queryKey: keys.artifactr.revisions(tenant, ws, artifact),
           queryFn: () =>
             body(
-              api.artifactr.GET("/workspaces/{workspace_id}/artifacts/{artifact_id}/revisions", {
-                ...named(tenant),
-                params: { path: { workspace_id: ws, artifact_id: artifact } },
-              }),
+              api.artifactr.GET(
+                "artifactr.list_revisions",
+                "/workspaces/{workspace_id}/artifacts/{artifact_id}/revisions",
+                {
+                  ...named(tenant),
+                  params: { path: { workspace_id: ws, artifact_id: artifact } },
+                },
+              ),
             ),
         }),
       proposals: (tenant: string, ws: string) =>
         queryOptions({
           queryKey: keys.artifactr.proposals(tenant, ws),
           queryFn: () =>
-            body(api.artifactr.GET("/workspaces/{workspace_id}/proposals", workspace(tenant, ws))),
+            body(
+              api.artifactr.GET(
+                "artifactr.list_proposals",
+                "/workspaces/{workspace_id}/proposals",
+                workspace(tenant, ws),
+              ),
+            ),
         }),
     },
     files: {
@@ -432,10 +463,14 @@ export function createQueries(api: Api) {
           queryKey: keys.files.status(tenant, ws, artifact),
           queryFn: () =>
             body(
-              api.files.GET("/workspaces/{workspace_id}/files/{artifact_id}", {
-                ...named(tenant),
-                params: { path: { workspace_id: ws, artifact_id: artifact } },
-              }),
+              api.files.GET(
+                "artifactr.read_file",
+                "/workspaces/{workspace_id}/files/{artifact_id}",
+                {
+                  ...named(tenant),
+                  params: { path: { workspace_id: ws, artifact_id: artifact } },
+                },
+              ),
             ),
           refetchInterval: (query) => {
             if (query.state.status === "error") {
@@ -453,7 +488,7 @@ export function createQueries(api: Api) {
         queryOptions({
           queryKey: keys.files.uploads(tenant, ws),
           queryFn: () =>
-            body(api.files.GET("/workspaces/{workspace_id}/uploads", workspace(tenant, ws))),
+            body(api.files.GET(null, "/workspaces/{workspace_id}/uploads", workspace(tenant, ws))),
           refetchInterval: (query) => (query.state.status === "error" ? false : 30_000),
         }),
       /**
@@ -466,6 +501,7 @@ export function createQueries(api: Api) {
           queryFn: () =>
             body(
               api.files.GET(
+                "artifactr.read_file",
                 "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/content",
                 {
                   ...named(tenant),
@@ -483,6 +519,7 @@ export function createQueries(api: Api) {
           queryFn: () =>
             words(
               api.files.GET(
+                "artifactr.read_file",
                 "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/text",
                 {
                   ...named(tenant),
@@ -501,6 +538,7 @@ export function createQueries(api: Api) {
             pngDataUrl(
               await body(
                 api.files.GET(
+                  "artifactr.read_file",
                   "/workspaces/{workspace_id}/files/{artifact_id}/versions/{version}/pages/{page}",
                   {
                     ...named(tenant),
@@ -518,11 +556,15 @@ export function createQueries(api: Api) {
           queryKey: [...keys.files.proposal(tenant, ws, proposal), "text"],
           queryFn: () =>
             words(
-              api.files.GET("/workspaces/{workspace_id}/proposals/{proposal_id}/text", {
-                ...named(tenant),
-                params: { path: { workspace_id: ws, proposal_id: proposal } },
-                parseAs: "text",
-              }),
+              api.files.GET(
+                "artifactr.list_proposals",
+                "/workspaces/{workspace_id}/proposals/{proposal_id}/text",
+                {
+                  ...named(tenant),
+                  params: { path: { workspace_id: ws, proposal_id: proposal } },
+                  parseAs: "text",
+                },
+              ),
             ),
           staleTime: Number.POSITIVE_INFINITY,
         }),
@@ -535,10 +577,14 @@ export function createQueries(api: Api) {
           queryKey: [...keys.files.proposal(tenant, ws, proposal), "commands"],
           queryFn: () =>
             words(
-              api.files.GET("/workspaces/{workspace_id}/proposals/{proposal_id}/commands", {
-                ...named(tenant),
-                params: { path: { workspace_id: ws, proposal_id: proposal } },
-              }),
+              api.files.GET(
+                "artifactr.list_proposals",
+                "/workspaces/{workspace_id}/proposals/{proposal_id}/commands",
+                {
+                  ...named(tenant),
+                  params: { path: { workspace_id: ws, proposal_id: proposal } },
+                },
+              ),
             ),
           staleTime: Number.POSITIVE_INFINITY,
         }),
@@ -549,11 +595,15 @@ export function createQueries(api: Api) {
           queryFn: async () =>
             pngDataUrl(
               await body(
-                api.files.GET("/workspaces/{workspace_id}/proposals/{proposal_id}/pages/{page}", {
-                  ...named(tenant),
-                  params: { path: { workspace_id: ws, proposal_id: proposal, page } },
-                  parseAs: "arrayBuffer",
-                }),
+                api.files.GET(
+                  "artifactr.list_proposals",
+                  "/workspaces/{workspace_id}/proposals/{proposal_id}/pages/{page}",
+                  {
+                    ...named(tenant),
+                    params: { path: { workspace_id: ws, proposal_id: proposal, page } },
+                    parseAs: "arrayBuffer",
+                  },
+                ),
               ),
             ),
           staleTime: Number.POSITIVE_INFINITY,
@@ -564,7 +614,13 @@ export function createQueries(api: Api) {
         queryOptions({
           queryKey: keys.reflexr.rules(tenant, ws),
           queryFn: () =>
-            body(api.reflexr.GET("/workspaces/{workspace_id}/rules", workspace(tenant, ws))),
+            body(
+              api.reflexr.GET(
+                "reflexr.rule_status",
+                "/workspaces/{workspace_id}/rules",
+                workspace(tenant, ws),
+              ),
+            ),
         }),
       /** One of the workspace's rules: a code rule, or an active stored one's current version. */
       rule: (tenant: string, ws: string, rule: string) =>
@@ -572,7 +628,7 @@ export function createQueries(api: Api) {
           queryKey: keys.reflexr.rule(tenant, ws, rule),
           queryFn: () =>
             body(
-              api.reflexr.GET("/workspaces/{workspace_id}/rules/{rule}", {
+              api.reflexr.GET("reflexr.get_rule", "/workspaces/{workspace_id}/rules/{rule}", {
                 ...named(tenant),
                 params: { path: { workspace_id: ws, rule } },
               }),
@@ -583,13 +639,25 @@ export function createQueries(api: Api) {
         queryOptions({
           queryKey: keys.reflexr.schedules(tenant, ws),
           queryFn: () =>
-            body(api.reflexr.GET("/workspaces/{workspace_id}/schedules", workspace(tenant, ws))),
+            body(
+              api.reflexr.GET(
+                "reflexr.schedule_status",
+                "/workspaces/{workspace_id}/schedules",
+                workspace(tenant, ws),
+              ),
+            ),
         }),
       runs: (tenant: string, ws: string) =>
         queryOptions({
           queryKey: keys.reflexr.runs(tenant, ws),
           queryFn: () =>
-            body(api.reflexr.GET("/workspaces/{workspace_id}/runs", workspace(tenant, ws))),
+            body(
+              api.reflexr.GET(
+                "reflexr.list_runs",
+                "/workspaces/{workspace_id}/runs",
+                workspace(tenant, ws),
+              ),
+            ),
         }),
     },
     relayr: {
@@ -605,6 +673,7 @@ export function createQueries(api: Api) {
               ? Promise.resolve(null)
               : body(
                   api.relayr.GET(
+                    "relayr.list_filed_items",
                     "/relayr/v1/workspaces/{workspace_id}/tracker/items",
                     workspace(tenant, ws),
                   ),
@@ -619,6 +688,7 @@ export function createQueries(api: Api) {
               ? Promise.resolve(null)
               : body(
                   api.relayr.GET(
+                    "relayr.tracker_status",
                     "/relayr/v1/workspaces/{workspace_id}/tracker",
                     workspace(tenant, ws),
                   ),
@@ -631,7 +701,7 @@ export function createQueries(api: Api) {
         queryOptions({
           queryKey: keys.grantr.memberships(user),
           queryFn: async () => {
-            const me = await body(api.grantr.GET("/grantr/v1/me"));
+            const me = await body(api.grantr.GET(null, "/grantr/v1/me"));
             if (!("memberships" in me)) {
               throw new Error("grantr answered for one tenant, though the read named none");
             }
@@ -644,7 +714,7 @@ export function createQueries(api: Api) {
           queryKey: keys.grantr.me(tenant),
           queryFn: async () => {
             const me = await body(
-              api.grantr.GET("/grantr/v1/me", { params: { header: { "X-Tenant": tenant } } }),
+              api.grantr.GET(null, "/grantr/v1/me", { params: { header: { "X-Tenant": tenant } } }),
             );
             if ("memberships" in me) {
               throw new Error("grantr answered for every tenant, though the read named one");
@@ -658,7 +728,7 @@ export function createQueries(api: Api) {
           queryKey: keys.grantr.checks(tenant, checks),
           queryFn: () =>
             body(
-              api.grantr.POST("/grantr/v1/checks", {
+              api.grantr.POST(null, "/grantr/v1/checks", {
                 params: { header: { "X-Tenant": tenant } },
                 body: [...checks],
               }),
@@ -670,7 +740,7 @@ export function createQueries(api: Api) {
           queryKey: keys.grantr.members(tenant),
           queryFn: () =>
             body(
-              api.grantr.GET("/grantr/v1/tenants/{tenant}/members", {
+              api.grantr.GET("grantr.list_members", "/grantr/v1/tenants/{tenant}/members", {
                 ...named(tenant),
                 params: { path: { tenant } },
               }),
@@ -685,7 +755,7 @@ export function createQueries(api: Api) {
           queryKey: keys.grantr.grants(tenant, ws),
           queryFn: () =>
             body(
-              api.grantr.GET("/grantr/v1/tenants/{tenant}/grants", {
+              api.grantr.GET("grantr.list_grants", "/grantr/v1/tenants/{tenant}/grants", {
                 ...named(tenant),
                 params: { path: { tenant }, query: ws === undefined ? {} : { workspace: ws } },
               }),
@@ -697,10 +767,14 @@ export function createQueries(api: Api) {
           queryKey: keys.grantr.restrictions(tenant, ws),
           queryFn: () =>
             body(
-              api.grantr.GET("/grantr/v1/tenants/{tenant}/restrictions", {
-                ...named(tenant),
-                params: { path: { tenant }, query: { workspace: ws } },
-              }),
+              api.grantr.GET(
+                "grantr.list_restrictions",
+                "/grantr/v1/tenants/{tenant}/restrictions",
+                {
+                  ...named(tenant),
+                  params: { path: { tenant }, query: { workspace: ws } },
+                },
+              ),
             ),
         }),
       /** The tenant's custom roles (`grantr:define_role`). */
@@ -709,7 +783,7 @@ export function createQueries(api: Api) {
           queryKey: keys.grantr.roles(tenant),
           queryFn: () =>
             body(
-              api.grantr.GET("/grantr/v1/tenants/{tenant}/roles", {
+              api.grantr.GET("grantr.list_roles", "/grantr/v1/tenants/{tenant}/roles", {
                 ...named(tenant),
                 params: { path: { tenant } },
               }),
@@ -722,7 +796,7 @@ export function createQueries(api: Api) {
       catalog: () =>
         queryOptions({
           queryKey: keys.grantr.catalog(),
-          queryFn: () => body(api.grantr.GET("/grantr/v1/catalog")),
+          queryFn: () => body(api.grantr.GET(null, "/grantr/v1/catalog")),
           staleTime: Number.POSITIVE_INFINITY,
         }),
       /** The tenant's groups, by name, with their members (`grantr:manage_groups`). */
@@ -731,7 +805,7 @@ export function createQueries(api: Api) {
           queryKey: keys.grantr.groups(tenant),
           queryFn: () =>
             body(
-              api.grantr.GET("/grantr/v1/tenants/{tenant}/groups", {
+              api.grantr.GET("grantr.list_groups", "/grantr/v1/tenants/{tenant}/groups", {
                 ...named(tenant),
                 params: { path: { tenant } },
               }),
@@ -748,7 +822,7 @@ export function createQueries(api: Api) {
           initialPageParam: null as number | null,
           queryFn: ({ pageParam }) =>
             body(
-              api.grantr.GET("/grantr/v1/tenants/{tenant}/audit", {
+              api.grantr.GET("grantr.read_audit", "/grantr/v1/tenants/{tenant}/audit", {
                 ...named(tenant),
                 params: {
                   path: { tenant },
@@ -776,7 +850,7 @@ export function createQueries(api: Api) {
           initialPageParam: null as number | null,
           queryFn: ({ pageParam }) =>
             body(
-              api.grantr.GET("/grantr/v1/audit", {
+              api.grantr.GET("grantr.read_audit", "/grantr/v1/audit", {
                 params: { query: { last: AUDIT_PAGE, before_seq: pageParam } },
               }),
             ),
@@ -793,11 +867,16 @@ export function createQueries(api: Api) {
           queryFn: () =>
             body(
               ws === undefined
-                ? api.grantr.GET("/grantr/v1/tenants/{tenant}/integrations", {
-                    ...named(tenant),
-                    params: { path: { tenant } },
-                  })
+                ? api.grantr.GET(
+                    "grantr.list_integrations",
+                    "/grantr/v1/tenants/{tenant}/integrations",
+                    {
+                      ...named(tenant),
+                      params: { path: { tenant } },
+                    },
+                  )
                 : api.grantr.GET(
+                    "grantr.list_integrations",
                     "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/integrations",
                     {
                       ...named(tenant),
@@ -818,14 +897,18 @@ export function createQueries(api: Api) {
           queryFn: () =>
             body(
               ws === undefined
-                ? api.grantr.GET("/grantr/v1/tenants/{tenant}/settings", {
+                ? api.grantr.GET("grantr.list_settings", "/grantr/v1/tenants/{tenant}/settings", {
                     ...named(tenant),
                     params: { path: { tenant } },
                   })
-                : api.grantr.GET("/grantr/v1/tenants/{tenant}/workspaces/{workspace}/settings", {
-                    ...named(tenant),
-                    params: { path: { tenant, workspace: ws } },
-                  }),
+                : api.grantr.GET(
+                    "grantr.list_settings",
+                    "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/settings",
+                    {
+                      ...named(tenant),
+                      params: { path: { tenant, workspace: ws } },
+                    },
+                  ),
             ),
         }),
       /**
@@ -841,6 +924,7 @@ export function createQueries(api: Api) {
           queryFn: () =>
             body(
               api.grantr.GET(
+                null,
                 "/grantr/v1/tenants/{tenant}/workspaces/{workspace}/enabled-integrations",
                 { ...named(tenant), params: { path: { tenant, workspace: ws } } },
               ),
@@ -854,7 +938,7 @@ export function createQueries(api: Api) {
           queryKey: keys.grantr.keyring(tenant),
           queryFn: () =>
             body(
-              api.grantr.GET("/grantr/v1/tenants/{tenant}/keys", {
+              api.grantr.GET("grantr.list_keys", "/grantr/v1/tenants/{tenant}/keys", {
                 ...named(tenant),
                 params: { path: { tenant } },
               }),
@@ -869,7 +953,7 @@ export function createQueries(api: Api) {
           queryKey: keys.grantr.approvalList(tenant),
           queryFn: () =>
             body(
-              api.grantr.GET("/grantr/v1/tenants/{tenant}/approvals", {
+              api.grantr.GET("grantr.list_approvals", "/grantr/v1/tenants/{tenant}/approvals", {
                 ...named(tenant),
                 params: { path: { tenant } },
               }),
@@ -884,10 +968,14 @@ export function createQueries(api: Api) {
           queryKey: keys.grantr.approval(tenant, id),
           queryFn: () =>
             body(
-              api.grantr.GET("/grantr/v1/tenants/{tenant}/approvals/{approval}", {
-                ...named(tenant),
-                params: { path: { tenant, approval: id } },
-              }),
+              api.grantr.GET(
+                "grantr.read_approval",
+                "/grantr/v1/tenants/{tenant}/approvals/{approval}",
+                {
+                  ...named(tenant),
+                  params: { path: { tenant, approval: id } },
+                },
+              ),
             ),
         }),
     },
@@ -905,7 +993,7 @@ export function createQueries(api: Api) {
             const emails: Record<string, string> = {};
             for (let from = 0; from < ids.length; from += PEOPLE_MAX) {
               const { people } = await body(
-                api.portalr.GET("/portalr/v1/people", {
+                api.portalr.GET(null, "/portalr/v1/people", {
                   ...(tenant === null ? {} : named(tenant)),
                   params: { query: { id: ids.slice(from, from + PEOPLE_MAX) } },
                 }),
@@ -923,7 +1011,8 @@ export function createQueries(api: Api) {
       spend: (tenant: string) =>
         queryOptions({
           queryKey: keys.portalr.spend(tenant),
-          queryFn: () => body(api.portalr.GET("/portalr/v1/spend", named(tenant))),
+          queryFn: () =>
+            body(api.portalr.GET("portalr.read_spend", "/portalr/v1/spend", named(tenant))),
         }),
       /** The tenant's feedback and evaluation scores in a window, from Langfuse. */
       scores: (tenant: string, window: TimeSpan) =>
@@ -931,7 +1020,7 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.scores(tenant, window),
           queryFn: () =>
             body(
-              api.portalr.GET("/portalr/v1/scores", {
+              api.portalr.GET("portalr.read_scores", "/portalr/v1/scores", {
                 ...named(tenant),
                 params: { query: { start: window.start, end: window.end, limit: 1000 } },
               }),
@@ -945,7 +1034,7 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.metrics(tenant, metric, window),
           queryFn: () =>
             body(
-              api.portalr.GET("/portalr/v1/metrics", {
+              api.portalr.GET("portalr.read_metrics", "/portalr/v1/metrics", {
                 ...named(tenant),
                 params: {
                   query: {
@@ -968,7 +1057,7 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.feedback(tenant, window, workspace),
           queryFn: () =>
             body(
-              api.portalr.GET("/portalr/v1/feedback", {
+              api.portalr.GET("portalr.read_feedback", "/portalr/v1/feedback", {
                 ...named(tenant),
                 params: { query: { start: window.start, end: window.end, workspace } },
               }),
@@ -986,7 +1075,7 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.usage(tenant, window, workspaces),
           queryFn: () =>
             body(
-              api.portalr.GET("/portalr/v1/usage", {
+              api.portalr.GET("portalr.read_usage", "/portalr/v1/usage", {
                 ...named(tenant),
                 params: {
                   query: { start: window.start, end: window.end, workspaces: [...workspaces] },
@@ -1006,7 +1095,7 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.adoption(tenant, window),
           queryFn: () =>
             body(
-              api.portalr.GET("/portalr/v1/adoption", {
+              api.portalr.GET("portalr.read_adoption", "/portalr/v1/adoption", {
                 ...named(tenant),
                 params: { query: { start: window.start, end: window.end } },
               }),
@@ -1024,7 +1113,7 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.traces(tenant, window, filter),
           queryFn: () =>
             body(
-              api.portalr.GET("/portalr/v1/traces", {
+              api.portalr.GET("portalr.list_traces", "/portalr/v1/traces", {
                 ...named(tenant),
                 params: {
                   query: {
@@ -1052,7 +1141,7 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.logs(tenant, window, filter),
           queryFn: () =>
             body(
-              api.portalr.GET("/portalr/v1/logs", {
+              api.portalr.GET("portalr.read_logs", "/portalr/v1/logs", {
                 ...named(tenant),
                 params: {
                   query: {
@@ -1076,7 +1165,7 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.logLine(tenant, id),
           queryFn: () =>
             body(
-              api.portalr.GET("/portalr/v1/logs/{record_id}", {
+              api.portalr.GET("portalr.read_log_line", "/portalr/v1/logs/{record_id}", {
                 ...named(tenant),
                 params: { path: { record_id: id } },
               }),
@@ -1097,7 +1186,7 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.trace(tenant, whole, span),
           queryFn: () =>
             body(
-              api.portalr.GET("/portalr/v1/traces/{trace_id}", {
+              api.portalr.GET("portalr.read_trace", "/portalr/v1/traces/{trace_id}", {
                 ...named(tenant),
                 params: {
                   path: { trace_id: whole },
@@ -1120,7 +1209,7 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.links(user, trace),
           queryFn: () =>
             body(
-              api.portalr.GET("/portalr/v1/deployment/links", {
+              api.portalr.GET("portalr.deployment_links", "/portalr/v1/deployment/links", {
                 params: { query: { trace_id: trace } },
               }),
             ),
@@ -1136,7 +1225,7 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.toolLinks(user, ids),
           queryFn: () =>
             body(
-              api.portalr.GET("/portalr/v1/deployment/links", {
+              api.portalr.GET("portalr.deployment_links", "/portalr/v1/deployment/links", {
                 params: {
                   query: {
                     trace_id: ids.trace ?? null,
@@ -1162,7 +1251,12 @@ export function createQueries(api: Api) {
           queryKey: keys.portalr.tenants(user),
           queryFn: async () => {
             try {
-              return await body(api.portalr.GET("/portalr/v1/deployment/tenants"));
+              return await body(
+                api.portalr.GET(
+                  "portalr.list_deployment_tenants",
+                  "/portalr/v1/deployment/tenants",
+                ),
+              );
             } catch (error) {
               if (forbidden(error)) {
                 return null;

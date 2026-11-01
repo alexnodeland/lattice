@@ -21,7 +21,7 @@ export const NOT_READ: Consent = { given: false, deleting: false };
  *   `NOT_READ` before the first, rather than taking a failure for a no.
  */
 export async function readConsent(api: Api): Promise<Consent> {
-  const { data, response } = await api.portalr.GET("/portalr/v1/analytics/consent");
+  const { data, response } = await api.portalr.GET(null, "/portalr/v1/analytics/consent");
   if (data === undefined) {
     throw new Error(`the answer couldn't be read (${response.status})`);
   }
@@ -41,7 +41,7 @@ export interface Answered {
  * @throws Error if the relay didn't record it: a screen says so, and keeps the answer it had.
  */
 export async function answerConsent(api: Api, given: boolean): Promise<Answered> {
-  const { data, response } = await api.portalr.PUT("/portalr/v1/analytics/consent", {
+  const { data, response } = await api.portalr.PUT(null, "/portalr/v1/analytics/consent", {
     body: { given },
   });
   if (data === undefined) {

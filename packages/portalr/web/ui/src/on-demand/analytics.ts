@@ -113,7 +113,7 @@ export class Capture {
   /** The session portalr signed for this capture, asked for once; null if it couldn't be. */
   private async signed(): Promise<string | null> {
     this.session ??= this.api.portalr
-      .POST("/portalr/v1/analytics/session")
+      .POST(null, "/portalr/v1/analytics/session")
       .then(({ data }) => data?.session ?? null)
       .catch(() => null);
     const session = await this.session;
@@ -127,7 +127,7 @@ export class Capture {
   /** Send a batch: false only where the relay refused its session, true otherwise. */
   private async send(session: string, events: readonly AnalyticsEvent[]): Promise<boolean> {
     try {
-      const { response } = await this.api.portalr.POST("/portalr/v1/events", {
+      const { response } = await this.api.portalr.POST(null, "/portalr/v1/events", {
         headers: { "X-Tenant": this.tenant },
         body: { session, events: [...events] },
       });

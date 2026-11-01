@@ -24,7 +24,11 @@ function relay(refusals = 0) {
   let refused = 0;
   let signed = 0;
   const POST = vi.fn(
-    async (path: string, init?: { headers?: Record<string, string>; body?: never }) => {
+    async (
+      _command: null,
+      path: string,
+      init?: { headers?: Record<string, string>; body?: never },
+    ) => {
       if (path === "/portalr/v1/analytics/session") {
         signed += 1;
         return { data: { session: `signed-${signed}` }, response: { status: 200 } };
@@ -258,9 +262,9 @@ test("events go in batches of a few, signed once, to the relay in the tenant", a
   expect(posted.map((batch) => batch.events.length)).toEqual([BATCH, BATCH, 3]);
   expect(posted.every((batch) => batch.events.length <= MOST_EVENTS)).toBe(true);
   expect(new Set(posted.map((batch) => batch.session))).toEqual(new Set(["signed-1"]));
-  expect(POST.mock.calls.filter(([path]) => path === "/portalr/v1/analytics/session")).toHaveLength(
-    1,
-  );
+  expect(
+    POST.mock.calls.filter(([, path]) => path === "/portalr/v1/analytics/session"),
+  ).toHaveLength(1);
 });
 
 test("a few events wait a while, and are sent then", async () => {
@@ -287,13 +291,13 @@ test("a session the relay no longer takes is signed afresh, once", async () => {
   made.add({ type: 3, data: { source: 1 } });
   await made.flush();
   expect(posted.map((batch) => batch.session)).toEqual(["signed-2"]);
-  expect(POST.mock.calls.filter(([path]) => path === "/portalr/v1/analytics/session")).toHaveLength(
-    2,
-  );
+  expect(
+    POST.mock.calls.filter(([, path]) => path === "/portalr/v1/analytics/session"),
+  ).toHaveLength(2);
 });
 
 test("a relay that fails drops the batch, and never fails the screen", async () => {
-  const POST = vi.fn(async (path: string) => {
+  const POST = vi.fn(async (_command: null, path: string) => {
     if (path === "/portalr/v1/analytics/session") {
       return { data: { session: "signed" }, response: { status: 200 } };
     }

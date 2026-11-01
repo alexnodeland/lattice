@@ -83,6 +83,12 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"relayr.events", "relayr.outbound", "relayr.rules"},
         {*LIBRARIES, "pydantic", "pydantic_ai"},
     ),
+    # relayr's static catalog (lattice RFC-0014): commands declared on lattice-core's types,
+    # reading nothing, so the parity test and the schema read it without a workspace.
+    "commands": (
+        {"relayr.commands"},
+        {"pydantic", "lattice_core.capabilities", "lattice_core.commands"},
+    ),
 }
 
 

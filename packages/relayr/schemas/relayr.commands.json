@@ -1,0 +1,78 @@
+{
+  "commands": {
+    "relayr.list_filed_items": {
+      "capability": {
+        "description": "List the items the workspace's runs filed in its tracker, each with its link and the chains that wrote to it.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "reflexr:read_runs",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "relayr.list_filed_items",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/runs",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "automations"
+    },
+    "relayr.tracker_status": {
+      "capability": {
+        "description": "Show how the workspace's tracker connector is doing: its binding, how far it has read the tracker, and what it couldn't publish.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "reflexr:read_dead_letters",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "relayr.tracker_status",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/app/t/{tenant}/w/{workspace}/runs",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "automations"
+    }
+  },
+  "listed": {},
+  "title": "relayr's commands"
+}

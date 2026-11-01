@@ -16,8 +16,9 @@ through nine steps in order, each answered by a port the application injects:
 6. **Approval.** The :class:`~lattice_core.approvals.ApprovalPolicy` says who must approve, if
    anyone; a taint ``ask`` needs someone too. The :class:`~lattice_core.approvals.Coverage` is asked
    first whether an approved plan covers the call; otherwise an approval is asked of the
-   :class:`~lattice_core.approvals.Approvals` store and the call is deferred
-   (:class:`ApprovalPending`) until it is answered, and called again with its id.
+   :class:`~lattice_core.approvals.Approvals` store, open for the workspace's ``approve-within``
+   minutes, and the call is deferred (:class:`ApprovalPending`) until it is answered, and called
+   again with its id.
 7. **Call** the provider.
 8. **Mark taint:** a capability that ``reads_untrusted`` taints the caller, even when it raised,
    which comes back as :class:`CallFailed` with the taint.
@@ -60,7 +61,7 @@ from lattice_core.capabilities import (
     Via,
 )
 from lattice_core.integrations import Integrations
-from lattice_core.settings import Settings
+from lattice_core.settings import APPROVE_WITHIN, Settings
 from lattice_core.taint import Cause, Clean, Taint, Tainted
 
 __all__ = [
@@ -347,7 +348,9 @@ class Enforcer:
         coverage: Whether an approved plan covers a call.
         store: Where approvals are asked and read.
         audit: Where each call is recorded.
-        approve_within: How long a new approval stays open: a day, if omitted.
+        approve_within: How long a new approval stays open where ``settings`` doesn't declare
+            ``approve-within``: a day, if omitted. Where it does, the workspace's value, in
+            minutes, says.
         clock: The time now; the system's, in UTC, if omitted.
     """
 
@@ -551,10 +554,28 @@ class Enforcer:
                 asked_by=context.caller,
                 via=context.via,
                 answerers=answerers,
-                deadline=self._clock() + self._within,
+                deadline=self._clock() + await self._open_for(context.scope),
             )
         )
         raise ApprovalPending(asked.id)
+
+    async def _open_for(self, scope: Scope) -> timedelta:
+        """How long a new approval stays open: the workspace's ``approve-within``, in minutes.
+
+        Where the settings don't declare it, the enforcer's own ``approve_within``.
+
+        Raises:
+            TypeError: If the setting isn't a whole number, which refuses the call.
+        """
+        try:
+            minutes = await self._settings.value(
+                scope.tenant_id, scope.workspace_id, APPROVE_WITHIN
+            )
+        except KeyError:
+            return self._within
+        if not isinstance(minutes, int):
+            raise TypeError(f"{APPROVE_WITHIN} is a number of minutes, not {minutes!r}")
+        return timedelta(minutes=minutes)
 
     async def _answered(
         self, id: ApprovalId, capability: Capability, digest: str, context: CallContext

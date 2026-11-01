@@ -9,9 +9,11 @@ from pathlib import Path
 import httpx
 import pytest
 
+from grantr.commands.schema import catalog_document
 from grantr.fastapi.openapi import openapi_app, openapi_document
 
 DOCUMENT = Path(__file__).parent.parent / "schemas" / "grantr.openapi.json"
+CATALOG = Path(__file__).parent.parent / "schemas" / "grantr.commands.json"
 
 
 def test_the_committed_document_is_current() -> None:
@@ -31,3 +33,15 @@ async def test_the_documents_application_admits_no_caller() -> None:
     transport = httpx.ASGITransport(app=openapi_app())
     async with httpx.AsyncClient(transport=transport, base_url="http://grantr") as client:
         assert (await client.get("/grantr/v1/me")).status_code == 401
+
+
+def test_the_committed_catalog_is_current() -> None:
+    assert json.loads(CATALOG.read_text()) == catalog_document(), "run `moon run grantr:schema`"
+
+
+@pytest.mark.filterwarnings("ignore:.*found in sys.modules:RuntimeWarning")
+def test_the_module_prints_the_catalog() -> None:
+    output = io.StringIO()
+    with redirect_stdout(output):
+        runpy.run_module("grantr.commands.schema", run_name="__main__")
+    assert json.loads(output.getvalue()) == catalog_document()

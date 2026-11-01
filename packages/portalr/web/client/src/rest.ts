@@ -59,7 +59,7 @@ type InitParam<Init> =
  * What an operation calls, as `Calls` says: its command, the commands its caller picks one of,
  * `null` for one that calls none, or `"frames"` where its body's command frames name theirs.
  */
-export type CommandOf<C, Path, M extends Method> = Path extends keyof C
+type CommandOf<C, Path, M extends Method> = Path extends keyof C
   ? M extends keyof C[Path]
     ? C[Path][M]
     : never
@@ -84,7 +84,7 @@ type NamedMethod<Paths, C, M extends Method> = <
  * `x-lattice-command` says, so a request that calls none or another fails `tsc` (lattice
  * RFC-0014, portalr ADR-0096). The name isn't sent: the server knows what each operation calls.
  */
-export interface Named<Paths, C> {
+interface Named<Paths, C> {
   readonly GET: NamedMethod<Paths, C, "get">;
   readonly PUT: NamedMethod<Paths, C, "put">;
   readonly POST: NamedMethod<Paths, C, "post">;
@@ -93,7 +93,7 @@ export interface Named<Paths, C> {
 }
 
 /** The client, as one whose every request names its command first. */
-export function withCommands<Paths extends object, C>(client: Client<Paths>): Named<Paths, C> {
+function withCommands<Paths extends object, C>(client: Client<Paths>): Named<Paths, C> {
   const drop =
     (method: (url: never, ...init: never[]) => unknown) =>
     (_command: unknown, url: never, ...init: never[]) =>

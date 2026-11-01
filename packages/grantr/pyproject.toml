@@ -1,6 +1,6 @@
 [project]
 name = "grantr"
-version = "0.7.0"
+version = "0.8.0"
 description = "Identity and access for artifactr and reflexr: tenants, members, groups, roles, service principals and grants, checked before every command and read."
 readme = "README.md"
 license = "MIT"

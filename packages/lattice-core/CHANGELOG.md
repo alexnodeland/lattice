@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.9.0...lattice-core-v0.10.0) (2026-11-01)
+
+
+### Features
+
+* **core:** lattice_core.commands: the command declaration every surface reads (RFC-0014 phase 1) ([#1314](https://github.com/alexnodeland/lattice/issues/1314)) ([ea3151a](https://github.com/alexnodeland/lattice/commit/ea3151a341586dcbc0cd9b3d69f70bf0ffea4257))
+
 ## [0.9.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.8.0...lattice-core-v0.9.0) (2026-11-01)
 
 

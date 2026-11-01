@@ -49,7 +49,19 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             *OTEL_API,
         },
     ),
-    "agent": (INNER, {"pydantic", "pydantic_ai", *OTEL_API}),
+    # lattice-core's approvals, which the runner answers and follows, and the bridge's metadata
+    # key, which carries an approval's id back as a run resumes (ADR-0101).
+    "agent": (
+        INNER,
+        {
+            "pydantic",
+            "pydantic_ai",
+            "lattice_core.agents",
+            "lattice_core.approvals",
+            "lattice_core.capabilities",
+            *OTEL_API,
+        },
+    ),
     "sql": (
         {"artifactr.core", "artifactr.workspace", "artifactr.sql"},
         # anyio shields the advisory lock's release from a cancellation (ADR-0085).

@@ -174,10 +174,11 @@ tasks:
       mergeArgs: 'replace'
 
   schema:
-    description: "Regenerate the router's OpenAPI document, and lattice's integrations, in schemas/"
+    description: "Regenerate the router's OpenAPI document, lattice's integrations, and portalr's catalog of commands, in schemas/"
     script: >-
       uv run python $workspaceRoot/scripts/generate.py schemas/portalr.openapi.json portalr.fastapi.openapi &&
-      uv run python $workspaceRoot/scripts/generate.py schemas/integrations.json portalr.integrations
+      uv run python $workspaceRoot/scripts/generate.py schemas/integrations.json portalr.integrations &&
+      uv run python $workspaceRoot/scripts/generate.py schemas/portalr.commands.json portalr.commands.schema
     options:
       cache: false
       runInCI: false

@@ -134,6 +134,40 @@ test("each type of change reads as a sentence", () => {
       },
       "closed apr~acme~1, expired: past its deadline unanswered",
     ],
+    [
+      {
+        type: "capability_called",
+        capability: "artifactr.edit_text",
+        version: "1.0.0",
+        workspace: "notes",
+        caller: "run:run_1",
+        client: "Claude (conn_1)",
+        correlation_id: "run_1",
+        surface: "mcp",
+        arguments_digest: "a".repeat(64),
+        steps: [{ name: "grant", passed: false, note: "" }],
+        outcome: "refused",
+        called_at: "2026-11-01T01:00:00Z",
+      },
+      "called artifactr.edit_text in workspace notes, as run:run_1 through Claude (conn_1): refused",
+    ],
+    [
+      {
+        type: "capability_called",
+        capability: "artifactr.edit_text",
+        version: null,
+        workspace: "notes",
+        tenant: "globex",
+        caller: "person:dave",
+        correlation_id: "turn_1",
+        surface: "portalr",
+        arguments_digest: "a".repeat(64),
+        steps: [],
+        outcome: "refused",
+        called_at: "2026-11-01T01:00:00Z",
+      },
+      "called artifactr.edit_text in globex's workspace notes, as person:dave: refused",
+    ],
   ];
   for (const [event, sentence] of cases) {
     expect(said(event)).toBe(sentence);
@@ -141,7 +175,7 @@ test("each type of change reads as a sentence", () => {
 });
 
 test("the filter offers every type, and reads one back from the address", () => {
-  expect(TYPES).toHaveLength(20);
+  expect(TYPES).toHaveLength(21);
   expect(TYPES.find((type) => type.value === "tenant_created")?.label).toBe("Tenant created");
   expect(filterOf({ type: "granted" })).toEqual({ type: "granted" });
   expect(filterOf({ type: "nonsense" })).toEqual({});

@@ -52,6 +52,7 @@ export function peopleOf(entry: AuditEntry): string[] {
     case "approval_asked":
     case "approval_answered":
     case "approval_closed":
+    case "capability_called":
       break;
     default:
       // Every type is read above: a new type of grantr's fails to typecheck here.
@@ -121,6 +122,13 @@ export function said(event: AuditEvent, names: Names = shortId): string {
       return `${event.approved ? "approved" : "denied"} ${event.approval} on ${event.surface}`;
     case "approval_closed":
       return `closed ${event.approval}, ${event.state}: ${event.reason}`;
+    case "capability_called": {
+      const where = event.tenant
+        ? `${event.tenant}'s workspace ${event.workspace}`
+        : `workspace ${event.workspace}`;
+      const through = event.client ? ` through ${event.client}` : "";
+      return `called ${event.capability} in ${where}, as ${event.caller}${through}: ${event.outcome}`;
+    }
     default: {
       // Every type is read above: a new type of grantr's fails to typecheck here.
       const unread: never = event;
@@ -152,6 +160,7 @@ const LABELS: Record<AuditType, string> = {
   approval_asked: "Approvals asked",
   approval_answered: "Approvals answered",
   approval_closed: "Approvals closed",
+  capability_called: "Capabilities called",
   tenant_created: "Tenant created",
   deployment_tenant_created: "Tenant created (deployment)",
   tenant_deleted: "Tenant deleted",

@@ -875,6 +875,18 @@
     "DeferredRequest": {
       "description": "A tool call a paused run is waiting on: a question to answer or a call to approve.",
       "properties": {
+        "approval": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approval"
+        },
         "args": {
           "additionalProperties": {
             "$ref": "#/$defs/JsonValue"

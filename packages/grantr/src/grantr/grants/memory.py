@@ -34,6 +34,7 @@ from grantr.core import (
 )
 from grantr.grants.storage import Transaction
 from lattice_core.approvals import Approval, ApprovalId
+from lattice_core.bindings import Binding, BindingId
 
 Clock = Callable[[], datetime]
 """Returns the current time; injectable so tests control it."""
@@ -71,6 +72,10 @@ class _Data:
         default_factory=dict[tuple[TenantId, ApprovalId], Approval]
     )
     """Each approval as it stands, by tenant and id."""
+    bindings: dict[tuple[TenantId, BindingId], Binding] = field(
+        default_factory=dict[tuple[TenantId, BindingId], Binding]
+    )
+    """Each binding, by tenant and id, in the order bound."""
     log: tuple[AuditEntry, ...] = ()
 
 
@@ -167,6 +172,23 @@ class _Reads:
         ]
         return sorted(found, key=lambda approval: (approval.asked_at, approval.id))
 
+    async def bindings(
+        self,
+        tenant: TenantId,
+        *,
+        workspace: WorkspaceId | None = None,
+        source: str | None = None,
+        connection: str | None = None,
+    ) -> list[Binding]:
+        return [
+            binding
+            for (t, _), binding in self._data.bindings.items()
+            if t == tenant
+            and workspace in (None, binding.workspace_id)
+            and source in (None, binding.source)
+            and connection in (None, binding.connection)
+        ]
+
     async def settings(
         self, tenant: TenantId, workspace: WorkspaceId | None = None
     ) -> dict[str, SettingRow]:
@@ -220,6 +242,7 @@ class _Transaction(_Reads):
             },
             settings={key: row for key, row in data.settings.items() if key[0] != tenant},
             approvals={key: a for key, a in data.approvals.items() if key[0] != tenant},
+            bindings={key: b for key, b in data.bindings.items() if key[0] != tenant},
         )
 
     async def add_grant(self, grant: Grant) -> None:
@@ -293,6 +316,17 @@ class _Transaction(_Reads):
     async def put_approval(self, approval: Approval) -> None:
         key = (approval.scope.tenant_id, approval.id)
         self._data = replace(self._data, approvals={**self._data.approvals, key: approval})
+
+    async def put_binding(self, binding: Binding) -> None:
+        key = (binding.tenant_id, binding.id)
+        self._data = replace(self._data, bindings={**self._data.bindings, key: binding})
+
+    async def delete_binding(self, tenant: TenantId, id: BindingId) -> Binding | None:
+        found = self._data.bindings.get((tenant, id))
+        if found is not None:
+            kept = {key: b for key, b in self._data.bindings.items() if key != (tenant, id)}
+            self._data = replace(self._data, bindings=kept)
+        return found
 
     async def add_key(self, key: Key) -> None:
         self._data = replace(self._data, keys={**self._data.keys, key.id: key})

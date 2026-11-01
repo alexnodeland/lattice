@@ -165,6 +165,24 @@ class BindingRow(Base):
     """The binding, as lattice-core's contract has it, as JSON."""
 
 
+class ConnectionRow(Base):
+    """A connection, in its tenant: its person and client as columns, and the whole as JSON.
+
+    portr reads a person's connection of a client on every call, and a person reads their own
+    (grantr ADR-0043).
+    """
+
+    __tablename__ = "grantr_connections"
+    __table_args__ = (Index("ix_grantr_connections_user", "tenant_id", "user_id", "client_id"),)
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    id: Mapped[str] = mapped_column(primary_key=True)
+    user_id: Mapped[str]
+    client_id: Mapped[str]
+    connection: Mapped[dict[str, Any]] = mapped_column(JSON)
+    """The connection, as grantr's model has it, as JSON."""
+
+
 class SettingRowRecord(Base):
     """A setting on a tenant, with an empty workspace, or in one of its workspaces.
 

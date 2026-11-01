@@ -142,6 +142,7 @@ nav:
     - adr/0097-a-message-chooses-the-model-of-the-turn-it-starts.md
     - adr/0098-a-mini-apps-html-read-by-its-own-tool-whose-results-skip-prompt-injection.md
     - adr/0099-artifactrs-tools-as-capabilities-called-through-the-enforcer-whose-policy-asks-approval.md
+    - adr/0101-a-run-paused-on-an-enforcers-approval-names-it-and-is-answered-in-its-store.md
   - RFCs:
     - rfcs/README.md
     - rfcs/0001-v0.1-implementation-plan.md

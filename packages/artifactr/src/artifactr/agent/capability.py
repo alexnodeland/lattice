@@ -80,6 +80,7 @@ from artifactr.core import (
 from artifactr.telemetry import annotate, attribution, current_trace_id
 from artifactr.telemetry.attributes import ARTIFACT_ID
 from artifactr.workspace import Workspace
+from lattice_core.agents import APPROVAL
 
 type Context = RunContext[Session[Any]]
 
@@ -508,10 +509,17 @@ def _requests(
             tool_name=call.tool_name,
             kind=kind,
             args=call.args_as_dict(),
-            review=metadata.get(call.tool_call_id, {}).get("review", {}),
+            review=(given := metadata.get(call.tool_call_id, {})).get("review", {}),
+            approval=_approval_id(given) if kind == "approval" else None,
         )
         for call in calls
     ]
+
+
+def _approval_id(metadata: dict[str, Any]) -> str | None:
+    """The id of the approval the enforcer asked for a call, as lattice's bridge names it."""
+    approval = metadata.get(APPROVAL)
+    return approval if isinstance(approval, str) else None
 
 
 def _named(args: dict[str, Any]) -> str | None:

@@ -2335,6 +2335,9 @@ dependencies = [
 agents = [
     { name = "pydantic-ai-slim" },
 ]
+conformance = [
+    { name = "pytest" },
+]
 langfuse = [
     { name = "langfuse" },
     { name = "opentelemetry-sdk" },
@@ -2409,9 +2412,10 @@ requires-dist = [
     { name = "pydantic-ai-slim", marker = "extra == 'agents'", specifier = ">=2.53" },
     { name = "pydantic-ai-slim", marker = "extra == 'otel'", specifier = ">=2.51" },
     { name = "pydantic-ai-slim", extras = ["openai"], marker = "extra == 'litellm'", specifier = ">=2.51" },
+    { name = "pytest", marker = "extra == 'conformance'", specifier = ">=8.4" },
     { name = "sqlalchemy", extras = ["asyncio"], marker = "extra == 'sql'", specifier = ">=2.1" },
 ]
-provides-extras = ["sql", "otel", "langfuse", "litellm", "agents"]
+provides-extras = ["sql", "otel", "langfuse", "litellm", "agents", "conformance"]
 
 [package.metadata.requires-dev]
 dev = [

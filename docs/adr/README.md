@@ -44,5 +44,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0036](0036-egress-decided-by-one-pure-function-hosts-the-operators-and-internal-destinations-declared-per-purpose.md) | Egress decided by one pure function: hosts the operator's, and internal destinations declared per purpose | Accepted |
 | [0037](0037-the-enforcement-path-in-lattice-core-refusals-by-step-approvals-resumed-by-id.md) | The enforcement path in lattice-core: refusals by step, approvals resumed by id | Accepted |
 | [0038](0038-approval-asked-by-tiers-a-union-resolved-setting-names-and-admin-high-confirmed-by-its-caller.md) | Approval asked by the tiers a union-resolved setting names, and admin_high confirmed by its caller | Accepted |
+| [0039](0039-the-conformance-harness-a-suite-per-port-each-check-on-a-fresh-adapter-in-an-owner-of-its-own.md) | The conformance harness: a suite per port, each check on a fresh adapter, in an owner of its own | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

@@ -363,6 +363,32 @@ async def test_cancelling_a_run_stops_its_action(build: Build) -> None:
 async def test_losing_the_lease_stops_the_action(
     build: Build, storage: Storage, clock: FakeClock, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    # Every lease the executor takes goes through here, from the start, so the test can hold
+    # its renewals back while the lease expires and the thief takes it. A renewal let through
+    # between the two would extend the lease from the fake clock's new time. One under way when
+    # they are held reads the clock when its database work first runs, a turn of the event loop
+    # after it is called, so the test waits for it to end before it moves the clock.
+    acquire = storage.acquire_lease
+    held = asyncio.Event()
+    drained = asyncio.Event()
+    stolen = asyncio.Event()
+    under_way = 0
+
+    async def held_while_stolen(
+        workspace: WorkspaceRef, key: str, holder: str, ttl: timedelta
+    ) -> bool:
+        nonlocal under_way
+        if held.is_set():
+            await stolen.wait()
+        under_way += 1
+        try:
+            return await acquire(workspace, key, holder, ttl)
+        finally:
+            under_way -= 1
+            if held.is_set() and not under_way:
+                drained.set()
+
+    monkeypatch.setattr(storage, "acquire_lease", held_while_stolen)
     workspaces = build([rule(then=run("blocked"))])
     deps = Deps()
     workspace = await open_(workspaces)
@@ -372,18 +398,9 @@ async def test_losing_the_lease_stops_the_action(
     attempt = asyncio.create_task(executor.execute())
     await deps.started.wait()
     [running] = await workspace.runs()
-    # Hold the executor's renewals back while the lease expires and the thief takes it: a
-    # renewal between the two would extend the lease from the fake clock's new time.
-    acquire = storage.acquire_lease
-    stolen = asyncio.Event()
-
-    async def renew_after_the_theft(
-        workspace: WorkspaceRef, key: str, holder: str, ttl: timedelta
-    ) -> bool:
-        await stolen.wait()
-        return await acquire(workspace, key, holder, ttl)
-
-    monkeypatch.setattr(storage, "acquire_lease", renew_after_the_theft)
+    held.set()
+    if under_way:
+        await drained.wait()
     clock.advance(60)
     assert await acquire(ACME, run_lease(running.id), "thief", timedelta(minutes=1))
     stolen.set()

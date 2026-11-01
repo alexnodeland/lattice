@@ -306,6 +306,41 @@ test("grantr's access commands go to the tenant's own paths, with its header", a
   }
 });
 
+test("an approval is answered on its page's surface, bound to the arguments shown", async () => {
+  const approval = { id: "apr_1", arguments_digest: "a".repeat(64) } as Parameters<
+    typeof commands.grantr.answerApproval
+  >[1];
+  expect(
+    await commands.grantr.answerApproval("acme", approval, { approved: true }, "portalr"),
+  ).toMatchObject({ outcome: "done" });
+  expect(sent.at(-1)).toMatchObject({
+    method: "POST",
+    tenant: "acme",
+    body: { approved: true, arguments_digest: "a".repeat(64), reason: null, surface: "portalr" },
+  });
+  expect(sent.at(-1)?.url.pathname).toBe("/grantr/v1/tenants/acme/approvals/apr_1/answer");
+  // A reason is sent as written, but for the space around it; one of spaces alone is none.
+  await commands.grantr.answerApproval(
+    "acme",
+    approval,
+    { approved: false, reason: "  Not this week.  " },
+    "portalr:confirm",
+  );
+  expect(sent.at(-1)?.body).toEqual({
+    approved: false,
+    arguments_digest: "a".repeat(64),
+    reason: "Not this week.",
+    surface: "portalr:confirm",
+  });
+  await commands.grantr.answerApproval(
+    "acme",
+    approval,
+    { approved: false, reason: "  " },
+    "portalr",
+  );
+  expect(sent.at(-1)?.body).toMatchObject({ reason: null });
+});
+
 test("a key's secret is in the answer to issuing it", async () => {
   expect(await commands.grantr.issueKey("acme", "ci")).toEqual({
     outcome: "done",

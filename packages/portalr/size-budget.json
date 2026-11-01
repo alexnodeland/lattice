@@ -1,7 +1,7 @@
 {
   "app": {
-    "initial": 207000,
-    "total": 500000,
+    "initial": 212000,
+    "total": 515000,
     "largest": 100000,
     "addons": {
       "highlight": { "total": 177000, "largest": 53000 },
@@ -23,7 +23,7 @@
   },
   "admin": {
     "initial": 230000,
-    "total": 610000,
+    "total": 620000,
     "largest": 140000,
     "addons": { "touch": { "total": 2500, "largest": 2500 } }
   }

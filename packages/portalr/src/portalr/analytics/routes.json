@@ -5,6 +5,8 @@
     "/sign-in",
     "/t/$tenant",
     "/t/$tenant/$",
+    "/t/$tenant/approvals",
+    "/t/$tenant/approvals/$approval",
     "/t/$tenant/w/$workspace",
     "/t/$tenant/w/$workspace/$",
     "/t/$tenant/w/$workspace/artifacts",

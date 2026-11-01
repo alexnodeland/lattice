@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.8.0...lattice-core-v0.9.0) (2026-11-01)
+
+
+### Features
+
+* **core:** the conformance harness, the secrets port's suite and a pytest plugin (RFC-0011 phase 5) ([#1306](https://github.com/alexnodeland/lattice/issues/1306)) ([7139fec](https://github.com/alexnodeland/lattice/commit/7139fecd596a58a8bcc3850decd4d9f3dfe05f44))
+
 ## [0.8.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.7.0...lattice-core-v0.8.0) (2026-11-01)
 
 

@@ -18,6 +18,14 @@ def process(proc: Path, pid: int, parent: int) -> None:
     (proc / str(pid) / "stat").write_text(f"{pid} (a (strange) name) S {parent} 1 1 0")
 
 
+def others(count: int) -> list[int]:
+    """Process ids above this process's, as many as asked: never its own, which the sweep keeps.
+
+    A fixed id could be the test's own process's, which the sweep would keep, not kill.
+    """
+    return [os.getpid() + offset for offset in range(1, count + 1)]
+
+
 def test_every_other_process_of_this_user_is_killed_and_the_calls_files_are_gone(
     tmp_path: Path,
 ) -> None:
@@ -25,12 +33,13 @@ def test_every_other_process_of_this_user_is_killed_and_the_calls_files_are_gone
     proc.mkdir()
     temporary.mkdir()
     me = os.getpid()
+    parent, stray, gone = others(3)
     (proc / "1").mkdir()  # the container's init, whose parent isn't listed
-    process(proc, 7, 1)
-    process(proc, me, 7)
-    process(proc, 4242, 1)  # a stray: in a session of its own, under init
+    process(proc, parent, 1)
+    process(proc, me, parent)
+    process(proc, stray, 1)  # a stray: in a session of its own, under init
     (proc / "self").mkdir()
-    (proc / "4343").symlink_to(proc / "gone")  # ended as it was listed
+    (proc / str(gone)).symlink_to(proc / "gone")  # ended as it was listed
     (temporary / "wordcraft-x" / "in").mkdir(parents=True)
     (temporary / "planted").write_text("for the next call")
     (temporary / "link").symlink_to(tmp_path)
@@ -40,8 +49,8 @@ def test_every_other_process_of_this_user_is_killed_and_the_calls_files_are_gone
     sealed.chmod(0)
     sealed.parent.chmod(0)
     killed: list[int] = []
-    assert sweep(proc=proc, temporary=temporary, kill=lambda pid, _: killed.append(pid)) == [4242]
-    assert killed == [4242]
+    assert sweep(proc=proc, temporary=temporary, kill=lambda pid, _: killed.append(pid)) == [stray]
+    assert killed == [stray]
     assert list(temporary.iterdir()) == []
     assert tmp_path.exists(), "a link is removed, never followed"
 
@@ -84,9 +93,10 @@ def test_strays_that_start_each_other_again_are_killed_again(tmp_path: Path, tim
     proc.mkdir()
     temporary.mkdir()
     process(proc, os.getpid(), 0)
-    process(proc, 5000, 1)
+    [first] = others(1)
+    process(proc, first, 1)
     killed = sweep(proc=proc, temporary=temporary, kill=respawning(proc, times))
-    assert killed == list(range(5000, 5001 + times))
+    assert killed == list(range(first, first + 1 + times))
 
 
 def test_strays_that_keep_starting_fail_the_sweep(tmp_path: Path) -> None:
@@ -94,7 +104,7 @@ def test_strays_that_keep_starting_fail_the_sweep(tmp_path: Path) -> None:
     proc.mkdir()
     temporary.mkdir()
     process(proc, os.getpid(), 0)
-    process(proc, 5000, 1)
+    process(proc, others(1)[0], 1)
     with pytest.raises(SweepFailed, match=f"still starting after {PASSES} sweeps"):
         sweep(proc=proc, temporary=temporary, kill=respawning(proc, PASSES))
 

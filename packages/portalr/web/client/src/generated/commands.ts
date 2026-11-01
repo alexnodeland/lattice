@@ -51,6 +51,7 @@ export const COMMANDS = [
   "grantr.list_integrations",
   "grantr.list_keys",
   "grantr.list_members",
+  "grantr.list_restrictions",
   "grantr.list_roles",
   "grantr.list_settings",
   "grantr.read_approval",

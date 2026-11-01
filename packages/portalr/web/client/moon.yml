@@ -16,12 +16,20 @@ tasks:
   test:
     command: 'bun x --bun --no-install vitest run --project unit'
     inputs:
+      - 'src/**/*'
+      - 'scripts/**/*'
+      - 'commands.used.json'
+      - 'vitest.config.ts'
       # The documents the drift test regenerates the types from.
       - '/packages/artifactr/schemas/*.json'
       - '/packages/reflexr/schemas/*.json'
       - '/packages/grantr/schemas/*.json'
       - '/packages/portalr/schemas/*.json'
       - '/packages/relayr/schemas/*.json'
+      # The UIs whose requests commands.used.json lists (portalr ADR-0096).
+      - '/packages/portalr/web/app/src/**/*'
+      - '/packages/portalr/web/admin/src/**/*'
+      - '/packages/portalr/web/ui/src/**/*'
     options:
       mergeArgs: 'replace'
 

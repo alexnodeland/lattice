@@ -3,8 +3,14 @@
  * openapi-fetch, and each request carrying the session.
  */
 
-import createClient, { type Client, type Middleware } from "openapi-fetch";
+import createClient, {
+  type Client,
+  type FetchResponse,
+  type MaybeOptionalInit,
+  type Middleware,
+} from "openapi-fetch";
 import type { paths as ArtifactrPaths } from "./generated/artifactr.openapi";
+import type { Calls } from "./generated/calls";
 import type { paths as FilesPaths } from "./generated/files.openapi";
 import type { paths as GrantrPaths } from "./generated/grantr.openapi";
 import type { components as Portalr, paths as PortalrPaths } from "./generated/portalr.openapi";
@@ -30,15 +36,86 @@ export interface Surfaces {
   readonly relayr?: string | null | undefined;
 }
 
+/** The methods the clients call an operation by. */
+type Method = "get" | "put" | "post" | "delete" | "patch";
+
+/** A document's paths that have an operation for the method. */
+type PathsWith<Paths, M extends Method> = {
+  [P in keyof Paths]: Paths[P] extends { [K in M]: unknown } ? P : never;
+}[keyof Paths];
+
+/** The keys of `T` that aren't optional. */
+type RequiredKeys<T> = {
+  [K in keyof T]-?: Record<never, never> extends Pick<T, K> ? never : K;
+}[keyof T];
+
+/** openapi-fetch's last argument: required where the operation's parameters or body are. */
+type InitParam<Init> =
+  RequiredKeys<Init> extends never
+    ? [(Init & { [key: string]: unknown })?]
+    : [Init & { [key: string]: unknown }];
+
+/**
+ * What an operation calls, as `Calls` says: its command, the commands its caller picks one of,
+ * `null` for one that calls none, or `"frames"` where its body's command frames name theirs.
+ */
+export type CommandOf<C, Path, M extends Method> = Path extends keyof C
+  ? M extends keyof C[Path]
+    ? C[Path][M]
+    : never
+  : never;
+
+/** One of a named client's methods: openapi-fetch's, with the operation's command first. */
+type NamedMethod<Paths, C, M extends Method> = <
+  Path extends PathsWith<Paths, M>,
+  Init extends MaybeOptionalInit<Paths[Path], M & keyof Paths[Path]>,
+>(
+  command: CommandOf<C, Path, M>,
+  url: Path,
+  ...init: InitParam<Init>
+) => Promise<
+  Paths[Path][M & keyof Paths[Path]] extends infer O extends Record<string | number, unknown>
+    ? FetchResponse<O, Init, `${string}/${string}`>
+    : never
+>;
+
+/**
+ * A surface's client, each of whose requests names the command it calls, as its document's
+ * `x-lattice-command` says, so a request that calls none or another fails `tsc` (lattice
+ * RFC-0014, portalr ADR-0096). The name isn't sent: the server knows what each operation calls.
+ */
+export interface Named<Paths, C> {
+  readonly GET: NamedMethod<Paths, C, "get">;
+  readonly PUT: NamedMethod<Paths, C, "put">;
+  readonly POST: NamedMethod<Paths, C, "post">;
+  readonly DELETE: NamedMethod<Paths, C, "delete">;
+  readonly PATCH: NamedMethod<Paths, C, "patch">;
+}
+
+/** The client, as one whose every request names its command first. */
+export function withCommands<Paths extends object, C>(client: Client<Paths>): Named<Paths, C> {
+  const drop =
+    (method: (url: never, ...init: never[]) => unknown) =>
+    (_command: unknown, url: never, ...init: never[]) =>
+      method(url, ...init);
+  return {
+    GET: drop(client.GET),
+    PUT: drop(client.PUT),
+    POST: drop(client.POST),
+    DELETE: drop(client.DELETE),
+    PATCH: drop(client.PATCH),
+  } as unknown as Named<Paths, C>;
+}
+
 export interface Api {
-  readonly artifactr: Client<ArtifactrPaths>;
+  readonly artifactr: Named<ArtifactrPaths, Calls["artifactr"]>;
   /** Native files' routes, which an application mounts beside artifactr's, on its surface. */
-  readonly files: Client<FilesPaths>;
-  readonly reflexr: Client<ReflexrPaths>;
-  readonly grantr: Client<GrantrPaths>;
-  readonly portalr: Client<PortalrPaths>;
+  readonly files: Named<FilesPaths, Calls["files"]>;
+  readonly reflexr: Named<ReflexrPaths, Calls["reflexr"]>;
+  readonly grantr: Named<GrantrPaths, Calls["grantr"]>;
+  readonly portalr: Named<PortalrPaths, Calls["portalr"]>;
   /** relayr's tracker reads, or none where the application has no tracker. */
-  readonly relayr: Client<RelayrPaths> | null;
+  readonly relayr: Named<RelayrPaths, Calls["relayr"]> | null;
 }
 
 /** The clients, each sending the session that `session()` returns at the time. */
@@ -61,7 +138,14 @@ export function createApi(surfaces: Surfaces, session: () => Session): Api {
   for (const client of [artifactr, files, reflexr, grantr, portalr, relayr] as const) {
     client?.use(signed);
   }
-  return { artifactr, files, reflexr, grantr, portalr, relayr };
+  return {
+    artifactr: withCommands(artifactr),
+    files: withCommands(files),
+    reflexr: withCommands(reflexr),
+    grantr: withCommands(grantr),
+    portalr: withCommands(portalr),
+    relayr: relayr === null ? null : withCommands(relayr),
+  };
 }
 
 /** The headers that name a request's tenant. */
@@ -72,9 +156,8 @@ export type Config = Portalr["schemas"]["Config"];
 
 /** Read `config.json`, which portalr's router serves at `/portalr/config.json` on `origin`. */
 export async function readConfig(origin: string): Promise<Config> {
-  const { data, response } = await createClient<PortalrPaths>({ baseUrl: origin }).GET(
-    "/portalr/config.json",
-  );
+  const client = withCommands<PortalrPaths, Calls["portalr"]>(createClient({ baseUrl: origin }));
+  const { data, response } = await client.GET(null, "/portalr/config.json");
   if (data === undefined) {
     throw new Error(`config.json answered ${response.status}`);
   }

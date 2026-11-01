@@ -25,7 +25,7 @@ grantr answers approvals over its admin API (grantr ADR-0040): the pending ones 
   - Its address names the approval alone, as a client or a push links to it. The page asks each of the person's tenants, in order, until one shows the approval; a tenant that doesn't (404 or 403) is skipped, and any other failure is the page's to show.
   - It reads the approval afresh each time it opens, never from the cache, so what is confirmed is the approval as it stands.
   - **The person types the tenant's name before Confirm does anything.** Every `admin_high` action acts on its tenant (deleting it, revoking its key, granting its roles, defining its roles, making an operator in it), and the tenant is the one target every approval names. A typed name stops a confirmation given in the wrong tenant, or by a press alone. Cancel needs no name.
-  - Only the person a confirmation was asked of, by name, sees Confirm. An approval that isn't a confirmation links to its page in the app.
+  - Confirm is shown only where the store lists the approval for the reader, which for a confirmation is its caller alone. Neither page compares ids itself: the browser's id for the person and grantr's may differ, as they do in the test application. An approval that isn't a confirmation links to its page in the app.
 - **Neither page is recorded** by session replay: both are listed in the app's routes, and `main` is blocked on them, as on every page that doesn't allow it (ADR-0077).
 
 ## Options considered

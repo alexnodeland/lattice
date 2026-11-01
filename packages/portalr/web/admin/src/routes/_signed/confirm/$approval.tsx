@@ -3,7 +3,6 @@ import {
   answeredBy,
   approvalPage,
   askedBy,
-  askedFor,
   changedApprovals,
   peopleIn,
   Refused,
@@ -20,7 +19,7 @@ import {
   Plain,
   TextField,
 } from "@portalr/ui";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { type FormEvent, useState } from "react";
 
@@ -68,7 +67,11 @@ function Confirm() {
   const { data: approval } = useSuspenseQuery(queries.grantr.approval(tenant, id));
   const names = usePeople(queries, config.people, tenant, peopleIn(approval, user));
   const [refused, setRefused] = useState<string | null>(null);
-  const mine = approval.answerers.confirmation && askedFor(approval) === user;
+  // Whether it is the reader's to confirm is the store's to say, as the app's page asks it: it is
+  // among the approvals the store lists for them, which a confirmation is for its caller alone.
+  const { data: answerable } = useQuery(queries.grantr.approvals(tenant));
+  const mine =
+    approval.answerers.confirmation && (answerable?.some((each) => each.id === id) ?? false);
   return (
     <Plain
       ui="admin"

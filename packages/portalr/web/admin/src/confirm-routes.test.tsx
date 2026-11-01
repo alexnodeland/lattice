@@ -42,6 +42,11 @@ function grantr(
   const answers: unknown[] = [];
   const reads: string[] = [];
   const serve: Serve = async (request, path) => {
+    // The approvals the store lists for alice: this one, while it waits, where she may answer it.
+    if (path === "/grantr/v1/tenants/globex/approvals") {
+      const hers = current.state === "pending" && current.answerers.subjects.includes("alice");
+      return Response.json(hers ? [current] : []);
+    }
     const match = /^\/grantr\/v1\/tenants\/([^/]+)\/approvals\/apr_1(\/answer)?$/u.exec(path);
     if (match === null) {
       return undefined;

@@ -27,19 +27,28 @@ When("they approve {string} because {string}", async ({ page }, title: string, w
   await page.getByRole("button", { name: "Approve" }).click();
 });
 
-Then("it is approved by them, because {string}", async ({ page }, why: string) => {
-  await expect(page.getByText("Approved", { exact: true })).toBeVisible();
-  await expect(page.getByText(/^you, /)).toBeVisible();
-  await expect(page.getByText(why, { exact: true })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(0);
-});
+/**
+ * Who answered, as the page names them: "you" where the server's id for the reader is the one
+ * the browser signed in with, else by their email, as the test application's ids are.
+ */
+const answerer = (person: string, after = "") => new RegExp(`^(you|${person}@\\S+), .*${after}$`);
+
+Then(
+  "it is approved by {word}, because {string}",
+  async ({ page }, person: string, why: string) => {
+    await expect(page.getByText("Approved", { exact: true })).toBeVisible();
+    await expect(page.getByText(answerer(person))).toBeVisible();
+    await expect(page.getByText(why, { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(0);
+  },
+);
 
 Then("{string} is theirs to confirm in admin", async ({ page }, title: string) => {
   const row = waiting(page).getByRole("listitem").filter({ hasText: title });
   await expect(row).toContainText("Yours to confirm, in admin.");
   await expect(row.getByRole("link", { name: title })).toHaveAttribute(
     "href",
-    /^\/portalr\/admin\/confirm\/apr_/,
+    /^\/portalr\/admin\/confirm\/[^/]+$/,
   );
 });
 
@@ -53,7 +62,7 @@ When(
   },
 );
 
-Then("it is approved by them on the confirm page", async ({ page }) => {
+Then("it is approved by {word} on the confirm page", async ({ page }, person: string) => {
   await expect(page.getByText("Approved", { exact: true })).toBeVisible();
-  await expect(page.getByText(/^you, .*, on the confirm page$/)).toBeVisible();
+  await expect(page.getByText(answerer(person, ", on the confirm page"))).toBeVisible();
 });

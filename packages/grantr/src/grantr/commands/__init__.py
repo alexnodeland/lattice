@@ -678,6 +678,8 @@ def _command(spec: _Spec) -> Command:
         exposure=spec.exposure,
         route=spec.route,
         surfaces=spec.surfaces,
+        # Access is the tenant's: a command names any workspace it acts on in its arguments.
+        tenant_wide=True,
     )
 
 

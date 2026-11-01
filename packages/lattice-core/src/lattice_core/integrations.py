@@ -234,8 +234,11 @@ class Integrations(Protocol):
     arguments are positional, so an implementation names them as it likes.
     """
 
-    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
-        """Return whether the integration ``key`` is on in the tenant's workspace."""
+    async def is_enabled(self, tenant_id: str, workspace_id: str | None, key: str, /) -> bool:
+        """Return whether the integration ``key`` is on in the tenant's workspace.
+
+        Given no workspace, a tenant-wide command's, it is the tenant's (lattice ADR-0044).
+        """
         ...
 
 
@@ -249,7 +252,7 @@ class Defaults:
     def __init__(self, known: Mapping[str, Integration] = KNOWN) -> None:
         self._known = known
 
-    async def is_enabled(self, _tenant_id: str, _workspace_id: str, key: str, /) -> bool:
+    async def is_enabled(self, _tenant_id: str, _workspace_id: str | None, key: str, /) -> bool:
         """Return the integration's default, or False for a key it doesn't know."""
         integration = self._known.get(key)
         return integration is not None and integration.default

@@ -51,6 +51,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.deployment_links": {
@@ -140,6 +141,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.invite_member": {
@@ -187,6 +189,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.list_deployment_tenants": {
@@ -223,6 +226,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.list_traces": {
@@ -322,6 +326,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.read_adoption": {
@@ -373,6 +378,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.read_feedback": {
@@ -441,6 +447,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.read_log_line": {
@@ -486,6 +493,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.read_logs": {
@@ -572,6 +580,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.read_metrics": {
@@ -650,6 +659,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.read_scores": {
@@ -708,6 +718,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.read_spend": {
@@ -744,6 +755,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.read_trace": {
@@ -789,6 +801,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "portalr.read_usage": {
@@ -854,6 +867,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     }
   },

@@ -448,8 +448,12 @@ class Settings(Protocol):
         KeyError: For a key no registry it knows declares.
     """
 
-    async def value(self, tenant_id: str, workspace_id: str, key: str, /) -> Value:
-        """Return the setting's value in the tenant's workspace."""
+    async def value(self, tenant_id: str, workspace_id: str | None, key: str, /) -> Value:
+        """Return the setting's value in the tenant's workspace, or the tenant's, given none.
+
+        A tenant-wide command is called with no workspace (lattice ADR-0044): its value is the
+        tenant's, narrowed by no workspace's.
+        """
         ...
 
 
@@ -473,7 +477,7 @@ class SettingsDefaults:
         self._known = known
         self._operator = operator_layer(known, operator)
 
-    async def value(self, _tenant_id: str, _workspace_id: str, key: str, /) -> Value:
+    async def value(self, _tenant_id: str, _workspace_id: str | None, key: str, /) -> Value:
         """Return the operator's value, or the default."""
         return self._operator.get(key, self._known[key].default)
 

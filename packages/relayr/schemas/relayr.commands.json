@@ -34,6 +34,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "relayr.tracker_status": {
@@ -70,6 +71,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     }
   },

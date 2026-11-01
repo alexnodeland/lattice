@@ -253,6 +253,12 @@
       "type": "array",
       "uniqueItems": true
     },
+    "tenant_wide": {
+      "default": false,
+      "description": "Whether it acts on the tenant as a whole, such as listing its workspaces or granting a\nrole, rather than in one of its workspaces: it is called with a scope that names no\nworkspace, and a surface asks its caller for none (lattice ADR-0044).",
+      "title": "Tenant Wide",
+      "type": "boolean"
+    },
     "toolset": {
       "description": "The one toolset it is offered in.",
       "enum": [
@@ -274,6 +280,6 @@
     "exposure",
     "route"
   ],
-  "title": "lattice.commands 1.0.0",
+  "title": "lattice.commands 1.1.0",
   "type": "object"
 }

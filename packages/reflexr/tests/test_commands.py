@@ -83,6 +83,10 @@ def test_a_rule_to_install_is_described_by_reflexrs_rule_schema() -> None:
     assert schema["$defs"]["Rule"]["properties"] == Rule.model_json_schema()["properties"]
 
 
+def test_each_is_called_in_a_workspace() -> None:
+    assert not any(command.tenant_wide for command in COMMANDS.values())
+
+
 def test_the_committed_catalog_is_current() -> None:
     assert json.loads(DOCUMENT.read_text()) == catalog_document(), "run `moon run reflexr:schema`"
 

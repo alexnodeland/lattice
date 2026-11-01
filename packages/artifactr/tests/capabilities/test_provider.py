@@ -248,3 +248,11 @@ async def test_another_providers_capability_is_refused(workspaces: Workspaces) -
     foreign = provider.capabilities(HERE)[0].model_copy(update={"name": "notes.list"})
     with pytest.raises(ValueError, match=r"notes\.list isn't one of artifactr's capabilities"):
         await provider.call(foreign, {}, context())
+
+
+async def test_a_call_that_names_no_workspace_is_refused(workspaces: Workspaces) -> None:
+    provider = ArtifactrProvider(workspaces, types=[Note])
+    [listing] = [c for c in provider.capabilities(HERE) if c.name == "artifactr.list_artifacts"]
+    tenant_wide = context().model_copy(update={"scope": Scope(tenant_id="acme")})
+    with pytest.raises(ValueError, match="is called in a workspace, and names none"):
+        await provider.call(listing, {}, tenant_wide)

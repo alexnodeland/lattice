@@ -67,7 +67,7 @@ __all__ = [
     "tool_name",
 ]
 
-CONTRACT: Final = "1.0.0"
+CONTRACT: Final = "1.1.0"
 """The contract's version. A removed field or a changed meaning is a major version; an optional
 field, a new :data:`Toolset` or a new :data:`Surface` is a minor one."""
 
@@ -120,8 +120,9 @@ class Command(BaseModel):
     Raises:
         ValueError: If its capability isn't a ``command`` capability, its name isn't of
             :data:`COMMAND_NAME`'s form or makes a tool name too long, it is exposed as a
-            resource without a URI template or offered on no surface, or a resource is given
-            to one that is only a tool.
+            resource without a URI template or offered on no surface, a resource is given to
+            one that is only a tool, or a tenant-wide one's route or resource names a
+            workspace.
     """
 
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
@@ -142,6 +143,10 @@ class Command(BaseModel):
     ``artifactr://{tenant}/{workspace}/artifacts/{artifact_id}``."""
     surfaces: frozenset[Surface] = SURFACES
     """The surfaces it is offered on: every one, unless it is portalr's alone or the like."""
+    tenant_wide: bool = False
+    """Whether it acts on the tenant as a whole, such as listing its workspaces or granting a
+    role, rather than in one of its workspaces: it is called with a scope that names no
+    workspace, and a surface asks its caller for none (lattice ADR-0044)."""
 
     @model_validator(mode="after")
     def _well_formed(self) -> Self:
@@ -159,6 +164,8 @@ class Command(BaseModel):
             raise ValueError(f"{name} names a resource, so it is exposed as one")
         if not self.surfaces:
             raise ValueError(f"{name} is offered on some surface")
+        if self.tenant_wide and "{workspace}" in f"{self.route or ''}{self.resource or ''}":
+            raise ValueError(f"{name} is tenant-wide, so its route and resource name no workspace")
         return self
 
     @property

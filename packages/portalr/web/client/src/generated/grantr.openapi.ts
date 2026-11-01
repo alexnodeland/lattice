@@ -998,7 +998,7 @@ export interface components {
              * @enum {string}
              */
             type: "approval_asked";
-            workspace: components["schemas"]["WorkspaceId"];
+            workspace: components["schemas"]["WorkspaceId"] | null;
         };
         /**
          * ApprovalClosed
@@ -1278,7 +1278,7 @@ export interface components {
             type: "capability_called";
             /** Version */
             version: string | null;
-            workspace: components["schemas"]["WorkspaceId"];
+            workspace: components["schemas"]["WorkspaceId"] | null;
         };
         /**
          * CapabilityStep
@@ -1968,13 +1968,19 @@ export interface components {
         };
         /**
          * Scope
-         * @description Where capabilities are offered and called: a tenant's workspace.
+         * @description Where capabilities are offered and called: a tenant's workspace, or the tenant as a whole.
+         *
+         *     A tenant-wide command, such as listing a tenant's workspaces, is called with no workspace
+         *     (lattice ADR-0044); everything else is called in one.
          */
         Scope: {
             /** Tenant Id */
             tenant_id: string;
-            /** Workspace Id */
-            workspace_id: string;
+            /**
+             * Workspace Id
+             * @description The workspace, or None for the tenant as a whole.
+             */
+            workspace_id?: string | null;
         };
         /**
          * ServicePrincipal

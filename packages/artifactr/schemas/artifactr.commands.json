@@ -46,6 +46,7 @@
       "surfaces": [
         "portalr"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.archive_artifact": {
@@ -89,6 +90,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.create_artifact": {
@@ -139,6 +141,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.create_thread": {
@@ -187,6 +190,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.edit_artifact": {
@@ -254,6 +258,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.edit_text": {
@@ -328,6 +333,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.give_feedback": {
@@ -392,6 +398,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "feedback"
     },
     "artifactr.list_artifacts": {
@@ -442,6 +449,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.list_files": {
@@ -478,6 +486,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.list_proposals": {
@@ -514,6 +523,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.list_revisions": {
@@ -559,6 +569,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.list_threads": {
@@ -595,6 +606,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.list_workspaces": {
@@ -653,6 +665,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "core"
     },
     "artifactr.post_message": {
@@ -710,6 +723,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.propose_text": {
@@ -797,6 +811,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.read_artifact": {
@@ -842,6 +857,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.read_events": {
@@ -894,6 +910,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "automations"
     },
     "artifactr.read_file": {
@@ -946,6 +963,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.read_run": {
@@ -991,6 +1009,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.read_thread": {
@@ -1043,6 +1062,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.respond_to_proposal": {
@@ -1105,6 +1125,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.set_focus": {
@@ -1154,6 +1175,7 @@
       "surfaces": [
         "portalr"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.set_thread_mode": {
@@ -1203,6 +1225,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     },
     "artifactr.stop_run": {
@@ -1246,6 +1269,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": false,
       "toolset": "core"
     }
   },

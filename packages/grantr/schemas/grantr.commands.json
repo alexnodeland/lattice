@@ -104,6 +104,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.answer_approval": {
@@ -159,6 +160,7 @@
       "surfaces": [
         "portalr"
       ],
+      "tenant_wide": true,
       "toolset": "core"
     },
     "grantr.bind": {
@@ -282,6 +284,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.define_group": {
@@ -399,6 +402,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.define_role": {
@@ -452,6 +456,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.delete_group": {
@@ -496,6 +501,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.delete_role": {
@@ -540,6 +546,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.delete_tenant": {
@@ -574,6 +581,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.grant": {
@@ -793,6 +801,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.grant_on_tenant": {
@@ -960,6 +969,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.grant_operator": {
@@ -1007,6 +1017,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.issue_key": {
@@ -1054,6 +1065,7 @@
       "surfaces": [
         "portalr"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.list_approvals": {
@@ -1104,6 +1116,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "core"
     },
     "grantr.list_bindings": {
@@ -1154,6 +1167,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.list_connections": {
@@ -1208,6 +1222,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.list_grants": {
@@ -1258,6 +1273,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.list_groups": {
@@ -1294,6 +1310,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.list_integrations": {
@@ -1344,6 +1361,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.list_keys": {
@@ -1380,6 +1398,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.list_members": {
@@ -1416,6 +1435,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.list_restrictions": {
@@ -1462,6 +1482,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.list_roles": {
@@ -1498,6 +1519,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.list_settings": {
@@ -1548,6 +1570,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.read_approval": {
@@ -1594,6 +1617,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "core"
     },
     "grantr.read_audit": {
@@ -1681,6 +1705,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.remove_member": {
@@ -1787,6 +1812,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.restrict": {
@@ -1887,6 +1913,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.revoke": {
@@ -2106,6 +2133,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.revoke_connection": {
@@ -2150,6 +2178,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.revoke_key": {
@@ -2194,6 +2223,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.revoke_member_connection": {
@@ -2238,6 +2268,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.revoke_operator": {
@@ -2285,6 +2316,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.set_integration": {
@@ -2354,6 +2386,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.set_setting": {
@@ -2442,6 +2475,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     },
     "grantr.unbind": {
@@ -2486,6 +2520,7 @@
         "portalr",
         "webmcp"
       ],
+      "tenant_wide": true,
       "toolset": "admin"
     }
   },

@@ -541,6 +541,9 @@
             "binding_added": "#/components/schemas/BindingAdded",
             "binding_removed": "#/components/schemas/BindingRemoved",
             "capability_called": "#/components/schemas/CapabilityCalled",
+            "connection_made": "#/components/schemas/ConnectionMade",
+            "connection_revoked": "#/components/schemas/ConnectionRevoked",
+            "connection_toolsets_added": "#/components/schemas/ConnectionToolsetsAdded",
             "deployment_tenant_created": "#/components/schemas/DeploymentTenantCreated",
             "granted": "#/components/schemas/Granted",
             "group_defined": "#/components/schemas/GroupDefined",
@@ -602,6 +605,15 @@
             "$ref": "#/components/schemas/KeyRevoked"
           },
           {
+            "$ref": "#/components/schemas/ConnectionMade"
+          },
+          {
+            "$ref": "#/components/schemas/ConnectionToolsetsAdded"
+          },
+          {
+            "$ref": "#/components/schemas/ConnectionRevoked"
+          },
+          {
             "$ref": "#/components/schemas/Restricted"
           },
           {
@@ -648,6 +660,9 @@
           "revoked",
           "key_issued",
           "key_revoked",
+          "connection_made",
+          "connection_toolsets_added",
+          "connection_revoked",
           "restricted",
           "unrestricted",
           "integration_set",
@@ -1085,6 +1100,232 @@
           "resource"
         ],
         "title": "Check",
+        "type": "object"
+      },
+      "ClientInfo": {
+        "description": "The client a connection is through, as its OAuth registration names it.",
+        "properties": {
+          "client_id": {
+            "description": "Its OAuth ``client_id``, which every token it holds carries.",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Client Id",
+            "type": "string"
+          },
+          "name": {
+            "description": "Its registered name, such as \"Claude\", which surfaces show as \"Alex via Claude\".",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "uri": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its home page, where it registered one.",
+            "title": "Uri"
+          }
+        },
+        "required": [
+          "client_id",
+          "name"
+        ],
+        "title": "ClientInfo",
+        "type": "object"
+      },
+      "Connection": {
+        "description": "A client a person connected to one of their tenants, with the toolsets it may use.",
+        "properties": {
+          "client": {
+            "$ref": "#/components/schemas/ClientInfo"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^con_[0-9a-f]{16}$",
+            "title": "Id",
+            "type": "string"
+          },
+          "last_used_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was last used, at most a few minutes behind.",
+            "title": "Last Used At"
+          },
+          "revoked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was revoked; a revoked connection refuses every call.",
+            "title": "Revoked At"
+          },
+          "tenant": {
+            "$ref": "#/components/schemas/TenantId",
+            "description": "The one tenant it reaches; a second tenant is a second connection."
+          },
+          "toolsets": {
+            "description": "The toolsets it may use, ``core`` always among them.",
+            "items": {
+              "enum": [
+                "core",
+                "automations",
+                "research",
+                "code",
+                "files",
+                "feedback",
+                "admin"
+              ],
+              "type": "string"
+            },
+            "title": "Toolsets",
+            "type": "array",
+            "uniqueItems": true
+          },
+          "user": {
+            "$ref": "#/components/schemas/User",
+            "description": "The person who connected it, as whom every call through it is checked."
+          }
+        },
+        "required": [
+          "id",
+          "tenant",
+          "user",
+          "client",
+          "toolsets",
+          "created_at"
+        ],
+        "title": "Connection",
+        "type": "object"
+      },
+      "ConnectionMade": {
+        "description": "A person connected an outside client to the tenant (grantr ADR-0043).",
+        "properties": {
+          "client": {
+            "title": "Client",
+            "type": "string"
+          },
+          "connection": {
+            "title": "Connection",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "toolsets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Toolsets",
+            "type": "array"
+          },
+          "type": {
+            "const": "connection_made",
+            "default": "connection_made",
+            "title": "Type",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "required": [
+          "connection",
+          "user",
+          "client",
+          "name",
+          "toolsets"
+        ],
+        "title": "ConnectionMade",
+        "type": "object"
+      },
+      "ConnectionRevoked": {
+        "description": "A connection was revoked: its next call is refused.",
+        "properties": {
+          "client": {
+            "title": "Client",
+            "type": "string"
+          },
+          "connection": {
+            "title": "Connection",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "const": "connection_revoked",
+            "default": "connection_revoked",
+            "title": "Type",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "required": [
+          "connection",
+          "user",
+          "client",
+          "name"
+        ],
+        "title": "ConnectionRevoked",
+        "type": "object"
+      },
+      "ConnectionToolsetsAdded": {
+        "description": "A person let one of their connections use more toolsets.",
+        "properties": {
+          "connection": {
+            "title": "Connection",
+            "type": "string"
+          },
+          "toolsets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Toolsets",
+            "type": "array"
+          },
+          "type": {
+            "const": "connection_toolsets_added",
+            "default": "connection_toolsets_added",
+            "title": "Type",
+            "type": "string"
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId"
+          }
+        },
+        "required": [
+          "connection",
+          "user",
+          "toolsets"
+        ],
+        "title": "ConnectionToolsetsAdded",
         "type": "object"
       },
       "DeploymentTenantCreated": {
@@ -3767,6 +4008,119 @@
           }
         },
         "summary": "Unbind"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/connections": {
+      "get": {
+        "description": "The outside clients connected to the tenant that the caller may read, oldest first.\n\nA member reads their own, with ``grantr:read_connections``; whoever adds the tenant's\nmembers, every one (grantr ADR-0043). Revoked ones are listed too.",
+        "operationId": "list_connections_grantr_v1_tenants__tenant__connections_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only this person's; theirs, or every one for an admin, if omitted.",
+            "in": "query",
+            "name": "user",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/UserId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only this person's; theirs, or every one for an admin, if omitted.",
+              "title": "User"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Connection"
+                  },
+                  "title": "Response List Connections Grantr V1 Tenants  Tenant  Connections Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Connections"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/connections/{connection}": {
+      "delete": {
+        "description": "Revoke a connection: its next call is refused.\n\nA member revokes their own, with ``grantr:revoke_connection``; whoever adds the\ntenant's members, any.",
+        "operationId": "revoke_connection_grantr_v1_tenants__tenant__connections__connection__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "connection",
+            "required": true,
+            "schema": {
+              "title": "Connection",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revoke Connection"
       }
     },
     "/grantr/v1/tenants/{tenant}/grants": {

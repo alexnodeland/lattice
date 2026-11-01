@@ -15,7 +15,7 @@ def test_the_matrix_lists_every_action_against_every_role() -> None:
     assert rule == "|---|" + "---|" * 9
     assert "| `lib:edit` |  |  | ✓ | ✓ |  | ✓ |  |  |  |" in rows
     assert "| `lib:open` |  | ✓ | ✓ | ✓ |  | ✓ | ✓ | ✓ |  |" in rows
-    assert len(rows) == 3 + 18, "every action, grantr's own included"
+    assert len(rows) == 3 + 20, "every action, grantr's own included"
 
 
 def test_the_matrix_has_a_column_per_custom_role() -> None:

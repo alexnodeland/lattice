@@ -15,6 +15,9 @@ from grantr.core.audit import (
     BindingRemoved,
     CapabilityCalled,
     CapabilityStep,
+    ConnectionMade,
+    ConnectionRevoked,
+    ConnectionToolsetsAdded,
     DeploymentTenantCreated,
     Granted,
     GroupDefined,
@@ -32,6 +35,13 @@ from grantr.core.audit import (
     TenantCreated,
     TenantDeleted,
     Unrestricted,
+)
+from grantr.core.connections import (
+    CONNECTION_ID,
+    ClientInfo,
+    Connection,
+    ConnectionId,
+    connection_id,
 )
 from grantr.core.errors import Forbidden, GrantrError, Invalid, Stale
 from grantr.core.grants import Grant, Membership, Visibility, memberships
@@ -79,6 +89,7 @@ from grantr.core.subjects import (
 __all__ = [
     "APPLICATION",
     "BUILT_IN",
+    "CONNECTION_ID",
     "DEPLOYMENT",
     "GRANTR_ACTIONS",
     "ITEMS",
@@ -102,6 +113,12 @@ __all__ = [
     "CapabilityStep",
     "Catalog",
     "CatalogView",
+    "ClientInfo",
+    "Connection",
+    "ConnectionId",
+    "ConnectionMade",
+    "ConnectionRevoked",
+    "ConnectionToolsetsAdded",
     "DeploymentTenantCreated",
     "Forbidden",
     "Grant",
@@ -150,6 +167,7 @@ __all__ = [
     "UserId",
     "Visibility",
     "WorkspaceId",
+    "connection_id",
     "effective",
     "issue",
     "key_id",

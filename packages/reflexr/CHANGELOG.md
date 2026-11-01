@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/alexnodeland/lattice/compare/reflexr-v0.2.2...reflexr-v0.3.0) (2026-11-01)
+
+
+### Features
+
+* **reflexr:** reflexr's commands, every action a command or listed with its reason (RFC-0014 phase 1) ([#1340](https://github.com/alexnodeland/lattice/issues/1340)) ([0068333](https://github.com/alexnodeland/lattice/commit/00683336d1b699b2f034297cd755a336d017dacc))
+
 ## [0.2.2](https://github.com/alexnodeland/lattice/compare/reflexr-v0.2.1...reflexr-v0.2.2) (2026-11-01)
 
 

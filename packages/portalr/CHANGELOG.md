@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.0](https://github.com/alexnodeland/lattice/compare/portalr-v0.7.0...portalr-v0.8.0) (2026-11-01)
+
+
+### Features
+
+* **portalr:** approvals' list and page in the app, and admin's confirm page for admin_high (RFC-0011, ADR-0038) ([#1316](https://github.com/alexnodeland/lattice/issues/1316)) ([ff04974](https://github.com/alexnodeland/lattice/commit/ff04974aeb951c2664dac27c5c0df3900bf93f2c))
+
 ## [0.7.0](https://github.com/alexnodeland/lattice/compare/portalr-v0.6.0...portalr-v0.7.0) (2026-11-01)
 
 

@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.5.0...artifactr-v0.6.0) (2026-11-01)
+
+
+### Features
+
+* **artifactr:** artifactr's commands, every action a command or listed with its reason (RFC-0014 phase 1) ([#1333](https://github.com/alexnodeland/lattice/issues/1333)) ([d062ac9](https://github.com/alexnodeland/lattice/commit/d062ac9e45a7a6d6c44efea9a40b2add19c44228))
+
 ## [0.5.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.4.1...artifactr-v0.5.0) (2026-10-31)
 
 

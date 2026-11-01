@@ -11,6 +11,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "An answer to a deferred tool's call.",
           "properties": {
             "approved": {
               "description": "Whether to let it go ahead.",
@@ -60,6 +61,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "One artifact.",
           "properties": {
             "artifact_id": {
               "description": "The artifact.",
@@ -104,6 +106,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "A new artifact.",
           "properties": {
             "data": {
               "additionalProperties": true,
@@ -155,6 +158,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "A new thread.",
           "properties": {
             "title": {
               "anyOf": [
@@ -204,11 +208,18 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "JSON Patch operations on an artifact's data, at the version they were made against.",
           "properties": {
             "artifact_id": {
               "description": "The artifact.",
               "title": "Artifact Id",
               "type": "string"
+            },
+            "base_version": {
+              "description": "The version you read: the edit is refused if the artifact has changed since.",
+              "minimum": 1,
+              "title": "Base Version",
+              "type": "integer"
             },
             "operations": {
               "description": "JSON Patch operations on the artifact's data.",
@@ -236,6 +247,7 @@
           },
           "required": [
             "artifact_id",
+            "base_version",
             "operations"
           ],
           "type": "object"
@@ -272,6 +284,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "A passage of an artifact's text field to replace.",
           "properties": {
             "artifact_id": {
               "description": "The artifact.",
@@ -346,37 +359,170 @@
           "integration": null
         },
         "input_schema": {
-          "additionalProperties": false,
-          "properties": {
-            "comment": {
-              "anyOf": [
+          "$defs": {
+            "FeedbackTarget": {
+              "discriminator": {
+                "mapping": {
+                  "artifact": "#/$defs/OnArtifact",
+                  "message": "#/$defs/OnMessage",
+                  "thread": "#/$defs/OnThread",
+                  "turn": "#/$defs/OnTurn"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
                 {
-                  "type": "string"
+                  "$ref": "#/$defs/OnArtifact"
                 },
                 {
-                  "type": "null"
+                  "$ref": "#/$defs/OnThread"
+                },
+                {
+                  "$ref": "#/$defs/OnTurn"
+                },
+                {
+                  "$ref": "#/$defs/OnMessage"
                 }
+              ]
+            },
+            "OnArtifact": {
+              "additionalProperties": false,
+              "description": "Feedback on one version of an artifact.",
+              "properties": {
+                "artifact_id": {
+                  "description": "The artifact.",
+                  "title": "Artifact Id",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "artifact",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "version": {
+                  "description": "Its version the feedback is on.",
+                  "minimum": 1,
+                  "title": "Version",
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "kind",
+                "artifact_id",
+                "version"
               ],
-              "default": null,
-              "description": "What you would say about it.",
-              "title": "Comment"
+              "title": "OnArtifact",
+              "type": "object"
             },
-            "rating": {
-              "description": "-1, 0 or 1.",
-              "maximum": 1,
-              "minimum": -1,
-              "title": "Rating",
-              "type": "integer"
+            "OnMessage": {
+              "additionalProperties": false,
+              "description": "Feedback on one message in a thread.",
+              "properties": {
+                "kind": {
+                  "const": "message",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "message_id": {
+                  "description": "The message.",
+                  "title": "Message Id",
+                  "type": "string"
+                },
+                "run_id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "description": "For an agent's message, the run that posted it.",
+                  "title": "Run Id"
+                },
+                "thread_id": {
+                  "description": "The thread it was posted in.",
+                  "title": "Thread Id",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "message_id",
+                "thread_id"
+              ],
+              "title": "OnMessage",
+              "type": "object"
             },
-            "target_id": {
-              "description": "The message, run or artifact the feedback is on.",
-              "title": "Target Id",
+            "OnThread": {
+              "additionalProperties": false,
+              "description": "Feedback on a whole thread.",
+              "properties": {
+                "kind": {
+                  "const": "thread",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "thread_id": {
+                  "description": "The thread.",
+                  "title": "Thread Id",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "thread_id"
+              ],
+              "title": "OnThread",
+              "type": "object"
+            },
+            "OnTurn": {
+              "additionalProperties": false,
+              "description": "Feedback on an agent's turn: its run.",
+              "properties": {
+                "kind": {
+                  "const": "turn",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "run_id": {
+                  "description": "The run.",
+                  "title": "Run Id",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "run_id"
+              ],
+              "title": "OnTurn",
+              "type": "object"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Feedback of a type the application registers.",
+          "properties": {
+            "feedback_type": {
+              "description": "The feedback type: one the application registers.",
+              "minLength": 1,
+              "title": "Feedback Type",
               "type": "string"
+            },
+            "target": {
+              "$ref": "#/$defs/FeedbackTarget",
+              "description": "What the feedback is on: an artifact's version, a thread, a turn or a message."
+            },
+            "value": {
+              "additionalProperties": true,
+              "description": "The feedback type's fields.",
+              "title": "Value",
+              "type": "object"
             }
           },
           "required": [
-            "target_id",
-            "rating"
+            "feedback_type",
+            "target"
           ],
           "type": "object"
         },
@@ -414,6 +560,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "The workspace's artifacts, optionally of one kind.",
           "properties": {
             "kind": {
               "anyOf": [
@@ -465,6 +612,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "No arguments: the command reads its workspace.",
           "properties": {},
           "type": "object"
         },
@@ -502,6 +650,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "No arguments: the command reads its workspace.",
           "properties": {},
           "type": "object"
         },
@@ -539,6 +688,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "One artifact.",
           "properties": {
             "artifact_id": {
               "description": "The artifact.",
@@ -585,6 +735,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "No arguments: the command reads its workspace.",
           "properties": {},
           "type": "object"
         },
@@ -622,6 +773,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "A page of a list ordered by id.",
           "properties": {
             "after": {
               "anyOf": [
@@ -679,6 +831,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "A message to post.",
           "properties": {
             "text": {
               "description": "The message.",
@@ -737,6 +890,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "A passage of an artifact's text field to propose replacing.",
           "properties": {
             "artifact_id": {
               "description": "The artifact.",
@@ -827,6 +981,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "One artifact.",
           "properties": {
             "artifact_id": {
               "description": "The artifact.",
@@ -873,6 +1028,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "The workspace's events after a sequence number.",
           "properties": {
             "after_seq": {
               "default": 0,
@@ -926,6 +1082,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "A page of a native file's text.",
           "properties": {
             "artifact_id": {
               "description": "The artifact.",
@@ -979,6 +1136,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "One run.",
           "properties": {
             "run_id": {
               "description": "The run.",
@@ -1025,6 +1183,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "A thread, and its events after a sequence number.",
           "properties": {
             "after_seq": {
               "default": 0,
@@ -1076,6 +1235,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "An answer to a proposal.",
           "properties": {
             "accept": {
               "description": "Whether to accept it, applying its change, or reject it.",
@@ -1139,6 +1299,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "What is open beside a thread.",
           "properties": {
             "artifact_id": {
               "anyOf": [
@@ -1189,9 +1350,14 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "A thread's mode.",
           "properties": {
             "mode": {
-              "description": "The thread's mode, as its runner offers them.",
+              "description": "``edit`` changes artifacts directly; ``suggest`` proposes changes for people to accept.",
+              "enum": [
+                "edit",
+                "suggest"
+              ],
               "title": "Mode",
               "type": "string"
             },
@@ -1239,6 +1405,7 @@
         },
         "input_schema": {
           "additionalProperties": false,
+          "description": "One run.",
           "properties": {
             "run_id": {
               "description": "The run.",

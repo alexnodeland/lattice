@@ -1,6 +1,7 @@
 import {
   type Approval,
   answeredBy,
+  answerersOf,
   askedBy,
   changedApprovals,
   confirmPage,
@@ -87,6 +88,7 @@ function ApprovalPage() {
         answeredBy={
           approval.answer == null ? undefined : answeredBy(approval.answer.by, user, names)
         }
+        answerers={answerersOf(approval, user, names)}
       />
       {approval.state === "pending" &&
         (approval.answerers.confirmation ? (

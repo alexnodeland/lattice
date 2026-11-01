@@ -39,6 +39,11 @@ export function peopleOf(entry: AuditEntry): string[] {
     case "revoked":
       named.push(event.grant.to);
       break;
+    case "connection_made":
+    case "connection_toolsets_added":
+    case "connection_revoked":
+      named.push({ kind: "user", id: event.user });
+      break;
     case "tenant_deleted":
     case "group_deleted":
     case "role_defined":
@@ -95,6 +100,12 @@ export function said(event: AuditEvent, names: Names = shortId): string {
       return `issued the key ${event.key} to ${who(event.principal, names)}`;
     case "key_revoked":
       return `revoked the key ${event.key} of ${who(event.principal, names)}`;
+    case "connection_made":
+      return `connected ${event.name} for ${who({ kind: "user", id: event.user }, names)}, with ${listed(event.toolsets)}`;
+    case "connection_toolsets_added":
+      return `let connection ${event.connection} for ${who({ kind: "user", id: event.user }, names)} use ${listed(event.toolsets)}`;
+    case "connection_revoked":
+      return `revoked the connection of ${event.name} for ${who({ kind: "user", id: event.user }, names)}`;
     case "restricted":
       return `restricted ${where(event.on)}`;
     case "unrestricted":
@@ -162,6 +173,9 @@ const LABELS: Record<AuditType, string> = {
   revoked: "Revocations",
   key_issued: "Keys issued",
   key_revoked: "Keys revoked",
+  connection_made: "Clients connected",
+  connection_toolsets_added: "Connections widened",
+  connection_revoked: "Connections revoked",
   restricted: "Restrictions",
   unrestricted: "Restrictions lifted",
   integration_set: "Integrations switched",

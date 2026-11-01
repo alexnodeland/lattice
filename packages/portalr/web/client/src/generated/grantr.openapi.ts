@@ -301,6 +301,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/grantr/v1/tenants/{tenant}/connections": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Connections
+         * @description The outside clients connected to the tenant that the caller may read, oldest first.
+         *
+         *     A member reads their own, with ``grantr:read_connections``; whoever adds the tenant's
+         *     members, every one (grantr ADR-0043). Revoked ones are listed too.
+         */
+        get: operations["list_connections_grantr_v1_tenants__tenant__connections_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grantr/v1/tenants/{tenant}/connections/{connection}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Revoke Connection
+         * @description Revoke a connection: its next call is refused.
+         *
+         *     A member revokes their own, with ``grantr:revoke_connection``; whoever adds the
+         *     tenant's members, any.
+         */
+        delete: operations["revoke_connection_grantr_v1_tenants__tenant__connections__connection__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/grantr/v1/tenants/{tenant}/grants": {
         parameters: {
             query?: never;
@@ -1073,9 +1119,9 @@ export interface components {
             seq: number;
             tenant: components["schemas"]["TenantId"] | null;
         };
-        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"] | components["schemas"]["IntegrationSet"] | components["schemas"]["SettingSet"] | components["schemas"]["BindingAdded"] | components["schemas"]["BindingRemoved"] | components["schemas"]["ApprovalAsked"] | components["schemas"]["ApprovalAnswered"] | components["schemas"]["ApprovalClosed"] | components["schemas"]["CapabilityCalled"];
+        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["ConnectionMade"] | components["schemas"]["ConnectionToolsetsAdded"] | components["schemas"]["ConnectionRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"] | components["schemas"]["IntegrationSet"] | components["schemas"]["SettingSet"] | components["schemas"]["BindingAdded"] | components["schemas"]["BindingRemoved"] | components["schemas"]["ApprovalAsked"] | components["schemas"]["ApprovalAnswered"] | components["schemas"]["ApprovalClosed"] | components["schemas"]["CapabilityCalled"];
         /** @enum {string} */
-        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted" | "integration_set" | "setting_set" | "binding_added" | "binding_removed" | "approval_asked" | "approval_answered" | "approval_closed" | "capability_called";
+        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "connection_made" | "connection_toolsets_added" | "connection_revoked" | "restricted" | "unrestricted" | "integration_set" | "setting_set" | "binding_added" | "binding_removed" | "approval_asked" | "approval_answered" | "approval_closed" | "capability_called";
         /**
          * Binding
          * @description Which of a source's events, on one of its connections, reach one workspace of a tenant.
@@ -1273,6 +1319,114 @@ export interface components {
             /** Action */
             action: string;
             resource: components["schemas"]["Resource"];
+        };
+        /**
+         * ClientInfo
+         * @description The client a connection is through, as its OAuth registration names it.
+         */
+        ClientInfo: {
+            /**
+             * Client Id
+             * @description Its OAuth ``client_id``, which every token it holds carries.
+             */
+            client_id: string;
+            /**
+             * Name
+             * @description Its registered name, such as "Claude", which surfaces show as "Alex via Claude".
+             */
+            name: string;
+            /**
+             * Uri
+             * @description Its home page, where it registered one.
+             */
+            uri?: string | null;
+        };
+        /**
+         * Connection
+         * @description A client a person connected to one of their tenants, with the toolsets it may use.
+         */
+        Connection: {
+            client: components["schemas"]["ClientInfo"];
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: string;
+            /**
+             * Last Used At
+             * @description When it was last used, at most a few minutes behind.
+             */
+            last_used_at?: string | null;
+            /**
+             * Revoked At
+             * @description When it was revoked; a revoked connection refuses every call.
+             */
+            revoked_at?: string | null;
+            /** @description The one tenant it reaches; a second tenant is a second connection. */
+            tenant: components["schemas"]["TenantId"];
+            /**
+             * Toolsets
+             * @description The toolsets it may use, ``core`` always among them.
+             */
+            toolsets: ("core" | "automations" | "research" | "code" | "files" | "feedback" | "admin")[];
+            /** @description The person who connected it, as whom every call through it is checked. */
+            user: components["schemas"]["User"];
+        };
+        /**
+         * ConnectionMade
+         * @description A person connected an outside client to the tenant (grantr ADR-0043).
+         */
+        ConnectionMade: {
+            /** Client */
+            client: string;
+            /** Connection */
+            connection: string;
+            /** Name */
+            name: string;
+            /** Toolsets */
+            toolsets: string[];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "connection_made";
+            user: components["schemas"]["UserId"];
+        };
+        /**
+         * ConnectionRevoked
+         * @description A connection was revoked: its next call is refused.
+         */
+        ConnectionRevoked: {
+            /** Client */
+            client: string;
+            /** Connection */
+            connection: string;
+            /** Name */
+            name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "connection_revoked";
+            user: components["schemas"]["UserId"];
+        };
+        /**
+         * ConnectionToolsetsAdded
+         * @description A person let one of their connections use more toolsets.
+         */
+        ConnectionToolsetsAdded: {
+            /** Connection */
+            connection: string;
+            /** Toolsets */
+            toolsets: string[];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "connection_toolsets_added";
+            user: components["schemas"]["UserId"];
         };
         /**
          * DeploymentTenantCreated
@@ -2559,6 +2713,72 @@ export interface operations {
             path: {
                 tenant: string;
                 binding: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_connections_grantr_v1_tenants__tenant__connections_get: {
+        parameters: {
+            query?: {
+                /** @description Only this person's; theirs, or every one for an admin, if omitted. */
+                user?: components["schemas"]["UserId"] | null;
+            };
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Connection"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_connection_grantr_v1_tenants__tenant__connections__connection__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+                connection: string;
             };
             cookie?: never;
         };

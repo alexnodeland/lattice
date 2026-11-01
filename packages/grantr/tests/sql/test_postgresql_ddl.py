@@ -22,6 +22,7 @@ INTEGRATIONS = VERSIONS / "0006_integrations.py"
 SETTINGS = VERSIONS / "0007_settings.py"
 APPROVALS = VERSIONS / "0008_approvals.py"
 BINDINGS = VERSIONS / "0009_bindings.py"
+CONNECTIONS = VERSIONS / "0010_connections.py"
 
 POLICIES = 10
 """How many policies the migration creates: one per table it names, frozen in it."""
@@ -75,7 +76,7 @@ def test_create_schema_creates_the_policies_the_migration_does(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     migrated = Recorder()
-    for path in (MIGRATION, CREATION, INTEGRATIONS, SETTINGS, APPROVALS, BINDINGS):
+    for path in (MIGRATION, CREATION, INTEGRATIONS, SETTINGS, APPROVALS, BINDINGS, CONNECTIONS):
         _migration(migrated, monkeypatch, path).upgrade()
     created = Recorder()
     _row_level_security(cast("Connection", created))

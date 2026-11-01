@@ -26,6 +26,7 @@ from grantr.core import (
     AuditEntry,
     AuditEvent,
     AuditFilter,
+    Connection,
     Grant,
     Grantee,
     Group,
@@ -49,6 +50,7 @@ from grantr.sql.tables import (
     ApprovalRow,
     AuditRow,
     BindingRow,
+    ConnectionRow,
     GrantRow,
     GroupMemberRow,
     GroupRow,
@@ -337,6 +339,24 @@ class _Reads:
         return sorted(found, key=lambda binding: (binding.bound_at, binding.id))
 
     @awaited_to_the_end
+    async def connections(
+        self, tenant: TenantId, *, user: UserId | None = None, client: str | None = None
+    ) -> list[Connection]:
+        query = select(ConnectionRow).where(ConnectionRow.tenant_id == tenant)
+        if user is not None:
+            query = query.where(ConnectionRow.user_id == user)
+        if client is not None:
+            query = query.where(ConnectionRow.client_id == client)
+        rows = await self._session.scalars(query)
+        found = [Connection.model_validate(row.connection) for row in rows]
+        return sorted(found, key=lambda connection: (connection.created_at, connection.id))
+
+    @awaited_to_the_end
+    async def connection(self, tenant: TenantId, id: str) -> Connection | None:
+        row = await self._session.get(ConnectionRow, (tenant, id))
+        return None if row is None else Connection.model_validate(row.connection)
+
+    @awaited_to_the_end
     async def settings(
         self, tenant: TenantId, workspace: WorkspaceId | None = None
     ) -> dict[str, SettingRow]:
@@ -411,6 +431,7 @@ class _Transaction(_Reads):
             SettingRowRecord,
             ApprovalRow,
             BindingRow,
+            ConnectionRow,
         ):
             await self._session.execute(delete(model).where(model.tenant_id == tenant))
         await self._session.execute(
@@ -461,6 +482,12 @@ class _Transaction(_Reads):
         if isinstance(member, ServicePrincipal):
             await self._session.execute(
                 delete(KeyRow).where(KeyRow.tenant_id == tenant, KeyRow.principal_id == member.id)
+            )
+        else:
+            await self._session.execute(
+                delete(ConnectionRow).where(
+                    ConnectionRow.tenant_id == tenant, ConnectionRow.user_id == member.id
+                )
             )
 
     @awaited_to_the_end
@@ -580,6 +607,19 @@ class _Transaction(_Reads):
         await self._session.delete(row)
         await self._session.flush()
         return Binding.model_validate(row.binding)
+
+    @awaited_to_the_end
+    async def put_connection(self, connection: Connection) -> None:
+        await self._session.merge(
+            ConnectionRow(
+                tenant_id=connection.tenant,
+                id=connection.id,
+                user_id=connection.user.id,
+                client_id=connection.client.client_id,
+                connection=connection.model_dump(mode="json"),
+            )
+        )
+        await self._session.flush()
 
     @awaited_to_the_end
     async def set_setting(
@@ -854,6 +894,18 @@ class SqlStorage:
                 tenant, workspace=workspace, source=source, connection=connection
             ),
         )
+
+    async def connections(
+        self, tenant: TenantId, *, user: UserId | None = None, client: str | None = None
+    ) -> list[Connection]:
+        """The tenant's connections, oldest first: one person's, or a client's, or every one."""
+        return await self._read(
+            tenant, lambda reads: reads.connections(tenant, user=user, client=client)
+        )
+
+    async def connection(self, tenant: TenantId, id: str) -> Connection | None:
+        """One of the tenant's connections, by its id."""
+        return await self._read(tenant, lambda reads: reads.connection(tenant, id))
 
     async def keys(self, tenant: TenantId) -> list[Key]:
         """A tenant's keys."""

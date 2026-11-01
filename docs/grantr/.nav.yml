@@ -52,6 +52,7 @@ nav:
   - adr/0036-a-hook-on-a-members-removal.md
   - adr/0037-the-deployments-own-tools-read-a-tenants-audit-log.md
   - adr/0038-approvals-stored-per-tenant-answered-by-grantrs-subjects-groups-and-grants.md
+  - adr/0039-the-enforcers-gate-and-audit-answered-by-grantr-each-call-as-the-person-it-is-for.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

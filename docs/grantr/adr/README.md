@@ -44,5 +44,6 @@ ADR-0001 to ADR-0009 record the decisions D1 to D9 of [lattice RFC-0001](../../r
 | [0036](0036-a-hook-on-a-members-removal.md) | A hook on a member's removal | Superseded by 0037 |
 | [0037](0037-the-deployments-own-tools-read-a-tenants-audit-log.md) | The deployment's own tools read a tenant's audit log | Accepted |
 | [0038](0038-approvals-stored-per-tenant-answered-by-grantrs-subjects-groups-and-grants.md) | Approvals stored per tenant, answered by grantr's subjects, groups and grants | Accepted |
+| [0039](0039-the-enforcers-gate-and-audit-answered-by-grantr-each-call-as-the-person-it-is-for.md) | The enforcer's gate and audit answered by grantr, each call as the person it is for | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

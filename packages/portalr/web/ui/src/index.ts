@@ -19,6 +19,7 @@ export { AnsiText, type Run, runs } from "./ansi";
 export { type AppHost, AppHostContext } from "./app-frame";
 export { AppShell } from "./app-shell";
 export { useAppearance } from "./appearance";
+export { ApprovalDetails, ApprovalStanding } from "./approval";
 export {
   ArtifactContent,
   capped,

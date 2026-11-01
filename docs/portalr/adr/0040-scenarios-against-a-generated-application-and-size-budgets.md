@@ -60,3 +60,12 @@ Two facts bound the design. The browser needs a Supabase Auth it can reach at `<
 - Harder: the Smoke job on local Supabase installs Chromium and runs two more projects' scenarios, a few minutes more.
 - Not covered: the scenarios on the PostgreSQL and single-host legs; the invitation flow, since local Supabase in CI runs without its mail server.
 - Phase 7b of [RFC-0001](../rfcs/0001-v0.1-implementation-plan.md) is done.
+
+## Amendment (2026-11-01)
+
+The approvals' pages (#1316, [ADR-0093](0093-approvals-on-their-own-page-and-a-confirmation-on-admins-confirm-page-alone.md)) raise three ceilings, each to leave the 2 to 3% of headroom a ceiling near its size is given (#1187):
+
+- The app's three new routes are preloaded with every other, so they count in its `initial`. It grows from 203,542 to 207,693 gzipped bytes, over its 207,000 ceiling, which is raised to 212,000. Its `total` grows from 493,901 to 503,039, over 500,000, and is raised to 515,000.
+- admin's confirm page takes its `total` from 601,697 to 605,987, under its 610,000 ceiling but with less than 1% of headroom; it is raised to 620,000.
+
+The diff an approval shows is plain, not highlighted, so admin loads no highlighter for it. No other ceiling moved. Sizes at the time: app 207.7 / 503.0 / 88.4 kB, admin 225.5 / 606.0 / 114.4 kB. Ceilings: app 212 / 515 / 100 kB, admin 230 / 620 / 140 kB.

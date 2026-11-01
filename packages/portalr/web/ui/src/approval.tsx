@@ -49,7 +49,8 @@ function Shown({ label, children }: { label: string; children: string }) {
  * - the change it would make, as a diff, or else the call's arguments;
  * - the steps of a plan it would pre-approve, if it is a plan's;
  * - who asked, the capability and its version, the workspace, and when it was asked;
- * - when it expires, while it waits, or else who answered, when, on which page, and why.
+ * - who may answer it and when it expires, while it waits, or else who answered, when, on which
+ *   page, and why.
  *
  * Each character a reader wouldn't see in the server's text is shown as its code point, so what
  * is read is what the call would do. Its title is the page's to show, as its heading.
@@ -58,12 +59,15 @@ export function ApprovalDetails({
   approval,
   askedBy,
   answeredBy,
+  answerers,
 }: {
   approval: Approval;
   /** Who asked, in words, as the client's `askedBy` says. */
   askedBy: string;
   /** Who answered, in words, as the client's `answeredBy` says, if anyone has. */
   answeredBy?: string | undefined;
+  /** Who may answer, in words, as the client's `answerersOf` says: shown while it waits. */
+  answerers?: readonly string[] | undefined;
 }) {
   const { rendering, answer } = approval;
   return (
@@ -104,6 +108,12 @@ export function ApprovalDetails({
         <dd>
           <Moment at={approval.asked_at} />
         </dd>
+        {approval.state === "pending" && answerers !== undefined && answerers.length > 0 && (
+          <>
+            <dt className="text-muted">Who may answer</dt>
+            <dd>{answerers.join(", ")}</dd>
+          </>
+        )}
         {approval.state === "pending" && (
           <>
             <dt className="text-muted">Expires</dt>

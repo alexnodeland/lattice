@@ -916,12 +916,19 @@ export function Request({
   onAnswer,
   answeredBy,
   focus = true,
+  approval,
 }: {
   request: ArtifactrV1.DeferredRequest;
   onAnswer: (answer: Answer) => Sent;
   answeredBy?: string | null;
   /** Take the focus as it appears: the newest of a run's forms does, and an answered one never. */
   focus?: boolean;
+  /**
+   * The link to the approval's own page, such as the router's, for a call lattice's enforcer
+   * deferred, which names it (artifactr ADR-0101): drawn as the card's "Who may answer it", where
+   * the page says who may, and by when (portalr ADR-0095).
+   */
+  approval?: ReactElement | undefined;
 }) {
   switch (request.tool_name) {
     case ASK_FORM:
@@ -938,7 +945,14 @@ export function Request({
         <Questions request={request} focus={focus} onAnswer={(answer) => onAnswer({ answer })} />
       );
     default:
-      return <Question request={request} focus={focus} onAnswer={onAnswer} />;
+      return (
+        <Question
+          request={request}
+          focus={focus}
+          onAnswer={onAnswer}
+          {...(approval !== undefined && { approval })}
+        />
+      );
   }
 }
 
@@ -947,10 +961,12 @@ function Question({
   request,
   focus,
   onAnswer,
+  approval,
 }: {
   request: ArtifactrV1.DeferredRequest;
   focus: boolean;
   onAnswer: (answer: Answer) => Sent;
+  approval?: ReactElement;
 }) {
   const [answered, setAnswered] = useState(false);
   const { pending, unsent, send } = useSending();
@@ -980,6 +996,11 @@ function Question({
           <pre className="overflow-x-auto rounded-(--code-block-radius) border border-line bg-paper p-(--code-panel-pad) font-mono text-xs">
             {unhidden(JSON.stringify(request.args, null, 2))}
           </pre>
+        )}
+        {approval && (
+          <ButtonLink size="sm" variant="ghost" render={approval} className="self-start">
+            Who may answer it
+          </ButtonLink>
         )}
         <span className="flex gap-2 sm:justify-end">
           <Button

@@ -1,7 +1,8 @@
 """The admin API, and the two reads UIs ask.
 
 Tenants, members, groups, roles, grants, keys, integrations and the audit log; and ``/me``,
-``/checks``, and which integrations are on in a workspace.
+``/checks``, and which integrations are on in a workspace. And approvals: those a person may
+answer, each one as it stands, and their answer (grantr ADR-0040).
 """
 
 from collections.abc import Awaitable, Callable
@@ -9,7 +10,16 @@ from typing import Annotated, Any, Final, Literal, NamedTuple
 
 from fastapi import APIRouter, Body, Depends, Header, HTTPException, Query, Request, Response
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, ConfigDict, StrictInt, StrictStr, TypeAdapter, ValidationError
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictInt,
+    StrictStr,
+    TypeAdapter,
+    ValidationError,
+)
 from starlette.requests import HTTPConnection
 
 from grantr.core import (
@@ -44,6 +54,19 @@ from grantr.core import (
 )
 from grantr.core.roles import MANAGE_SETTINGS
 from grantr.grants import Grants
+from lattice_core.approvals import (
+    Answer,
+    Approval,
+    ApprovalId,
+    ApprovalRequest,
+    DigestMismatch,
+    NotAnAnswerer,
+    NotPending,
+    State,
+    UnknownApproval,
+)
+from lattice_core.approvals import Subject as Answerer
+from lattice_core.capabilities import Scope
 
 
 class Caller(NamedTuple):
@@ -69,6 +92,8 @@ STATUS_CODES: dict[str, int] = {
     "forbidden": 403,
     "invalid": 422,
     "version_conflict": 409,
+    "not_found": 404,
+    "invalid_state": 409,
 }
 """The HTTP status for each refusal ``type``."""
 
@@ -152,6 +177,64 @@ class SettingChange(BaseModel):
 
     value: StrictInt | list[StrictStr] | None
     """A whole number or names, no wider than the layer above's; ``null`` to unset it."""
+
+
+class ApprovalAnswerer(Answerer):
+    """Who answered an approval: a person, or a service principal, by their grantr id.
+
+    lattice-core's answerer, named apart from grantr's own subjects in the API's document.
+    """
+
+
+class AnswerGiven(Answer):
+    """An approval's answer as grantr recorded it: who gave it, and when."""
+
+    by: ApprovalAnswerer
+    """Who answered."""
+    at: AwareDatetime
+    """When it was answered."""
+
+
+class ApprovalView(ApprovalRequest):
+    """An approval as it stands: lattice-core's ``Approval``, as the API's document names it.
+
+    Its fields are the approval's, which a test holds equal; only its answerer's model is named
+    apart from grantr's own subjects.
+    """
+
+    id: ApprovalId
+    """Its id."""
+    asked_at: AwareDatetime
+    """When it was asked."""
+    state: State
+    """Where it stands."""
+    answer: AnswerGiven | None = None
+    """The answer that settled it, if one did."""
+    reason: str | None = None
+    """Why it expired or was withdrawn."""
+    taken_at: AwareDatetime | None = None
+    """When the one call it lets through went ahead, if one has."""
+
+
+def _view(approval: Approval) -> ApprovalView:
+    return ApprovalView.model_validate(approval.model_dump())
+
+
+class ApprovalAnswer(BaseModel):
+    """An answer to an approval, as a person gives it in portalr."""
+
+    model_config = ConfigDict(frozen=True)
+
+    approved: bool
+    """Whether it approves the call."""
+    arguments_digest: str = Field(pattern=r"^[0-9a-f]{64}$")
+    """The digest of the arguments the person was shown, as the approval gives it; an answer
+    to other arguments is refused."""
+    reason: str | None = Field(default=None, max_length=2000)
+    """Why, in the person's words, if they gave one."""
+    surface: Literal["portalr", "portalr:confirm"] = "portalr"
+    """Where it was given: portalr's approval page, or its confirm page, the one surface a
+    caller's own confirmation is answered on."""
 
 
 class NewKey(BaseModel):
@@ -305,6 +388,23 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         ):
             return tenant, subject
         raise _refused(Forbidden(f"the caller isn't a member of {tenant}"))
+
+    approvals = grants.approvals()
+
+    async def answerer(tenant: TenantId, who: Caller) -> Answerer:
+        """The caller as an approval's answerer, if a member of the tenant."""
+        _, member = await active(who, tenant)
+        return Answerer(id=member.id, service=isinstance(member, ServicePrincipal))
+
+    async def shown(tenant: TenantId, id: ApprovalId, subject: Answerer) -> Approval:
+        """The tenant's approval, to one who may see it; a 404 for anyone else."""
+        try:
+            approval = await approvals.shown(id, subject)
+        except UnknownApproval as error:
+            raise _refusal("not_found", f"no approval {id}") from error
+        if approval.scope.tenant_id != tenant:
+            raise _refusal("not_found", f"no approval {id}")
+        return approval
 
     @router.get("/catalog", dependencies=[current])
     async def catalog() -> CatalogView:
@@ -675,6 +775,64 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
     async def revoke_key(tenant: TenantId, key_id: str, who: Caller = current) -> AuditEntry:
         """Revoke a key."""
         return await _or_http(grants.revoke_key(tenant, key_id, by=by(tenant, who)))
+
+    @router.get("/tenants/{tenant}/approvals")
+    async def list_approvals(
+        tenant: TenantId,
+        workspace: Annotated[
+            WorkspaceId | None,
+            Query(description="Only those asked in this workspace; in every one if omitted."),
+        ] = None,
+        who: Caller = current,
+    ) -> list[ApprovalView]:
+        """The approvals pending in the tenant that the caller may answer, oldest first."""
+        subject = await answerer(tenant, who)
+        if workspace is None:
+            asked = await approvals.answerable(tenant, subject)
+        else:
+            asked = await approvals.pending(
+                Scope(tenant_id=tenant, workspace_id=workspace), subject
+            )
+        return [_view(approval) for approval in asked]
+
+    @router.get("/tenants/{tenant}/approvals/{approval}")
+    async def read_approval(
+        tenant: TenantId, approval: ApprovalId, who: Caller = current
+    ) -> ApprovalView:
+        """An approval as it stands, for one who may answer it or the person it was asked for.
+
+        Anyone else is told it isn't there.
+        """
+        return _view(await shown(tenant, approval, await answerer(tenant, who)))
+
+    @router.post("/tenants/{tenant}/approvals/{approval}/answer")
+    async def answer_approval(
+        tenant: TenantId, approval: ApprovalId, body: ApprovalAnswer, who: Caller = current
+    ) -> ApprovalView:
+        """Answer a pending approval as the caller, and return it settled.
+
+        The first answer wins: a later one, or one past the deadline, is a 409 (`invalid_state`),
+        and the approval, read again, shows the first. An answer to other arguments than the
+        approval's is a 409 (`version_conflict`). A caller who may see it but not answer it, or
+        not on that surface, is refused; a caller's own confirmation is answered on
+        `portalr:confirm` alone.
+        """
+        subject = await answerer(tenant, who)
+        await shown(tenant, approval, subject)
+        answer = Answer(
+            approved=body.approved,
+            arguments_digest=body.arguments_digest,
+            surface=body.surface,
+            reason=body.reason,
+        )
+        try:
+            return _view(await approvals.answer(approval, answer, subject=subject))
+        except NotPending as error:
+            raise _refusal("invalid_state", str(error)) from error
+        except NotAnAnswerer as error:
+            raise _refusal("forbidden", str(error)) from error
+        except DigestMismatch as error:
+            raise _refusal("version_conflict", str(error)) from error
 
     return router
 

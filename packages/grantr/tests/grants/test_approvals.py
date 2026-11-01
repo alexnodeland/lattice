@@ -420,6 +420,46 @@ async def test_pending_lists_what_the_subject_may_answer_in_the_scope(storage: S
     assert await approvals.pending(deployment, _as(BOB)) == []
 
 
+async def test_answerable_lists_what_the_subject_may_answer_in_every_workspace(
+    storage: Storage,
+) -> None:
+    clock = Clock()
+    grants = await _grants(storage)
+    await grants.grant(
+        "acme", "admin", on=Resource(kind="workspace", workspace="w2"), to=BOB, by=ALICE
+    )
+    approvals = _store(grants, clock)
+    first = await approvals.ask(_request())
+    clock.now = NOW + timedelta(minutes=1)
+    in_w2 = await approvals.ask(_request(workspace="w2"))
+    await approvals.ask(_request(workspace="w3"))
+    await approvals.ask(_request(Answerers(subjects=frozenset({ERIN.id}))))
+    assert await approvals.answerable("acme", _as(BOB)) == [first, in_w2], "oldest first"
+    assert await approvals.answerable("acme", _as(CAROL)) == []
+    assert await approvals.answerable("globex", _as(BOB)) == []
+    assert await approvals.answerable("~deployment", _as(BOB)) == []
+
+
+async def test_an_approval_is_shown_to_its_answerers_and_the_person_it_was_for(
+    storage: Storage,
+) -> None:
+    grants = await _grants(storage)
+    approvals = _store(grants, Clock())
+    asked = await approvals.ask(_request())
+    assert await approvals.shown(asked.id, _as(BOB)) == asked, "who may answer it"
+    assert await approvals.shown(asked.id, _as(CAROL)) == asked, "the person the run is for"
+    answered = await approvals.answer(asked.id, _answer(), subject=_as(BOB))
+    assert await approvals.shown(asked.id, _as(CAROL)) == answered, "whatever its state"
+    for stranger in (_as(ERIN), _as(DAVE), Subject(id=CAROL.id, service=True)):
+        with pytest.raises(UnknownApproval, match=f"no approval {asked.id}"):
+            await approvals.shown(asked.id, stranger)
+    await grants.remove_member("acme", CAROL, by=ALICE)
+    with pytest.raises(UnknownApproval):  # no longer a member
+        await approvals.shown(asked.id, _as(CAROL))
+    with pytest.raises(UnknownApproval):
+        await approvals.shown("apr~acme~nope", _as(BOB))
+
+
 @pytest.mark.parametrize(
     "id",
     ["apr_1", "apr~acme", "apr~acme~", "apr~~token", "xyz~acme~token", "apr~acme~a~b"],

@@ -168,6 +168,40 @@ test("each type of change reads as a sentence", () => {
       },
       "called artifactr.edit_text in globex's workspace notes, as person:dave: refused",
     ],
+    [
+      {
+        type: "binding_added",
+        binding: "bnd_0123456789abcdef",
+        workspace: "api",
+        source: "forge",
+        connection: "inst_1",
+        types: ["forge:issue", "forge:pull_request"],
+        trust: "untrusted",
+      },
+      "bound forge inst_1 (forge:issue, forge:pull_request) to workspace api, trusted as untrusted",
+    ],
+    [
+      {
+        type: "binding_added",
+        binding: "bnd_0123456789abcdef",
+        workspace: "ops",
+        source: "tracker",
+        connection: "plane",
+        types: null,
+        trust: null,
+      },
+      "bound tracker plane to workspace ops",
+    ],
+    [
+      {
+        type: "binding_removed",
+        binding: "bnd_0123456789abcdef",
+        workspace: "ops",
+        source: "tracker",
+        connection: "plane",
+      },
+      "unbound tracker plane from workspace ops",
+    ],
   ];
   for (const [event, sentence] of cases) {
     expect(said(event)).toBe(sentence);
@@ -175,7 +209,7 @@ test("each type of change reads as a sentence", () => {
 });
 
 test("the filter offers every type, and reads one back from the address", () => {
-  expect(TYPES).toHaveLength(21);
+  expect(TYPES).toHaveLength(23);
   expect(TYPES.find((type) => type.value === "tenant_created")?.label).toBe("Tenant created");
   expect(filterOf({ type: "granted" })).toEqual({ type: "granted" });
   expect(filterOf({ type: "nonsense" })).toEqual({});

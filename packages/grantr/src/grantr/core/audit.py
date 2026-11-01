@@ -198,6 +198,39 @@ class SettingSet(BaseModel):
     """The level's version of the setting once changed: one more than before."""
 
 
+class BindingAdded(BaseModel):
+    """A source's connection was bound to a workspace (lattice ADR-0040, grantr ADR-0041)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["binding_added"] = "binding_added"
+    binding: str
+    """The binding's id."""
+
+    workspace: WorkspaceId
+    source: str
+    connection: str
+    types: list[str] | None
+    """The types it receives, sorted; ``None`` for every type the source has."""
+
+    trust: str | None
+    """The level it lowers the source's to; ``None`` keeps the source's."""
+
+
+class BindingRemoved(BaseModel):
+    """A binding was removed: its source's events no longer reach the workspace."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["binding_removed"] = "binding_removed"
+    binding: str
+    """The binding's id."""
+
+    workspace: WorkspaceId
+    source: str
+    connection: str
+
+
 class ApprovalAsked(BaseModel):
     """A call was deferred for a person's approval (lattice ADR-0035, grantr ADR-0038)."""
 
@@ -317,6 +350,8 @@ type AuditEvent = Annotated[
     | Unrestricted
     | IntegrationSet
     | SettingSet
+    | BindingAdded
+    | BindingRemoved
     | ApprovalAsked
     | ApprovalAnswered
     | ApprovalClosed
@@ -363,6 +398,8 @@ type AuditType = Literal[
     "unrestricted",
     "integration_set",
     "setting_set",
+    "binding_added",
+    "binding_removed",
     "approval_asked",
     "approval_answered",
     "approval_closed",

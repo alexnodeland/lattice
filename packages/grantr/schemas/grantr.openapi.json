@@ -164,6 +164,8 @@
             "approval_answered": "#/components/schemas/ApprovalAnswered",
             "approval_asked": "#/components/schemas/ApprovalAsked",
             "approval_closed": "#/components/schemas/ApprovalClosed",
+            "binding_added": "#/components/schemas/BindingAdded",
+            "binding_removed": "#/components/schemas/BindingRemoved",
             "capability_called": "#/components/schemas/CapabilityCalled",
             "deployment_tenant_created": "#/components/schemas/DeploymentTenantCreated",
             "granted": "#/components/schemas/Granted",
@@ -238,6 +240,12 @@
             "$ref": "#/components/schemas/SettingSet"
           },
           {
+            "$ref": "#/components/schemas/BindingAdded"
+          },
+          {
+            "$ref": "#/components/schemas/BindingRemoved"
+          },
+          {
             "$ref": "#/components/schemas/ApprovalAsked"
           },
           {
@@ -270,12 +278,208 @@
           "unrestricted",
           "integration_set",
           "setting_set",
+          "binding_added",
+          "binding_removed",
           "approval_asked",
           "approval_answered",
           "approval_closed",
           "capability_called"
         ],
         "type": "string"
+      },
+      "Binding": {
+        "description": "Which of a source's events, on one of its connections, reach one workspace of a tenant.\n\nRaises:\n    ValueError: If the id isn't of :data:`BINDING_ID`'s form, the source's name isn't of\n        :data:`SOURCE`'s, or it receives no type at all: None receives every type.",
+        "properties": {
+          "bound_at": {
+            "description": "When it was bound: there is no history before it.",
+            "format": "date-time",
+            "title": "Bound At",
+            "type": "string"
+          },
+          "by": {
+            "description": "Who bound it: the operator, or the grantr subject who did, such as ``user:alice``.",
+            "minLength": 1,
+            "title": "By",
+            "type": "string"
+          },
+          "connection": {
+            "description": "The id of the source's connection it binds, such as a tracker's project or an\ninstallation.",
+            "minLength": 1,
+            "title": "Connection",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/BindingId",
+            "description": "Its id, opaque."
+          },
+          "options": {
+            "$ref": "#/components/schemas/JsonObject",
+            "description": "The source's own options, such as a tracker's default labels."
+          },
+          "select": {
+            "$ref": "#/components/schemas/JsonObject",
+            "description": "What it selects by, in the source's declared selectors, such as ``{\"repository\":\n\"acme/api\"}``: validated against the source's select schema; empty selects everything."
+          },
+          "source": {
+            "description": "The source's name, as its spec names it: ``tracker``, ``alertmanager``, ``forge``.",
+            "title": "Source",
+            "type": "string"
+          },
+          "tenant_id": {
+            "description": "The tenant whose workspace it reaches.",
+            "minLength": 1,
+            "title": "Tenant Id",
+            "type": "string"
+          },
+          "trust": {
+            "anyOf": [
+              {
+                "enum": [
+                  "untrusted",
+                  "authenticated",
+                  "internal"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The level it lowers the source's to here, never raising it; None keeps the source's.",
+            "title": "Trust"
+          },
+          "types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The event types it receives; None receives every type the source has.",
+            "title": "Types"
+          },
+          "workspace_id": {
+            "description": "The workspace the events reach.",
+            "minLength": 1,
+            "title": "Workspace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "tenant_id",
+          "workspace_id",
+          "source",
+          "connection",
+          "bound_at",
+          "by"
+        ],
+        "title": "Binding",
+        "type": "object"
+      },
+      "BindingAdded": {
+        "description": "A source's connection was bound to a workspace (lattice ADR-0040, grantr ADR-0041).",
+        "properties": {
+          "binding": {
+            "title": "Binding",
+            "type": "string"
+          },
+          "connection": {
+            "title": "Connection",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "trust": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trust"
+          },
+          "type": {
+            "const": "binding_added",
+            "default": "binding_added",
+            "title": "Type",
+            "type": "string"
+          },
+          "types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Types"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          }
+        },
+        "required": [
+          "binding",
+          "workspace",
+          "source",
+          "connection",
+          "types",
+          "trust"
+        ],
+        "title": "BindingAdded",
+        "type": "object"
+      },
+      "BindingId": {
+        "type": "string"
+      },
+      "BindingRemoved": {
+        "description": "A binding was removed: its source's events no longer reach the workspace.",
+        "properties": {
+          "binding": {
+            "title": "Binding",
+            "type": "string"
+          },
+          "connection": {
+            "title": "Connection",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "type": {
+            "const": "binding_removed",
+            "default": "binding_removed",
+            "title": "Type",
+            "type": "string"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          }
+        },
+        "required": [
+          "binding",
+          "workspace",
+          "source",
+          "connection"
+        ],
+        "title": "BindingRemoved",
+        "type": "object"
       },
       "BuiltInRole": {
         "description": "A built-in role a tenant's admins grant, and the kinds of resource it may be granted on.",
@@ -871,6 +1075,13 @@
         "title": "IssuedKey",
         "type": "object"
       },
+      "JsonObject": {
+        "additionalProperties": {
+          "$ref": "#/components/schemas/JsonValue"
+        },
+        "type": "object"
+      },
+      "JsonValue": {},
       "KeyIssued": {
         "description": "A key was issued to a service principal.",
         "properties": {
@@ -1061,6 +1272,71 @@
           "memberships"
         ],
         "title": "Memberships",
+        "type": "object"
+      },
+      "NewBinding": {
+        "description": "A source's connection to bind to one of the tenant's workspaces (lattice ADR-0040).",
+        "properties": {
+          "connection": {
+            "title": "Connection",
+            "type": "string"
+          },
+          "options": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Options",
+            "type": "object"
+          },
+          "select": {
+            "additionalProperties": true,
+            "default": {},
+            "title": "Select",
+            "type": "object"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "trust": {
+            "anyOf": [
+              {
+                "enum": [
+                  "untrusted",
+                  "authenticated",
+                  "internal"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trust"
+          },
+          "types": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Types"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          }
+        },
+        "required": [
+          "workspace",
+          "source",
+          "connection"
+        ],
+        "title": "NewBinding",
         "type": "object"
       },
       "NewKey": {
@@ -2509,6 +2785,168 @@
           }
         },
         "summary": "Tenant Audit"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/bindings": {
+      "get": {
+        "description": "The bindings that reach the tenant's workspaces, with ``grantr:manage_bindings``.\n\nThe operator's come first, read only, then the tenant's.",
+        "operationId": "list_bindings_grantr_v1_tenants__tenant__bindings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only those reaching this workspace; every one if omitted.",
+            "in": "query",
+            "name": "workspace",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/WorkspaceId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Only those reaching this workspace; every one if omitted.",
+              "title": "Workspace"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Binding"
+                  },
+                  "title": "Response List Bindings Grantr V1 Tenants  Tenant  Bindings Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Bindings"
+      },
+      "post": {
+        "description": "Bind a source's connection to one of the tenant's workspaces.",
+        "operationId": "bind_grantr_v1_tenants__tenant__bindings_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewBinding"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bind"
+      }
+    },
+    "/grantr/v1/tenants/{tenant}/bindings/{binding}": {
+      "delete": {
+        "description": "Remove one of the tenant's bindings; the operator's are the deployment's to change.",
+        "operationId": "unbind_grantr_v1_tenants__tenant__bindings__binding__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "tenant",
+            "required": true,
+            "schema": {
+              "pattern": "^[^~]+$",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "binding",
+            "required": true,
+            "schema": {
+              "title": "Binding",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditEntry"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Unbind"
       }
     },
     "/grantr/v1/tenants/{tenant}/grants": {

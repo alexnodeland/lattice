@@ -1,7 +1,8 @@
 """The admin API, and the two reads UIs ask.
 
 Tenants, members, groups, roles, grants, keys, integrations and the audit log; and ``/me``,
-``/checks``, and which integrations are on in a workspace.
+``/checks``, and which integrations are on in a workspace. And bindings: which of a source's
+events reach which workspace (grantr ADR-0041).
 """
 
 from collections.abc import Awaitable, Callable
@@ -44,6 +45,7 @@ from grantr.core import (
 )
 from grantr.core.roles import MANAGE_SETTINGS
 from grantr.grants import Grants
+from lattice_core.bindings import Binding, Trust
 
 
 class Caller(NamedTuple):
@@ -152,6 +154,24 @@ class SettingChange(BaseModel):
 
     value: StrictInt | list[StrictStr] | None
     """A whole number or names, no wider than the layer above's; ``null`` to unset it."""
+
+
+class NewBinding(BaseModel):
+    """A source's connection to bind to one of the tenant's workspaces (lattice ADR-0040)."""
+
+    workspace: WorkspaceId
+    source: str
+    """The source's name, as its spec names it: ``tracker``, ``forge``."""
+    connection: str
+    """The id of the source's connection."""
+    select: dict[str, Any] = {}
+    """What it selects by, in the source's declared selectors; empty selects everything."""
+    types: list[str] | None = None
+    """The event types it receives; ``null`` for every type the source has."""
+    trust: Trust | None = None
+    """The level it lowers the source's to; ``null`` keeps the source's."""
+    options: dict[str, Any] = {}
+    """The source's own options, such as a tracker's default labels."""
 
 
 class NewKey(BaseModel):
@@ -675,6 +695,44 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
     async def revoke_key(tenant: TenantId, key_id: str, who: Caller = current) -> AuditEntry:
         """Revoke a key."""
         return await _or_http(grants.revoke_key(tenant, key_id, by=by(tenant, who)))
+
+    @router.get("/tenants/{tenant}/bindings")
+    async def list_bindings(
+        tenant: TenantId,
+        workspace: Annotated[
+            WorkspaceId | None,
+            Query(description="Only those reaching this workspace; every one if omitted."),
+        ] = None,
+        who: Caller = current,
+    ) -> list[Binding]:
+        """The bindings that reach the tenant's workspaces, with ``grantr:manage_bindings``.
+
+        The operator's come first, read only, then the tenant's.
+        """
+        bindings = grants.bindings()
+        return await _or_http(bindings.listed(tenant, by=by(tenant, who), workspace=workspace))
+
+    @router.post("/tenants/{tenant}/bindings", status_code=201)
+    async def bind(tenant: TenantId, body: NewBinding, who: Caller = current) -> AuditEntry:
+        """Bind a source's connection to one of the tenant's workspaces."""
+        return await _or_http(
+            grants.bindings().bind(
+                tenant,
+                body.workspace,
+                body.source,
+                body.connection,
+                select=body.select,
+                types=body.types,
+                trust=body.trust,
+                options=body.options,
+                by=by(tenant, who),
+            )
+        )
+
+    @router.delete("/tenants/{tenant}/bindings/{binding}")
+    async def unbind(tenant: TenantId, binding: str, who: Caller = current) -> AuditEntry:
+        """Remove one of the tenant's bindings; the operator's are the deployment's to change."""
+        return await _or_http(grants.bindings().unbind(tenant, binding, by=by(tenant, who)))
 
     return router
 

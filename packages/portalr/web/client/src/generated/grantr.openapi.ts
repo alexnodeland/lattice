@@ -187,6 +187,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/grantr/v1/tenants/{tenant}/bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Bindings
+         * @description The bindings that reach the tenant's workspaces, with ``grantr:manage_bindings``.
+         *
+         *     The operator's come first, read only, then the tenant's.
+         */
+        get: operations["list_bindings_grantr_v1_tenants__tenant__bindings_get"];
+        put?: never;
+        /**
+         * Bind
+         * @description Bind a source's connection to one of the tenant's workspaces.
+         */
+        post: operations["bind_grantr_v1_tenants__tenant__bindings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/grantr/v1/tenants/{tenant}/bindings/{binding}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Unbind
+         * @description Remove one of the tenant's bindings; the operator's are the deployment's to change.
+         */
+        delete: operations["unbind_grantr_v1_tenants__tenant__bindings__binding__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/grantr/v1/tenants/{tenant}/grants": {
         parameters: {
             query?: never;
@@ -726,9 +772,111 @@ export interface components {
             seq: number;
             tenant: components["schemas"]["TenantId"] | null;
         };
-        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"] | components["schemas"]["IntegrationSet"] | components["schemas"]["SettingSet"] | components["schemas"]["ApprovalAsked"] | components["schemas"]["ApprovalAnswered"] | components["schemas"]["ApprovalClosed"] | components["schemas"]["CapabilityCalled"];
+        AuditEvent: components["schemas"]["TenantCreated"] | components["schemas"]["DeploymentTenantCreated"] | components["schemas"]["TenantDeleted"] | components["schemas"]["MemberAdded"] | components["schemas"]["MemberRemoved"] | components["schemas"]["GroupDefined"] | components["schemas"]["GroupDeleted"] | components["schemas"]["RoleDefined"] | components["schemas"]["RoleDeleted"] | components["schemas"]["Granted"] | components["schemas"]["Revoked"] | components["schemas"]["KeyIssued"] | components["schemas"]["KeyRevoked"] | components["schemas"]["Restricted"] | components["schemas"]["Unrestricted"] | components["schemas"]["IntegrationSet"] | components["schemas"]["SettingSet"] | components["schemas"]["BindingAdded"] | components["schemas"]["BindingRemoved"] | components["schemas"]["ApprovalAsked"] | components["schemas"]["ApprovalAnswered"] | components["schemas"]["ApprovalClosed"] | components["schemas"]["CapabilityCalled"];
         /** @enum {string} */
-        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted" | "integration_set" | "setting_set" | "approval_asked" | "approval_answered" | "approval_closed" | "capability_called";
+        AuditType: "tenant_created" | "deployment_tenant_created" | "tenant_deleted" | "member_added" | "member_removed" | "group_defined" | "group_deleted" | "role_defined" | "role_deleted" | "granted" | "revoked" | "key_issued" | "key_revoked" | "restricted" | "unrestricted" | "integration_set" | "setting_set" | "binding_added" | "binding_removed" | "approval_asked" | "approval_answered" | "approval_closed" | "capability_called";
+        /**
+         * Binding
+         * @description Which of a source's events, on one of its connections, reach one workspace of a tenant.
+         *
+         *     Raises:
+         *         ValueError: If the id isn't of :data:`BINDING_ID`'s form, the source's name isn't of
+         *             :data:`SOURCE`'s, or it receives no type at all: None receives every type.
+         */
+        Binding: {
+            /**
+             * Bound At
+             * Format: date-time
+             * @description When it was bound: there is no history before it.
+             */
+            bound_at: string;
+            /**
+             * By
+             * @description Who bound it: the operator, or the grantr subject who did, such as ``user:alice``.
+             */
+            by: string;
+            /**
+             * Connection
+             * @description The id of the source's connection it binds, such as a tracker's project or an
+             *     installation.
+             */
+            connection: string;
+            /** @description Its id, opaque. */
+            id: components["schemas"]["BindingId"];
+            /** @description The source's own options, such as a tracker's default labels. */
+            options?: components["schemas"]["JsonObject"];
+            /**
+             * @description What it selects by, in the source's declared selectors, such as ``{"repository":
+             *     "acme/api"}``: validated against the source's select schema; empty selects everything.
+             */
+            select?: components["schemas"]["JsonObject"];
+            /**
+             * Source
+             * @description The source's name, as its spec names it: ``tracker``, ``alertmanager``, ``forge``.
+             */
+            source: string;
+            /**
+             * Tenant Id
+             * @description The tenant whose workspace it reaches.
+             */
+            tenant_id: string;
+            /**
+             * Trust
+             * @description The level it lowers the source's to here, never raising it; None keeps the source's.
+             */
+            trust?: ("untrusted" | "authenticated" | "internal") | null;
+            /**
+             * Types
+             * @description The event types it receives; None receives every type the source has.
+             */
+            types?: string[] | null;
+            /**
+             * Workspace Id
+             * @description The workspace the events reach.
+             */
+            workspace_id: string;
+        };
+        /**
+         * BindingAdded
+         * @description A source's connection was bound to a workspace (lattice ADR-0040, grantr ADR-0041).
+         */
+        BindingAdded: {
+            /** Binding */
+            binding: string;
+            /** Connection */
+            connection: string;
+            /** Source */
+            source: string;
+            /** Trust */
+            trust: string | null;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "binding_added";
+            /** Types */
+            types: string[] | null;
+            workspace: components["schemas"]["WorkspaceId"];
+        };
+        BindingId: string;
+        /**
+         * BindingRemoved
+         * @description A binding was removed: its source's events no longer reach the workspace.
+         */
+        BindingRemoved: {
+            /** Binding */
+            binding: string;
+            /** Connection */
+            connection: string;
+            /** Source */
+            source: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            type: "binding_removed";
+            workspace: components["schemas"]["WorkspaceId"];
+        };
         /**
          * BuiltInRole
          * @description A built-in role a tenant's admins grant, and the kinds of resource it may be granted on.
@@ -994,6 +1142,10 @@ export interface components {
             /** Key */
             key: string;
         };
+        JsonObject: {
+            [key: string]: components["schemas"]["JsonValue"];
+        };
+        JsonValue: unknown;
         /**
          * KeyIssued
          * @description A key was issued to a service principal.
@@ -1084,6 +1236,35 @@ export interface components {
         Memberships: {
             /** Memberships */
             memberships: components["schemas"]["Membership"][];
+        };
+        /**
+         * NewBinding
+         * @description A source's connection to bind to one of the tenant's workspaces (lattice ADR-0040).
+         */
+        NewBinding: {
+            /** Connection */
+            connection: string;
+            /**
+             * Options
+             * @default {}
+             */
+            options: {
+                [key: string]: unknown;
+            };
+            /**
+             * Select
+             * @default {}
+             */
+            select: {
+                [key: string]: unknown;
+            };
+            /** Source */
+            source: string;
+            /** Trust */
+            trust?: ("untrusted" | "authenticated" | "internal") | null;
+            /** Types */
+            types?: string[] | null;
+            workspace: components["schemas"]["WorkspaceId"];
         };
         /**
          * NewKey
@@ -1713,6 +1894,107 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AuditEntry"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_bindings_grantr_v1_tenants__tenant__bindings_get: {
+        parameters: {
+            query?: {
+                /** @description Only those reaching this workspace; every one if omitted. */
+                workspace?: components["schemas"]["WorkspaceId"] | null;
+            };
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Binding"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    bind_grantr_v1_tenants__tenant__bindings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NewBinding"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEntry"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unbind_grantr_v1_tenants__tenant__bindings__binding__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                tenant: string;
+                binding: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuditEntry"];
                 };
             };
             /** @description Validation Error */

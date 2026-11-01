@@ -31,17 +31,25 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             "lattice_core.approvals",
             "lattice_core.capabilities",
             "lattice_core.enforcement",
+            "lattice_core.bindings",
         },
     ),
     "telemetry": ({"grantr.core", "grantr.telemetry"}, {"opentelemetry", *OTEL_API}),
     "testing": ({"grantr.core", "grantr.testing"}, set()),
     "fastapi": (
         {"grantr.core", "grantr.grants", "grantr.fastapi"},
-        {"fastapi", "starlette", "pydantic"},
+        {"fastapi", "starlette", "pydantic", "lattice_core.bindings"},
     ),
     "sql": (
         {"grantr.core", "grantr.sql"},
-        {"pydantic", "sqlalchemy", "alembic", "lattice_core.sql", "lattice_core.approvals"},
+        {
+            "pydantic",
+            "sqlalchemy",
+            "alembic",
+            "lattice_core.sql",
+            "lattice_core.approvals",
+            "lattice_core.bindings",
+        },
     ),
 }
 

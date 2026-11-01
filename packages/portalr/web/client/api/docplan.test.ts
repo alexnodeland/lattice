@@ -29,7 +29,7 @@ test("a client resumes docplan's stream across a dropped connection, losing and 
   // The client goes away, two notices are posted over REST, and it comes back.
   store.close();
   for (const n of [1, 2]) {
-    const { data } = await api.artifactr.POST("/workspaces/{workspace_id}/commands", {
+    const { data } = await api.artifactr.POST("frames", "/workspaces/{workspace_id}/commands", {
       params: { path: { workspace_id: ws } },
       body: {
         type: "command",
@@ -46,9 +46,13 @@ test("a client resumes docplan's stream across a dropped connection, losing and 
   }
 
   store.open();
-  const { data: tail } = await api.artifactr.GET("/workspaces/{workspace_id}/events", {
-    params: { path: { workspace_id: ws }, query: { last: 1 } },
-  });
+  const { data: tail } = await api.artifactr.GET(
+    "artifactr.read_events",
+    "/workspaces/{workspace_id}/events",
+    {
+      params: { path: { workspace_id: ws }, query: { last: 1 } },
+    },
+  );
   const head = tail?.at(-1)?.seq ?? 0;
   const { state } = await until(store, (s) => s.status === "live" && s.seq === head);
   expect(seqs).toEqual(every(head));

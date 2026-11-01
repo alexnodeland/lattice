@@ -113,7 +113,7 @@ test("a sentence stamped into any attribute, a stylesheet, an svg text, a shadow
   const posted: unknown[] = [];
   const api = {
     portalr: {
-      POST: async (path: string, init?: { body?: { events: unknown[] } }) => {
+      POST: async (_command: null, path: string, init?: { body?: { events: unknown[] } }) => {
         if (path === "/portalr/v1/analytics/session") {
           return { data: { session: "s" }, response: { status: 200 } };
         }
@@ -190,7 +190,7 @@ test("a bare word stamped into each attribute is kept in exactly those that name
   const posted: unknown[] = [];
   const api = {
     portalr: {
-      POST: async (path: string, init?: { body?: { events: unknown[] } }) => {
+      POST: async (_command: null, path: string, init?: { body?: { events: unknown[] } }) => {
         if (path === "/portalr/v1/analytics/session") {
           return { data: { session: "s" }, response: { status: 200 } };
         }

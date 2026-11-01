@@ -49,6 +49,7 @@ An application's own, with its custom roles, is in its `access.md` ([Roles and g
 | `grantr:manage_groups` |  |  | ✓ | ✓ |  |  |  |  |  |
 | `grantr:manage_integrations` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
 | `grantr:manage_settings` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
+| `grantr:read_approvals` |  |  | ✓ | ✓ | ✓ |  |  |  |  |
 | `grantr:read_audit` |  |  | ✓ | ✓ |  |  |  |  |  |
 | `grantr:remove_member` |  |  | ✓ | ✓ |  |  |  |  |  |
 | `grantr:restrict` |  |  | ✓ | ✓ |  | ✓ |  |  |  |

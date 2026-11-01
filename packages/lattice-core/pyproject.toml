@@ -1,6 +1,6 @@
 [project]
 name = "lattice-core-ai"
-version = "0.7.0"
+version = "0.8.0"
 description = "What lattice's packages share and must keep identical."
 readme = "README.md"
 license = "MIT"

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.0](https://github.com/alexnodeland/lattice/compare/portalr-v0.5.0...portalr-v0.6.0) (2026-11-01)
+
+
+### Features
+
+* **core,portalr:** an approval's deadline is the workspace's approve-within setting (RFC-0011 phase 3) ([#1303](https://github.com/alexnodeland/lattice/issues/1303)) ([fa19735](https://github.com/alexnodeland/lattice/commit/fa19735166dcd4da2ecfd56b3085b17f42942b0b))
+
 ## [0.5.0](https://github.com/alexnodeland/lattice/compare/portalr-v0.4.0...portalr-v0.5.0) (2026-11-01)
 
 

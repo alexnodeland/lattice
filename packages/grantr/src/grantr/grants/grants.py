@@ -86,6 +86,7 @@ from grantr.core.settings import wire
 from grantr.grants.approvals import POLL, GrantrApprovals, Record
 from grantr.grants.bindings import GrantrBindings
 from grantr.grants.calls import CallAudit, subject_of_call
+from grantr.grants.connections import GrantrConnections
 from grantr.grants.storage import Reads, Storage, Transaction
 from grantr.telemetry import SLOW_CHECK, Reason, Telemetry
 from lattice_core.bindings import Binding
@@ -1170,6 +1171,21 @@ class Grants:
         and admins change with ``grantr:manage_bindings`` (lattice ADR-0040, grantr ADR-0041).
         """
         return self._bindings
+
+    # ─── connections ─────────────────────────────────────────────────────────
+
+    def connections(self, *, clock: Callable[[], datetime] | None = None) -> GrantrConnections:
+        """The connections: the outside clients people connected to their tenants.
+
+        A person connects their own; every member reads and revokes their own, and whoever holds
+        ``grantr:add_member`` on the tenant, every one (lattice RFC-0014, grantr ADR-0043).
+
+        Args:
+            clock: The time a connection's use is noted at; the system's, in UTC, if omitted.
+        """
+        return GrantrConnections(
+            self._storage, change=self._change, require=self._require, held=self._held, clock=clock
+        )
 
     # ─── approvals ───────────────────────────────────────────────────────────
 

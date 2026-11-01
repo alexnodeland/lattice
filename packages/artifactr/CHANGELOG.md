@@ -5,6 +5,14 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.7.0...artifactr-v0.8.0) (2026-11-01)
+
+
+### Features
+
+* **artifactr:** an approval a run asked is withdrawn when the run ends before it pauses on it (RFC-0011) ([#1364](https://github.com/alexnodeland/lattice/issues/1364)) ([a3a1b2f](https://github.com/alexnodeland/lattice/commit/a3a1b2feb84899aec1d2507bcd3a32ea8b8b93b3))
+* **core:** parity: every operation names its command, and one test holds the catalogs to grantr (RFC-0014 P13) ([#1366](https://github.com/alexnodeland/lattice/issues/1366)) ([0138269](https://github.com/alexnodeland/lattice/commit/013826911c9cb515ef3c45ad49c0afb396f876de))
+
 ## [0.7.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.6.0...artifactr-v0.7.0) (2026-11-01)
 
 

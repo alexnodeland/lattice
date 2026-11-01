@@ -146,6 +146,49 @@ class KeyRevoked(BaseModel):
     key: str
 
 
+class ConnectionMade(BaseModel):
+    """A person connected an outside client to the tenant (grantr ADR-0043)."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["connection_made"] = "connection_made"
+    connection: str
+    """The connection's id."""
+    user: UserId
+    """Whom it acts for."""
+    client: str
+    """The client's OAuth ``client_id``."""
+    name: str
+    """The client's registered name."""
+    toolsets: list[str]
+    """The toolsets it may use, sorted."""
+
+
+class ConnectionToolsetsAdded(BaseModel):
+    """A person let one of their connections use more toolsets."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["connection_toolsets_added"] = "connection_toolsets_added"
+    connection: str
+    user: UserId
+    toolsets: list[str]
+    """The toolsets it may now use, sorted."""
+
+
+class ConnectionRevoked(BaseModel):
+    """A connection was revoked: its next call is refused."""
+
+    model_config = ConfigDict(frozen=True)
+
+    type: Literal["connection_revoked"] = "connection_revoked"
+    connection: str
+    user: UserId
+    """Whom it acted for."""
+    client: str
+    name: str
+
+
 class Restricted(BaseModel):
     """A thread or artifact was restricted to those granted a role on it."""
 
@@ -346,6 +389,9 @@ type AuditEvent = Annotated[
     | Revoked
     | KeyIssued
     | KeyRevoked
+    | ConnectionMade
+    | ConnectionToolsetsAdded
+    | ConnectionRevoked
     | Restricted
     | Unrestricted
     | IntegrationSet
@@ -394,6 +440,9 @@ type AuditType = Literal[
     "revoked",
     "key_issued",
     "key_revoked",
+    "connection_made",
+    "connection_toolsets_added",
+    "connection_revoked",
     "restricted",
     "unrestricted",
     "integration_set",

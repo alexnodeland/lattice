@@ -1,7 +1,7 @@
 """The storage port: where access, integrations' and settings' values, and the audit log live.
 
-It holds tenants, grants, groups, custom roles and keys, and which integrations each tenant and
-workspace turned on or off.
+It holds tenants, grants, groups, custom roles, keys and connections, and which integrations each
+tenant and workspace turned on or off.
 
 grantr ships an in-memory implementation, :class:`~grantr.grants.InMemoryStorage`; the SQL one
 comes with grantr's ``sql`` extra. The contract test in the test tree shows what an
@@ -21,6 +21,7 @@ from grantr.core import (
     AuditEntry,
     AuditEvent,
     AuditFilter,
+    Connection,
     Grant,
     Grantee,
     Group,
@@ -156,6 +157,19 @@ class Reads(Protocol):
         """
         ...
 
+    async def connections(
+        self, tenant: TenantId, *, user: UserId | None = None, client: str | None = None
+    ) -> list[Connection]:
+        """The tenant's connections, revoked ones too, oldest first.
+
+        One person's, or a client's, or every one.
+        """
+        ...
+
+    async def connection(self, tenant: TenantId, id: str) -> Connection | None:
+        """One of the tenant's connections, by its id; None if it has none of the id."""
+        ...
+
 
 class Transaction(Reads, Protocol):
     """One atomic change to access, serialized with every other in its tenant.
@@ -180,7 +194,7 @@ class Transaction(Reads, Protocol):
         ...
 
     async def remove_member(self, tenant: TenantId, member: Member) -> None:
-        """Remove a member's grants, its places in groups, and its keys."""
+        """Remove a member's grants, its places in groups, its keys and its connections."""
         ...
 
     async def put_group(self, tenant: TenantId, group: Group, members: frozenset[Member]) -> None:
@@ -229,6 +243,10 @@ class Transaction(Reads, Protocol):
 
     async def delete_binding(self, tenant: TenantId, id: BindingId) -> Binding | None:
         """Delete one of the tenant's bindings, and return it; None if it has no such binding."""
+        ...
+
+    async def put_connection(self, connection: Connection) -> None:
+        """Store a connection in its tenant, or replace it as it now stands."""
         ...
 
     async def add_key(self, key: Key) -> None:

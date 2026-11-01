@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.10.0...lattice-core-v0.11.0) (2026-11-01)
+
+
+### Features
+
+* **core:** parity: every operation names its command, and one test holds the catalogs to grantr (RFC-0014 P13) ([#1366](https://github.com/alexnodeland/lattice/issues/1366)) ([0138269](https://github.com/alexnodeland/lattice/commit/013826911c9cb515ef3c45ad49c0afb396f876de))
+
 ## [0.10.0](https://github.com/alexnodeland/lattice/compare/lattice-core-v0.9.0...lattice-core-v0.10.0) (2026-11-01)
 
 

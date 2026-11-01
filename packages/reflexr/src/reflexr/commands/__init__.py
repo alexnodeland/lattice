@@ -14,20 +14,69 @@ portr does (lattice ADR-0041).
   reflexr's server already serves.
 - **No command, by action** (:data:`LISTED`): ``reflexr:open``, asked before every command in a
   workspace, and what a run and the log's consumers do as they go, each with its reason.
+
+:func:`provider` binds the catalog to the application's ``Workspaces`` (reflexr ADR-0068):
+lattice-core's ``Provider``, whose ``call`` opens the call's workspace as the call's actor
+(:func:`actor_for`) and runs the command as reflexr's own surfaces do, so the workspace checks it
+again. Each answers JSON text.
 """
 
-from collections.abc import Iterable
+import json
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue
 
-from lattice_core.capabilities import Capability, Effect, Gate, JsonObject, Reversibility, Tier
+from lattice_core.capabilities import (
+    CallContext,
+    Capability,
+    Effect,
+    Gate,
+    JsonObject,
+    PersonCaller,
+    ProviderKind,
+    Reversibility,
+    RunCaller,
+    Scope,
+    Tier,
+    ToolResult,
+)
 from lattice_core.commands import Command, Exposure, NotExposed, Surface, Toolset
-from reflexr.core import FeedbackTarget, Rule, RunStatus
+from reflexr.core import (
+    ArchiveRule,
+    CancelRun,
+    ExternalAgentActor,
+    FeedbackTarget,
+    GiveFeedback,
+    InstallRule,
+    Publish,
+    Rejection,
+    ReplayRule,
+    RetryRun,
+    Rule,
+    RunStatus,
+    SkipRun,
+    UpdateRule,
+    UserActor,
+    load_event,
+    new_id,
+)
+from reflexr.core import Command as Frame
+from reflexr.core import scope_key as key_of
+from reflexr.workspace import Workspace, Workspaces
 
-__all__ = ["CATALOG", "LISTED", "VERSION", "ReflexrCommands"]
+__all__ = [
+    "CATALOG",
+    "LISTED",
+    "VERSION",
+    "CommandRejected",
+    "ReflexrCommands",
+    "ReflexrProvider",
+    "actor_for",
+    "provider",
+]
 
 VERSION: Final = "1.0.0"
 """Each command's version."""
@@ -369,3 +418,195 @@ class ReflexrCommands:
 
 CATALOG: Final = ReflexrCommands()
 """reflexr's catalog, unbound: what an application binds at its composition root."""
+
+
+READ_LIMIT: Final = 50
+"""How many envelopes ``reflexr.read_events`` reads when it is given neither ``limit`` nor
+``last``, as reflexr's MCP server does."""
+
+type ActorFor = Callable[[CallContext], UserActor | ExternalAgentActor]
+"""How a call's context becomes the actor its workspace is opened as."""
+
+
+def actor_for(context: CallContext) -> UserActor | ExternalAgentActor:
+    """Return the actor a call acts as: the outside client it came through, or else its caller.
+
+    - A call through an outside client (``via``) is that client's
+      :class:`~reflexr.core.ExternalAgentActor`, by its connection's id and name, for the person
+      the caller is or acts for (lattice RFC-0014).
+    - A person's own call is their :class:`~reflexr.core.UserActor`.
+    - An agent's run is an outside agent's, ``agent:<agent>``, and a code session's is
+      ``session:<id>``, each for the person it acts for, if it acts for one. Neither is a rule's
+      own :class:`~reflexr.core.AgentActor`.
+
+    Args:
+        context: The call's context.
+    """
+    caller = context.caller
+    person_id = caller.id if isinstance(caller, PersonCaller) else caller.on_behalf_of
+    person = None if person_id is None else UserActor(id=person_id)
+    if context.via is not None:
+        via = context.via
+        return ExternalAgentActor(
+            client_id=via.connection_id, name=via.client_name, on_behalf_of=person
+        )
+    if isinstance(caller, PersonCaller):
+        return UserActor(id=caller.id)
+    if isinstance(caller, RunCaller):
+        return ExternalAgentActor(
+            client_id=f"agent:{caller.agent}", name=caller.agent, on_behalf_of=person
+        )
+    return ExternalAgentActor(
+        client_id=f"session:{caller.id}", name="code session", on_behalf_of=person
+    )
+
+
+class CommandRejected(Rejection):
+    """A command the workspace refused: its rejection, as reflexr's surfaces send it."""
+
+    def __init__(self, rejection: dict[str, JsonValue]) -> None:
+        super().__init__(str(rejection.get("message", "rejected")))
+        self._rejection = rejection
+
+    def payload(self) -> dict[str, JsonValue]:
+        """Return the rejection as the workspace gave it."""
+        return dict(self._rejection)
+
+
+_BY_NAME: Final = MappingProxyType({spec.name: spec for spec in _SPECS})
+
+
+class ReflexrProvider(ReflexrCommands):
+    """reflexr's catalog bound to its workspaces: lattice-core's ``Provider`` and ``Commands``.
+
+    Each call opens the call's workspace as its actor, so the workspace checks it again, and
+    carries a command out once, as every surface does.
+
+    Args:
+        workspaces: The application's workspaces.
+        actor: How a call's context becomes the actor its workspace is opened as;
+            :func:`actor_for` if omitted.
+    """
+
+    def __init__(self, workspaces: Workspaces, *, actor: ActorFor = actor_for) -> None:
+        super().__init__()
+        self.kind: ProviderKind = "command"
+        self._workspaces = workspaces
+        self._actor = actor
+        self._offered = tuple(command.capability for command in self._commands)
+
+    def capabilities(self, _scope: Scope, /) -> tuple[Capability, ...]:
+        """Return every command's capability, the same in every workspace.
+
+        Where stored rules are off, installing, updating and archiving one are offered still,
+        and refused as they are carried out, as reflexr's surfaces refuse them.
+        """
+        return self._offered
+
+    async def call(
+        self, capability: Capability, arguments: JsonObject, context: CallContext, /
+    ) -> ToolResult:
+        """Run a command in the call's workspace, as the call's actor, and answer JSON text.
+
+        Raises:
+            ValueError: If the capability isn't one of reflexr's commands.
+            pydantic.ValidationError: If the arguments aren't the command's.
+            reflexr.core.Rejection: If the workspace refuses the actor or the command.
+        """
+        spec = _BY_NAME.get(capability.name)
+        if spec is None:
+            raise ValueError(f"{capability.name} isn't one of reflexr's commands")
+        given = spec.arguments.model_validate(arguments)
+        scope, actor = context.scope, self._actor(context)
+        if spec.name == "reflexr.list_rules":
+            rules = await self._workspaces.rules_for(scope.tenant_id, actor=actor)
+            return ToolResult(output=_listed(rules))
+        workspace = await self._workspaces.open(scope.tenant_id, scope.workspace_id, actor=actor)
+        return ToolResult(output=await self._run(workspace, spec.name, given))
+
+    async def _run(self, workspace: Workspace, name: str, given: _Arguments) -> str:
+        match given:
+            case _Publish():
+                event = load_event(given.event)
+                frame = Publish(event=event, id=given.id, correlation_id=given.correlation_id)
+                return await self._execute(workspace, frame)
+            case _Events():
+                limit = READ_LIMIT if given.limit is None and given.last is None else given.limit
+                found = await workspace.read(
+                    after_seq=given.after_seq,
+                    before_seq=given.before_seq,
+                    types=given.types,
+                    limit=limit,
+                    last=given.last,
+                )
+                return _listed(found)
+            case _Replay():
+                frame = ReplayRule(rule=given.rule, from_seq=given.from_seq, mode=given.mode)
+                return await self._execute(workspace, frame)
+            case _Update():
+                frame = UpdateRule(
+                    rule=given.rule,
+                    expected_version=given.expected_version,
+                    provenance=given.provenance or {},
+                )
+                return await self._execute(workspace, frame)
+            case _Install():
+                frame = InstallRule(rule=given.rule, provenance=given.provenance or {})
+                return await self._execute(workspace, frame)
+            case _Archive():
+                frame = ArchiveRule(
+                    rule=given.rule, expected_version=given.expected_version, reason=given.reason
+                )
+                return await self._execute(workspace, frame)
+            case _Rule() if name == "reflexr.get_rule":
+                return (await workspace.get_rule(given.rule)).model_dump_json()
+            case _Rule():
+                return _listed(await workspace.rule_history(given.rule))
+            case _Runs():
+                key = None if given.scope_key is None else key_of(given.scope_key)
+                found = await workspace.runs(
+                    rule=given.rule, scope_key=key, status=given.status, limit=given.limit
+                )
+                return _listed(found)
+            case _Settle() if name == "reflexr.skip_run":
+                frame = SkipRun(run_id=given.run_id, reason=given.reason)
+                return await self._execute(workspace, frame)
+            case _Settle():
+                frame = CancelRun(run_id=given.run_id, reason=given.reason)
+                return await self._execute(workspace, frame)
+            case _Run() if name == "reflexr.retry_run":
+                return await self._execute(workspace, RetryRun(run_id=given.run_id))
+            case _Run():
+                return (await workspace.run(given.run_id)).model_dump_json()
+            case _DeadLetters():
+                return _listed(await workspace.dead_letters(rule=given.rule))
+            case _Feedback():
+                frame = GiveFeedback(
+                    feedback_type=given.feedback_type, target=given.target, value=given.value
+                )
+                return await self._execute(workspace, frame)
+            case _ if name == "reflexr.rule_status":
+                return _listed(await workspace.rule_statuses())
+            case _:  # reflexr.schedule_status
+                return _listed(await workspace.schedule_statuses())
+
+    async def _execute(self, workspace: Workspace, frame: Frame) -> str:
+        """Carry a command out once, under an id of its own, as every surface does.
+
+        Raises:
+            CommandRejected: If the workspace refuses it.
+        """
+        result = await self._workspaces.execute(workspace, frame, command_id=new_id("cmd"))
+        if result.rejection is not None:
+            raise CommandRejected(result.rejection)
+        assert result.outcome is not None, "a result has an outcome or a rejection"
+        return result.outcome.model_dump_json()
+
+
+def _listed(found: Sequence[BaseModel]) -> str:
+    return json.dumps([each.model_dump(mode="json") for each in found], sort_keys=True)
+
+
+def provider(workspaces: Workspaces, *, actor: ActorFor = actor_for) -> ReflexrProvider:
+    """Bind reflexr's catalog to the application's workspaces, at its composition root."""
+    return ReflexrProvider(workspaces, actor=actor)

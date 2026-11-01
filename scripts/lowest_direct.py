@@ -35,10 +35,11 @@ PACKAGES = {
 stackr ships none."""
 EXPECTED: dict[str, tuple[str, str]] = {
     "artifactr": (
-        "its provider and connected apps' tiers import lattice_core.capabilities, which"
-        " lattice-core-ai 0.2.0, the newest on PyPI, lacks: its floor rises to 0.3.0 once that"
+        "its agent imports lattice_core.agents and lattice_core.approvals, and its provider and"
+        " connected apps' tiers lattice_core.capabilities, which lattice-core-ai 0.2.0, the"
+        " newest on PyPI, lacks: its floor rises to the first release with all three, once that"
         " is published",
-        "No module named 'lattice_core.capabilities'",
+        "No module named 'lattice_core.agents'",
     ),
     "grantr": (
         "its store of approvals imports lattice_core.approvals, its settings"
@@ -60,6 +61,12 @@ EXPECTED: dict[str, tuple[str, str]] = {
         "No module named 'lattice_core.capabilities'",
     ),
     "reflexr": (
+        "its catalog of commands imports lattice_core.capabilities and lattice_core.commands,"
+        " which lattice-core-ai 0.2.0, the newest on PyPI, lacks: its floor rises to the first"
+        " release with both, once that is published",
+        "No module named 'lattice_core.capabilities'",
+    ),
+    "relayr": (
         "its catalog of commands imports lattice_core.capabilities and lattice_core.commands,"
         " which lattice-core-ai 0.2.0, the newest on PyPI, lacks: its floor rises to the first"
         " release with both, once that is published",

@@ -499,6 +499,8 @@ export interface components {
          * @description A tool call a paused run is waiting on: a question to answer or a call to approve.
          */
         DeferredRequest: {
+            /** Approval */
+            approval?: string | null;
             /**
              * Args
              * @default {}

@@ -9,7 +9,15 @@ comes from:
   it, ``ask_user``'s as a reply in place of choices (ADR-0083), approvals are declined with it
   as the reason, and the run resumes. A form is answered only by its own answer, so a message
   posted while one is open waits, not taken, and reaches the run as it resumes, beside the
-  form's values (lattice RFC-0005).
+  form's values (lattice RFC-0005). So is an approval lattice's enforcer asked.
+
+An approval the enforcer asked (lattice RFC-0011) pauses its run naming its id, and is answered
+in the application's store of approvals (ADR-0101). An answer sent with the Runner is the
+store's, given by the person who sends it, and the store says who may give it. The Runner
+follows each approval a paused run waits on, so one answered anywhere else, as on portalr's
+approval page, or that expires or is withdrawn, is committed in the thread as the store settled
+it, and the run resumes. As it resumes, the call is given the approval's id back, so the
+enforcer lets it through on that approval alone.
 
 The log decides what each turn carries out (ADR-0055). A thread's messages are taken in order,
 each by one turn: as the prompt of a run, the reply to a paused one, or through the watcher of
@@ -136,6 +144,19 @@ from artifactr.telemetry.attributes import (
 )
 from artifactr.telemetry.metrics import TURN_DURATION, TURNS
 from artifactr.workspace import Access, ThreadBusy, Workspace
+from lattice_core.agents import APPROVAL
+from lattice_core.approvals import (
+    Answer,
+    Approval,
+    ApprovalError,
+    Approvals,
+    NotAnAnswerer,
+    NotPending,
+    Subject,
+    UnknownApproval,
+    arguments_digest,
+)
+from lattice_core.capabilities import Caller, PersonCaller
 
 logger = logging.getLogger("artifactr.agent")
 
@@ -154,6 +175,9 @@ USE_MODEL: Final = "artifactr:use_model"
 named (ADR-0097): an ``Access`` with that ``model``."""
 
 _RUNNER: Final = SystemActor(name="runner")
+
+_ANSWER: Final = "artifactr:answer_deferred"
+"""Answering a paused run's request, which artifactr asks before the store of approvals."""
 """Who the Runner's own work acts as: holding threads, keeping its cursors, planning turns."""
 
 type _ThreadKey = tuple[TenantId, WorkspaceId, ThreadId]
@@ -338,6 +362,12 @@ class Runner[AppDepsT]:
             (``artifactr:use_model``) and the host knows it; otherwise with the agent's own,
             and a notice says why. Without it, every turn answers with the agent's own model,
             and a message that names one is told so.
+        approvals: The application's store of approvals, the one its enforcer asks (lattice
+            RFC-0011). An approval a call waits on is answered there, and the Runner follows
+            each one a paused run waits on, so an answer given anywhere resumes the run
+            (ADR-0101). Without it, an answer to one is refused.
+        surface: The surface the store records an answer sent with the Runner as given on:
+            ``portalr``, whose thread shows the request, by default.
     """
 
     def __init__(
@@ -356,8 +386,13 @@ class Runner[AppDepsT]:
         results: CommandResults | None = None,
         liveness: Liveness | None = None,
         model_for: ModelFor | None = None,
+        approvals: Approvals | None = None,
+        surface: str = "portalr",
     ) -> None:
         self._agent = agent
+        self._approvals = approvals
+        self._surface = surface
+        self._follows: dict[str, asyncio.Task[None]] = {}
         self._model_for = model_for
         self._results = results or InMemoryCommandResults()
         self._liveness = liveness or Liveness()
@@ -457,9 +492,137 @@ class Runner[AppDepsT]:
         return await self._ask(runner, thread_id, await runner.head_seq())
 
     async def answer(self, workspace: Workspace, command: AnswerDeferred) -> Sent:
-        """Answer one of a paused run's requests, resuming the run once all are answered."""
-        answered = await workspace.commit(command)
+        """Answer one of a paused run's requests, resuming the run once all are answered.
+
+        An approval the enforcer asked is answered in the store first, as the person the
+        handle's actor is, bound to the arguments the request shows by their digest, with the
+        answer, if it is text, as the reason (ADR-0101). The store's refusal is the answer's. One
+        settled already, as on another surface, is refused with how it was settled, and the
+        thread takes that.
+
+        Raises:
+            Forbidden: If the actor isn't a person, or neither artifactr nor the store lets them
+                answer it.
+            InvalidState: If the approval was settled already, or the Runner keeps no store.
+            NotFound: If the store has no such approval.
+        """
+        runner = _runner(workspace)  # the sender is asked as it answers, not as it reads runs
+        run = await runner.run(command.run_id)
+        request = _open(run, command.tool_call_id)
+        approval = None if request is None else request.approval
+        if request is not None and approval is not None and command.approved is not None:
+            await self._answer_approval(workspace, run, request, approval, command)
+        try:
+            answered = await workspace.commit(command)
+        except InvalidState:
+            if approval is None or command.tool_call_id not in (await runner.run(run.id)).answers:
+                raise
+            answered = Recorded()  # the store's answer, as the Runner followed it, came first
         return _sent(answered, await self.resume(workspace, command.run_id))
+
+    async def _answer_approval(
+        self,
+        workspace: Workspace,
+        run: Run,
+        request: DeferredRequest,
+        approval: str,
+        command: AnswerDeferred,
+    ) -> None:
+        """Answer the approval a request waits on in the store, as the handle's person."""
+        if self._approvals is None:
+            raise InvalidState(f"approval {approval} is answered where the application keeps them")
+        actor = workspace.actor
+        if not isinstance(actor, UserActor):
+            raise Forbidden("an approval is answered by a person")
+        await workspace.check(Access(action=_ANSWER, thread_id=run.thread_id))
+        reason = command.answer.strip() if isinstance(command.answer, str) else ""
+        answer = Answer(
+            approved=bool(command.approved),
+            arguments_digest=arguments_digest(request.args),
+            surface=self._surface,
+            reason=reason or None,
+        )
+        try:
+            await self._approvals.answer(approval, answer, subject=Subject(id=actor.id))
+        except NotPending as settled:  # answered first, expired or withdrawn: the thread takes it
+            await self._settle(_runner(workspace), run.id, request, settled.approval)
+            await self.resume(workspace, run.id)
+            raise InvalidState(str(settled)) from None
+        except NotAnAnswerer as refused:
+            raise Forbidden(str(refused)) from None
+        except UnknownApproval:
+            raise NotFound("approval", approval) from None
+        except ApprovalError as refused:  # an answer to other arguments than the store's
+            raise InvalidState(str(refused)) from None
+
+    def _follow(self, runner: Workspace, run: Run) -> None:
+        """Follow each approval a paused run waits on in the store, until it is settled.
+
+        Each has one follower in this process; :meth:`aclose` cancels them.
+        """
+        store = self._approvals
+        if store is None or self._closed:
+            return
+        for request in run.pending:
+            approval = request.approval
+            if approval is None or request.tool_call_id in run.answers:
+                continue
+            if approval not in self._follows:
+                follower = asyncio.create_task(
+                    self._settle_when_answered(store, runner, run.id, request, approval),
+                    context=contextvars.Context(),
+                )
+                self._follows[approval] = follower
+
+    async def _settle_when_answered(
+        self,
+        store: Approvals,
+        runner: Workspace,
+        run_id: RunId,
+        request: DeferredRequest,
+        approval: str,
+    ) -> None:
+        """Once the store settles an approval a run waits on, commit it and resume the run."""
+        try:
+            async for seen in store.watch(approval):
+                if seen.state != "pending":
+                    await self._settle(runner, run_id, request, seen)
+                    await self.resume(runner, run_id)
+        except Exception:
+            logger.exception(
+                "following approval %s of run %s failed; an answer in its thread resumes it",
+                approval,
+                run_id,
+            )
+        finally:
+            self._follows.pop(approval, None)
+
+    async def _settle(
+        self, runner: Workspace, run_id: RunId, request: DeferredRequest, approval: Approval
+    ) -> None:
+        """Commit in the thread how the store settled the approval a request waits on.
+
+        It is committed as the person who answered it, so the run resumes for them, as if they
+        had answered in the thread (ADR-0057); one that expired or was withdrawn, or that a
+        service principal answered, as the person it was asked for. One the thread refuses that
+        person is committed as the Runner. One answered in the thread already is left as it is.
+        """
+        given = approval.answer
+        command = AnswerDeferred(
+            run_id=run_id,
+            tool_call_id=request.tool_call_id,
+            answer=_settled(approval),
+            approved=approval.state == "approved",
+        )
+        by = given.by.id if given is not None and not given.by.service else None
+        person = by or _person(approval.asked_by)
+        with contextlib.suppress(InvalidState):  # answered in the thread already
+            try:
+                if person is None:
+                    raise Forbidden("no one to answer it as")
+                await runner.as_actor(UserActor(id=person)).commit(command)
+            except Forbidden:
+                await runner.commit(command)
 
     async def resume(self, workspace: Workspace, run_id: RunId) -> RunHandle | None:
         """Ask for the thread's next turn, which resumes a paused run whose requests are answered.
@@ -495,6 +658,8 @@ class Runner[AppDepsT]:
         taken = [await self._take_or_log(runner, thread.id) for thread in await runner.threads()]
         for run in await runner.runs(status="running"):
             await self._sweep(runner, run.id, run.thread_id, again=True)
+        for run in await runner.runs(status="paused"):
+            self._follow(runner, run)
         return [handle for handle in taken if handle is not None]
 
     async def _sweep(
@@ -555,6 +720,7 @@ class Runner[AppDepsT]:
         tasks: list[asyncio.Task[Any]] = [handle.task for handle in self._runs.values()]
         tasks += self._handovers
         tasks += self._looks
+        tasks += self._follows.values()
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
@@ -713,8 +879,9 @@ class Runner[AppDepsT]:
         """Decide, holding the thread, which turn carries out the oldest message not taken.
 
         With a paused run, that message is its reply: it answers the questions and declines the
-        approvals left, and the run resumes. A form left open keeps it paused, and a message posted
-        while only forms are open answers nothing and is not taken: it waits for the form's answer.
+        approvals left, and the run resumes. A form left open keeps it paused, as does an approval
+        the enforcer asked, and a message posted while only those are open answers nothing and is
+        not taken: it waits for their answers.
         A paused run whose requests are all answered resumes, with the messages not taken as its
         prompt. Otherwise the oldest message starts a run. The turn's watcher follows from there, so
         later messages reach it too. ``claim`` is the thread's, ``(thread_id, holder)``, which
@@ -754,7 +921,7 @@ class Runner[AppDepsT]:
                     return await self._plan(workspace, claim)
                 run = await workspace.run(run.id)
                 if not run.all_answered:
-                    return None  # a form is open: its answer resumes the run
+                    return None  # a form or an enforcer's approval is open: its answer resumes it
                 if not replied:
                     return await self._plan(workspace, claim)  # answers came first
                 turn = _resume(run, taken, asked, reply.seq, [], reply)
@@ -933,6 +1100,9 @@ class Runner[AppDepsT]:
         :meth:`aclose` cancels a hand-over, and it closes the runner first.
         """
         try:
+            if self._approvals is not None:  # a run that paused on approvals waits for the store
+                for run in await workspace.runs(thread_id=thread_id, status="paused"):
+                    self._follow(workspace, run)
             took = await _taken_seq(workspace, thread_id) > taken
             if cancelled or took or await workspace.cursor(_asked(thread_id)) > asked:
                 await self._take(workspace, thread_id, None)
@@ -1197,6 +1367,8 @@ def _resume(
             for r in run.pending
             if r.kind == "approval"
         },
+        # The call resumed on an enforcer's approval names it, as lattice's bridge reads it back.
+        metadata={r.tool_call_id: {APPROVAL: r.approval} for r in run.pending if r.approval},
     )
     messages = [e.event for e in ours if isinstance(e.event, MessagePosted)]
     carried = [by.event] if not ours and by is not None else messages
@@ -1227,7 +1399,8 @@ async def _reply(
 ) -> bool:
     """Answer a paused run's open questions with a message, and decline its open approvals.
 
-    A form is left open: only its own answer answers it. Each answer takes the message, in its
+    A form is left open, and so is an approval the enforcer asked: only its own answer answers
+    it, and the store says who may give one. Each answer takes the message, in its
     own transaction, fenced by the thread's ``claim``. A request refused, as when another answer
     came first, is left as it was answered. Returns whether the message answered any.
 
@@ -1238,7 +1411,7 @@ async def _reply(
     content = message.event.content
     answered = False
     for request in run.pending:
-        if request.tool_call_id in run.answers or request.tool_name == _FORM:
+        if request.tool_call_id in run.answers or request.tool_name == _FORM or request.approval:
             continue
         declined = request.kind == "approval"
         answer = AnswerDeferred(
@@ -1302,6 +1475,25 @@ async def _taken_seq(workspace: Workspace, thread_id: ThreadId) -> int:
     if taken:
         return max(taken, upgraded)  # after a downgrade and a second upgrade, the later point
     return max(upgraded, await last_seen(workspace, thread_id))
+
+
+def _open(run: Run, tool_call_id: str) -> DeferredRequest | None:
+    """The request of a paused run that a call waits on, while it is unanswered."""
+    if run.status != "paused" or tool_call_id in run.answers:
+        return None
+    return next((r for r in run.pending if r.tool_call_id == tool_call_id), None)
+
+
+def _settled(approval: Approval) -> str | None:
+    """What the thread is told of how the store settled an approval: why, if anyone said."""
+    if approval.answer is not None:
+        return approval.answer.reason
+    return f"{approval.state}: {approval.reason}"
+
+
+def _person(caller: Caller) -> str | None:
+    """The id of the person a caller is or acts for, if any."""
+    return caller.id if isinstance(caller, PersonCaller) else caller.on_behalf_of
 
 
 def _approval(run: Run, tool_call_id: str) -> bool | ToolDenied:

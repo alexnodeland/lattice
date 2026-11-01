@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/alexnodeland/lattice/compare/portalr-v0.4.0...portalr-v0.5.0) (2026-11-01)
+
+
+### Features
+
+* **grantr:** answer the enforcer's Authorize and Audit, each call as the person it is for (RFC-0011 phase 3) ([#1291](https://github.com/alexnodeland/lattice/issues/1291)) ([72a2308](https://github.com/alexnodeland/lattice/commit/72a230810666f52db2c5b78c0fedd7d62fa405c8))
+
 ## [0.4.0](https://github.com/alexnodeland/lattice/compare/portalr-v0.3.0...portalr-v0.4.0) (2026-11-01)
 
 

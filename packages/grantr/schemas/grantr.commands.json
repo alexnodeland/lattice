@@ -1,0 +1,2302 @@
+{
+  "commands": {
+    "grantr.add_member": {
+      "capability": {
+        "description": "Add a user or service principal to the tenant, holding no role until one is granted.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:add_member",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "Member": {
+              "discriminator": {
+                "mapping": {
+                  "service_principal": "#/$defs/ServicePrincipal",
+                  "user": "#/$defs/User"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/User"
+                },
+                {
+                  "$ref": "#/$defs/ServicePrincipal"
+                }
+              ]
+            },
+            "PrincipalId": {
+              "pattern": "^[^:~\\s]+$",
+              "type": "string"
+            },
+            "ServicePrincipal": {
+              "description": "A tenant's non-human principal: an integration, an MCP client or the application.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/PrincipalId"
+                },
+                "kind": {
+                  "const": "service_principal",
+                  "default": "service_principal",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "ServicePrincipal",
+              "type": "object"
+            },
+            "User": {
+              "description": "A person, by their identity provider's id.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/UserId"
+                },
+                "kind": {
+                  "const": "user",
+                  "default": "user",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "User",
+              "type": "object"
+            },
+            "UserId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "member": {
+              "$ref": "#/$defs/Member",
+              "description": "The user or service principal."
+            }
+          },
+          "required": [
+            "member"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.add_member",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/members",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.answer_approval": {
+      "capability": {
+        "description": "Answer an approval.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:answer_approval",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "approval": {
+              "description": "The approval's id.",
+              "minLength": 1,
+              "title": "Approval",
+              "type": "string"
+            },
+            "approved": {
+              "description": "Whether it approves the call.",
+              "title": "Approved",
+              "type": "boolean"
+            },
+            "arguments_digest": {
+              "description": "The digest of the arguments shown.",
+              "title": "Arguments Digest",
+              "type": "string"
+            }
+          },
+          "required": [
+            "approval",
+            "approved",
+            "arguments_digest"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.answer_approval",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": {
+        "reason": "approvals come from a person: elicitation or portalr"
+      },
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/approvals",
+      "surfaces": [
+        "portalr"
+      ],
+      "toolset": "core"
+    },
+    "grantr.bind": {
+      "capability": {
+        "description": "Bind a source's connection to one of the tenant's workspaces, so its events reach it.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:manage_bindings",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "JsonObject": {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            },
+            "JsonValue": {}
+          },
+          "additionalProperties": false,
+          "properties": {
+            "connection": {
+              "description": "The source's connection the events come from, such as an app's installation.",
+              "title": "Connection",
+              "type": "string"
+            },
+            "options": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/JsonObject"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The source's own options for the binding."
+            },
+            "select": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/JsonObject"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Which of the connection's events, as the source reads a selection; every one if omitted."
+            },
+            "source": {
+              "description": "The event source, by its name.",
+              "title": "Source",
+              "type": "string"
+            },
+            "trust": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "untrusted",
+                    "authenticated",
+                    "internal"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "How far the events are trusted; the source's own trust if omitted.",
+              "title": "Trust"
+            },
+            "types": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Only events of these types; every type the source has if omitted.",
+              "title": "Types"
+            },
+            "workspace": {
+              "description": "The tenant's workspace the source's events reach.",
+              "minLength": 1,
+              "title": "Workspace",
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace",
+            "source",
+            "connection"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.bind",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": null,
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.define_group": {
+      "capability": {
+        "description": "Define a group of the tenant's members, or replace its members.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:manage_groups",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "Member": {
+              "discriminator": {
+                "mapping": {
+                  "service_principal": "#/$defs/ServicePrincipal",
+                  "user": "#/$defs/User"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/User"
+                },
+                {
+                  "$ref": "#/$defs/ServicePrincipal"
+                }
+              ]
+            },
+            "PrincipalId": {
+              "pattern": "^[^:~\\s]+$",
+              "type": "string"
+            },
+            "ServicePrincipal": {
+              "description": "A tenant's non-human principal: an integration, an MCP client or the application.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/PrincipalId"
+                },
+                "kind": {
+                  "const": "service_principal",
+                  "default": "service_principal",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "ServicePrincipal",
+              "type": "object"
+            },
+            "User": {
+              "description": "A person, by their identity provider's id.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/UserId"
+                },
+                "kind": {
+                  "const": "user",
+                  "default": "user",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "User",
+              "type": "object"
+            },
+            "UserId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "group": {
+              "description": "The group's name.",
+              "minLength": 1,
+              "title": "Group",
+              "type": "string"
+            },
+            "members": {
+              "description": "Its members, which replace any it had.",
+              "items": {
+                "$ref": "#/$defs/Member"
+              },
+              "title": "Members",
+              "type": "array"
+            }
+          },
+          "required": [
+            "group",
+            "members"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.define_group",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/groups",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.define_role": {
+      "capability": {
+        "description": "Define a custom role of the tenant, or replace its actions. It asks your confirmation.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:define_role",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "actions": {
+              "description": "The actions it holds, which replace any it held.",
+              "items": {
+                "type": "string"
+              },
+              "title": "Actions",
+              "type": "array"
+            },
+            "name": {
+              "description": "The custom role's name.",
+              "minLength": 1,
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "actions"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.define_role",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": "admin_high",
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/roles",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.delete_group": {
+      "capability": {
+        "description": "Delete a group, with every grant made to it.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:manage_groups",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "group": {
+              "description": "The group's name.",
+              "minLength": 1,
+              "title": "Group",
+              "type": "string"
+            }
+          },
+          "required": [
+            "group"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.delete_group",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/groups",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.delete_role": {
+      "capability": {
+        "description": "Delete a custom role that no grant names.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:define_role",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "name": {
+              "description": "The custom role's name.",
+              "minLength": 1,
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.delete_role",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/roles",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.delete_tenant": {
+      "capability": {
+        "description": "Delete the tenant and everything grantr holds of it. It asks your confirmation.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:delete_tenant",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.delete_tenant",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "irreversible",
+        "risk_class": "admin_high",
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.grant": {
+      "capability": {
+        "description": "Grant a role on a workspace, thread, artifact or rule to a member, group or rule.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:grant",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "Grantee": {
+              "discriminator": {
+                "mapping": {
+                  "group": "#/$defs/Group",
+                  "rule": "#/$defs/RulePrincipal",
+                  "service_principal": "#/$defs/ServicePrincipal",
+                  "user": "#/$defs/User"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/User"
+                },
+                {
+                  "$ref": "#/$defs/ServicePrincipal"
+                },
+                {
+                  "$ref": "#/$defs/RulePrincipal"
+                },
+                {
+                  "$ref": "#/$defs/Group"
+                }
+              ]
+            },
+            "Group": {
+              "description": "A tenant's named set of users and service principals, granted roles like a subject.",
+              "properties": {
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "group",
+                  "default": "group",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "Group",
+              "type": "object"
+            },
+            "PrincipalId": {
+              "pattern": "^[^:~\\s]+$",
+              "type": "string"
+            },
+            "Resource": {
+              "description": "A resource, by its kind, its workspace if it is in one, and its id if it is an item.",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Id"
+                },
+                "kind": {
+                  "$ref": "#/$defs/ResourceKind"
+                },
+                "workspace": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/WorkspaceId"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "title": "Resource",
+              "type": "object"
+            },
+            "ResourceKind": {
+              "enum": [
+                "deployment",
+                "tenant",
+                "workspace",
+                "thread",
+                "artifact",
+                "rule"
+              ],
+              "type": "string"
+            },
+            "RulePrincipal": {
+              "description": "A reflexr rule, named by its workspace and rule: its runs act as it.",
+              "properties": {
+                "kind": {
+                  "const": "rule",
+                  "default": "rule",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "rule": {
+                  "title": "Rule",
+                  "type": "string"
+                },
+                "workspace": {
+                  "$ref": "#/$defs/WorkspaceId"
+                }
+              },
+              "required": [
+                "workspace",
+                "rule"
+              ],
+              "title": "RulePrincipal",
+              "type": "object"
+            },
+            "ServicePrincipal": {
+              "description": "A tenant's non-human principal: an integration, an MCP client or the application.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/PrincipalId"
+                },
+                "kind": {
+                  "const": "service_principal",
+                  "default": "service_principal",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "ServicePrincipal",
+              "type": "object"
+            },
+            "User": {
+              "description": "A person, by their identity provider's id.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/UserId"
+                },
+                "kind": {
+                  "const": "user",
+                  "default": "user",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "User",
+              "type": "object"
+            },
+            "UserId": {
+              "type": "string"
+            },
+            "WorkspaceId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "on": {
+              "$ref": "#/$defs/Resource",
+              "description": "Where: a workspace, a thread, an artifact or a rule. The tenant's roles are granted by\n``grantr.grant_on_tenant``."
+            },
+            "role": {
+              "description": "The role to grant or revoke.",
+              "title": "Role",
+              "type": "string"
+            },
+            "to": {
+              "$ref": "#/$defs/Grantee",
+              "description": "To whom: a user, a service principal, a group or a rule."
+            }
+          },
+          "required": [
+            "role",
+            "on",
+            "to"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.grant",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/grants",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.grant_on_tenant": {
+      "capability": {
+        "description": "Grant a role on the whole tenant, such as owner or admin. It asks your confirmation.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:grant",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "Grantee": {
+              "discriminator": {
+                "mapping": {
+                  "group": "#/$defs/Group",
+                  "rule": "#/$defs/RulePrincipal",
+                  "service_principal": "#/$defs/ServicePrincipal",
+                  "user": "#/$defs/User"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/User"
+                },
+                {
+                  "$ref": "#/$defs/ServicePrincipal"
+                },
+                {
+                  "$ref": "#/$defs/RulePrincipal"
+                },
+                {
+                  "$ref": "#/$defs/Group"
+                }
+              ]
+            },
+            "Group": {
+              "description": "A tenant's named set of users and service principals, granted roles like a subject.",
+              "properties": {
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "group",
+                  "default": "group",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "Group",
+              "type": "object"
+            },
+            "PrincipalId": {
+              "pattern": "^[^:~\\s]+$",
+              "type": "string"
+            },
+            "RulePrincipal": {
+              "description": "A reflexr rule, named by its workspace and rule: its runs act as it.",
+              "properties": {
+                "kind": {
+                  "const": "rule",
+                  "default": "rule",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "rule": {
+                  "title": "Rule",
+                  "type": "string"
+                },
+                "workspace": {
+                  "$ref": "#/$defs/WorkspaceId"
+                }
+              },
+              "required": [
+                "workspace",
+                "rule"
+              ],
+              "title": "RulePrincipal",
+              "type": "object"
+            },
+            "ServicePrincipal": {
+              "description": "A tenant's non-human principal: an integration, an MCP client or the application.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/PrincipalId"
+                },
+                "kind": {
+                  "const": "service_principal",
+                  "default": "service_principal",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "ServicePrincipal",
+              "type": "object"
+            },
+            "User": {
+              "description": "A person, by their identity provider's id.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/UserId"
+                },
+                "kind": {
+                  "const": "user",
+                  "default": "user",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "User",
+              "type": "object"
+            },
+            "UserId": {
+              "type": "string"
+            },
+            "WorkspaceId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "role": {
+              "description": "The role to grant on the tenant: owner, admin, or a custom role.",
+              "title": "Role",
+              "type": "string"
+            },
+            "to": {
+              "$ref": "#/$defs/Grantee",
+              "description": "To whom."
+            }
+          },
+          "required": [
+            "role",
+            "to"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.grant_on_tenant",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": "admin_high",
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/grants",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.grant_operator": {
+      "capability": {
+        "description": "Make a user one of the deployment's operators. It asks your confirmation.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:grant_operator",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "UserId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "user": {
+              "$ref": "#/$defs/UserId",
+              "description": "The user."
+            }
+          },
+          "required": [
+            "user"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.grant_operator",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": "admin_high",
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/deployment",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.issue_key": {
+      "capability": {
+        "description": "Issue a key to a service principal; its secret is shown once.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:issue_key",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "PrincipalId": {
+              "pattern": "^[^:~\\s]+$",
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "principal": {
+              "$ref": "#/$defs/PrincipalId",
+              "description": "The service principal the key is for."
+            }
+          },
+          "required": [
+            "principal"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.issue_key",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": {
+        "reason": "a key's secret is shown once, to who issues it, in portalr"
+      },
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/keys",
+      "surfaces": [
+        "portalr"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.list_approvals": {
+      "capability": {
+        "description": "List the approvals pending in the tenant, or a workspace, that you may answer.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:read_approvals",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "workspace": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Only in this workspace; on the tenant, or in every workspace, if omitted.",
+              "title": "Workspace"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_approvals",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/approvals",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "grantr.list_bindings": {
+      "capability": {
+        "description": "List the sources bound to the tenant's workspaces, or one of them: the operator's first.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:manage_bindings",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "workspace": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Only in this workspace; on the tenant, or in every workspace, if omitted.",
+              "title": "Workspace"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_bindings",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": null,
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.list_grants": {
+      "capability": {
+        "description": "List the grants made in the tenant, or in one of its workspaces.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:grant",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "workspace": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Only in this workspace; on the tenant, or in every workspace, if omitted.",
+              "title": "Workspace"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_grants",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/grants",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.list_groups": {
+      "capability": {
+        "description": "List the tenant's groups and their members.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:manage_groups",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_groups",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/groups",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.list_integrations": {
+      "capability": {
+        "description": "List each integration as it is set on the tenant, or in one of its workspaces.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:manage_integrations",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "workspace": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Only in this workspace; on the tenant, or in every workspace, if omitted.",
+              "title": "Workspace"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_integrations",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/integrations",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.list_keys": {
+      "capability": {
+        "description": "List the tenant's keys by their public ids, never their secrets.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:issue_key",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_keys",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/keys",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.list_members": {
+      "capability": {
+        "description": "List the tenant's members: its users and service principals.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:add_member",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_members",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/members",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.list_roles": {
+      "capability": {
+        "description": "List the tenant's custom roles and the actions each holds.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:define_role",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_roles",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/roles",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.list_settings": {
+      "capability": {
+        "description": "List each setting as it applies on the tenant, or in one of its workspaces.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:manage_settings",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "workspace": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Only in this workspace; on the tenant, or in every workspace, if omitted.",
+              "title": "Workspace"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_settings",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/settings",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.read_approval": {
+      "capability": {
+        "description": "Read an approval as it stands: what it asks, who may answer, and its answer if any.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:read_approvals",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "approval": {
+              "description": "The approval's id.",
+              "minLength": 1,
+              "title": "Approval",
+              "type": "string"
+            }
+          },
+          "required": [
+            "approval"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.read_approval",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/approvals",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "core"
+    },
+    "grantr.read_audit": {
+      "capability": {
+        "description": "Read the newest entries of the tenant's audit log of changes to access, oldest first.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:read_audit",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "AuditType": {
+              "enum": [
+                "tenant_created",
+                "deployment_tenant_created",
+                "tenant_deleted",
+                "member_added",
+                "member_removed",
+                "group_defined",
+                "group_deleted",
+                "role_defined",
+                "role_deleted",
+                "granted",
+                "revoked",
+                "key_issued",
+                "key_revoked",
+                "restricted",
+                "unrestricted",
+                "integration_set",
+                "setting_set",
+                "binding_added",
+                "binding_removed",
+                "approval_asked",
+                "approval_answered",
+                "approval_closed",
+                "capability_called"
+              ],
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "last": {
+              "default": 100,
+              "description": "How many of the newest entries to read, oldest first.",
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Last",
+              "type": "integer"
+            },
+            "types": {
+              "default": [],
+              "description": "Only entries of these types; every type if empty.",
+              "items": {
+                "$ref": "#/$defs/AuditType"
+              },
+              "title": "Types",
+              "type": "array"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.read_audit",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/audit",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.remove_member": {
+      "capability": {
+        "description": "Remove a member from the tenant, with every grant made to them in it.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:remove_member",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "Member": {
+              "discriminator": {
+                "mapping": {
+                  "service_principal": "#/$defs/ServicePrincipal",
+                  "user": "#/$defs/User"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/User"
+                },
+                {
+                  "$ref": "#/$defs/ServicePrincipal"
+                }
+              ]
+            },
+            "PrincipalId": {
+              "pattern": "^[^:~\\s]+$",
+              "type": "string"
+            },
+            "ServicePrincipal": {
+              "description": "A tenant's non-human principal: an integration, an MCP client or the application.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/PrincipalId"
+                },
+                "kind": {
+                  "const": "service_principal",
+                  "default": "service_principal",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "ServicePrincipal",
+              "type": "object"
+            },
+            "User": {
+              "description": "A person, by their identity provider's id.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/UserId"
+                },
+                "kind": {
+                  "const": "user",
+                  "default": "user",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "User",
+              "type": "object"
+            },
+            "UserId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "member": {
+              "$ref": "#/$defs/Member",
+              "description": "The user or service principal."
+            }
+          },
+          "required": [
+            "member"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.remove_member",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/members",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.restrict": {
+      "capability": {
+        "description": "Restrict a thread or artifact to those granted a role on it, or lift the restriction.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:restrict",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "Resource": {
+              "description": "A resource, by its kind, its workspace if it is in one, and its id if it is an item.",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Id"
+                },
+                "kind": {
+                  "$ref": "#/$defs/ResourceKind"
+                },
+                "workspace": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/WorkspaceId"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "title": "Resource",
+              "type": "object"
+            },
+            "ResourceKind": {
+              "enum": [
+                "deployment",
+                "tenant",
+                "workspace",
+                "thread",
+                "artifact",
+                "rule"
+              ],
+              "type": "string"
+            },
+            "WorkspaceId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "on": {
+              "$ref": "#/$defs/Resource",
+              "description": "The thread or artifact."
+            },
+            "restricted": {
+              "default": true,
+              "description": "Whether only those granted a role on it may open it.",
+              "title": "Restricted",
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "on"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.restrict",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": null,
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.revoke": {
+      "capability": {
+        "description": "Revoke a role granted on the tenant, a workspace, a thread, an artifact or a rule.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:revoke",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "Grantee": {
+              "discriminator": {
+                "mapping": {
+                  "group": "#/$defs/Group",
+                  "rule": "#/$defs/RulePrincipal",
+                  "service_principal": "#/$defs/ServicePrincipal",
+                  "user": "#/$defs/User"
+                },
+                "propertyName": "kind"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/User"
+                },
+                {
+                  "$ref": "#/$defs/ServicePrincipal"
+                },
+                {
+                  "$ref": "#/$defs/RulePrincipal"
+                },
+                {
+                  "$ref": "#/$defs/Group"
+                }
+              ]
+            },
+            "Group": {
+              "description": "A tenant's named set of users and service principals, granted roles like a subject.",
+              "properties": {
+                "id": {
+                  "title": "Id",
+                  "type": "string"
+                },
+                "kind": {
+                  "const": "group",
+                  "default": "group",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "Group",
+              "type": "object"
+            },
+            "PrincipalId": {
+              "pattern": "^[^:~\\s]+$",
+              "type": "string"
+            },
+            "Resource": {
+              "description": "A resource, by its kind, its workspace if it is in one, and its id if it is an item.",
+              "properties": {
+                "id": {
+                  "anyOf": [
+                    {
+                      "type": "string"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null,
+                  "title": "Id"
+                },
+                "kind": {
+                  "$ref": "#/$defs/ResourceKind"
+                },
+                "workspace": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/$defs/WorkspaceId"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ],
+                  "default": null
+                }
+              },
+              "required": [
+                "kind"
+              ],
+              "title": "Resource",
+              "type": "object"
+            },
+            "ResourceKind": {
+              "enum": [
+                "deployment",
+                "tenant",
+                "workspace",
+                "thread",
+                "artifact",
+                "rule"
+              ],
+              "type": "string"
+            },
+            "RulePrincipal": {
+              "description": "A reflexr rule, named by its workspace and rule: its runs act as it.",
+              "properties": {
+                "kind": {
+                  "const": "rule",
+                  "default": "rule",
+                  "title": "Kind",
+                  "type": "string"
+                },
+                "rule": {
+                  "title": "Rule",
+                  "type": "string"
+                },
+                "workspace": {
+                  "$ref": "#/$defs/WorkspaceId"
+                }
+              },
+              "required": [
+                "workspace",
+                "rule"
+              ],
+              "title": "RulePrincipal",
+              "type": "object"
+            },
+            "ServicePrincipal": {
+              "description": "A tenant's non-human principal: an integration, an MCP client or the application.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/PrincipalId"
+                },
+                "kind": {
+                  "const": "service_principal",
+                  "default": "service_principal",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "ServicePrincipal",
+              "type": "object"
+            },
+            "User": {
+              "description": "A person, by their identity provider's id.",
+              "properties": {
+                "id": {
+                  "$ref": "#/$defs/UserId"
+                },
+                "kind": {
+                  "const": "user",
+                  "default": "user",
+                  "title": "Kind",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "title": "User",
+              "type": "object"
+            },
+            "UserId": {
+              "type": "string"
+            },
+            "WorkspaceId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "on": {
+              "$ref": "#/$defs/Resource",
+              "description": "Where: a workspace, a thread, an artifact or a rule. The tenant's roles are granted by\n``grantr.grant_on_tenant``."
+            },
+            "role": {
+              "description": "The role to grant or revoke.",
+              "title": "Role",
+              "type": "string"
+            },
+            "to": {
+              "$ref": "#/$defs/Grantee",
+              "description": "To whom: a user, a service principal, a group or a rule."
+            }
+          },
+          "required": [
+            "role",
+            "on",
+            "to"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.revoke",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/grants",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.revoke_key": {
+      "capability": {
+        "description": "Revoke a key at once: whatever holds it is refused. It asks your confirmation.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:revoke_key",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "description": "The key's public id.",
+              "minLength": 1,
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "key"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.revoke_key",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "irreversible",
+        "risk_class": "admin_high",
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/keys",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.revoke_operator": {
+      "capability": {
+        "description": "Take the operator role from a user.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:grant_operator",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "UserId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "user": {
+              "$ref": "#/$defs/UserId",
+              "description": "The user."
+            }
+          },
+          "required": [
+            "user"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.revoke_operator",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/deployment",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.set_integration": {
+      "capability": {
+        "description": "Turn an integration on or off on the tenant or in a workspace, or unset it.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:manage_integrations",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "description": "The integration's key.",
+              "title": "Key",
+              "type": "string"
+            },
+            "on": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "On, off, or null to unset it, so it inherits the level above.",
+              "title": "On"
+            },
+            "workspace": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "In this workspace; on the tenant if omitted.",
+              "title": "Workspace"
+            }
+          },
+          "required": [
+            "key",
+            "on"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.set_integration",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/integrations",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.set_setting": {
+      "capability": {
+        "description": "Narrow a setting on the tenant or in a workspace, within the layer above, or unset it.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:manage_settings",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "key": {
+              "description": "The setting's key.",
+              "title": "Key",
+              "type": "string"
+            },
+            "value": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "A whole number or names, within the layer above's; null to unset it.",
+              "title": "Value"
+            },
+            "version": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The version read, so a change made since is refused; the last write wins if omitted.",
+              "title": "Version"
+            },
+            "workspace": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "In this workspace; on the tenant if omitted.",
+              "title": "Workspace"
+            }
+          },
+          "required": [
+            "key",
+            "value"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.set_setting",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/settings",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.unbind": {
+      "capability": {
+        "description": "Remove one of the tenant's bindings, so its source's events stop reaching it.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:manage_bindings",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "binding": {
+              "description": "The binding's id.",
+              "minLength": 1,
+              "title": "Binding",
+              "type": "string"
+            }
+          },
+          "required": [
+            "binding"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.unbind",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": null,
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    }
+  },
+  "title": "grantr's commands"
+}

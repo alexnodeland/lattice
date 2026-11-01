@@ -12,8 +12,10 @@ tasks:
     args: ['--numprocesses', 'auto']
 
   schema:
-    description: "Regenerate the admin API's OpenAPI document from the router"
-    script: 'uv run python $workspaceRoot/scripts/generate.py schemas/grantr.openapi.json grantr.fastapi.openapi'
+    description: "Regenerate the admin API's OpenAPI document from the router, and the catalog of grantr's commands"
+    script: >-
+      uv run python $workspaceRoot/scripts/generate.py schemas/grantr.openapi.json grantr.fastapi.openapi
+      && uv run python $workspaceRoot/scripts/generate.py schemas/grantr.commands.json grantr.commands.schema
     options:
       cache: false
       runInCI: false

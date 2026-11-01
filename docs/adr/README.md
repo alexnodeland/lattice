@@ -35,7 +35,7 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0027](0027-integrations-switched-per-workspace-through-one-port.md) | Integrations switched per workspace, through one port | Accepted |
 | [0028](0028-a-stuck-test-fails-by-a-signal-and-its-worker-carries-on.md) | A stuck test fails by a signal, and its worker carries on | Accepted |
 | [0029](0029-each-wheel-checked-at-its-floors.md) | Each wheel checked at its floors | Accepted |
-| [0030](0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md) | Settings: typed, declared in lattice-core, and only narrowed below the operator | Accepted |
+| [0030](0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md) | Settings: typed, declared in lattice-core, and only narrowed below the operator | Accepted, amended by 0038 |
 | [0031](0031-one-approval-publishes-every-package-a-release-made.md) | One approval publishes every package a release made | Accepted |
 | [0032](0032-the-capability-registry-in-lattice-core-four-tiers-three-effects-and-entry-points.md) | The capability registry in lattice-core: four tiers, three effects, and entry points | Accepted |
 | [0033](0033-egress-pinned-by-an-original-dst-cluster-that-the-authorizer-addresses.md) | Egress pinned by an ORIGINAL_DST cluster that the authorizer addresses | Accepted |
@@ -43,5 +43,6 @@ Outside its own series, a record is named with its package, as in "reflexr ADR-0
 | [0035](0035-one-approval-per-call-bound-to-its-arguments-declared-in-lattice-core-and-stored-by-grantr.md) | One approval per call, bound to its arguments, declared in lattice-core and stored by grantr | Accepted |
 | [0036](0036-egress-decided-by-one-pure-function-hosts-the-operators-and-internal-destinations-declared-per-purpose.md) | Egress decided by one pure function: hosts the operator's, and internal destinations declared per purpose | Accepted |
 | [0037](0037-the-enforcement-path-in-lattice-core-refusals-by-step-approvals-resumed-by-id.md) | The enforcement path in lattice-core: refusals by step, approvals resumed by id | Accepted |
+| [0038](0038-approval-asked-by-tiers-a-union-resolved-setting-names-and-admin-high-confirmed-by-its-caller.md) | Approval asked by the tiers a union-resolved setting names, and admin_high confirmed by its caller | Accepted |
 
 To add a record, copy [`template.md`](template.md) to the next number and add a row above. Each package's series uses the same template.

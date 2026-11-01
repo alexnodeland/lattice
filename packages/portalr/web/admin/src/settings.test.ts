@@ -58,6 +58,40 @@ test("a clamped value says why: the settings now allow more, or less", () => {
   );
 });
 
+test("a superset is at least the layer above's, and clamped when more is asked for", () => {
+  const tiers = state({
+    key: "approve:tiers",
+    description: "Which tiers of capability need a person's approval.",
+    kind: {
+      type: "superset",
+      low: null,
+      high: null,
+      universe: ["outbound", "read", "run_code", "write"],
+    },
+    default: ["outbound", "run_code"],
+    operator: ["outbound", "read"],
+    tenant: {
+      value: ["outbound", "write"],
+      version: 2,
+      by: { kind: "user", id: "alice" },
+      at: "2026-11-01T09:00:00Z",
+      clamped: true,
+    },
+    ceiling: ["outbound", "read"],
+    effective: ["outbound", "read", "write"],
+  });
+  const [row] = settingRowsOf([tiers], false, (id) => id);
+  expect(row).toMatchObject({
+    name: "Tiers that need approval",
+    ceiling: "At least outbound, read: the operator's value.",
+    clamped:
+      "What is set here doesn't apply: outbound, read, write does, as more is asked for now.",
+  });
+  expect(nameOf(state({ key: "admin-high:different-approver" }))).toBe(
+    "Admin actions a second person approves",
+  );
+});
+
 test("a value is said as a number, or names, or none", () => {
   expect([said(5), said(["read", "run"]), said([])]).toEqual(["5", "read, run", "none"]);
 });

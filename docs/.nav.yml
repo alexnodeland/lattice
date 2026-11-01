@@ -59,6 +59,7 @@ nav:
       - adr/0035-one-approval-per-call-bound-to-its-arguments-declared-in-lattice-core-and-stored-by-grantr.md
       - adr/0036-egress-decided-by-one-pure-function-hosts-the-operators-and-internal-destinations-declared-per-purpose.md
       - adr/0037-the-enforcement-path-in-lattice-core-refusals-by-step-approvals-resumed-by-id.md
+      - adr/0038-approval-asked-by-tiers-a-union-resolved-setting-names-and-admin-high-confirmed-by-its-caller.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr

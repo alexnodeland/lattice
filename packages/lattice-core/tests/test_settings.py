@@ -4,13 +4,16 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
+from lattice_core.capabilities import TIERS as CAPABILITY_TIERS
 from lattice_core.settings import (
+    APPROVE_TIERS,
     CONNECTED_TOOLS,
     KNOWN_SETTINGS,
     IntRange,
     Setting,
     SettingsDefaults,
     Subset,
+    Superset,
     floor,
     operator_layer,
     registry,
@@ -24,6 +27,13 @@ TOOLS = Setting(
     lowest="workspace",
     description="The fake's tools a workspace offers.",
 )
+ASKS = Setting(
+    "approve:fake",
+    Superset(frozenset({"read", "write", "outbound"})),
+    default=("outbound",),
+    lowest="workspace",
+    description="The fake's tiers that need a person.",
+)
 
 
 def test_lattices_settings_are_each_apps_hourly_tries() -> None:
@@ -32,12 +42,44 @@ def test_lattices_settings_are_each_apps_hourly_tries() -> None:
         "connect-per-hour:blender",
         "connect-tools:freecad",
         "connect-tools:blender",
+        APPROVE_TIERS,
     ]
     for app in ("freecad", "blender"):
         tools = KNOWN_SETTINGS[f"connect-tools:{app}"]
         assert tools.kind == Subset(CONNECTED_TOOLS[app])
         assert (tools.lowest, tools.default) == ("workspace", tuple(sorted(CONNECTED_TOOLS[app])))
     assert (LIMIT.kind, LIMIT.default, LIMIT.lowest) == (IntRange(0, 1000), 30, "workspace")
+
+
+def test_the_tiers_that_need_a_person_are_the_capabilities_tiers() -> None:
+    tiers = KNOWN_SETTINGS[APPROVE_TIERS]
+    assert tiers.kind == Superset(frozenset(CAPABILITY_TIERS))
+    assert (tiers.default, tiers.lowest) == (("outbound", "run_code"), "workspace")
+    assert set(tiers.labels) == set(CAPABILITY_TIERS), "each tier named in words"
+
+
+def test_a_superset_only_grows_down_the_layers() -> None:
+    assert ASKS.narrow(("outbound",), ("read",)) == ("outbound", "read"), "a union"
+    assert ASKS.narrow(("outbound",), None) == ("outbound",)
+    assert ASKS.within(("outbound", "write"), ("outbound",)), "asking more is narrower"
+    assert ASKS.within(("outbound",), ("outbound",))
+    assert not ASKS.within(("write",), ("outbound",)), "asking less is wider"
+    assert ASKS.value(["write", "outbound"]) == ("outbound", "write")
+    with pytest.raises(ValueError, match="names it knows, not run_code"):
+        ASKS.value(["run_code"])
+    assert ASKS.kept(["outbound", "gone"]) == ("outbound",), "a name no tier has asks nothing"
+
+
+@given(
+    st.lists(st.sampled_from(["read", "write", "outbound"]), unique=True),
+    st.none() | st.lists(st.sampled_from(["read", "write", "outbound"]), unique=True),
+)
+def test_a_superset_keeps_every_name_of_the_layer_above(
+    above: list[str], below: list[str] | None
+) -> None:
+    upper = ASKS.value(above)
+    lower = None if below is None else ASKS.value(below)
+    assert ASKS.within(ASKS.narrow(upper, lower), upper)
 
 
 @pytest.mark.parametrize("given", [True, 1.5, "30", None, -1, 1001, [30], {"v": 1}])
@@ -99,6 +141,7 @@ async def test_without_a_store_the_operators_value_or_the_default() -> None:
 
 def test_the_floor_is_the_narrowest_value() -> None:
     assert (floor(LIMIT), floor(TOOLS)) == (0, ())
+    assert floor(ASKS) == ("outbound", "read", "write"), "an unreadable store asks for everything"
 
 
 @given(
@@ -171,5 +214,7 @@ def test_a_stored_number_is_clamped_into_a_changed_range_both_ways() -> None:
 def test_a_subsets_labels_name_only_its_names() -> None:
     with pytest.raises(ValueError, match="labels names it doesn't have: x"):
         Setting("a", Subset(frozenset({"r"})), ("r",), "workspace", "A.", labels={"x": "y"})
+    with pytest.raises(ValueError, match="labels names it doesn't have: x"):
+        Setting("a", Superset(frozenset({"r"})), (), "workspace", "A.", labels={"x": "y"})
     tools = KNOWN_SETTINGS["connect-tools:freecad"]
     assert (tools.labels["execute_code"], tools.labels["get_view"]) == ("runs code", "reads")

@@ -95,6 +95,7 @@ def test_the_modules_that_need_no_extra_are_found() -> None:
     assert base >= {
         "lattice_core.adapters",
         "lattice_core.approvals",
+        "lattice_core.bindings",
         "lattice_core.capabilities",
         "lattice_core.egress",
         "lattice_core.enforcement",

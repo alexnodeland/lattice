@@ -40,6 +40,7 @@ GRANTR_ACTIONS: Final = frozenset(
         "read_audit",
         "grant_operator",
         "answer_approval",
+        "read_approvals",
     )
 )
 """grantr's own catalog: the actions that change access and switch integrations, read its audit
@@ -57,6 +58,10 @@ MANAGE_INTEGRATIONS: Final = "grantr:manage_integrations"
 MANAGE_SETTINGS: Final = "grantr:manage_settings"
 """Narrowing settings, on the tenant or in a workspace, and reading how they are (lattice
 ADR-0030)."""
+
+READ_APPROVALS: Final = "grantr:read_approvals"
+"""Listing and reading the approvals one may answer, or was asked for: every member of a tenant
+holds it (lattice RFC-0014, grantr ADR-0042)."""
 
 MANAGE_BINDINGS: Final = "grantr:manage_bindings"
 """Binding a source's connections to the tenant's workspaces, and reading its bindings: a
@@ -307,7 +312,7 @@ class Catalog:
                 ),
                 ("tenant", "owner"): owner,
                 ("tenant", "admin"): owner - {"grantr:delete_tenant"},
-                ("tenant", MEMBER): MEMBERS_READS & libraries,
+                ("tenant", MEMBER): MEMBERS_READS & libraries | {READ_APPROVALS},
                 ("workspace", "admin"): libraries - BOOKKEEPING - ABOVE_WORKSPACES
                 | WORKSPACE_GRANTS,
                 ("workspace", "editor"): editor,

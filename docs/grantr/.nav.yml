@@ -55,6 +55,7 @@ nav:
   - adr/0039-the-enforcers-gate-and-audit-answered-by-grantr-each-call-as-the-person-it-is-for.md
   - adr/0040-approvals-over-the-admin-api-read-by-who-may-answer-them-answered-on-portalrs-pages.md
   - adr/0041-bindings-stored-per-tenant-beside-the-operators-read-across-tenants-for-the-intake.md
+  - adr/0042-grantrs-commands-every-action-on-access-a-command-called-as-the-person-it-is-for.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

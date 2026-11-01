@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.8.0...grantr-v0.9.0) (2026-11-01)
+
+
+### Features
+
+* **grantr:** connections: grantr objects, one tenant each, read on every call, revoked at once (RFC-0014 P7) ([#1355](https://github.com/alexnodeland/lattice/issues/1355)) ([4bb7559](https://github.com/alexnodeland/lattice/commit/4bb755918dc242ddc8b560b0229b26a2a6033bb7))
+
 ## [0.8.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.7.0...grantr-v0.8.0) (2026-11-01)
 
 

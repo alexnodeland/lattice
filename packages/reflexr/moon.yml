@@ -27,10 +27,11 @@ tasks:
       # run without them.
 
   schema:
-    description: "Regenerate the rule and protocol JSON Schemas, and the REST surface's OpenAPI document"
+    description: "Regenerate the rule and protocol JSON Schemas, the REST surface's OpenAPI document, and the catalog of commands"
     script: >-
       uv run python $workspaceRoot/scripts/generate.py schemas/reflexr.rules.v1.json reflexr.core.schema rules
       && uv run python $workspaceRoot/scripts/generate.py schemas/reflexr.v1.json reflexr.core.schema protocol
+      && uv run python $workspaceRoot/scripts/generate.py schemas/reflexr.commands.json reflexr.commands.schema
       && uv run python $workspaceRoot/scripts/generate.py schemas/reflexr.openapi.json reflexr.fastapi.openapi
     options:
       cache: false

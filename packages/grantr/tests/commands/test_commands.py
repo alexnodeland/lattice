@@ -8,7 +8,8 @@ from typing import Any
 import pytest
 
 from grantr.commands import ADMIN_HIGH, CATALOG, GrantrProvider, provider
-from grantr.core import GRANTR_ACTIONS, ServicePrincipal, User
+from grantr.core import GRANTR_ACTIONS, ClientInfo, ServicePrincipal, User
+from grantr.core import Forbidden as Refused
 from grantr.grants import Grants, InMemoryStorage
 from lattice_core.approvals import (
     Answerers,
@@ -95,6 +96,7 @@ def test_the_high_risk_ones_are_admin_high_and_answering_and_issuing_keys_are_no
         "grantr.revoke_key",
         "grantr.delete_tenant",
         "grantr.grant_operator",
+        "grantr.revoke_member_connection",
     }
     assert expected == ADMIN_HIGH
     assert {n for n, c in COMMANDS.items() if c.capability.risk_class == "admin_high"} == ADMIN_HIGH
@@ -194,6 +196,27 @@ async def test_bindings_are_listed_bound_and_unbound_as_the_caller() -> None:
     gone = await _call(bound, "grantr.unbind", binding=binding["id"])
     assert gone["event"]["type"] == "binding_removed"
     assert await _call(bound, "grantr.list_bindings") == []
+
+
+async def test_connections_are_listed_and_revoked_as_the_caller() -> None:
+    grants = await _grants()
+    bound = provider(grants)
+    connections = grants.connections()
+    bob = User(id="bob")
+    await grants.add_member("acme", bob, by=ALICE)
+    claude = ClientInfo(client_id="client_claude", name="Claude")
+    alices = await connections.connect("acme", claude, by=ALICE)
+    bobs = await connections.connect("acme", claude, by=bob)
+    listed = await _call(bound, "grantr.list_connections")
+    assert [c["id"] for c in listed] == [alices.id, bobs.id], "an owner reads every one"
+    only = await _call(bound, "grantr.list_connections", user="bob")
+    assert [c["id"] for c in only] == [bobs.id]
+    with pytest.raises(Refused, match="isn't yours"):
+        await _call(bound, "grantr.revoke_connection", connection=bobs.id)
+    own = await _call(bound, "grantr.revoke_connection", connection=alices.id)
+    assert own["event"]["type"] == "connection_revoked"
+    theirs = await _call(bound, "grantr.revoke_member_connection", connection=bobs.id)
+    assert theirs["event"]["user"] == "bob"
 
 
 async def test_approvals_are_read_by_who_may_answer_them() -> None:

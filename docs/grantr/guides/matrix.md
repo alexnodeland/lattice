@@ -51,9 +51,11 @@ An application's own, with its custom roles, is in its `access.md` ([Roles and g
 | `grantr:manage_settings` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
 | `grantr:read_approvals` |  |  | ✓ | ✓ | ✓ |  |  |  |  |
 | `grantr:read_audit` |  |  | ✓ | ✓ |  |  |  |  |  |
+| `grantr:read_connections` |  |  | ✓ | ✓ | ✓ |  |  |  |  |
 | `grantr:remove_member` |  |  | ✓ | ✓ |  |  |  |  |  |
 | `grantr:restrict` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
 | `grantr:revoke` |  |  | ✓ | ✓ |  | ✓ |  |  |  |
+| `grantr:revoke_connection` |  |  | ✓ | ✓ | ✓ |  |  |  |  |
 | `grantr:revoke_key` |  |  | ✓ | ✓ |  |  |  |  |  |
 | `reflexr:archive_rule` |  | ✓ | ✓ | ✓ |  | ✓ |  |  |  |
 | `reflexr:cancel_run` |  |  | ✓ | ✓ |  | ✓ | ✓ |  |  |

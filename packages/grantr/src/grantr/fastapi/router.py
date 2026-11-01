@@ -30,6 +30,7 @@ from grantr.core import (
     AuditFilter,
     AuditType,
     CatalogView,
+    Connection,
     Forbidden,
     Grant,
     Grantee,
@@ -936,6 +937,35 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
     async def unbind(tenant: TenantId, binding: str, who: Caller = current) -> AuditEntry:
         """Remove one of the tenant's bindings; the operator's are the deployment's to change."""
         return await _or_http(grants.bindings().unbind(tenant, binding, by=by(tenant, who)))
+
+    @router.get("/tenants/{tenant}/connections")
+    async def list_connections(
+        tenant: TenantId,
+        user: Annotated[
+            UserId | None,
+            Query(description="Only this person's; theirs, or every one for an admin, if omitted."),
+        ] = None,
+        who: Caller = current,
+    ) -> list[Connection]:
+        """The outside clients connected to the tenant that the caller may read, oldest first.
+
+        A member reads their own, with ``grantr:read_connections``; whoever adds the tenant's
+        members, every one (grantr ADR-0043). Revoked ones are listed too.
+        """
+        listed = grants.connections().listed(tenant, by=by(tenant, who), user=user)
+        return await _or_http(listed)
+
+    @router.delete("/tenants/{tenant}/connections/{connection}")
+    async def revoke_connection(
+        tenant: TenantId, connection: str, who: Caller = current
+    ) -> AuditEntry:
+        """Revoke a connection: its next call is refused.
+
+        A member revokes their own, with ``grantr:revoke_connection``; whoever adds the
+        tenant's members, any.
+        """
+        revoked = grants.connections().revoke(tenant, connection, by=by(tenant, who))
+        return await _or_http(revoked)
 
     return router
 

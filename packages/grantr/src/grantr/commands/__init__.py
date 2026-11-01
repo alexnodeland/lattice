@@ -11,8 +11,11 @@ for (:func:`~grantr.grants.calls.subject_of_call`), in the call's tenant, so gra
 again as it does every command. Each answers JSON text.
 
 - **`admin_high`:** deleting the tenant, revoking a key, granting a role on the tenant, defining
-  a role (whose actions are known only as it is called) and granting the operator role. Each
-  asks its caller's own confirmation through the enforcer's policy (lattice ADR-0038).
+  a role (whose actions are known only as it is called), granting the operator role and revoking
+  another member's connection. Each asks its caller's own confirmation through the enforcer's
+  policy (lattice ADR-0038).
+- **Connections** (grantr ADR-0043): a member lists and revokes their own; revoking another's,
+  for whoever adds the tenant's members, is a command of its own, ``admin_high``.
 - **Not exposed:** answering an approval, which comes from a person (lattice RFC-0014), and
   issuing a key, whose secret is shown once, to the person who issues it, in portalr: neither is
   a tool a model can call.
@@ -136,6 +139,16 @@ class _Restrict(_Arguments):
 class _Key(_Arguments):
     key: str = Field(min_length=1)
     """The key's public id."""
+
+
+class _Connections(_Arguments):
+    user: UserId | None = None
+    """Only this person's; yours, or every one for an admin, if omitted."""
+
+
+class _Connection(_Arguments):
+    connection: str = Field(min_length=1)
+    """The connection's id, such as ``con_0123456789abcdef``."""
 
 
 class _NewKey(_Arguments):
@@ -468,6 +481,35 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         reversibility="irreversible",
         admin_high=True,
         route=f"{ADMIN}/access/keys",
+    ),
+    _read(
+        "grantr.list_connections",
+        "List the outside clients connected to the tenant that you may read, revoked ones too: "
+        "your own, or every one if you add the tenant's members.",
+        "grantr:read_connections",
+        f"{ADMIN}/access/connections",
+        lambda g, a, t, by: _listed(g.connections().listed(t, by=by, user=a.user)),
+        arguments=_Connections,
+    ),
+    _Spec(
+        "grantr.revoke_connection",
+        "Revoke one of your own connections at once: its next call is refused.",
+        "grantr:revoke_connection",
+        _Connection,
+        lambda g, a, t, by: _entry(g.connections().revoke(t, a.connection, by=by, own_only=True)),
+        reversibility="irreversible",
+        route=f"{ADMIN}/access/connections",
+    ),
+    _Spec(
+        "grantr.revoke_member_connection",
+        "Revoke another member's connection at once, if you add the tenant's members: its next "
+        "call is refused. It asks your confirmation.",
+        "grantr:revoke_connection",
+        _Connection,
+        lambda g, a, t, by: _entry(g.connections().revoke(t, a.connection, by=by)),
+        reversibility="irreversible",
+        admin_high=True,
+        route=f"{ADMIN}/access/connections",
     ),
     _read(
         "grantr.list_integrations",

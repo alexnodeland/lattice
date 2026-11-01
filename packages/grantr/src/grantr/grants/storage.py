@@ -37,6 +37,7 @@ from grantr.core import (
     WorkspaceId,
 )
 from lattice_core.approvals import Approval, ApprovalId
+from lattice_core.bindings import Binding, BindingId
 
 
 class Reads(Protocol):
@@ -141,6 +142,20 @@ class Reads(Protocol):
         """
         ...
 
+    async def bindings(
+        self,
+        tenant: TenantId,
+        *,
+        workspace: WorkspaceId | None = None,
+        source: str | None = None,
+        connection: str | None = None,
+    ) -> list[Binding]:
+        """The tenant's bindings, oldest first.
+
+        Those reaching a workspace, or of a source's connection, or every one.
+        """
+        ...
+
 
 class Transaction(Reads, Protocol):
     """One atomic change to access, serialized with every other in its tenant.
@@ -206,6 +221,14 @@ class Transaction(Reads, Protocol):
 
     async def put_approval(self, approval: Approval) -> None:
         """Store an approval in its scope's tenant, or replace it as it now stands."""
+        ...
+
+    async def put_binding(self, binding: Binding) -> None:
+        """Store a binding in its tenant."""
+        ...
+
+    async def delete_binding(self, tenant: TenantId, id: BindingId) -> Binding | None:
+        """Delete one of the tenant's bindings, and return it; None if it has no such binding."""
         ...
 
     async def add_key(self, key: Key) -> None:

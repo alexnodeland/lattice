@@ -36,6 +36,7 @@ GRANTR_ACTIONS: Final = frozenset(
         "restrict",
         "manage_integrations",
         "manage_settings",
+        "manage_bindings",
         "read_audit",
         "grant_operator",
         "answer_approval",
@@ -56,6 +57,10 @@ MANAGE_INTEGRATIONS: Final = "grantr:manage_integrations"
 MANAGE_SETTINGS: Final = "grantr:manage_settings"
 """Narrowing settings, on the tenant or in a workspace, and reading how they are (lattice
 ADR-0030)."""
+
+MANAGE_BINDINGS: Final = "grantr:manage_bindings"
+"""Binding a source's connections to the tenant's workspaces, and reading its bindings: a
+tenant's owners and admins hold it, never a workspace's (lattice ADR-0040)."""
 
 ANSWER_APPROVAL: Final = "grantr:answer_approval"
 """Answering an approval whose answerers name this action, in a workspace: a person delegates

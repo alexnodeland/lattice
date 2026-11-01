@@ -143,6 +143,28 @@ class ApprovalRow(Base):
     """The approval, its request, answer and whether it was taken, as JSON."""
 
 
+class BindingRow(Base):
+    """A binding, in its tenant: its workspace, source and connection, and the whole as JSON.
+
+    The intake reads a connection's bindings, and a workspace's admin reads its own (lattice
+    ADR-0040).
+    """
+
+    __tablename__ = "grantr_bindings"
+    __table_args__ = (
+        Index("ix_grantr_bindings_connection", "tenant_id", "source", "connection"),
+        Index("ix_grantr_bindings_workspace", "tenant_id", "workspace"),
+    )
+
+    tenant_id: Mapped[str] = mapped_column(primary_key=True)
+    id: Mapped[str] = mapped_column(primary_key=True)
+    workspace: Mapped[str]
+    source: Mapped[str]
+    connection: Mapped[str]
+    binding: Mapped[dict[str, Any]] = mapped_column(JSON)
+    """The binding, as lattice-core's contract has it, as JSON."""
+
+
 class SettingRowRecord(Base):
     """A setting on a tenant, with an empty workspace, or in one of its workspaces.
 

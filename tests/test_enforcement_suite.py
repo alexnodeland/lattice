@@ -33,6 +33,10 @@ from pydantic_ai.models.function import AgentInfo, FunctionModel
 from artifactr.capabilities import ArtifactrProvider
 from artifactr.core import ExternalAgentActor, MarkdownArtifact, UserActor
 from artifactr.workspace import InMemoryStorage, Workspaces
+from grantr.core import Agent as Nobody
+from grantr.core import AuditFilter, CapabilityCalled, Resource, User
+from grantr.grants import Grants
+from grantr.grants import InMemoryStorage as Access
 from lattice_core.agents import APPROVAL, toolset
 from lattice_core.approvals import (
     Answer,
@@ -523,3 +527,51 @@ def test_an_agents_run_writes_through_the_enforcer_and_pauses_for_the_policys_ap
 
 async def _never() -> int:
     raise AssertionError("not counted here")
+
+
+# ─── grantr's answers ─────────────────────────────────────────────────────────
+
+
+def test_grantr_answers_the_gate_and_records_every_call() -> None:
+    """grantr's ``Authorize`` and ``Audit`` (grantr ADR-0039), composed into the enforcer."""
+
+    async def case() -> None:
+        under = _fake("command")
+        grants = Grants(Access(), catalogs=[{"suite:read", "suite:write"}])
+        await grants.first_operator("root")
+        await grants.create_tenant("acme", owner="alex", by=User(id="root"))
+        await grants.add_member("acme", User(id="sam"), by=User(id="alex"))
+        docs = Resource(kind="workspace", workspace="docs")
+        await grants.grant("acme", "viewer", on=docs, to=User(id="sam"), by=User(id="alex"))
+        enforcer = Enforcer(
+            Registry(under.provider),
+            integrations=Defaults({}),
+            authorize=grants.authorize(),
+            ceilings=FixedCeilings(frozenset(TIERS)),
+            settings=SettingsDefaults({PER_HOUR.key: PER_HOUR}),
+            counter=FakeCounter(),
+            taint=FixedTaint("allow"),
+            approvals=Policy(None),
+            coverage=NoCoverage(),
+            store=FakeApprovals(),
+            audit=grants.capability_audit(),
+            clock=lambda: NOW,
+        )
+        await enforcer.call(under.write, under.write_arguments, context())
+        for on_behalf_of in ("sam", None):
+            caller = RunCaller(id="run_2", agent="helper", on_behalf_of=on_behalf_of)
+            within = context().model_copy(update={"caller": caller})
+            await refused(Forbidden, enforcer.call(under.write, under.write_arguments, within))
+        assert await under.writes() == 1, "only the owner's run wrote"
+        calls = AuditFilter(types=frozenset({"capability_called"}))
+        entries = await grants.audit("acme", by=User(id="alex"), keep=calls)
+        events = [e.event for e in entries if isinstance(e.event, CapabilityCalled)]
+        assert [(e.outcome, e.caller) for e in events] == [
+            ("called", "run:run_1"),
+            ("refused", "run:run_2"),
+            ("refused", "run:run_2"),
+        ]
+        assert [entry.by for entry in entries] == [User(id="alex"), User(id="sam"), Nobody()]
+        assert events[1].steps[-2].name == "grant", "refused at the gate, then audited"
+
+    run(case())

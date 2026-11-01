@@ -164,6 +164,7 @@
             "approval_answered": "#/components/schemas/ApprovalAnswered",
             "approval_asked": "#/components/schemas/ApprovalAsked",
             "approval_closed": "#/components/schemas/ApprovalClosed",
+            "capability_called": "#/components/schemas/CapabilityCalled",
             "deployment_tenant_created": "#/components/schemas/DeploymentTenantCreated",
             "granted": "#/components/schemas/Granted",
             "group_defined": "#/components/schemas/GroupDefined",
@@ -244,6 +245,9 @@
           },
           {
             "$ref": "#/components/schemas/ApprovalClosed"
+          },
+          {
+            "$ref": "#/components/schemas/CapabilityCalled"
           }
         ]
       },
@@ -268,7 +272,8 @@
           "setting_set",
           "approval_asked",
           "approval_answered",
-          "approval_closed"
+          "approval_closed",
+          "capability_called"
         ],
         "type": "string"
       },
@@ -292,6 +297,144 @@
           "kinds"
         ],
         "title": "BuiltInRole",
+        "type": "object"
+      },
+      "CapabilityCalled": {
+        "description": "A capability was called through lattice-core's enforcer: never its arguments or output.\n\nEvery call leaves one, refused, pending, failed or called (lattice ADR-0037, grantr\nADR-0039).",
+        "properties": {
+          "approval": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Approval"
+          },
+          "arguments_digest": {
+            "title": "Arguments Digest",
+            "type": "string"
+          },
+          "called_at": {
+            "format": "date-time",
+            "title": "Called At",
+            "type": "string"
+          },
+          "caller": {
+            "title": "Caller",
+            "type": "string"
+          },
+          "capability": {
+            "title": "Capability",
+            "type": "string"
+          },
+          "client": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Client"
+          },
+          "correlation_id": {
+            "title": "Correlation Id",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "called",
+              "failed",
+              "refused",
+              "pending"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/CapabilityStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "surface": {
+            "title": "Surface",
+            "type": "string"
+          },
+          "tenant": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tenant"
+          },
+          "type": {
+            "const": "capability_called",
+            "default": "capability_called",
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Version"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/WorkspaceId"
+          }
+        },
+        "required": [
+          "capability",
+          "version",
+          "workspace",
+          "caller",
+          "correlation_id",
+          "surface",
+          "arguments_digest",
+          "steps",
+          "outcome",
+          "called_at"
+        ],
+        "title": "CapabilityCalled",
+        "type": "object"
+      },
+      "CapabilityStep": {
+        "description": "A step of the enforcement path a call passed, or was stopped at (lattice ADR-0037).",
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "note": {
+            "default": "",
+            "title": "Note",
+            "type": "string"
+          },
+          "passed": {
+            "title": "Passed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name",
+          "passed"
+        ],
+        "title": "CapabilityStep",
         "type": "object"
       },
       "CatalogView": {

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.3.0...grantr-v0.4.0) (2026-11-01)
+
+
+### Features
+
+* **core,grantr,portalr:** ask approval by the tiers a union-resolved setting names, and confirm admin_high by its caller (RFC-0011 phase 3) ([#1286](https://github.com/alexnodeland/lattice/issues/1286)) ([6d54b2c](https://github.com/alexnodeland/lattice/commit/6d54b2cb851fcb7e4253d8e371369cbc95462186))
+
 ## [0.3.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.2.1...grantr-v0.3.0) (2026-11-01)
 
 

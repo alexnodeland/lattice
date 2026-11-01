@@ -50,7 +50,14 @@ from lattice_core.enforcement import (
     WrongApproval,
 )
 from lattice_core.integrations import Defaults, Integration
-from lattice_core.settings import IntRange, Setting, SettingsDefaults, Subset
+from lattice_core.settings import (
+    APPROVE_WITHIN,
+    KNOWN_SETTINGS,
+    IntRange,
+    Setting,
+    SettingsDefaults,
+    Subset,
+)
 from lattice_core.taint import Cause, Clean, Tainted
 
 HERE = Scope(tenant_id="acme", workspace_id="docs")
@@ -382,6 +389,44 @@ async def test_a_call_that_needs_approval_waits_and_goes_ahead_once_approved() -
     called = await built.call(approval="apr_1")
     assert (called.result.output, called.approval) == ("sent", "apr_1")
     assert built.audit.entries[-1].approval == "apr_1"
+
+
+async def test_an_approval_stays_open_for_the_workspaces_approve_within() -> None:
+    sam = Policy(Answerers(subjects=frozenset({"sam"})))
+    known = {PER_HOUR.key: PER_HOUR, APPROVE_WITHIN: KNOWN_SETTINGS[APPROVE_WITHIN]}
+    for operator, open_for in (
+        ({}, timedelta(days=1)),
+        ({APPROVE_WITHIN: 90}, timedelta(hours=1.5)),
+    ):
+        built = Built(
+            capability(),
+            approvals=sam,
+            settings=SettingsDefaults(known, operator),
+            approve_within=timedelta(hours=2),
+        )
+        with pytest.raises(ApprovalPending) as pending:
+            await built.call()
+        approval = await built.store.get(pending.value.approval)
+        assert approval.deadline == NOW + open_for, "the setting, wherever it is declared"
+
+
+async def test_an_approve_within_that_isnt_a_number_refuses_and_asks_no_one() -> None:
+    minutes = Setting(
+        key=APPROVE_WITHIN,
+        kind=Subset(frozenset({"soon"})),
+        default=("soon",),
+        lowest="workspace",
+        description="Not minutes.",
+    )
+    built = Built(
+        capability(),
+        approvals=Policy(Answerers(subjects=frozenset({"sam"}))),
+        settings=SettingsDefaults({APPROVE_WITHIN: minutes}),
+    )
+    with pytest.raises(TypeError, match="approve-within is a number of minutes, not \\('soon',\\)"):
+        await built.call()
+    assert built.audit.entries[-1].outcome == "refused"
+    assert list(built.store.all()) == [], "no approval is asked"
 
 
 async def test_an_approval_lets_one_call_through() -> None:

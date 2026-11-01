@@ -134,6 +134,9 @@ class GrantrApprovals:
       subjects and groups an approval names are people, since a principal's id may be a
       person's too, and it never answers a confirmation.
 
+    An approval is shown (:meth:`shown`) to whoever may answer it, and to the person it was
+    asked for, while each is a member of its tenant; to anyone else it isn't there.
+
     The groups an answerer says it is in count for nothing: grantr's own do. Nothing offers a
     scope yet, so an answer that carries one is refused. An approval past its deadline takes
     no answer, though only :meth:`expire_due`, the sweep, closes it.
@@ -326,14 +329,44 @@ class GrantrApprovals:
 
     async def pending(self, scope: Scope, subject: Answerer, /) -> list[Approval]:
         """Return the approvals pending in the scope that the subject may answer, oldest first."""
-        if not TENANT_ID.fullmatch(scope.tenant_id):
+        return await self._answerable(scope.tenant_id, subject, scope.workspace_id)
+
+    async def answerable(self, tenant: TenantId, subject: Answerer, /) -> list[Approval]:
+        """Return the approvals pending in the tenant that the subject may answer, oldest first.
+
+        Those of every workspace: the list a person answers from.
+        """
+        return await self._answerable(tenant, subject, None)
+
+    async def _answerable(
+        self, tenant: TenantId, subject: Answerer, workspace: WorkspaceId | None
+    ) -> list[Approval]:
+        if not TENANT_ID.fullmatch(tenant):
             return []
-        asked = await self._storage.approvals(scope.tenant_id, workspace=scope.workspace_id)
+        asked = await self._storage.approvals(tenant, workspace=workspace)
         return [
             approval
             for approval in asked
             if await self._may_answer(self._storage, approval, subject)
         ]
+
+    async def shown(self, id: ApprovalId, subject: Answerer, /) -> Approval:
+        """Return the approval as it stands, to one who may answer it or who it was asked for.
+
+        Either is a member of its tenant still; the approval is shown whatever its state.
+
+        Raises:
+            UnknownApproval: If there is no approval of the id, or the subject may see it
+                neither way: whether it exists isn't said.
+        """
+        approval = await _stored(self._storage, id)
+        tenant = approval.scope.tenant_id
+        asker = not subject.service and subject.id == _person(approval.asked_by)
+        if asker and await self._is_member(self._storage, tenant, User(id=subject.id)):
+            return approval
+        if await self._may_answer(self._storage, approval, subject):
+            return approval
+        raise UnknownApproval(id)
 
     async def watch(self, id: ApprovalId, /) -> AsyncIterator[Approval]:
         """Yield the approval as it stands, then each change, until it is settled.

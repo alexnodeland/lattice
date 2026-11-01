@@ -7,6 +7,7 @@ from hypothesis import strategies as st
 from lattice_core.capabilities import TIERS as CAPABILITY_TIERS
 from lattice_core.settings import (
     APPROVE_TIERS,
+    APPROVE_WITHIN,
     CONNECTED_TOOLS,
     KNOWN_SETTINGS,
     IntRange,
@@ -43,12 +44,19 @@ def test_lattices_settings_are_each_apps_hourly_tries() -> None:
         "connect-tools:freecad",
         "connect-tools:blender",
         APPROVE_TIERS,
+        APPROVE_WITHIN,
     ]
     for app in ("freecad", "blender"):
         tools = KNOWN_SETTINGS[f"connect-tools:{app}"]
         assert tools.kind == Subset(CONNECTED_TOOLS[app])
         assert (tools.lowest, tools.default) == ("workspace", tuple(sorted(CONNECTED_TOOLS[app])))
     assert (LIMIT.kind, LIMIT.default, LIMIT.lowest) == (IntRange(0, 1000), 30, "workspace")
+
+
+def test_an_approval_waits_a_day_by_default_and_a_layer_only_shortens_it() -> None:
+    within = KNOWN_SETTINGS[APPROVE_WITHIN]
+    assert (within.kind, within.default, within.lowest) == (IntRange(5, 10080), 1440, "workspace")
+    assert floor(within) == 5, "an unreadable store gives a person five minutes"
 
 
 def test_the_tiers_that_need_a_person_are_the_capabilities_tiers() -> None:

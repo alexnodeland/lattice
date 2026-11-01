@@ -110,6 +110,16 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         },
         {*LIBRARY, "pydantic", "lattice_core.integrations"},
     ),
+    # Native files' two commands, bound to the workspaces and native files: a provider of
+    # lattice-core's, on the catalog's declaration and the catalog provider's actor (ADR-0104).
+    "capabilities": (
+        {"artifactr.files.manifest", "artifactr.files.native", "artifactr.files.capabilities"},
+        {
+            *LIBRARY,
+            *("artifactr.capabilities", "artifactr.commands", "artifactr.commands.arguments"),
+            "lattice_core.capabilities",
+        },
+    ),
     # The agent's tools, on pydantic-ai and the agent's Session, the one layer that knows them;
     # a file it creates is marked on its tool's span, as `create_artifact`'s artifact is.
     "tools": (

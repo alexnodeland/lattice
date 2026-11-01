@@ -427,6 +427,8 @@ pydantic-ai's AG-UI and Vercel AI adapters may be added later as compatibility s
 - **It validates a call with the command's own arguments model** from `artifactr.commands.ARGUMENTS`, and `artifactr.create_artifact` names the application's kinds, as `ArtifactrProvider`'s does.
 - **The two providers share six names,** so a registry holds one of them: portr's the catalog provider, an agent's bridge the six tools.
 
+Native files' two commands, `artifactr.list_files` and `artifactr.read_file`, are the files extra's: `artifactr.files.capabilities.NativeFilesProvider(workspaces, files)` serves them, beside the catalog provider, with which it shares no name ([ADR-0104](adr/0104-native-files-commands-a-provider-of-the-files-extras-own.md)). It opens the call's workspace as `actor_for`'s actor, lists the workspace's native files as JSON lines, and reads a file's words as kept, 8,000 characters a page.
+
 ## Storage protocols
 
 One protocol, `Storage`, covers everything a workspace persists ([ADR-0019](adr/0019-storage-protocol-and-workspace-handles.md)). Every method but `workspaces` takes a `Scope` (tenant and workspace); `Workspace` handles hold the scope so application code never passes it. `workspaces` lists a tenant's.

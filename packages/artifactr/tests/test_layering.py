@@ -177,14 +177,14 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "files": (
         {
             *("artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.fastapi"),
-            "artifactr.telemetry",
+            *("artifactr.telemetry", "artifactr.capabilities", "artifactr.commands"),
             "artifactr.files",
         },
         {
             *("pydantic", "pydantic_ai", "sqlalchemy", "alembic", "mcp", "anyio"),
             *("fastapi", "starlette", "uvicorn", "httpx"),
             *("lattice_core.sql", "lattice_core.integrations", "lattice_core.refusals"),
-            *("lattice_core.commands", "lattice_core.origins"),
+            *("lattice_core.commands", "lattice_core.origins", "lattice_core.capabilities"),
             *("FreeCAD", "Part", "Sketcher", "TechDraw", "PIL"),
             *("zstandard", "bpy", "bmesh", "mathutils"),
         },

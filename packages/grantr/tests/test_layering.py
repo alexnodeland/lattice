@@ -57,6 +57,7 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
             "lattice_core.approvals",
             "lattice_core.bindings",
             "lattice_core.capabilities",
+            "lattice_core.commands",
         },
     ),
     "sql": (

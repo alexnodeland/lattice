@@ -19,6 +19,8 @@ portalr's design is [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md), and 
 
 An application mounts `portalr_router(resolve_actor=, grants=, readers=, invite=, site=, people=)` at `/portalr` ([ADR-0011](adr/0011-the-router-and-its-readers.md)). `grants` is grantr's `Grants`, with portalr's catalog, `portalr.actions.ACTIONS`, among its catalogs: grantr's roles give a tenant's owners and admins its reads, and operators the deployment's.
 
+Each route under `/portalr` says in the document's `x-lattice-command` the command it calls, or why it calls none: `config.json`, a person's own analytics consent and session, the analytics relay, people's emails and the models a turn may use are no commands. lattice's parity test holds them to the catalogs (lattice [ADR-0042](../adr/0042-parity-every-operation-names-its-command-and-one-test-holds-the-catalogs-to-grantr.md)).
+
 | Route | Answers | Needs |
 |---|---|---|
 | `/portalr/app/`, `/portalr/admin/` | The built UIs: hashed assets cached for good, the index for every client-side route, a strict Content-Security-Policy | Nothing |

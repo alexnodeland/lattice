@@ -387,6 +387,8 @@ Every surface is a thin adapter: it authenticates, opens the workspace for the c
 | REST | `artifactr.fastapi` | The same command frames at `POST .../commands`, and reads of artifacts, revisions, the log (a window of it, for some threads, from its start or its end), threads, proposals and runs. |
 | MCP | `artifactr.mcp` | External agents join as `ExternalAgentActor`s: artifacts are resources at `artifactr://{tenant}/{workspace}/artifacts/{id}`, commands are tools that take an optional `command_id`, REST's reads (artifacts, revisions, the log, threads, proposals and runs) are tools too, and artifact changes become resource-updated notifications on the server's `SubscriptionBus`. |
 
+Each REST operation, native files' and diagrams' too, says in the document's `x-lattice-command` the command it calls, the member of its body that carries command frames, or why it calls none: native files' upload and check-out, whose commands come in 0.3.x (#924), and the stream's own subscriptions, `watch_run`, `watch_artifact` and `unwatch_artifact`, which `POST .../commands` refuses. lattice's parity test holds them to the catalogs (lattice [ADR-0042](../adr/0042-parity-every-operation-names-its-command-and-one-test-holds-the-catalogs-to-grantr.md)).
+
 ```python
 app = FastAPI(lifespan=lifespan)
 app.include_router(artifactr_router(workspaces, runner, resolve_actor=resolve_actor), prefix="/v1")

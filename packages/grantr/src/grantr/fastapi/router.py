@@ -69,6 +69,7 @@ from lattice_core.approvals import (
 from lattice_core.approvals import Subject as Answerer
 from lattice_core.bindings import Binding, Trust
 from lattice_core.capabilities import Scope
+from lattice_core.commands import calls, calls_none
 
 
 class Caller(NamedTuple):
@@ -426,7 +427,11 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
             raise _refusal("not_found", f"no approval {id}")
         return approval
 
-    @router.get("/catalog", dependencies=[current])
+    @router.get(
+        "/catalog",
+        dependencies=[current],
+        openapi_extra=calls_none("the deployment's built-in roles, which any caller may read"),
+    )
     async def catalog() -> CatalogView:
         """The built-in roles a tenant's admins grant, and what a custom role may hold.
 
@@ -435,7 +440,7 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         """
         return grants.catalog()
 
-    @router.get("/me")
+    @router.get("/me", openapi_extra=calls_none("the caller's own roles and memberships"))
     async def me(x_tenant: TenantHeader = None, who: Caller = current) -> Me | Memberships:
         """The caller in the tenant ``X-Tenant`` names, or every tenant they are a member of.
 
@@ -451,7 +456,12 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
             workspaces=await grants.workspaces(tenant, member),
         )
 
-    @router.post("/checks")
+    @router.post(
+        "/checks",
+        openapi_extra=calls_none(
+            "asks what the caller may do; each command is checked again when it arrives"
+        ),
+    )
     async def checks(
         questions: Annotated[list[Check], Body(max_length=MAX_CHECKS)],
         x_tenant: TenantHeader = None,
@@ -467,32 +477,32 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
             for question in questions
         ]
 
-    @router.get("/tenants")
+    @router.get("/tenants", openapi_extra=calls("portalr.list_deployment_tenants"))
     async def list_tenants(who: Caller = current) -> list[TenantId]:
         """Every tenant, for an operator."""
         return await _or_http(grants.tenants(by=who.subject))
 
-    @router.post("/tenants", status_code=201)
+    @router.post("/tenants", status_code=201, openapi_extra=calls("portalr.create_tenant"))
     async def create_tenant(body: NewTenant, who: Caller = current) -> AuditEntry:
         """Create a tenant, with its first owner."""
         return await _or_http(grants.create_tenant(body.tenant, owner=body.owner, by=who.subject))
 
-    @router.delete("/tenants/{tenant}")
+    @router.delete("/tenants/{tenant}", openapi_extra=calls("grantr.delete_tenant"))
     async def delete_tenant(tenant: TenantId, who: Caller = current) -> AuditEntry:
         """Delete a tenant, and everything grantr holds for it but its audit log."""
         return await _or_http(grants.delete_tenant(tenant, by=by(tenant, who)))
 
-    @router.put("/operators/{user}")
+    @router.put("/operators/{user}", openapi_extra=calls("grantr.grant_operator"))
     async def grant_operator(user: UserId, who: Caller = current) -> AuditEntry:
         """Make a user an operator of the deployment."""
         return await _or_http(grants.grant_operator(user, by=who.subject))
 
-    @router.delete("/operators/{user}")
+    @router.delete("/operators/{user}", openapi_extra=calls("grantr.revoke_operator"))
     async def revoke_operator(user: UserId, who: Caller = current) -> AuditEntry:
         """Stop a user being an operator."""
         return await _or_http(grants.revoke_operator(user, by=who.subject))
 
-    @router.get("/audit")
+    @router.get("/audit", openapi_extra=calls("grantr.read_audit"))
     async def deployment_audit(
         keep: Kept,
         after_seq: AfterSeq = 0,
@@ -520,7 +530,7 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
             )
         )
 
-    @router.get("/tenants/{tenant}/audit")
+    @router.get("/tenants/{tenant}/audit", openapi_extra=calls("grantr.read_audit"))
     async def tenant_audit(
         tenant: TenantId,
         keep: Kept,
@@ -549,23 +559,30 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
             )
         )
 
-    @router.get("/tenants/{tenant}/members")
+    @router.get("/tenants/{tenant}/members", openapi_extra=calls("grantr.list_members"))
     async def list_members(tenant: TenantId, who: Caller = current) -> list[Member]:
         """A tenant's members."""
         return await _or_http(grants.members(tenant, by=by(tenant, who)))
 
-    @router.post("/tenants/{tenant}/members", status_code=201)
+    @router.post(
+        "/tenants/{tenant}/members", status_code=201, openapi_extra=calls("grantr.add_member")
+    )
     async def add_member(tenant: TenantId, body: NewMember, who: Caller = current) -> AuditEntry:
         """Add a user or service principal to a tenant."""
         return await _or_http(grants.add_member(tenant, body.member, by=by(tenant, who)))
 
-    @router.delete("/tenants/{tenant}/members/user/{member_id}")
+    @router.delete(
+        "/tenants/{tenant}/members/user/{member_id}", openapi_extra=calls("grantr.remove_member")
+    )
     async def remove_user(tenant: TenantId, member_id: UserId, who: Caller = current) -> AuditEntry:
         """Remove a user, with their grants and their places in groups."""
         member = User(id=member_id)
         return await _or_http(grants.remove_member(tenant, member, by=by(tenant, who)))
 
-    @router.delete("/tenants/{tenant}/members/service_principal/{member_id}")
+    @router.delete(
+        "/tenants/{tenant}/members/service_principal/{member_id}",
+        openapi_extra=calls("grantr.remove_member"),
+    )
     async def remove_principal(
         tenant: TenantId, member_id: PrincipalId, who: Caller = current
     ) -> AuditEntry:
@@ -573,7 +590,7 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         member = ServicePrincipal(id=member_id)
         return await _or_http(grants.remove_member(tenant, member, by=by(tenant, who)))
 
-    @router.get("/tenants/{tenant}/groups")
+    @router.get("/tenants/{tenant}/groups", openapi_extra=calls("grantr.list_groups"))
     async def list_groups(tenant: TenantId, who: Caller = current) -> dict[str, list[Member]]:
         """A tenant's groups, by id, with their members."""
         groups = await _or_http(grants.groups(tenant, by=by(tenant, who)))
@@ -582,7 +599,7 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
             for group, members in sorted(groups.items())
         }
 
-    @router.put("/tenants/{tenant}/groups/{group}")
+    @router.put("/tenants/{tenant}/groups/{group}", openapi_extra=calls("grantr.define_group"))
     async def define_group(
         tenant: TenantId, group: str, body: GroupMembers, who: Caller = current
     ) -> AuditEntry:
@@ -592,17 +609,17 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
             grants.define_group(tenant, Group(id=group), members, by=by(tenant, who))
         )
 
-    @router.delete("/tenants/{tenant}/groups/{group}")
+    @router.delete("/tenants/{tenant}/groups/{group}", openapi_extra=calls("grantr.delete_group"))
     async def delete_group(tenant: TenantId, group: str, who: Caller = current) -> AuditEntry:
         """Delete a group, with its grants."""
         return await _or_http(grants.delete_group(tenant, Group(id=group), by=by(tenant, who)))
 
-    @router.get("/tenants/{tenant}/roles")
+    @router.get("/tenants/{tenant}/roles", openapi_extra=calls("grantr.list_roles"))
     async def list_roles(tenant: TenantId, who: Caller = current) -> list[Role]:
         """A tenant's custom roles."""
         return await _or_http(grants.roles(tenant, by=by(tenant, who)))
 
-    @router.put("/tenants/{tenant}/roles/{name}")
+    @router.put("/tenants/{tenant}/roles/{name}", openapi_extra=calls("grantr.define_role"))
     async def define_role(
         tenant: TenantId, name: str, body: RoleActions, who: Caller = current
     ) -> AuditEntry:
@@ -610,54 +627,60 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         role = Role(name=name, actions=frozenset(body.actions))
         return await _or_http(grants.define_role(tenant, role, by=by(tenant, who)))
 
-    @router.delete("/tenants/{tenant}/roles/{name}")
+    @router.delete("/tenants/{tenant}/roles/{name}", openapi_extra=calls("grantr.delete_role"))
     async def delete_role(tenant: TenantId, name: str, who: Caller = current) -> AuditEntry:
         """Delete a custom role, with its grants."""
         return await _or_http(grants.delete_role(tenant, name, by=by(tenant, who)))
 
-    @router.get("/tenants/{tenant}/grants")
+    @router.get("/tenants/{tenant}/grants", openapi_extra=calls("grantr.list_grants"))
     async def list_grants(
         tenant: TenantId, workspace: WorkspaceId | None = None, who: Caller = current
     ) -> list[Grant]:
         """Every grant in a tenant, or on a workspace and the items in it."""
         return await _or_http(grants.grants_in(tenant, by=by(tenant, who), workspace=workspace))
 
-    @router.post("/tenants/{tenant}/grants", status_code=201)
+    @router.post(
+        "/tenants/{tenant}/grants",
+        status_code=201,
+        openapi_extra=calls("grantr.grant", "grantr.grant_on_tenant"),
+    )
     async def grant(tenant: TenantId, body: GrantRequest, who: Caller = current) -> AuditEntry:
         """Grant a role on a resource."""
         return await _or_http(
             grants.grant(tenant, body.role, on=body.on, to=body.to, by=by(tenant, who))
         )
 
-    @router.post("/tenants/{tenant}/revocations")
+    @router.post("/tenants/{tenant}/revocations", openapi_extra=calls("grantr.revoke"))
     async def revoke(tenant: TenantId, body: GrantRequest, who: Caller = current) -> AuditEntry:
         """Revoke a grant."""
         return await _or_http(
             grants.revoke(tenant, body.role, on=body.on, to=body.to, by=by(tenant, who))
         )
 
-    @router.get("/tenants/{tenant}/restrictions")
+    @router.get("/tenants/{tenant}/restrictions", openapi_extra=calls("grantr.list_restrictions"))
     async def list_restrictions(
         tenant: TenantId, workspace: WorkspaceId, who: Caller = current
     ) -> list[Resource]:
         """The threads and artifacts restricted in a workspace."""
         return await _or_http(grants.restrictions(tenant, workspace, by=by(tenant, who)))
 
-    @router.post("/tenants/{tenant}/restrictions")
+    @router.post("/tenants/{tenant}/restrictions", openapi_extra=calls("grantr.restrict"))
     async def restrict(tenant: TenantId, body: Restriction, who: Caller = current) -> AuditEntry:
         """Restrict a thread or artifact, or lift its restriction."""
         return await _or_http(
             grants.restrict(tenant, body.on, restricted=body.restricted, by=by(tenant, who))
         )
 
-    @router.get("/tenants/{tenant}/integrations")
+    @router.get("/tenants/{tenant}/integrations", openapi_extra=calls("grantr.list_integrations"))
     async def tenant_integrations(
         tenant: TenantId, who: Caller = current
     ) -> list[IntegrationState]:
         """Every integration as it is set on a tenant, and whether it is on where unset."""
         return await _or_http(grants.integrations(tenant, by=by(tenant, who)))
 
-    @router.put("/tenants/{tenant}/integrations/{key}")
+    @router.put(
+        "/tenants/{tenant}/integrations/{key}", openapi_extra=calls("grantr.set_integration")
+    )
     async def set_tenant_integration(
         tenant: TenantId, key: str, body: IntegrationSwitch, who: Caller = current
     ) -> IntegrationState:
@@ -669,14 +692,20 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
 
     # A workspace's id may hold a slash, as a path does. Each route below ends in segments of
     # its own, and a key holds no slash, so a path matches one of them, however the id reads.
-    @router.get("/tenants/{tenant}/workspaces/{workspace:path}/integrations")
+    @router.get(
+        "/tenants/{tenant}/workspaces/{workspace:path}/integrations",
+        openapi_extra=calls("grantr.list_integrations"),
+    )
     async def workspace_integrations(
         tenant: TenantId, workspace: WorkspaceId, who: Caller = current
     ) -> list[IntegrationState]:
         """Every integration as it is set in a workspace and on its tenant, and whether it is on."""
         return await _or_http(grants.integrations(tenant, workspace=workspace, by=by(tenant, who)))
 
-    @router.put("/tenants/{tenant}/workspaces/{workspace:path}/integrations/{key}")
+    @router.put(
+        "/tenants/{tenant}/workspaces/{workspace:path}/integrations/{key}",
+        openapi_extra=calls("grantr.set_integration"),
+    )
     async def set_workspace_integration(
         tenant: TenantId,
         workspace: WorkspaceId,
@@ -692,14 +721,19 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
             grants.set_integration(tenant, key, body.on, workspace=workspace, by=by(tenant, who))
         )
 
-    @router.get("/tenants/{tenant}/workspaces/{workspace:path}/enabled-integrations")
+    @router.get(
+        "/tenants/{tenant}/workspaces/{workspace:path}/enabled-integrations",
+        openapi_extra=calls_none(
+            "whether each integration is on, for whoever can open the workspace: asked as its open"
+        ),
+    )
     async def enabled_integrations(
         tenant: TenantId, workspace: WorkspaceId, who: Caller = current
     ) -> dict[str, bool]:
         """Whether each integration is on in a workspace, by key, for whoever can open it."""
         return await _or_http(grants.integrations_enabled(tenant, workspace, by=by(tenant, who)))
 
-    @router.get("/tenants/{tenant}/settings")
+    @router.get("/tenants/{tenant}/settings", openapi_extra=calls("grantr.list_settings"))
     async def tenant_settings(tenant: TenantId, who: Caller = current) -> SettingsView:
         """Every setting as it is narrowed on a tenant: each layer, the ceiling, the outcome."""
         return await _or_http(grants.settings(tenant, by=by(tenant, who)))
@@ -730,7 +764,7 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
     workspace_manager = Depends(manages_workspace)
     version_named = Depends(named_version)
 
-    @router.put("/tenants/{tenant}/settings/{key}")
+    @router.put("/tenants/{tenant}/settings/{key}", openapi_extra=calls("grantr.set_setting"))
     async def set_tenant_setting(
         tenant: TenantId,
         key: str,
@@ -752,14 +786,20 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         response.headers["ETag"] = f'"{state.version}"'
         return state
 
-    @router.get("/tenants/{tenant}/workspaces/{workspace:path}/settings")
+    @router.get(
+        "/tenants/{tenant}/workspaces/{workspace:path}/settings",
+        openapi_extra=calls("grantr.list_settings"),
+    )
     async def workspace_settings(
         tenant: TenantId, workspace: WorkspaceId, who: Caller = current
     ) -> SettingsView:
         """Every setting as it is narrowed in a workspace and on its tenant, and the outcome."""
         return await _or_http(grants.settings(tenant, workspace=workspace, by=by(tenant, who)))
 
-    @router.put("/tenants/{tenant}/workspaces/{workspace:path}/settings/{key}")
+    @router.put(
+        "/tenants/{tenant}/workspaces/{workspace:path}/settings/{key}",
+        openapi_extra=calls("grantr.set_setting"),
+    )
     async def set_workspace_setting(
         tenant: TenantId,
         workspace: WorkspaceId,
@@ -778,25 +818,25 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         response.headers["ETag"] = f'"{state.version}"'
         return state
 
-    @router.get("/tenants/{tenant}/keys")
+    @router.get("/tenants/{tenant}/keys", openapi_extra=calls("grantr.list_keys"))
     async def list_keys(tenant: TenantId, who: Caller = current) -> list[KeyView]:
         """A tenant's keys: their ids and principals, never their secrets."""
         keys = await _or_http(grants.keys(tenant, by=by(tenant, who)))
         return [KeyView(id=key.id, principal=key.principal) for key in keys]
 
-    @router.post("/tenants/{tenant}/keys", status_code=201)
+    @router.post("/tenants/{tenant}/keys", status_code=201, openapi_extra=calls("grantr.issue_key"))
     async def issue_key(tenant: TenantId, body: NewKey, who: Caller = current) -> IssuedKey:
         """Issue a key for a service principal. The key is in this response, and nowhere else."""
         principal = ServicePrincipal(id=body.principal)
         key, entry = await _or_http(grants.issue_key(tenant, principal, by=by(tenant, who)))
         return IssuedKey(key=key, entry=entry)
 
-    @router.delete("/tenants/{tenant}/keys/{key_id}")
+    @router.delete("/tenants/{tenant}/keys/{key_id}", openapi_extra=calls("grantr.revoke_key"))
     async def revoke_key(tenant: TenantId, key_id: str, who: Caller = current) -> AuditEntry:
         """Revoke a key."""
         return await _or_http(grants.revoke_key(tenant, key_id, by=by(tenant, who)))
 
-    @router.get("/tenants/{tenant}/approvals")
+    @router.get("/tenants/{tenant}/approvals", openapi_extra=calls("grantr.list_approvals"))
     async def list_approvals(
         tenant: TenantId,
         workspace: Annotated[
@@ -815,7 +855,9 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
             )
         return [_view(approval) for approval in asked]
 
-    @router.get("/tenants/{tenant}/approvals/{approval}")
+    @router.get(
+        "/tenants/{tenant}/approvals/{approval}", openapi_extra=calls("grantr.read_approval")
+    )
     async def read_approval(
         tenant: TenantId, approval: ApprovalId, who: Caller = current
     ) -> ApprovalView:
@@ -825,7 +867,10 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         """
         return _view(await shown(tenant, approval, await answerer(tenant, who)))
 
-    @router.post("/tenants/{tenant}/approvals/{approval}/answer")
+    @router.post(
+        "/tenants/{tenant}/approvals/{approval}/answer",
+        openapi_extra=calls("grantr.answer_approval"),
+    )
     async def answer_approval(
         tenant: TenantId, approval: ApprovalId, body: ApprovalAnswer, who: Caller = current
     ) -> ApprovalView:
@@ -854,7 +899,7 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         except DigestMismatch as error:
             raise _refusal("version_conflict", str(error)) from error
 
-    @router.get("/tenants/{tenant}/bindings")
+    @router.get("/tenants/{tenant}/bindings", openapi_extra=calls("grantr.list_bindings"))
     async def list_bindings(
         tenant: TenantId,
         workspace: Annotated[
@@ -870,7 +915,7 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
         bindings = grants.bindings()
         return await _or_http(bindings.listed(tenant, by=by(tenant, who), workspace=workspace))
 
-    @router.post("/tenants/{tenant}/bindings", status_code=201)
+    @router.post("/tenants/{tenant}/bindings", status_code=201, openapi_extra=calls("grantr.bind"))
     async def bind(tenant: TenantId, body: NewBinding, who: Caller = current) -> AuditEntry:
         """Bind a source's connection to one of the tenant's workspaces."""
         return await _or_http(
@@ -887,7 +932,7 @@ def grantr_router(grants: Grants, *, resolve_actor: ResolveActor) -> APIRouter:
             )
         )
 
-    @router.delete("/tenants/{tenant}/bindings/{binding}")
+    @router.delete("/tenants/{tenant}/bindings/{binding}", openapi_extra=calls("grantr.unbind"))
     async def unbind(tenant: TenantId, binding: str, who: Caller = current) -> AuditEntry:
         """Remove one of the tenant's bindings; the operator's are the deployment's to change."""
         return await _or_http(grants.bindings().unbind(tenant, binding, by=by(tenant, who)))

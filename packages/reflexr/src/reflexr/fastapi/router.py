@@ -8,6 +8,7 @@ from opentelemetry import trace
 from pydantic import BaseModel, ConfigDict
 from starlette.requests import HTTPConnection
 
+from lattice_core.commands import calls, carries_frames
 from lattice_core.refusals import Refused, refusals
 from reflexr.core import (
     Actor,
@@ -137,6 +138,7 @@ def reflexr_router(
             status: {"model": CommandResult | Refused, "description": "Refused, or rejected"}
             for status in STATUS_CODES.values()
         },
+        openapi_extra=carries_frames("command"),
     )
     async def post_command(
         frame: CommandFrame, response: Response, workspace: Workspace = current_workspace
@@ -147,7 +149,7 @@ def reflexr_router(
             response.status_code = STATUS_CODES.get(str(result.rejection["type"]), 400)
         return result
 
-    @router.post("/workspaces/{workspace_id}/events")
+    @router.post("/workspaces/{workspace_id}/events", openapi_extra=calls("reflexr.publish_event"))
     async def post_events(
         body: PublishItem | PublishBatch, workspace: Workspace = current_workspace
     ) -> list[PublishedOutcome]:
@@ -165,7 +167,7 @@ def reflexr_router(
             for p in published
         ]
 
-    @router.get("/workspaces/{workspace_id}/events")
+    @router.get("/workspaces/{workspace_id}/events", openapi_extra=calls("reflexr.read_events"))
     async def list_events(
         after_seq: Count = 0,
         before_seq: Count | None = None,
@@ -185,13 +187,13 @@ def reflexr_router(
             )
         )
 
-    @router.get("/rules")
+    @router.get("/rules", openapi_extra=calls("reflexr.list_rules"))
     async def list_rules(request: Request) -> list[Rule]:
         """Return the rules registered in code, which every workspace evaluates."""
         tenant_id, actor = await _or_http(_authenticate(request))
         return await _or_http(workspaces.rules_for(tenant_id, actor=actor))
 
-    @router.get("/workspaces/{workspace_id}/rules")
+    @router.get("/workspaces/{workspace_id}/rules", openapi_extra=calls("reflexr.rule_status"))
     async def list_rule_status(workspace: Workspace = current_workspace) -> list[RuleStatus]:
         """Return the status of each of the workspace's rules, code rules first.
 
@@ -200,12 +202,15 @@ def reflexr_router(
         """
         return await _or_http(workspace.rule_statuses())
 
-    @router.get("/workspaces/{workspace_id}/rules/{rule}")
+    @router.get("/workspaces/{workspace_id}/rules/{rule}", openapi_extra=calls("reflexr.get_rule"))
     async def get_rule(rule: PathId, workspace: Workspace = current_workspace) -> WorkspaceRule:
         """Return one of the workspace's rules, with a stored rule's version and provenance."""
         return await _or_http(workspace.get_rule(rule))
 
-    @router.get("/workspaces/{workspace_id}/rules/{rule}/history")
+    @router.get(
+        "/workspaces/{workspace_id}/rules/{rule}/history",
+        openapi_extra=calls("reflexr.rule_history"),
+    )
     async def get_rule_history(
         rule: PathId, workspace: Workspace = current_workspace
     ) -> list[Envelope]:
@@ -215,7 +220,7 @@ def reflexr_router(
         """
         return await _or_http(workspace.rule_history(rule))
 
-    @router.get("/workspaces/{workspace_id}/runs")
+    @router.get("/workspaces/{workspace_id}/runs", openapi_extra=calls("reflexr.list_runs"))
     async def list_runs(
         rule: RuleName | None = None,
         scope_key: str | None = None,
@@ -228,19 +233,21 @@ def reflexr_router(
             workspace.runs(rule=rule, scope_key=scope_key, status=status, limit=limit)
         )
 
-    @router.get("/workspaces/{workspace_id}/runs/{run_id}")
+    @router.get("/workspaces/{workspace_id}/runs/{run_id}", openapi_extra=calls("reflexr.get_run"))
     async def get_run(run_id: PathId, workspace: Workspace = current_workspace) -> Run:
         """Return a run, with its attempts, last error and checkpoint."""
         return await _or_http(workspace.run(run_id))
 
-    @router.get("/workspaces/{workspace_id}/dead-letters")
+    @router.get(
+        "/workspaces/{workspace_id}/dead-letters", openapi_extra=calls("reflexr.list_dead_letters")
+    )
     async def list_dead_letters(
         rule: RuleName | None = None, workspace: Workspace = current_workspace
     ) -> list[EvaluationError]:
         """Return the envelopes rules could not evaluate, oldest first."""
         return await _or_http(workspace.dead_letters(rule=rule))
 
-    @router.get("/schedules")
+    @router.get("/schedules", openapi_extra=calls("reflexr.schedule_status"))
     async def list_schedules(request: Request) -> list[Schedule]:
         """Return the registered schedules that tick in the caller's tenant.
 
@@ -250,7 +257,9 @@ def reflexr_router(
         tenant_id, actor = await _or_http(_authenticate(request))
         return await _or_http(workspaces.schedules_for(tenant_id, actor=actor))
 
-    @router.get("/workspaces/{workspace_id}/schedules")
+    @router.get(
+        "/workspaces/{workspace_id}/schedules", openapi_extra=calls("reflexr.schedule_status")
+    )
     async def list_schedule_status(
         workspace: Workspace = current_workspace,
     ) -> list[ScheduleStatus]:

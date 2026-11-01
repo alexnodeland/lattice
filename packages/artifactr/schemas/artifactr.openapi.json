@@ -3211,7 +3211,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Workspaces"
+        "summary": "List Workspaces",
+        "x-lattice-command": "artifactr.list_workspaces"
       }
     },
     "/workspaces/{workspace_id}/artifacts": {
@@ -3326,7 +3327,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Artifacts"
+        "summary": "List Artifacts",
+        "x-lattice-command": "artifactr.list_artifacts"
       }
     },
     "/workspaces/{workspace_id}/artifacts/{artifact_id}": {
@@ -3425,7 +3427,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Get Artifact"
+        "summary": "Get Artifact",
+        "x-lattice-command": "artifactr.read_artifact"
       }
     },
     "/workspaces/{workspace_id}/artifacts/{artifact_id}/revisions": {
@@ -3530,7 +3533,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Revisions"
+        "summary": "List Revisions",
+        "x-lattice-command": "artifactr.list_revisions"
       }
     },
     "/workspaces/{workspace_id}/commands": {
@@ -3671,7 +3675,15 @@
             "description": "Refused, or rejected"
           }
         },
-        "summary": "Post Command"
+        "summary": "Post Command",
+        "x-lattice-command": {
+          "frames": "command",
+          "none": {
+            "unwatch_artifact": "presence with an artifact open, which the stream alone carries: refused here",
+            "watch_artifact": "presence with an artifact open, which the stream alone carries: refused here",
+            "watch_run": "a run's live frames, which the stream alone sends: refused here"
+          }
+        }
       }
     },
     "/workspaces/{workspace_id}/events": {
@@ -3851,7 +3863,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Events"
+        "summary": "List Events",
+        "x-lattice-command": "artifactr.read_events"
       }
     },
     "/workspaces/{workspace_id}/proposals": {
@@ -3968,7 +3981,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Proposals"
+        "summary": "List Proposals",
+        "x-lattice-command": "artifactr.list_proposals"
       }
     },
     "/workspaces/{workspace_id}/runs/{run_id}": {
@@ -4069,7 +4083,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Get Run"
+        "summary": "Get Run",
+        "x-lattice-command": "artifactr.read_run"
       }
     },
     "/workspaces/{workspace_id}/threads": {
@@ -4164,7 +4179,8 @@
             "description": "Refused"
           }
         },
-        "summary": "List Threads"
+        "summary": "List Threads",
+        "x-lattice-command": "artifactr.list_threads"
       }
     },
     "/workspaces/{workspace_id}/threads/{thread_id}": {
@@ -4265,7 +4281,8 @@
             "description": "Refused"
           }
         },
-        "summary": "Get Thread"
+        "summary": "Get Thread",
+        "x-lattice-command": "artifactr.read_thread"
       }
     }
   }

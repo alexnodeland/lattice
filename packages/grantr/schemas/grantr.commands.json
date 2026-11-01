@@ -1364,6 +1364,52 @@
       ],
       "toolset": "admin"
     },
+    "grantr.list_restrictions": {
+      "capability": {
+        "description": "List the threads and artifacts restricted in a workspace.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:restrict",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "workspace": {
+              "description": "The workspace whose restricted threads and artifacts to list.",
+              "minLength": 1,
+              "title": "Workspace",
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_restrictions",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": null,
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
     "grantr.list_roles": {
       "capability": {
         "description": "List the tenant's custom roles and the actions each holds.",

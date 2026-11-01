@@ -41,7 +41,8 @@ EXPECTED: dict[str, tuple[str, str]] = {
     ),
     "grantr": (
         "its store of approvals imports lattice_core.approvals, which lattice-core-ai 0.2.0, the"
-        " newest on PyPI, lacks: its floor rises to 0.3.0 once that is published",
+        " newest on PyPI, lacks: its floor rises to 0.6.0, the first with Approvals.take, once"
+        " that is published",
         "No module named 'lattice_core.approvals'",
     ),
 }

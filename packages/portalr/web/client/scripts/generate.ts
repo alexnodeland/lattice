@@ -39,6 +39,18 @@ const SCHEMAS = {
 /** lattice's integrations, each key's default and sentence, in the registry's order (ADR-0045). */
 const INTEGRATIONS = "packages/portalr/schemas/integrations.json";
 
+/**
+ * The libraries' command catalogs, each written by its package's `schema` task (lattice ADR-0041):
+ * every action a person can take in portalr is one of their commands (lattice RFC-0014).
+ */
+const CATALOGS = [
+  "packages/artifactr/schemas/artifactr.commands.json",
+  "packages/grantr/schemas/grantr.commands.json",
+  "packages/portalr/schemas/portalr.commands.json",
+  "packages/reflexr/schemas/reflexr.commands.json",
+  "packages/relayr/schemas/relayr.commands.json",
+] as const;
+
 /** Keywords that describe a value without constraining it. */
 const ANNOTATIONS = new Set([
   "$comment",
@@ -93,6 +105,23 @@ function integrations(text: string): string {
   );
 }
 
+/**
+ * Every command's name, from the catalogs, as a constant and the union of its names, so a name
+ * that is no command fails `tsc` (lattice RFC-0014).
+ */
+export function commands(catalogs: readonly string[]): string {
+  const names = catalogs
+    .flatMap((text) => Object.keys((JSON.parse(text) as { commands: object }).commands))
+    .sort();
+  return (
+    `${HEADER}${CATALOGS.map((source) => `// ${source}\n`).join("")}\n` +
+    "/** Every command of lattice's catalogs, by name, `<package>.<name>`, sorted. */\n" +
+    `export const COMMANDS = [\n${names.map((name) => `  ${JSON.stringify(name)},\n`).join("")}] as const;\n\n` +
+    "/** A command's name: one the catalogs declare, or `tsc` fails. */\n" +
+    "export type CommandName = (typeof COMMANDS)[number];\n"
+  );
+}
+
 /** Every generated file, by name, as it should read. */
 export async function generate(): Promise<Record<string, string>> {
   const files: Record<string, string> = {};
@@ -111,6 +140,8 @@ export async function generate(): Promise<Record<string, string>> {
     files[name] = `${HEADER}// ${source}\n\n${types}`;
   }
   files["integrations.ts"] = integrations(await readFile(join(root, INTEGRATIONS), "utf8"));
+  const catalogs = CATALOGS.map((source) => readFile(join(root, source), "utf8"));
+  files["commands.ts"] = commands(await Promise.all(catalogs));
   return files;
 }
 

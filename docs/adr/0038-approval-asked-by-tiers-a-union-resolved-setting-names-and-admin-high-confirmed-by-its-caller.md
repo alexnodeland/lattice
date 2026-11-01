@@ -1,6 +1,6 @@
 # ADR-0038: Approval asked by the tiers a union-resolved setting names, and admin_high confirmed by its caller
 
-**Status:** Accepted
+**Status:** Accepted, amended 2026-11-01 (see Amendment)
 **Date:** 2026-11-01
 **Deciders:** Alex Nodeland
 **Implements:** [RFC-0011](../rfcs/0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s O5 and O15; amends [ADR-0030](0030-settings-typed-declared-in-lattice-core-and-only-narrowed-below.md); beside [ADR-0035](0035-one-approval-per-call-bound-to-its-arguments-declared-in-lattice-core-and-stored-by-grantr.md) and [ADR-0037](0037-the-enforcement-path-in-lattice-core-refusals-by-step-approvals-resumed-by-id.md)
@@ -77,4 +77,12 @@ Option A keeps one rule for every setting: a lower layer narrows. A new tier is 
 
 1. [x] `Superset`, `approve:tiers`, `admin_high_approvers` and `SettingsPolicy`, tested; grantr's wire type and refusal, and portalr's control.
 2. [ ] portalr's confirm page, answering a confirmation on `portalr:confirm`.
-3. [ ] The `approve-within` setting, read by the enforcer for an approval's deadline.
+3. [x] The `approve-within` setting, read by the enforcer for an approval's deadline (see Amendment).
+
+## Amendment (2026-11-01)
+
+An approval's deadline is the setting `approve-within`, in `KNOWN_SETTINGS`, as RFC-0011 decided:
+
+- **An `IntRange` of minutes, from 5 to 10,080 (a week), a day by default,** set at every layer. A lower layer may only shorten it, so the operator's value is the longest an approval waits anywhere. A store that can't be read answers its floor, 5 minutes, so an approval asked then never waits longer than a tenant or workspace may have chosen.
+- **The enforcer reads it for each approval it asks,** in the call's workspace, through the `Settings` it is given. A value that isn't a whole number raises, which refuses the call, as `SettingsPolicy` does with `approve:tiers`.
+- **The enforcer's `approve_within` stays, for settings that don't declare it** (the port's `KeyError`). An application whose registry has lattice's settings, as grantr's and the template's do, follows the setting, a day unless changed. One that passed its own `approve_within` sets the operator's `approve-within` instead.

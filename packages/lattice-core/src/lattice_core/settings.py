@@ -30,6 +30,7 @@ from lattice_core.integrations import KEY
 
 __all__ = [
     "APPROVE_TIERS",
+    "APPROVE_WITHIN",
     "CONNECTED_TOOLS",
     "CONNECTED_TOOL_RISKS",
     "KNOWN_SETTINGS",
@@ -387,12 +388,28 @@ _APPROVE_TIERS = Setting(
     },
 )
 
+APPROVE_WITHIN: Final = "approve-within"
+"""The setting that says how many minutes a new approval waits for an answer before it expires
+(lattice RFC-0011, ADR-0038's amendment)."""
+
+_APPROVE_WITHIN = Setting(
+    APPROVE_WITHIN,
+    IntRange(5, 10080),
+    default=1440,
+    lowest="workspace",
+    description=(
+        "How many minutes an approval waits for an answer before it expires and the call it"
+        " holds is refused; a tenant or workspace may only shorten it."
+    ),
+)
+
 KNOWN_SETTINGS: Final = registry(
     _per_hour("freecad", "FreeCAD"),
     _per_hour("blender", "Blender"),
     _tools("freecad", "FreeCAD"),
     _tools("blender", "Blender"),
     _APPROVE_TIERS,
+    _APPROVE_WITHIN,
 )
 """lattice's settings. A connected app vetted later adds its own ``connect-per-hour:<app>`` and
 ``connect-tools:<app>``; an application with ``admin_high`` capabilities adds

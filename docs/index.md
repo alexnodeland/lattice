@@ -26,9 +26,10 @@ Libraries for applications in which people and agents work together, and the sta
 | [grantr](grantr/index.md) | Identity and access for artifactr and reflexr: tenants, members, groups, roles and service principals, checked before every command and read |
 | [stackr](stackr/index.md) | The infrastructure the libraries run on, and an application template |
 | [portalr](portalr/index.md) | The portal into an application: an app UI to chat with its agents and see their artifacts, proposals and runs, and an admin UI to run it |
+| [portr](portr/index.md) | One gateway that serves lattice's commands to outside clients over MCP and ACP, each call through the enforcer; being built |
 | [lattice-core](lattice-core/index.md) | What the packages share and must keep identical: infrastructure each depends on and re-exports, never imported by an application |
 
-Every package is released: the libraries on PyPI, and stackr's images on GHCR. stackr's [hosting recipes](stackr/rfcs/0004-hosting-recipes.md) are being built.
+Every package is released, except portr, which is being built: the libraries on PyPI, and stackr's images on GHCR. stackr's [hosting recipes](stackr/rfcs/0004-hosting-recipes.md) are being built.
 
 lattice's mark is one cell of the lattice that every package's mark is drawn on. Its [brand page](assets/brand/README.md) has the mark, the colours and the brand system every package shares, and [ADR-0001](adr/0001-lattices-brand.md) records why.
 

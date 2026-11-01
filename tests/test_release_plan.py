@@ -70,6 +70,7 @@ def test_the_stages_follow_the_packages_own_requirements() -> None:
         "packages/grantr",
         "packages/relayr",
         "packages/portalr",
+        "packages/portr",
     }, "every package that ships a wheel is in a stage, and stackr is not"
 
 

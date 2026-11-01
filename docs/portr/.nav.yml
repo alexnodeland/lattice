@@ -1,0 +1,5 @@
+# portr's section of the site, in order. Paths are from docs/portr/.
+nav:
+- Home: index.md
+- Architecture: architecture.md
+- Reference: reference.md

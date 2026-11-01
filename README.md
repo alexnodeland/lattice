@@ -102,6 +102,7 @@ sequenceDiagram
 | **[relayr](packages/relayr)** | The bridge between artifactr and reflexr: chat events become events for rules, and runs act back in the chat. Rules can be drafted in chat. | ✅ released · 📦 [PyPI](https://pypi.org/project/relayr-ai/) |
 | **[grantr](packages/grantr)** | Identity and access: tenants, members, groups, roles, service principals and restricted items, checked before every command and read, with row-level security | ✅ released · 📦 [PyPI](https://pypi.org/project/grantr/) |
 | **[portalr](packages/portalr)** | The portal: an app UI to chat with agents and see their artifacts, proposals and runs, and an admin UI for access, feedback, traces and spend | ✅ released · 📦 [PyPI](https://pypi.org/project/portalr/) |
+| **[portr](packages/portr)** | One gateway that serves lattice's commands to outside clients (Claude, ChatGPT, Cursor, coding agents) over MCP and ACP, each call through the enforcer | 🚧 being built |
 | **[lattice-core](packages/lattice-core)** | What the packages share and must keep identical: infrastructure each depends on and re-exports, never imported by an application | 📦 [PyPI](https://pypi.org/project/lattice-core-ai/) |
 | **[stackr](packages/stackr)** | The stack the libraries run on (Supabase or PostgreSQL, LiteLLM, OpenTelemetry, Grafana, Langfuse), an application template, and hosting recipes | ✅ template · 🐳 [images on GHCR](https://github.com/alexnodeland/lattice/releases/tag/stackr-v0.1.0) · 🚧 [hosting recipes](docs/stackr/rfcs/0004-hosting-recipes.md) |
 

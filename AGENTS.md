@@ -4,7 +4,7 @@ Instructions for coding agents working in lattice. Humans read [CONTRIBUTING.md]
 
 ## What this repository is
 
-One repository: eight Python packages, two reference implementations, and the tools that check, release and document them ([docs/architecture.md](docs/architecture.md)).
+One repository: nine Python packages, two reference implementations, and the tools that check, release and document them ([docs/architecture.md](docs/architecture.md)).
 
 | Path | What it is |
 |---|---|
@@ -14,6 +14,7 @@ One repository: eight Python packages, two reference implementations, and the to
 | `packages/relayr/` | Carries events from artifactr (and task trackers) to reflexr |
 | `packages/grantr/` | Identity and access, checked before every command and read |
 | `packages/portalr/` | The portal: a Python package, and `web/`, its Bun workspace |
+| `packages/portr/` | The gateway: lattice's commands to outside clients over MCP and ACP, each call through the enforcer |
 | `packages/stackr/` | The stack (compose, deploy) and the copier application template |
 | `packages/lattice-core/` | What the libraries share and must keep identical |
 | `examples/` | `docplan` (artifactr's reference implementation) and `oncall` (reflexr's) |

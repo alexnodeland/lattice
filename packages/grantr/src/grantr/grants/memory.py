@@ -15,6 +15,7 @@ from grantr.core import (
     AuditEntry,
     AuditEvent,
     AuditFilter,
+    Connection,
     Grant,
     Grantee,
     Group,
@@ -55,6 +56,10 @@ class _Data:
         default_factory=dict[tuple[TenantId, str], Role]
     )
     keys: dict[str, Key] = field(default_factory=dict[str, Key])
+    connections: dict[tuple[TenantId, str], Connection] = field(
+        default_factory=dict[tuple[TenantId, str], Connection]
+    )
+    """Each connection, by tenant and id, in the order made."""
     items: dict[tuple[TenantId, Resource], bool] = field(
         default_factory=dict[tuple[TenantId, Resource], bool]
     )
@@ -189,6 +194,20 @@ class _Reads:
             and connection in (None, binding.connection)
         ]
 
+    async def connections(
+        self, tenant: TenantId, *, user: UserId | None = None, client: str | None = None
+    ) -> list[Connection]:
+        return [
+            connection
+            for (t, _), connection in self._data.connections.items()
+            if t == tenant
+            and user in (None, connection.user.id)
+            and client in (None, connection.client.client_id)
+        ]
+
+    async def connection(self, tenant: TenantId, id: str) -> Connection | None:
+        return self._data.connections.get((tenant, id))
+
     async def settings(
         self, tenant: TenantId, workspace: WorkspaceId | None = None
     ) -> dict[str, SettingRow]:
@@ -243,6 +262,7 @@ class _Transaction(_Reads):
             settings={key: row for key, row in data.settings.items() if key[0] != tenant},
             approvals={key: a for key, a in data.approvals.items() if key[0] != tenant},
             bindings={key: b for key, b in data.bindings.items() if key[0] != tenant},
+            connections={key: c for key, c in data.connections.items() if key[0] != tenant},
         )
 
     async def add_grant(self, grant: Grant) -> None:
@@ -264,6 +284,11 @@ class _Transaction(_Reads):
                 key_id: key
                 for key_id, key in data.keys.items()
                 if key.tenant != tenant or key.principal != member
+            },
+            connections={
+                key: connection
+                for key, connection in data.connections.items()
+                if key[0] != tenant or connection.user != member
             },
         )
 
@@ -327,6 +352,10 @@ class _Transaction(_Reads):
             kept = {key: b for key, b in self._data.bindings.items() if key != (tenant, id)}
             self._data = replace(self._data, bindings=kept)
         return found
+
+    async def put_connection(self, connection: Connection) -> None:
+        key = (connection.tenant, connection.id)
+        self._data = replace(self._data, connections={**self._data.connections, key: connection})
 
     async def add_key(self, key: Key) -> None:
         self._data = replace(self._data, keys={**self._data.keys, key.id: key})

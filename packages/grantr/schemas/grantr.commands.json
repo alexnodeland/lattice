@@ -1156,6 +1156,60 @@
       ],
       "toolset": "admin"
     },
+    "grantr.list_connections": {
+      "capability": {
+        "description": "List the outside clients connected to the tenant that you may read, revoked ones too: your own, or every one if you add the tenant's members.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:read_connections",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "UserId": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false,
+          "properties": {
+            "user": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/UserId"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Only this person's; yours, or every one for an admin, if omitted."
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_connections",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/connections",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
     "grantr.list_grants": {
       "capability": {
         "description": "List the grants made in the tenant, or in one of its workspaces.",
@@ -1524,6 +1578,9 @@
                 "revoked",
                 "key_issued",
                 "key_revoked",
+                "connection_made",
+                "connection_toolsets_added",
+                "connection_revoked",
                 "restricted",
                 "unrestricted",
                 "integration_set",
@@ -2005,6 +2062,50 @@
       ],
       "toolset": "admin"
     },
+    "grantr.revoke_connection": {
+      "capability": {
+        "description": "Revoke one of your own connections at once: its next call is refused.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:revoke_connection",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "connection": {
+              "description": "The connection's id, such as ``con_0123456789abcdef``.",
+              "minLength": 1,
+              "title": "Connection",
+              "type": "string"
+            }
+          },
+          "required": [
+            "connection"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.revoke_connection",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "irreversible",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/connections",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
     "grantr.revoke_key": {
       "capability": {
         "description": "Revoke a key at once: whatever holds it is refused. It asks your confirmation.",
@@ -2041,6 +2142,50 @@
       "exposure": "tool",
       "resource": null,
       "route": "/portalr/admin/t/{tenant}/access/keys",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.revoke_member_connection": {
+      "capability": {
+        "description": "Revoke another member's connection at once, if you add the tenant's members: its next call is refused. It asks your confirmation.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:revoke_connection",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "connection": {
+              "description": "The connection's id, such as ``con_0123456789abcdef``.",
+              "minLength": 1,
+              "title": "Connection",
+              "type": "string"
+            }
+          },
+          "required": [
+            "connection"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.revoke_member_connection",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "irreversible",
+        "risk_class": "admin_high",
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/connections",
       "surfaces": [
         "acp",
         "mcp",

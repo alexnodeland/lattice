@@ -202,6 +202,36 @@ test("each type of change reads as a sentence", () => {
       },
       "unbound tracker plane from workspace ops",
     ],
+    [
+      {
+        type: "connection_made",
+        connection: "con_0123456789abcdef",
+        user: "alice",
+        client: "client_claude",
+        name: "Claude",
+        toolsets: ["core", "files"],
+      },
+      "connected Claude for alice (person), with core, files",
+    ],
+    [
+      {
+        type: "connection_toolsets_added",
+        connection: "con_0123456789abcdef",
+        user: "alice",
+        toolsets: ["automations", "core"],
+      },
+      "let connection con_0123456789abcdef for alice (person) use automations, core",
+    ],
+    [
+      {
+        type: "connection_revoked",
+        connection: "con_0123456789abcdef",
+        user: "alice",
+        client: "client_claude",
+        name: "Claude",
+      },
+      "revoked the connection of Claude for alice (person)",
+    ],
   ];
   for (const [event, sentence] of cases) {
     expect(said(event)).toBe(sentence);
@@ -209,7 +239,7 @@ test("each type of change reads as a sentence", () => {
 });
 
 test("the filter offers every type, and reads one back from the address", () => {
-  expect(TYPES).toHaveLength(23);
+  expect(TYPES).toHaveLength(26);
   expect(TYPES.find((type) => type.value === "tenant_created")?.label).toBe("Tenant created");
   expect(filterOf({ type: "granted" })).toEqual({ type: "granted" });
   expect(filterOf({ type: "nonsense" })).toEqual({});

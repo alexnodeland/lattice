@@ -43,6 +43,7 @@ from grantr.core import (
 from grantr.grants import Grants
 from grantr.grants.calls import subject_of_call
 from lattice_core.approvals import Subject as Answerer
+from lattice_core.bindings import Trust
 from lattice_core.capabilities import (
     CallContext,
     Capability,
@@ -181,6 +182,28 @@ class _Answer(_Approval):
     """The digest of the arguments shown."""
 
 
+class _Bind(_Arguments):
+    workspace: str = Field(min_length=1)
+    """The tenant's workspace the source's events reach."""
+    source: str
+    """The event source, by its name."""
+    connection: str
+    """The source's connection the events come from, such as an app's installation."""
+    select: JsonObject | None = None
+    """Which of the connection's events, as the source reads a selection; every one if omitted."""
+    types: list[str] | None = None
+    """Only events of these types; every type the source has if omitted."""
+    trust: Trust | None = None
+    """How far the events are trusted; the source's own trust if omitted."""
+    options: JsonObject | None = None
+    """The source's own options for the binding."""
+
+
+class _Binding(_Arguments):
+    binding: str = Field(min_length=1)
+    """The binding's id."""
+
+
 class _Operator(_Arguments):
     user: UserId
     """The user."""
@@ -216,7 +239,7 @@ def _all(values: Iterable[BaseModel]) -> JsonValue:
 
 
 def _read(
-    name: str, description: str, action: str, route: str, handler: _Handler, **more: Any
+    name: str, description: str, action: str, route: str | None, handler: _Handler, **more: Any
 ) -> _Spec:
     return _Spec(
         name,
@@ -466,6 +489,42 @@ _SPECS: Final[tuple[_Spec, ...]] = (
             g.set_setting(t, a.key, a.value, version=a.version, workspace=a.workspace, by=by)
         ),
         route=f"{ADMIN}/settings",
+    ),
+    _read(
+        "grantr.list_bindings",
+        "List the sources bound to the tenant's workspaces, or one of them: the operator's first.",
+        "grantr:manage_bindings",
+        None,
+        lambda g, a, t, by: _listed(g.bindings().listed(t, by=by, workspace=a.workspace)),
+        arguments=_InWorkspace,
+    ),
+    _Spec(
+        "grantr.bind",
+        "Bind a source's connection to one of the tenant's workspaces, so its events reach it.",
+        "grantr:manage_bindings",
+        _Bind,
+        lambda g, a, t, by: _entry(
+            g.bindings().bind(
+                t,
+                a.workspace,
+                a.source,
+                a.connection,
+                select=a.select,
+                types=a.types,
+                trust=a.trust,
+                options=a.options,
+                by=by,
+            )
+        ),
+        route=None,
+    ),
+    _Spec(
+        "grantr.unbind",
+        "Remove one of the tenant's bindings, so its source's events stop reaching it.",
+        "grantr:manage_bindings",
+        _Binding,
+        lambda g, a, t, by: _entry(g.bindings().unbind(t, a.binding, by=by)),
+        route=None,
     ),
     _read(
         "grantr.read_audit",

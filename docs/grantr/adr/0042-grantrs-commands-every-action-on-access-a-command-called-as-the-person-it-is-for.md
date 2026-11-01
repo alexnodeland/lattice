@@ -15,7 +15,7 @@ RFC-0014 makes every action a person can take in portalr a command, declared onc
 
 ## Decision
 
-- **`grantr.commands`** declares the catalog, `CATALOG`, lattice-core's `Commands`: 28 commands named `grantr.<name>`, version 1.0.0.
+- **`grantr.commands`** declares the catalog, `CATALOG`, lattice-core's `Commands`: 31 commands named `grantr.<name>`, version 1.0.0, among them `grantr.list_bindings`, `grantr.bind` and `grantr.unbind`, gated by `grantr:manage_bindings` (ADR-0041).
   - Each is gated by the action grantr's own method asks: a list by the action that manages it, such as `grantr:add_member` for `grantr.list_members`.
   - Every grantr action but `grantr:create_tenant`, which is portalr's command (RFC-0014), is some command's gate. A test holds that.
   - Each is in the `admin` toolset, but the approvals' reads, which are in `core`.
@@ -54,11 +54,11 @@ RFC-0014 makes every action a person can take in portalr a command, declared onc
 
 - Easier: an application offers grantr through the enforcer with one `provider(grants)`, and an outside client or another library's agent manages access as the person it acts for.
 - Harder: a new grantr action needs a command, or a reason in the parity test, and a new command is a public name.
-- The bindings' commands come with the bindings' store, and the connections' with connections (#917).
+- The connections' commands come with connections (#917).
 - The entry point that names the catalog comes with lattice-core's discovery of commands and the parity test.
 
 ## Action items
 
 1. [x] `grantr.commands`: the catalog, its schema, `grantr:read_approvals` and the provider, tested, and through the enforcer, an `admin_high` command waiting for its caller's confirmation.
-2. [ ] The bindings' commands, once the bindings' store merges (grantr ADR-0041).
+2. [x] The bindings' commands, with the bindings' store (grantr ADR-0041).
 3. [ ] The parity test, which reads this catalog (lattice ADR-0041).

@@ -161,6 +161,129 @@
       ],
       "toolset": "core"
     },
+    "grantr.bind": {
+      "capability": {
+        "description": "Bind a source's connection to one of the tenant's workspaces, so its events reach it.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:manage_bindings",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "JsonObject": {
+              "additionalProperties": {
+                "$ref": "#/$defs/JsonValue"
+              },
+              "type": "object"
+            },
+            "JsonValue": {}
+          },
+          "additionalProperties": false,
+          "properties": {
+            "connection": {
+              "description": "The source's connection the events come from, such as an app's installation.",
+              "title": "Connection",
+              "type": "string"
+            },
+            "options": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/JsonObject"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The source's own options for the binding."
+            },
+            "select": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/JsonObject"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Which of the connection's events, as the source reads a selection; every one if omitted."
+            },
+            "source": {
+              "description": "The event source, by its name.",
+              "title": "Source",
+              "type": "string"
+            },
+            "trust": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "untrusted",
+                    "authenticated",
+                    "internal"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "How far the events are trusted; the source's own trust if omitted.",
+              "title": "Trust"
+            },
+            "types": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Only events of these types; every type the source has if omitted.",
+              "title": "Types"
+            },
+            "workspace": {
+              "description": "The tenant's workspace the source's events reach.",
+              "minLength": 1,
+              "title": "Workspace",
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace",
+            "source",
+            "connection"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.bind",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": null,
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
     "grantr.define_group": {
       "capability": {
         "description": "Define a group of the tenant's members, or replace its members.",
@@ -983,6 +1106,56 @@
       ],
       "toolset": "core"
     },
+    "grantr.list_bindings": {
+      "capability": {
+        "description": "List the sources bound to the tenant's workspaces, or one of them: the operator's first.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "grantr:manage_bindings",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "workspace": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Only in this workspace; on the tenant, or in every workspace, if omitted.",
+              "title": "Workspace"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.list_bindings",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": null,
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
     "grantr.list_grants": {
       "capability": {
         "description": "List the grants made in the tenant, or in one of its workspaces.",
@@ -1355,6 +1528,8 @@
                 "unrestricted",
                 "integration_set",
                 "setting_set",
+                "binding_added",
+                "binding_removed",
                 "approval_asked",
                 "approval_answered",
                 "approval_closed",
@@ -2070,6 +2245,50 @@
       "exposure": "tool",
       "resource": null,
       "route": "/portalr/admin/t/{tenant}/settings",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "grantr.unbind": {
+      "capability": {
+        "description": "Remove one of the tenant's bindings, so its source's events stop reaching it.",
+        "effects": [],
+        "gate": {
+          "action": "grantr:manage_bindings",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "binding": {
+              "description": "The binding's id.",
+              "minLength": 1,
+              "title": "Binding",
+              "type": "string"
+            }
+          },
+          "required": [
+            "binding"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "grantr.unbind",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": null,
       "surfaces": [
         "acp",
         "mcp",

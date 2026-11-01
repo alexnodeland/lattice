@@ -171,6 +171,30 @@ async def test_restrictions_keys_integrations_settings_and_the_audit_log() -> No
     assert issued.event.type == "key_issued"
 
 
+async def test_bindings_are_listed_bound_and_unbound_as_the_caller() -> None:
+    grants = await _grants()
+    bound = provider(grants)
+    made = await _call(
+        bound,
+        "grantr.bind",
+        workspace="w1",
+        source="forge",
+        connection="inst_1",
+        types=["forge:issue"],
+        trust="untrusted",
+    )
+    assert made["event"]["type"] == "binding_added"
+    [binding] = await _call(bound, "grantr.list_bindings", workspace="w1")
+    assert (binding["source"], binding["connection"], binding["trust"]) == (
+        "forge",
+        "inst_1",
+        "untrusted",
+    )
+    gone = await _call(bound, "grantr.unbind", binding=binding["id"])
+    assert gone["event"]["type"] == "binding_removed"
+    assert await _call(bound, "grantr.list_bindings") == []
+
+
 async def test_approvals_are_read_by_who_may_answer_them() -> None:
     grants = await _grants()
     bound = provider(grants)

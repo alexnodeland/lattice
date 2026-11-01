@@ -189,10 +189,11 @@ The contract test, `tests/grants/test_contract.py`, runs every behaviour on this
 
 `grantr.commands.CATALOG` declares every action on access as a lattice-core command (lattice [ADR-0041](../adr/0041-the-command-declaration-a-capability-with-its-toolset-exposure-route-and-surfaces-in-a-static-catalog.md), [ADR-0042](adr/0042-grantrs-commands-every-action-on-access-a-command-called-as-the-person-it-is-for.md)), named `grantr.<name>`, which portalr, outside clients and other libraries' agents reach through the enforcer.
 
-- **Each is gated by the action grantr's own method asks,** a list by the action that manages it, and every grantr action but `grantr:create_tenant` (portalr's) is some command's gate. Each is in the `admin` toolset, but the approvals' reads, in `core`, and links to its page in portalr's admin.
+- **Each is gated by the action grantr's own method asks,** a list by the action that manages it, and every grantr action but `grantr:create_tenant` (portalr's) is some command's gate. Each is in the `admin` toolset, but the approvals' reads, in `core`, and links to its page in portalr's admin where it has one.
 - **`admin_high`:** `grantr.delete_tenant`, `grantr.revoke_key`, `grantr.grant_on_tenant` (granting on a workspace or item is `grantr.grant`), `grantr.define_role` and `grantr.grant_operator`, each confirmed by its caller.
 - **Not exposed:** `grantr.answer_approval` and `grantr.issue_key`, portalr's alone.
 - **`grantr:read_approvals`** gates `grantr.list_approvals` and `grantr.read_approval`, and every member holds it.
+- **`grantr:manage_bindings`** gates `grantr.list_bindings`, `grantr.bind` and `grantr.unbind`, which no admin page links to yet.
 - **`provider(grants)`** is lattice-core's `Provider`: each call runs as the person it is for (`subject_of_call`), in its tenant, so grantr checks it again, and answers JSON text. The catalog is `schemas/grantr.commands.json`, which `grantr:schema` regenerates.
 
 ## The admin API

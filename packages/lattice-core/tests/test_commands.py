@@ -9,13 +9,20 @@ from pydantic import ValidationError
 
 from lattice_core.capabilities import Capability, Gate, Scope
 from lattice_core.commands import (
+    EXTENSION,
     SURFACES,
     TOOLSETS,
     Command,
     Commands,
+    Frames,
+    NoCommand,
     NotExposed,
     ResourceChanged,
     Watch,
+    called,
+    calls,
+    calls_none,
+    carries_frames,
     catalog,
     contract_schema,
     tool_name,
@@ -128,6 +135,38 @@ def test_the_catalog_composes_and_refuses_a_name_or_a_tool_twice() -> None:
         catalog(Catalog(post), Catalog(post))
     with pytest.raises(ValueError, match=r"a\.b_c and a_b\.c are both the tool a_b_c"):
         catalog(Catalog(command("a_b.c")), Catalog(command("a.b_c")))
+
+
+def test_an_operation_says_the_command_it_calls_or_one_of_several() -> None:
+    assert calls("grantr.list_members") == {EXTENSION: "grantr.list_members"}
+    both = calls("grantr.grant", "grantr.grant_on_tenant")
+    assert both == {"x-lattice-command": ["grantr.grant", "grantr.grant_on_tenant"]}
+    assert called(both[EXTENSION]) == ("grantr.grant", "grantr.grant_on_tenant")
+    assert called("grantr.list_members") == ("grantr.list_members",)
+    with pytest.raises(ValueError, match="not 'grantr:list_members'"):
+        calls("grantr.list_members", "grantr:list_members")
+
+
+def test_an_operation_says_it_carries_frames_or_why_it_calls_none() -> None:
+    frames = carries_frames("command")[EXTENSION]
+    assert called(frames) == Frames(frames="command")
+    watching = carries_frames("command", watch_run="the stream's alone")[EXTENSION]
+    assert called(watching) == Frames(frames="command", none={"watch_run": "the stream's alone"})
+    with pytest.raises(ValidationError):
+        carries_frames("command", watch_run="")
+    nothing = calls_none("the UIs' configuration, which anyone may read")[EXTENSION]
+    assert called(nothing) == NoCommand(none="the UIs' configuration, which anyone may read")
+    with pytest.raises(ValidationError):
+        calls_none("")
+
+
+@pytest.mark.parametrize(
+    "extension",
+    [None, "grantr:list_members", "list_members", [], ["grantr.grant"], {"frames": ""}, {}],
+)
+def test_an_operation_that_says_nothing_readable_is_refused(extension: Any) -> None:
+    with pytest.raises(ValidationError):
+        called(extension)
 
 
 class Changes:

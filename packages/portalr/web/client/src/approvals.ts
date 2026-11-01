@@ -64,12 +64,38 @@ export function answeredBy(
 }
 
 /**
+ * Who may answer, in words, one entry each (lattice RFC-0011): whoever holds its grantr action,
+ * each subject it names, by `names`, and each of its groups' members; then, if the answer must
+ * come from someone else, who that excludes. A confirmation is the one subject it names, on
+ * admin's confirm page.
+ */
+export function answerersOf(approval: Approval, me: string, names: Names = shortId): string[] {
+  const person = (id: string) => (id === me ? "you" : names(id));
+  const { action, subjects, groups, confirmation, different_approver } = approval.answerers;
+  if (confirmation) {
+    return subjects.map((id) => `${person(id)}, on the confirm page`);
+  }
+  const asker = askedFor(approval);
+  return [
+    ...(action == null ? [] : [`anyone who holds ${action}`]),
+    ...subjects.map(person),
+    ...groups.map((id) => `the members of group ${id}`),
+    ...(different_approver ? [`except ${asker === null ? "whoever asked" : person(asker)}`] : []),
+  ];
+}
+
+/**
  * The people an approval names whom the reader may know by their email: whom it was asked for,
- * and who answered it, if a person did; never the reader, who is "you".
+ * who may answer it by name, and who answered it, if a person did; never the reader, who is
+ * "you".
  */
 export function peopleIn(approval: Approval, me: string): string[] {
   const by = approval.answer?.by;
-  const named = [askedFor(approval), by === undefined || by.service ? null : by.id];
+  const named = [
+    askedFor(approval),
+    ...approval.answerers.subjects,
+    by === undefined || by.service ? null : by.id,
+  ];
   return [...new Set(named.filter((id): id is string => id !== null && id !== me))];
 }
 

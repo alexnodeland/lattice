@@ -14,6 +14,11 @@ its runtime at its composition root, where the bound provider also answers ``Com
 command's MCP tool name is ``<package>_<name>`` (:func:`tool_name`), since some clients refuse a
 dot. A breaking change is a new command, ``<package>.<name>_v2``, beside the old one.
 
+Every operation of a library's OpenAPI document says what it calls in its :data:`EXTENSION`,
+``x-lattice-command`` (lattice ADR-0042): a command (:func:`calls`), the member of its body that
+carries command frames, whose ``type`` names the action (:func:`carries_frames`), or why it calls
+none (:func:`calls_none`). :func:`called` reads it back, for the parity test.
+
 The contract's version is :data:`CONTRACT`, and its JSON Schema, which :func:`contract_schema`
 returns, is checked in at ``schemas/commands.v1.json``: regenerate it with ``moon run
 lattice-core:schema`` (:mod:`lattice_core.contracts`).
@@ -22,26 +27,41 @@ lattice-core:schema`` (:mod:`lattice_core.contracts`).
 import re
 from collections.abc import AsyncIterator, Iterable
 from types import MappingProxyType
-from typing import Final, Literal, Protocol, Self, get_args, runtime_checkable
+from typing import Annotated, Final, Literal, Protocol, Self, get_args, runtime_checkable
 
-from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    StringConstraints,
+    TypeAdapter,
+    model_validator,
+)
 
 from lattice_core.capabilities import Capability, Scope
 
 __all__ = [
     "COMMAND_NAME",
     "CONTRACT",
+    "EXTENSION",
     "SURFACES",
     "TOOLSETS",
     "TOOL_NAME",
     "Command",
     "Commands",
     "Exposure",
+    "Frames",
+    "NoCommand",
     "NotExposed",
     "ResourceChanged",
     "Surface",
     "Toolset",
     "Watch",
+    "called",
+    "calls",
+    "calls_none",
+    "carries_frames",
     "catalog",
     "contract_schema",
     "tool_name",
@@ -198,6 +218,95 @@ def catalog(*catalogs: Commands) -> MappingProxyType[str, Command]:
             found[command.name] = command
             tools[command.tool] = command.name
     return MappingProxyType(found)
+
+
+EXTENSION: Final = "x-lattice-command"
+"""The OpenAPI extension on every operation of a library's document: what the operation calls
+(lattice ADR-0042)."""
+
+
+class Frames(BaseModel):
+    """An operation whose body carries command frames: the member that holds one.
+
+    The frame's ``type`` names the action it asks, as on the stream, so the parity test holds each
+    ``type`` the frame union names to some command's gate.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, use_attribute_docstrings=True)
+
+    frames: str = Field(min_length=1)
+    """The body's member that holds a frame, such as ``command``."""
+    none: dict[str, Annotated[str, Field(min_length=1)]] = Field(default_factory=dict[str, str])
+    """Each frame ``type`` that asks no action, and why, such as a subscription the stream
+    alone serves."""
+
+
+class NoCommand(BaseModel):
+    """An operation that calls no command, and why: no action, or a command still to come."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, use_attribute_docstrings=True)
+
+    none: str = Field(min_length=1)
+    """Why: "the UIs' configuration, which anyone may read", or the issue a command comes in."""
+
+
+_Name = Annotated[str, StringConstraints(pattern=f"^{COMMAND_NAME.pattern}$")]
+
+_CALLED: Final = TypeAdapter[_Name | list[_Name] | Frames | NoCommand](
+    _Name | Annotated[list[_Name], Field(min_length=2)] | Frames | NoCommand
+)
+
+
+def calls(command: str, /, *more: str) -> dict[str, JsonValue]:
+    """Return the ``openapi_extra`` of an operation that calls a command.
+
+    An operation that calls one of several, by its arguments, names each, such as grantr's grant
+    of a role on a workspace or on the tenant.
+
+    Raises:
+        ValueError: If a name isn't of :data:`COMMAND_NAME`'s form.
+    """
+    names = (command, *more)
+    if malformed := [name for name in names if not COMMAND_NAME.fullmatch(name)]:
+        raise ValueError(f"a command's name is <package>.<name>, not {malformed[0]!r}")
+    return {EXTENSION: list(names) if more else command}
+
+
+def carries_frames(member: str, /, **none: str) -> dict[str, JsonValue]:
+    """Return the ``openapi_extra`` of an operation whose body's ``member`` is a command frame.
+
+    Args:
+        member: The body's member that holds the frame.
+        **none: Each frame ``type`` that asks no action, and why.
+
+    Raises:
+        ValueError: If a reason is empty.
+    """
+    return {EXTENSION: Frames(frames=member, none=none).model_dump()}
+
+
+def calls_none(reason: str, /) -> dict[str, JsonValue]:
+    """Return the ``openapi_extra`` of an operation that calls no command, and why.
+
+    Raises:
+        ValueError: If the reason is empty.
+    """
+    return {EXTENSION: NoCommand(none=reason).model_dump()}
+
+
+def called(extension: JsonValue, /) -> tuple[str, ...] | Frames | NoCommand:
+    """Read what an operation's :data:`EXTENSION` says it calls: commands' names, or else.
+
+    Raises:
+        ValueError: If it says none of what :func:`calls`, :func:`carries_frames` and
+            :func:`calls_none` write, or is missing.
+    """
+    found = _CALLED.validate_python(extension)
+    if isinstance(found, str):
+        return (found,)
+    if isinstance(found, list):
+        return tuple(found)
+    return found
 
 
 def contract_schema() -> dict[str, JsonValue]:

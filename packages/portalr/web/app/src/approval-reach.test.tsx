@@ -101,3 +101,27 @@ for (const width of [320, 393, 430, 768, 1024, 1100, 1440]) {
     }
   });
 }
+
+test("a call lattice's enforcer deferred links from its card to its approval's page", async () => {
+  const named = at(5, agent, {
+    type: "run_paused",
+    run_id: "run_a",
+    thread_id: "thr_a",
+    requests: [
+      {
+        kind: "approval",
+        tool_call_id: "a1",
+        tool_name: "publish",
+        args: { channel: "customers" },
+        approval: "apr_1",
+      },
+    ],
+  });
+  const { screen } = await open("/t/acme/w/notes/threads/thr_a", serve, () => null, {
+    artifactrLog: [...LOG.slice(0, -1), named],
+  });
+  const card = screen.getByRole("region", { name: "Approve publish?" });
+  await expect
+    .element(card.getByRole("link", { name: "Who may answer it" }))
+    .toHaveAttribute("href", "/t/acme/approvals/apr_1");
+});

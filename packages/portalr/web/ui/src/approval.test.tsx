@@ -39,6 +39,23 @@ test("a waiting approval says what it would be called with, by whom, where, and 
   await expect.element(screen.getByText("Approved by")).not.toBeInTheDocument();
 });
 
+test("a waiting approval says who may answer it, as the client words them", async () => {
+  const words = ["anyone who holds grantr:answer_approval", "except bob@acme.test"];
+  const screen = await render(
+    <ApprovalDetails approval={PENDING} askedBy="bob@acme.test" answerers={words} />,
+  );
+  await expect.element(screen.getByText("Who may answer")).toBeVisible();
+  await expect
+    .element(screen.getByText("anyone who holds grantr:answer_approval, except bob@acme.test"))
+    .toBeVisible();
+  // Answered, or with no one to name, it says nothing of who may.
+  const denied: Approval = { ...PENDING, state: "expired", reason: "No one answered in time." };
+  screen.rerender(<ApprovalDetails approval={denied} askedBy="bob" answerers={words} />);
+  await expect.element(screen.getByText("Who may answer")).not.toBeInTheDocument();
+  screen.rerender(<ApprovalDetails approval={PENDING} askedBy="bob" answerers={[]} />);
+  await expect.element(screen.getByText("Who may answer")).not.toBeInTheDocument();
+});
+
 test("a change is shown as its diff, and a plan's approval names the steps it allows", async () => {
   const plan: Approval = {
     ...PENDING,

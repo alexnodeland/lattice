@@ -156,6 +156,7 @@ async def test_restrictions_keys_integrations_settings_and_the_audit_log() -> No
     thread = {"kind": "thread", "workspace": "w1", "id": "t1"}
     restricted = await _call(bound, "grantr.restrict", on=thread)
     assert restricted["event"]["type"] == "restricted"
+    assert await _call(bound, "grantr.list_restrictions", workspace="w1") == [thread]
     [key] = await _call(bound, "grantr.list_keys")
     revoked = await _call(bound, "grantr.revoke_key", key=key["id"])
     assert revoked["event"]["type"] == "key_revoked"

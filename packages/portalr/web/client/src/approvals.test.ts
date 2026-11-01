@@ -3,6 +3,7 @@ import { expect, test } from "vitest";
 import {
   type Approval,
   answeredBy,
+  answerersOf,
   approvalPage,
   askedBy,
   askedFor,
@@ -92,7 +93,46 @@ test("who answered is the reader, a person by their email, or a service principa
   expect(answeredBy(by("ci", true), "alice", names)).toBe("ci");
 });
 
-test("the people named are whom it was asked for and who answered, never the reader or a key", () => {
+test("who may answer is said of its action, its subjects and groups, and whom it excludes", () => {
+  const asked = (answerers: Partial<Approval["answerers"]>, by = "bob") => ({
+    ...approval({ kind: "run", id: "r", agent: "assistant", on_behalf_of: by }),
+    answerers: {
+      subjects: [],
+      groups: [],
+      confirmation: false,
+      different_approver: false,
+      ...answerers,
+    },
+  });
+  expect(answerersOf(asked({ action: "grantr:answer_approval" }), "alice", names)).toEqual([
+    "anyone who holds grantr:answer_approval",
+  ]);
+  expect(
+    answerersOf(asked({ subjects: ["alice", "carol"], groups: ["grp_ops"] }), "alice", names),
+  ).toEqual(["you", "carol@acme.test", "the members of group grp_ops"]);
+  expect(
+    answerersOf(asked({ action: "notes:publish", different_approver: true }), "alice", names),
+  ).toEqual(["anyone who holds notes:publish", "except bob@acme.test"]);
+  expect(
+    answerersOf(asked({ action: "notes:publish", different_approver: true }, "alice"), "alice"),
+  ).toEqual(["anyone who holds notes:publish", "except you"]);
+  const forNoOne = {
+    ...asked({ action: "notes:publish", different_approver: true }),
+    asked_by: { kind: "session" as const, id: "s" },
+  };
+  expect(answerersOf(forNoOne, "alice")).toEqual([
+    "anyone who holds notes:publish",
+    "except whoever asked",
+  ]);
+  expect(answerersOf(asked({ subjects: ["bob"], confirmation: true }), "alice", names)).toEqual([
+    "bob@acme.test, on the confirm page",
+  ]);
+  expect(answerersOf(asked({ subjects: ["alice"], confirmation: true }), "alice")).toEqual([
+    "you, on the confirm page",
+  ]);
+});
+
+test("the people named are whom it was asked for, who may answer and who answered, never the reader or a key", () => {
   expect(peopleIn(approval({ kind: "person", id: "bob" }, null, { id: "carol" }), "alice")).toEqual(
     ["bob", "carol"],
   );
@@ -104,7 +144,7 @@ test("the people named are whom it was asked for and who answered, never the rea
   ).toEqual([]);
   expect(
     peopleIn(approval({ kind: "run", id: "r", agent: "a", on_behalf_of: "bob" }), "bob"),
-  ).toEqual([]);
+  ).toEqual(["alice"]);
 });
 
 test("an approval's pages are the app's, in its tenant, and admin's confirm page", () => {

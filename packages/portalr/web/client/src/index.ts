@@ -11,6 +11,7 @@ export { allowedIn, workspaceOf } from "./allowed";
 export {
   type Approval,
   answeredBy,
+  answerersOf,
   approvalPage,
   askedBy,
   askedFor,

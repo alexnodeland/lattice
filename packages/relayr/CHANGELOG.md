@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0](https://github.com/alexnodeland/lattice/compare/relayr-v0.2.1...relayr-v0.3.0) (2026-11-01)
+
+
+### Features
+
+* **relayr:** relayr's commands, the tracker connector's reads gated by reflexr's actions (RFC-0014 phase 1) ([#1341](https://github.com/alexnodeland/lattice/issues/1341)) ([7bfe389](https://github.com/alexnodeland/lattice/commit/7bfe38922e59515afe7c5c50affd0eabfd8211da))
+
 ## [0.2.1](https://github.com/alexnodeland/lattice/compare/relayr-v0.2.0...relayr-v0.2.1) (2026-10-30)
 
 

@@ -46,6 +46,8 @@ tasks:
       - 'uv.lock'
       - 'packages/portalr/web/*/src/**/*'
       - 'packages/portalr/web/*/*.{json,ts,yml}'
+      # The parity test reads every library's OpenAPI document.
+      - 'packages/*/schemas/*.openapi.json'
       - 'docs/*/spec/**/*'
       # The typefaces' notices, which test_font_notices.py holds to each other and to the font.
       - 'packages/stackr/workers/diagrams/FONTS.txt'

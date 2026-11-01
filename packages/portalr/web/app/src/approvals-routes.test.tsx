@@ -164,12 +164,23 @@ test("a denial refused, as one answered first, says why, and the page shows the 
 });
 
 test("the person it was asked for sees where it stands, with nothing to answer", async () => {
+  const answerers = {
+    action: "grantr:answer_approval",
+    subjects: [],
+    groups: [],
+    confirmation: false,
+    different_approver: true,
+  };
   const { screen } = await open(
     "/t/acme/approvals/apr_1",
-    grantr(new Map([["apr_1", approval("apr_1")]]), () => false).serve,
+    grantr(new Map([["apr_1", approval("apr_1", { answerers })]]), () => false).serve,
   );
   await expect
     .element(screen.getByText("It waits for one of those who may answer it."))
+    .toBeVisible();
+  await expect.element(screen.getByText("Who may answer")).toBeVisible();
+  await expect
+    .element(screen.getByText(/^anyone who holds grantr:answer_approval, except /u))
     .toBeVisible();
   await expect.element(screen.getByRole("button", { name: "Approve" })).not.toBeInTheDocument();
 });

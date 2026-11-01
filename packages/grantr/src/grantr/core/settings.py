@@ -2,11 +2,11 @@
 
 A setting's default is the registry's, which the operator's value, in the deployment's
 configuration, replaces. A tenant's admins, and then a workspace's, may each only narrow the
-layer above: a number lowered, a subset shrunk. A stored value that would widen its layer, after
-the operator lowered the ceiling under it, is kept but clamped: the narrower wins, and the value
-is shown as clamped. A value a changed registry no longer takes is kept narrowed to it, never
-widened, and a stored key no registry declares any more is never applied, and is listed as
-unknown.
+layer above: a number lowered, a subset shrunk, a superset added to (lattice ADR-0038). A stored
+value that would widen its layer, after the operator lowered the ceiling under it, is kept but
+clamped: the narrower wins, and the value is shown as clamped. A value a changed registry no
+longer takes is kept narrowed to it, never widened, and a stored key no registry declares any
+more is never applied, and is listed as unknown.
 """
 
 from datetime import datetime
@@ -15,7 +15,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from grantr.core.subjects import Subject
-from lattice_core.settings import IntRange, Setting, Tier, Value
+from lattice_core.settings import IntRange, Setting, Superset, Tier, Value
 
 type Wire = int | list[str]
 """A setting's value as JSON carries it: a whole number, or names, sorted."""
@@ -59,17 +59,22 @@ class SettingLayer(BaseModel):
 
 
 class SettingKind(BaseModel):
-    """What a setting's value is: a whole number within bounds, or some of a set of names."""
+    """What a setting's value is: a whole number within bounds, or some of a set of names.
+
+    A ``subset``'s names are what a layer allows, so a lower layer may only take names out; a
+    ``superset``'s are what a layer asks for, so a lower layer may only add names (lattice
+    ADR-0038).
+    """
 
     model_config = ConfigDict(frozen=True)
 
-    type: Literal["int_range", "subset"]
+    type: Literal["int_range", "subset", "superset"]
     low: int | None = None
     high: int | None = None
     universe: list[str] | None = None
     labels: dict[str, str] | None = None
-    """What each of a subset's names is, in words, where the registry says: such as a tool's
-    risk."""
+    """What each of a subset's or superset's names is, in words, where the registry says: such
+    as a tool's risk."""
 
 
 class SettingState(BaseModel):
@@ -97,7 +102,8 @@ class SettingState(BaseModel):
     """The version of this level's setting, which a change names: 0 if it was never set."""
 
     ceiling: Wire
-    """The widest value this level may set: the layer above's."""
+    """The widest value this level may set: the layer above's. A number may be no higher and a
+    subset may name no more, and a superset must keep each of its names."""
 
     ceiling_set_by: Literal["default", "operator", "tenant"]
     """Which layer the ceiling is."""
@@ -133,7 +139,9 @@ def kind(setting: Setting) -> SettingKind:
     if isinstance(setting.kind, IntRange):
         return SettingKind(type="int_range", low=setting.kind.low, high=setting.kind.high)
     return SettingKind(
-        type="subset", universe=sorted(setting.kind.universe), labels=dict(setting.labels)
+        type="superset" if isinstance(setting.kind, Superset) else "subset",
+        universe=sorted(setting.kind.universe),
+        labels=dict(setting.labels),
     )
 
 

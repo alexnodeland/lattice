@@ -1121,6 +1121,10 @@ export interface components {
         /**
          * SettingKind
          * @description What a setting's value is: a whole number within bounds, or some of a set of names.
+         *
+         *     A ``subset``'s names are what a layer allows, so a lower layer may only take names out; a
+         *     ``superset``'s are what a layer asks for, so a lower layer may only add names (lattice
+         *     ADR-0039).
          */
         SettingKind: {
             /** High */
@@ -1135,7 +1139,7 @@ export interface components {
              * Type
              * @enum {string}
              */
-            type: "int_range" | "subset";
+            type: "int_range" | "subset" | "superset";
             /** Universe */
             universe?: string[] | null;
         };

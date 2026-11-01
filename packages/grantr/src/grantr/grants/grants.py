@@ -86,7 +86,7 @@ from grantr.core.settings import wire
 from grantr.grants.storage import Reads, Storage, Transaction
 from grantr.telemetry import SLOW_CHECK, Reason, Telemetry
 from lattice_core.integrations import KNOWN, Integration
-from lattice_core.settings import KNOWN_SETTINGS, Setting, Value, floor, operator_layer
+from lattice_core.settings import KNOWN_SETTINGS, Setting, Superset, Value, floor, operator_layer
 
 logger = logging.getLogger(__name__)
 
@@ -1024,7 +1024,8 @@ class Grants:
     ) -> SettingState:
         """Narrow a setting on the tenant or in a workspace, or unset it with None.
 
-        A value may only narrow the layer above: no higher a number, no more names. ``version``,
+        A value may only narrow the layer above: no higher a number, no more names of a subset,
+        and no fewer of a superset, whose names a layer asks for (lattice ADR-0038). ``version``,
         if given, is the version of this level's setting the caller read: 0 for one never set.
         Setting what is set already changes nothing, and records nothing.
 
@@ -1060,9 +1061,10 @@ class Grants:
             if canonical is not None and not setting.within(
                 canonical, setting.value(state.ceiling)
             ):
+                # A superset's layer above is the least it may hold, not the most.
+                bound = "must keep" if isinstance(setting.kind, Superset) else "may be at most"
                 raise Invalid(
-                    f"{key} may be at most {_said(state.ceiling)} here: the"
-                    f" {state.ceiling_set_by}'s value"
+                    f"{key} {bound} {_said(state.ceiling)} here: the {state.ceiling_set_by}'s value"
                 )
             new = None if canonical is None else wire(canonical)
             old = None if stored is None else stored.value

@@ -20,7 +20,14 @@ from grantr.core import (
     User,
 )
 from grantr.grants import Grants, InMemoryStorage, Storage
-from lattice_core.settings import KNOWN_SETTINGS, IntRange, Setting, Subset, registry
+from lattice_core.settings import (
+    APPROVE_TIERS,
+    KNOWN_SETTINGS,
+    IntRange,
+    Setting,
+    Subset,
+    registry,
+)
 from tests.catalogs import ARTIFACTR, PORTALR, REFLEXR
 from tests.grants.conftest import ALICE, ROOT
 
@@ -369,3 +376,59 @@ async def test_a_workspace_offers_only_tools_the_tenant_keeps(storage: Storage) 
     assert await grants.value("acme", "w2", key) == ("get_objects", "get_view")
     with pytest.raises(Invalid, match="names it knows, not rm"):
         await grants.set_setting("acme", key, ["rm"], by=ALICE)
+
+
+async def test_tiers_that_need_approval_only_grow_down_the_layers(storage: Storage) -> None:
+    """lattice ADR-0038: a superset's names are what each layer asks for, resolved as a union."""
+    key = APPROVE_TIERS
+    grants = await _grants(storage, operator_settings={key: ["outbound"]})
+    state = await grants.set_setting("acme", key, ["outbound", "write"], by=ALICE)
+    assert (state.kind.type, state.effective, state.ceiling) == (
+        "superset",
+        ["outbound", "write"],
+        ["outbound"],
+    )
+    with pytest.raises(Invalid, match="must keep outbound, write here: the tenant's value"):
+        await grants.set_setting("acme", key, ["outbound"], workspace="w1", by=BOB)
+    with pytest.raises(Invalid, match="must keep outbound here: the operator's value"):
+        await grants.set_setting("acme", key, [], by=ALICE)
+    added = await grants.set_setting(
+        "acme", key, ["outbound", "read", "write"], workspace="w1", by=BOB
+    )
+    assert added.effective == ["outbound", "read", "write"], "the tenant's, and what it adds"
+    assert await grants.value("acme", "w1", key) == ("outbound", "read", "write")
+    assert await grants.value("acme", "w2", key) == ("outbound", "write")
+    assert await grants.value("globex", "w1", key) == ("outbound",), "the operator's floor"
+
+
+async def test_a_superset_the_operator_raised_under_a_stored_value_is_clamped(
+    storage: Storage,
+) -> None:
+    grants = await _grants(storage)
+    await grants.set_setting("acme", APPROVE_TIERS, ["outbound", "run_code", "write"], by=ALICE)
+    # The operator asks more: a deployment restarted asking approval of reads too.
+    raised = Grants(storage, catalogs=[ARTIFACTR], operator_settings={APPROVE_TIERS: ["read"]})
+    [state] = [
+        s for s in (await raised.settings("acme", by=ALICE)).settings if s.key == APPROVE_TIERS
+    ]
+    assert state.tenant is not None
+    assert state.tenant.clamped, "the tenant's no longer keeps the operator's read"
+    assert await raised.value("acme", "w1", APPROVE_TIERS) == (
+        "outbound",
+        "read",
+        "run_code",
+        "write",
+    )
+
+
+async def test_an_unreadable_store_asks_approval_on_every_tier() -> None:
+    class Broken(InMemoryStorage):
+        async def settings(self, tenant: str, workspace: str | None = None) -> Any:
+            raise OSError("down")
+
+    assert await Grants(Broken()).value("acme", "w1", APPROVE_TIERS) == (
+        "outbound",
+        "read",
+        "run_code",
+        "write",
+    )

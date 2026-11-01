@@ -78,7 +78,7 @@ A custom role is a tenant's own set of actions, granted wherever `editor` can be
 | `issue_key`, `revoke_key` | `grantr:issue_key`, `grantr:revoke_key` |
 | `restrict` | `grantr:restrict` on the thread or artifact; it sets or clears its restricted flag |
 | `set_integration` | `grantr:manage_integrations` on the tenant, or on the workspace; it turns an integration on or off there, or unsets it, and records only a real change |
-| `set_setting` | `grantr:manage_settings` on the tenant, or on the workspace, at a level the setting's `lowest` reaches; it narrows a setting there, never past the layer above, or unsets it, at the version the caller read, and records only a real change |
+| `set_setting` | `grantr:manage_settings` on the tenant, or on the workspace, at a level the setting's `lowest` reaches; it narrows a setting there, never past the layer above (a superset's names a layer asks for, so it may only add to them: [lattice ADR-0038](../adr/0038-approval-asked-by-tiers-a-union-resolved-setting-names-and-admin-high-confirmed-by-its-caller.md)), or unsets it, at the version the caller read, and records only a real change |
 | `audit` | `grantr:read_audit`, or `grantr:grant_operator` for the deployment's log |
 
 - **No one gives more than they hold.** A command that gives or takes access is refused unless its maker holds every action it gives or takes, where it applies: a grant's role on its resource; each grant a removed member loses; the grants a group's members gain or lose; and the grants a key acts with, when it is issued or revoked. A custom role needs no bound: whoever may define one holds every action it can hold.

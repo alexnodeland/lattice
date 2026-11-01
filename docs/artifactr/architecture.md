@@ -16,6 +16,7 @@
 | `artifactr.files` | Phase 1 of [lattice RFC-0003](../rfcs/0003-native-files-as-artifacts.md): native files' types, blobs, check-outs and the app port, unreleased ([its section](files/index.md)) |
 | `artifactr.connect` | Implemented: connected apps, an operator's own FreeCAD or Blender through a vetted MCP server, off by default ([ADR-0085](adr/0085-connected-apps-an-operators-own-freecad-or-blender-through-a-vetted-mcp-server.md)) |
 | `artifactr.capabilities` | Implemented, unreleased: the artifact tools as capabilities, called through lattice-core's enforcer ([ADR-0099](adr/0099-artifactrs-tools-as-capabilities-called-through-the-enforcer-whose-policy-asks-approval.md)) |
+| `artifactr.commands` | Implemented, unreleased: every action a person takes as a lattice-core command, in a static catalog, or listed with its reason ([ADR-0100](adr/0100-artifactrs-commands-every-action-a-command-or-listed-with-its-reason.md)) |
 | `examples/docplan` | Implemented: server, terminal client and tests; observed, rated and routed when configured |
 
 ## What artifactr is
@@ -96,6 +97,7 @@ The inner layers (core, telemetry, workspace, agent) form a hexagon of ports and
 | `artifactr.files` (extra) | the public API of core and workspace; its `sql` layer SQLAlchemy 2 async, Alembic and lattice-core's `sql` | A domain built on artifactr, with ports of its own: `Blobs`, `Checkouts` and `App` | Native files as artifacts: manifests over a blob store, check-outs and agents' edits under one lease, and its own tables and migrations ([its architecture](files/architecture.md), [lattice ADR-0026](../adr/0026-a-distribution-needs-a-reason-integrations-are-extras.md)). |
 | `artifactr.connect` (extra `connect`) | the public API of core, workspace and agent; the MCP SDK's client and anyio | A toolset, with lattice-core's switches and the workspace's `authorize` as its gates | Connected apps: a vetted server's tools, filtered by risk, code and network calls approved by a person every call ([the guide](guides/connected-apps.md)); each risk's capability tier (`TIERS`) |
 | `artifactr.capabilities` | the public API of core, workspace and agent; lattice-core's `capabilities` | A provider for lattice-core's capability registry | The artifact tools as capabilities, for callers outside artifactr's threads, each opening the call's workspace as its actor ([Capabilities](#capabilities)) |
+| `artifactr.commands` | pydantic and lattice-core's `capabilities` and `commands` only | A static catalog for lattice-core's commands | Every action a person takes on threads and artifacts as a command, its document `schemas/artifactr.commands.json`, and `LISTED`, each action no command gates, with its reason ([ADR-0100](adr/0100-artifactrs-commands-every-action-a-command-or-listed-with-its-reason.md)) |
 | `artifactr.ui` (extra `forms`) | the public API of core, workspace and agent | A domain built on artifactr, filling its check hook | Forms, dashboards and mini apps in the chat: the schema subset, its types, checks and agent toolset ([Forms and dashboards](#forms-and-dashboards)) |
 
 ### `artifactr.core`: sans-IO

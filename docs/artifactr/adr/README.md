@@ -103,5 +103,6 @@ Each record captures one decision: the context that forced it, the options consi
 | [0097](0097-a-message-chooses-the-model-of-the-turn-it-starts.md) | A message chooses the model of the turn it starts | Accepted |
 | [0098](0098-a-mini-apps-html-read-by-its-own-tool-whose-results-skip-prompt-injection.md) | A mini app's HTML read by its own tool, whose results skip prompt-injection | Accepted |
 | [0099](0099-artifactrs-tools-as-capabilities-called-through-the-enforcer-whose-policy-asks-approval.md) | artifactr's tools as capabilities, called through the enforcer, whose policy asks approval | Accepted |
+| [0100](0100-artifactrs-commands-every-action-a-command-or-listed-with-its-reason.md) | artifactr's commands: every action a command, or listed with its reason | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

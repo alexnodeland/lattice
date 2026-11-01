@@ -1,0 +1,862 @@
+{
+  "commands": {
+    "portalr.create_tenant": {
+      "capability": {
+        "description": "Create a tenant, and invite its first owner by email, for operators.",
+        "effects": [
+          "sends_out"
+        ],
+        "gate": {
+          "action": "grantr:create_tenant",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "owner_email": {
+              "description": "Its first owner's email, whom Supabase invites.",
+              "maxLength": 254,
+              "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+              "title": "Owner Email",
+              "type": "string"
+            },
+            "tenant": {
+              "description": "The new tenant's id.",
+              "title": "Tenant",
+              "type": "string"
+            }
+          },
+          "required": [
+            "tenant",
+            "owner_email"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.create_tenant",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/deployment/tenants",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.deployment_links": {
+      "capability": {
+        "description": "Make links into the deployment's own tools (Langfuse, Grafana, Umami) for a trace, a session, a run or a tenant, for operators. Each link made is recorded.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_deployment",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "run_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "A run to link to.",
+              "title": "Run Id"
+            },
+            "session_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "A session to link to, in Langfuse.",
+              "title": "Session Id"
+            },
+            "tenant_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "A tenant whose traces to link to.",
+              "title": "Tenant Id"
+            },
+            "trace_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "A trace to link to, in Langfuse.",
+              "title": "Trace Id"
+            }
+          },
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.deployment_links",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/deployment/tools",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.invite_member": {
+      "capability": {
+        "description": "Invite someone to the tenant by email, as a member; inviting a member again changes nothing.",
+        "effects": [
+          "sends_out"
+        ],
+        "gate": {
+          "action": "grantr:add_member",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "email": {
+              "description": "Whom to invite: Supabase finds or invites them, and grantr adds them as a member.",
+              "maxLength": 254,
+              "pattern": "^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$",
+              "title": "Email",
+              "type": "string"
+            }
+          },
+          "required": [
+            "email"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.invite_member",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "compensable",
+        "risk_class": null,
+        "tier": "write",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/access/members",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.list_deployment_tenants": {
+      "capability": {
+        "description": "List every tenant of the deployment, with its spend, for operators.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_deployment",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.list_deployment_tenants",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/deployment/tenants",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.list_traces": {
+      "capability": {
+        "description": "List the tenant's traces in a window, newest first, optionally of one kind of span.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_telemetry",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "Id": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$",
+              "type": "string"
+            }
+          },
+          "description": "Which of a tenant's traces to find: a thread's, a run's, an analytics session's, or any.\n\nA search by analytics session reads at most ``MOST_DAYS``: a session lasts hours.",
+          "properties": {
+            "analytics_session": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{1,12}-[0-9a-f]{16}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Analytics Session"
+            },
+            "end": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            },
+            "limit": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "run": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "session": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "start": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.list_traces",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/traces",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.read_adoption": {
+      "capability": {
+        "description": "Read how much the tenant's people use the portal over a span of time.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_telemetry",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "description": "Which adoption to read: a window of at most ``MOST_DAYS``.",
+          "properties": {
+            "end": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            },
+            "start": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.read_adoption",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/adoption",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.read_feedback": {
+      "capability": {
+        "description": "Read the feedback people and evaluators gave in the tenant over a span of time.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_telemetry",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "Id": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$",
+              "type": "string"
+            }
+          },
+          "description": "Which feedback to sum: a window of at most ``MOST_DAYS``, and one workspace's, or all.",
+          "properties": {
+            "end": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            },
+            "start": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            },
+            "workspace": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.read_feedback",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/feedback",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.read_log_line": {
+      "capability": {
+        "description": "Read one of the tenant's log records, with its fields.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_telemetry",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "record_id": {
+              "description": "The log record, as a list of logs gives its id.",
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_id"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.read_log_line",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/logs",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.read_logs": {
+      "capability": {
+        "description": "Read the tenant's log records in a window, newest first, optionally filtered.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_telemetry",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "Id": {
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@-]{0,127}$",
+              "type": "string"
+            }
+          },
+          "description": "Which of a tenant's logs to read: a thread's, a run's, or any, within a day.",
+          "properties": {
+            "end": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            },
+            "limit": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "run": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            },
+            "start": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            },
+            "thread": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Id"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.read_logs",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/logs",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.read_metrics": {
+      "capability": {
+        "description": "Read one of the tenant's metrics over a window.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_telemetry",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "Metric": {
+              "enum": [
+                "turn_latency",
+                "failed_turns"
+              ],
+              "type": "string"
+            }
+          },
+          "description": "A metric over a window, at a step.",
+          "properties": {
+            "end": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            },
+            "limit": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "metric": {
+              "$ref": "#/$defs/Metric"
+            },
+            "start": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            },
+            "step": {
+              "default": 300,
+              "maximum": 86400,
+              "minimum": 15,
+              "title": "Step",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "start",
+            "end",
+            "metric"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.read_metrics",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.read_scores": {
+      "capability": {
+        "description": "Read the tenant's evaluation scores over a window.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_telemetry",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "description": "A span of time, and how many results to return from it.",
+          "properties": {
+            "end": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            },
+            "limit": {
+              "default": 100,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            },
+            "start": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.read_scores",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/feedback",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.read_spend": {
+      "capability": {
+        "description": "Read the tenant's spend on models against its budget.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_spend",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {},
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.read_spend",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/usage",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.read_trace": {
+      "capability": {
+        "description": "Read one of the tenant's traces, with its spans.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_telemetry",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "additionalProperties": false,
+          "properties": {
+            "trace_id": {
+              "description": "The trace.",
+              "title": "Trace Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "trace_id"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.read_trace",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/traces/{trace_id}",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    },
+    "portalr.read_usage": {
+      "capability": {
+        "description": "Read the tenant's use of models over a span of time, by model, person or workspace.",
+        "effects": [
+          "reads_private"
+        ],
+        "gate": {
+          "action": "portalr:read_spend",
+          "different_approver": false,
+          "integration": null
+        },
+        "input_schema": {
+          "$defs": {
+            "WorkspaceName": {
+              "pattern": "^[^\\x00]{1,256}$",
+              "type": "string"
+            }
+          },
+          "description": "Which usage to read: a window of at most ``MOST_DAYS``, and the workspaces to split it by.\n\nLiteLLM sums by whole UTC day, so the window is read as the days it touches: its first and\nlast days are whole days, whatever time of day it starts or ends. Today, the last day of a\nwindow that ends now, is a part of a day, set beside a whole day's share of the budget.\n``workspaces`` are asked after once each, in the order given.",
+          "properties": {
+            "end": {
+              "format": "date-time",
+              "title": "End",
+              "type": "string"
+            },
+            "start": {
+              "format": "date-time",
+              "title": "Start",
+              "type": "string"
+            },
+            "workspaces": {
+              "items": {
+                "$ref": "#/$defs/WorkspaceName"
+              },
+              "maxItems": 50,
+              "title": "Workspaces",
+              "type": "array"
+            }
+          },
+          "required": [
+            "start",
+            "end"
+          ],
+          "type": "object"
+        },
+        "limits": [],
+        "name": "portalr.read_usage",
+        "output_schema": null,
+        "provider": "command",
+        "reversibility": "none",
+        "risk_class": null,
+        "tier": "read",
+        "version": "1.0.0"
+      },
+      "exposure": "tool",
+      "resource": null,
+      "route": "/portalr/admin/t/{tenant}/usage",
+      "surfaces": [
+        "acp",
+        "mcp",
+        "portalr",
+        "webmcp"
+      ],
+      "toolset": "admin"
+    }
+  },
+  "listed": {},
+  "title": "portalr's commands"
+}

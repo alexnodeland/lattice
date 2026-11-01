@@ -1,6 +1,6 @@
 # ADR-0037: The enforcement path in lattice-core: refusals by step, approvals resumed by id
 
-**Status:** Accepted
+**Status:** Accepted, amended 2026-10-31 (see Amendment)
 **Date:** 2026-10-31
 **Deciders:** Alex Nodeland
 **Records:** how [lattice RFC-0011](../rfcs/0011-the-v0-3-platform-capabilities-approvals-secrets-egress-and-adapters.md)'s "One enforcement path" and its agents bridge are built in `lattice_core.enforcement` and `lattice_core.agents`, where the RFC leaves the shape open
@@ -44,3 +44,7 @@ RFC-0011 makes `Enforcer.call(name, arguments, context)` the only way a capabili
 - Harder: a runner must give back the approval's metadata when it resumes a call, and keep the taint a call leaves.
 - Harder: a capability's name and its tool's name differ, so logs and surfaces that show both must say which.
 - Follow-ups: artifactr's provider, `requires_approval` set by the policy (T5), and the runner keeping taint (phase 2's rest); grantr's `Authorize`, `Audit` and approvals store (phase 3); the cross-package bypass test (phase 6).
+
+## Amendment (2026-10-31)
+
+**An approval lets through only the call that asked it.** The enforcer also checks that a resumed call is the one that asked: the same scope, caller and outside client (`via`) as the approval holds, beside its capability and arguments' digest. Otherwise it refuses with `WrongApproval`, and the approval stays for its own call. Before this, an id answered in one tenant could let the same capability and arguments through in another, or for another person or client in the same workspace, since an id is all a caller gives back. Whether a store's ids name their tenant is the store's business; the enforcer checks either way.

@@ -1023,7 +1023,9 @@ async def test_a_rule_authorize_refuses_fails_for_good_and_the_others_still_run(
         assert runs[refused].error == f"reflexr:{action} is refused in this workspace"
 
 
-async def test_an_on_open_that_fails_fails_the_attempt_to_retry(storage: Storage) -> None:
+async def test_an_on_open_that_fails_fails_the_attempt_to_retry(
+    storage: Storage, clock: FakeClock
+) -> None:
     opened: list[str] = []
 
     async def on_open(tenant_id: str, workspace_id: str) -> None:
@@ -1031,7 +1033,8 @@ async def test_an_on_open_that_fails_fails_the_attempt_to_retry(storage: Storage
         if len(opened) > 1:  # the source's open goes through; the run's fails
             raise RuntimeError("the mirror is down")
 
-    workspaces = Workspaces(storage, events=[Deploy], rules=[rule()], on_open=on_open)
+    # On the fake clock, the retry never comes due while the reactor settles, however slowly.
+    workspaces = Workspaces(storage, events=[Deploy], rules=[rule()], on_open=on_open, clock=clock)
     workspace = await open_(workspaces)
     await workspace.publish(Deploy(service="auth"))
     await reactor(workspaces, Deps()).settle()

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.6.0...grantr-v0.7.0) (2026-11-01)
+
+
+### Features
+
+* **grantr:** store each tenant's bindings beside the operator's, under grantr:manage_bindings (RFC-0011 O13) ([#1315](https://github.com/alexnodeland/lattice/issues/1315)) ([c3cf2d7](https://github.com/alexnodeland/lattice/commit/c3cf2d74eded4b38dc231102901c3f592c812022))
+
 ## [0.6.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.5.0...grantr-v0.6.0) (2026-11-01)
 
 

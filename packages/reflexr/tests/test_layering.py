@@ -67,9 +67,9 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     ),
     # reflexr's static catalog (lattice RFC-0014): commands declared on lattice-core's types and
     # core's models, reading nothing, so the parity test and the schema read it without a
-    # workspace.
+    # workspace; and its provider, which opens one for each call (ADR-0068).
     "commands": (
-        {"reflexr.core", "reflexr.commands"},
+        {"reflexr.core", "reflexr.workspace", "reflexr.commands"},
         {"pydantic", "lattice_core.capabilities", "lattice_core.commands"},
     ),
 }

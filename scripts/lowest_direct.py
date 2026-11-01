@@ -46,6 +46,12 @@ EXPECTED: dict[str, tuple[str, str]] = {
         " with all three, once that is published",
         "cannot import name 'Superset' from 'lattice_core.settings'",
     ),
+    "reflexr": (
+        "its catalog of commands imports lattice_core.capabilities and lattice_core.commands,"
+        " which lattice-core-ai 0.2.0, the newest on PyPI, lacks: its floor rises to the first"
+        " release with both, once that is published",
+        "No module named 'lattice_core.capabilities'",
+    ),
     "relayr": (
         "its catalog of commands imports lattice_core.capabilities and lattice_core.commands,"
         " which lattice-core-ai 0.2.0, the newest on PyPI, lacks: its floor rises to the first"

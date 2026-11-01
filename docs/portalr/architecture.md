@@ -9,6 +9,7 @@ portalr's design is [lattice RFC-0002](../rfcs/0002-portalr-the-portal.md), and 
 | `portalr.actions` | portalr's catalog: `portalr:read_telemetry`, `portalr:read_spend` and `portalr:read_deployment`, for `Grants(catalogs=...)` |
 | `portalr.tenant` | `Tenant`, read-only, which only `allowed()` makes; the layering test keeps `allowed()` to the router, which calls it after grantr allows the read |
 | `portalr.readers` | One reader per tool: `Tempo`, `Loki`, `Prometheus` (through prom-label-proxy), `Langfuse` and `LiteLLM`, and `Grafana` for operators' deep links. `Readers` holds those the stack runs. The only code that talks to the tools |
+| `portalr.commands` | portalr's commands for lattice-core: its admin's reads, creating a tenant and inviting a member, each a `command` capability in the `admin` toolset, a read taking its route's query, and its document `schemas/portalr.commands.json` ([ADR-0094](adr/0094-portalrs-commands-its-admins-reads-and-the-tenant-and-member-it-makes.md)). It reads no tool |
 | `portalr.invites` | `Invite`, and `SupabaseInvite` over Supabase Auth's admin API |
 | `portalr.people` | `People`, the hook that names people by email, and `SupabasePeople` over Supabase Auth's admin API, with a short in-memory cache ([ADR-0038](adr/0038-people-by-email.md)) |
 | `portalr.fastapi` | `portalr_router`, its `Site` settings, the UIs' serving, and its OpenAPI document |

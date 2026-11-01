@@ -159,6 +159,10 @@ class DeferredRequest(BaseModel):
     review: dict[str, JsonValue] = {}
     """What the tool tells the person who answers, beside the call's arguments: for a connected
     app's code, the app, what running it means, and what a scan found in it (ADR-0085)."""
+    approval: str | None = None
+    """The id of the approval an approval waits on, in the application's store of approvals,
+    when lattice's enforcer asked it (lattice RFC-0011): it is answered there, and given back to
+    the call as the run resumes (ADR-0101). ``None`` for one artifactr's own tools asked."""
 
 
 class StepUsage(BaseModel):

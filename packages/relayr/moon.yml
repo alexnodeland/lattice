@@ -14,8 +14,10 @@ tasks:
     args: ['--numprocesses', 'auto']
 
   schema:
-    description: "Regenerate the OpenAPI document of relayr's routes, which portalr's client is typed from"
-    script: 'uv run python $workspaceRoot/scripts/generate.py schemas/relayr.openapi.json relayr.fastapi.openapi'
+    description: "Regenerate the OpenAPI document of relayr's routes, which portalr's client is typed from, and the catalog of commands"
+    script: >-
+      uv run python $workspaceRoot/scripts/generate.py schemas/relayr.openapi.json relayr.fastapi.openapi
+      && uv run python $workspaceRoot/scripts/generate.py schemas/relayr.commands.json relayr.commands.schema
     options:
       cache: false
       runInCI: false

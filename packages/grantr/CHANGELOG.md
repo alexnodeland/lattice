@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/alexnodeland/lattice/compare/grantr-v0.2.1...grantr-v0.3.0) (2026-11-01)
+
+
+### Features
+
+* **grantr:** store approvals per tenant, the first answer winning (RFC-0011 phase 3) ([#1284](https://github.com/alexnodeland/lattice/issues/1284)) ([93bd099](https://github.com/alexnodeland/lattice/commit/93bd099685138c9e07dc3e0fdc99157afe8b697d))
+
 ## [0.2.1](https://github.com/alexnodeland/lattice/compare/grantr-v0.2.0...grantr-v0.2.1) (2026-10-30)
 
 

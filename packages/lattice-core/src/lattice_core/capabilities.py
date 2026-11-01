@@ -72,7 +72,7 @@ __all__ = [
     "discover",
 ]
 
-CONTRACT: Final = "1.0.0"
+CONTRACT: Final = "1.1.0"
 """The contract's version. A removed field or a changed meaning is a major version; an optional
 field, a new :data:`Effect` or a new :data:`ProviderKind` is a minor one, and a consumer treats
 a value it doesn't know as the strictest."""
@@ -213,12 +213,17 @@ class Capability(BaseModel):
 
 
 class Scope(BaseModel):
-    """Where capabilities are offered and called: a tenant's workspace."""
+    """Where capabilities are offered and called: a tenant's workspace, or the tenant as a whole.
+
+    A tenant-wide command, such as listing a tenant's workspaces, is called with no workspace
+    (lattice ADR-0044); everything else is called in one.
+    """
 
     model_config = ConfigDict(frozen=True, use_attribute_docstrings=True)
 
     tenant_id: str
-    workspace_id: str
+    workspace_id: str | None = None
+    """The workspace, or None for the tenant as a whole."""
 
 
 class PersonCaller(BaseModel):

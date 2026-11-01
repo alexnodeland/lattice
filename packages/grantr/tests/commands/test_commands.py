@@ -83,6 +83,10 @@ def test_every_command_is_grantrs_and_gated_by_a_grantr_action() -> None:
     assert list(catalog(CATALOG)) == list(COMMANDS), "no two share a name or a tool name"
 
 
+def test_every_command_is_tenant_wide_as_access_is_the_tenants() -> None:
+    assert all(command.tenant_wide for command in COMMANDS.values())
+
+
 def test_every_grantr_action_is_some_commands_gate() -> None:
     gates = {command.capability.gate.action for command in COMMANDS.values()}
     # Creating a tenant is portalr's command, which asks for its name and owner (RFC-0014).

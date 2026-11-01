@@ -152,7 +152,7 @@ class Switch:
 
     on: set[str] = field(default_factory=set[str])
 
-    async def is_enabled(self, _tenant_id: str, _workspace_id: str, key: str, /) -> bool:
+    async def is_enabled(self, _tenant_id: str, _workspace_id: str | None, key: str, /) -> bool:
         return key in self.on
 
 
@@ -1192,7 +1192,8 @@ async def test_the_hourly_limit_is_read_from_settings_each_call_and_fails_closed
     reads: list[tuple[str, str, str]] = []
 
     class Store:
-        async def value(self, tenant_id: str, workspace_id: str, key: str, /) -> Any:
+        async def value(self, tenant_id: str, workspace_id: str | None, key: str, /) -> Any:
+            assert workspace_id is not None, "artifactr reads its settings in a workspace"
             reads.append((tenant_id, workspace_id, key))
             if key not in limits:
                 raise KeyError(key)
@@ -1237,7 +1238,7 @@ class Narrowed:
         self.names = frozenset(names)
         self.broken = False
 
-    async def value(self, _tenant: str, _workspace: str, key: str, /) -> Any:
+    async def value(self, _tenant: str, _workspace: str | None, key: str, /) -> Any:
         if self.broken:
             raise OSError("the store can't be read")
         assert key == "connect-tools:fake"

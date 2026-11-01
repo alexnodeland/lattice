@@ -48,7 +48,8 @@ class Switch:
     on: bool = True
     asked: list[tuple[str, str, str]] = field(default_factory=list[tuple[str, str, str]])
 
-    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
+    async def is_enabled(self, tenant_id: str, workspace_id: str | None, key: str, /) -> bool:
+        assert workspace_id is not None, "relayr asks in a workspace"
         self.asked.append((tenant_id, workspace_id, key))
         return self.on
 

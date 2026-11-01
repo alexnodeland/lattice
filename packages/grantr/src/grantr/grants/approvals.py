@@ -59,9 +59,9 @@ type Record = Callable[[TenantId | None, Subject | None, AuditEvent], Awaitable[
 type Change = Callable[[TenantId], AbstractAsyncContextManager[tuple[Transaction, Record]]]
 """A change to one tenant: its transaction, and how to record its audit entries."""
 
-type Holds = Callable[[Reads, TenantId, Member, str, WorkspaceId], Awaitable[bool]]
-"""Whether a member holds an action on a workspace, as an answerer: a service principal by a
-grant made to it, and not to a group it is in."""
+type Holds = Callable[[Reads, TenantId, Member, str, WorkspaceId | None], Awaitable[bool]]
+"""Whether a member holds an action on a workspace, or on the tenant for None, as an answerer: a
+service principal by a grant made to it, and not to a group it is in."""
 
 type IsMember = Callable[[Reads, TenantId, Member], Awaitable[bool]]
 """Whether a user or service principal is a member of a tenant."""
@@ -328,7 +328,11 @@ class GrantrApprovals:
         return expired
 
     async def pending(self, scope: Scope, subject: Answerer, /) -> list[Approval]:
-        """Return the approvals pending in the scope that the subject may answer, oldest first."""
+        """Return the approvals pending in the scope that the subject may answer, oldest first.
+
+        A scope with no workspace is the tenant as a whole, so its are every workspace's too, as
+        :meth:`answerable`'s are (lattice ADR-0044).
+        """
         return await self._answerable(scope.tenant_id, subject, scope.workspace_id)
 
     async def answerable(self, tenant: TenantId, subject: Answerer, /) -> list[Approval]:

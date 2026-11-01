@@ -17,7 +17,7 @@ __all__ = ["ALWAYS"]
 class _Always:
     """Every integration runs everywhere."""
 
-    async def is_enabled(self, _tenant_id: str, _workspace_id: str, _key: str, /) -> bool:
+    async def is_enabled(self, _tenant_id: str, _workspace_id: str | None, _key: str, /) -> bool:
         """Return True: the integration runs."""
         return True
 

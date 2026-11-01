@@ -65,6 +65,7 @@ nav:
       - adr/0041-the-command-declaration-a-capability-with-its-toolset-exposure-route-and-surfaces-in-a-static-catalog.md
       - adr/0042-parity-every-operation-names-its-command-and-one-test-holds-the-catalogs-to-grantr.md
       - adr/0043-portr-a-package-of-its-own-on-lattice-core-reaching-commands-only-through-the-registry.md
+      - adr/0044-tenant-wide-commands-called-with-no-workspace-and-checked-on-the-tenant.md
       - Template: adr/template.md
   - Brand: assets/brand/README.md
   - artifactr: artifactr

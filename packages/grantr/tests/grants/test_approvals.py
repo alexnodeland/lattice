@@ -102,7 +102,7 @@ def _request(
     answerers: Answerers = BY_ACTION,
     *,
     tenant: str = "acme",
-    workspace: str = "w1",
+    workspace: str | None = "w1",
     asked_by: Caller = RUN,
     deadline: datetime = NOW + timedelta(hours=1),
 ) -> ApprovalRequest:
@@ -237,6 +237,23 @@ async def test_who_holds_the_action_on_its_workspace_may_answer(storage: Storage
     with pytest.raises(NotAnAnswerer, match="carol may not answer"):
         await approvals.answer(asked.id, _answer(), subject=_as(CAROL))
     assert not await approvals.may_answer(asked, _as(DAVE)), "another tenant's owner"
+
+
+async def test_a_tenant_wide_calls_approval_is_the_tenants(storage: Storage) -> None:
+    """lattice ADR-0044: asked with no workspace, answered by who holds the action on the tenant."""
+    grants = await _grants(storage)
+    approvals = _store(grants, Clock())
+    asked = await approvals.ask(_request(workspace=None))
+    assert asked.scope.workspace_id is None
+    assert await approvals.may_answer(asked, _as(ALICE)), "the owner's, on the tenant"
+    assert not await approvals.may_answer(asked, _as(BOB)), "w1's admin, not the tenant's"
+    assert [a.id for a in await approvals.pending(Scope(tenant_id="acme"), _as(ALICE))] == [
+        asked.id
+    ]
+    assert (await approvals.get(asked.id)).scope == Scope(tenant_id="acme")
+    [entry] = await grants.audit("acme", by=ALICE, keep=APPROVALS)
+    assert isinstance(entry.event, ApprovalAsked)
+    assert entry.event.workspace is None
 
 
 async def test_a_named_subject_or_group_may_answer_by_grantrs_groups(storage: Storage) -> None:

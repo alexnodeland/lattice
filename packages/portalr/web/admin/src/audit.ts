@@ -136,16 +136,16 @@ export function said(event: AuditEvent, names: Names = shortId): string {
     }
     case "binding_removed":
       return `unbound ${event.source} ${event.connection} from workspace ${event.workspace}`;
-    case "approval_asked":
-      return `asked approval ${event.approval} to call ${event.capability} in workspace ${event.workspace}, as ${event.caller}`;
+    case "approval_asked": {
+      const where = event.workspace === null ? "on the tenant" : `in workspace ${event.workspace}`;
+      return `asked approval ${event.approval} to call ${event.capability} ${where}, as ${event.caller}`;
+    }
     case "approval_answered":
       return `${event.approved ? "approved" : "denied"} ${event.approval} on ${event.surface}`;
     case "approval_closed":
       return `closed ${event.approval}, ${event.state}: ${event.reason}`;
     case "capability_called": {
-      const where = event.tenant
-        ? `${event.tenant}'s workspace ${event.workspace}`
-        : `workspace ${event.workspace}`;
+      const where = calledIn(event.workspace, event.tenant);
       const through = event.client ? ` through ${event.client}` : "";
       return `called ${event.capability} in ${where}, as ${event.caller}${through}: ${event.outcome}`;
     }
@@ -158,6 +158,13 @@ export function said(event: AuditEvent, names: Names = shortId): string {
 }
 
 /** An event of a type no case reads, named by its type alone. */
+/** Where a call was made: a workspace, or the tenant for a tenant-wide command's; and the tenant it
+ * named, when the deployment's log holds it. */
+function calledIn(workspace: string | null, tenant: string | null | undefined): string {
+  if (workspace === null) return tenant ? `tenant ${tenant}` : "the tenant";
+  return tenant ? `${tenant}'s workspace ${workspace}` : `workspace ${workspace}`;
+}
+
 const unknown = (event: { readonly type: string }) =>
   `made a change of a kind admin doesn't know: ${event.type}`;
 

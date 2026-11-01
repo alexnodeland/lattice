@@ -48,7 +48,9 @@ async def note(reaction: Reaction[None]) -> Literal["noted"]:
     return "noted"
 
 
-def context(caller: Any = ALICE, workspace: str = "prod", via: Via | None = None) -> CallContext:
+def context(
+    caller: Any = ALICE, workspace: str | None = "prod", via: Via | None = None
+) -> CallContext:
     return CallContext(
         scope=Scope(tenant_id="acme", workspace_id=workspace),
         caller=caller,
@@ -199,6 +201,8 @@ async def test_what_the_workspace_refuses_is_raised(workspaces: Workspaces) -> N
     unknown = capability("reflexr.get_run").model_copy(update={"name": "reflexr.dance"})
     with pytest.raises(ValueError, match=r"reflexr\.dance isn't one of reflexr's commands"):
         await bound.call(unknown, {}, context())
+    with pytest.raises(ValueError, match=r"reflexr\.list_runs is called in a workspace"):
+        await bound.call(capability("reflexr.list_runs"), {}, context(workspace=None))
 
 
 async def test_a_call_is_checked_as_its_actor() -> None:

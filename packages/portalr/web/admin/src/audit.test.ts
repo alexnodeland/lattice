@@ -118,6 +118,16 @@ test("each type of change reads as a sentence", () => {
       "asked approval apr~acme~1 to call artifactr.edit_text in workspace notes, as run:run_1",
     ],
     [
+      {
+        type: "approval_asked",
+        approval: "apr~acme~2",
+        workspace: null,
+        capability: "grantr.revoke_member_connection",
+        caller: "person:alice",
+      },
+      "asked approval apr~acme~2 to call grantr.revoke_member_connection on the tenant, as person:alice",
+    ],
+    [
       { type: "approval_answered", approval: "apr~acme~1", approved: true, surface: "portalr" },
       "approved apr~acme~1 on portalr",
     ],
@@ -167,6 +177,39 @@ test("each type of change reads as a sentence", () => {
         called_at: "2026-11-01T01:00:00Z",
       },
       "called artifactr.edit_text in globex's workspace notes, as person:dave: refused",
+    ],
+    [
+      {
+        type: "capability_called",
+        capability: "artifactr.list_workspaces",
+        version: "1.0.0",
+        workspace: null,
+        caller: "person:alice",
+        correlation_id: "turn_2",
+        surface: "mcp",
+        arguments_digest: "a".repeat(64),
+        steps: [],
+        outcome: "called",
+        called_at: "2026-11-01T01:00:00Z",
+      },
+      "called artifactr.list_workspaces in the tenant, as person:alice: called",
+    ],
+    [
+      {
+        type: "capability_called",
+        capability: "artifactr.list_workspaces",
+        version: null,
+        workspace: null,
+        tenant: "globex",
+        caller: "person:dave",
+        correlation_id: "turn_3",
+        surface: "mcp",
+        arguments_digest: "a".repeat(64),
+        steps: [],
+        outcome: "refused",
+        called_at: "2026-11-01T01:00:00Z",
+      },
+      "called artifactr.list_workspaces in tenant globex, as person:dave: refused",
     ],
     [
       {

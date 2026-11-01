@@ -317,7 +317,7 @@ class _ByTenant:
     def __init__(self) -> None:
         self.off: set[tuple[str, str, str]] = set()
 
-    async def is_enabled(self, tenant_id: str, workspace_id: str, key: str, /) -> bool:
+    async def is_enabled(self, tenant_id: str, workspace_id: str | None, key: str, /) -> bool:
         return (tenant_id, workspace_id, key) not in self.off
 
 

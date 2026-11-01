@@ -283,7 +283,7 @@ class ApprovalAsked(BaseModel):
     approval: str
     """The approval's id."""
 
-    workspace: WorkspaceId
+    workspace: WorkspaceId | None
     capability: str
     """The capability the call would call."""
 
@@ -347,7 +347,7 @@ class CapabilityCalled(BaseModel):
     version: str | None
     """The version called, or None if no capability of the name was offered."""
 
-    workspace: WorkspaceId
+    workspace: WorkspaceId | None
     tenant: str | None = None
     """The tenant the call named, in the deployment's log alone: one that doesn't exist."""
 

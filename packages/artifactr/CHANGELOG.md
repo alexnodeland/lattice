@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.9.0...artifactr-v0.10.0) (2026-11-02)
+
+
+### Features
+
+* **artifactr:** artifactr's catalog bound to its workspaces and runner, every command a client may call (ADR-0103) ([#1384](https://github.com/alexnodeland/lattice/issues/1384)) ([a32385c](https://github.com/alexnodeland/lattice/commit/a32385c65e94c95a21c4a6802f8bdcf1ae937cc5))
+
 ## [0.9.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.8.0...artifactr-v0.9.0) (2026-11-02)
 
 

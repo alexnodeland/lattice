@@ -52,6 +52,7 @@ nav:
   - adr/0040-draft-rule-reads-a-rule-sent-as-json-and-stays-offered.md
   - adr/0041-a-diagrams-commits-bridged-as-its-elements-changed-and-comments-on-them.md
   - adr/0042-relayrs-commands-the-tracker-connectors-reads-gated-by-reflexrs-actions.md
+  - adr/0043-relayrs-provider-its-two-reads-asked-of-reflexrs-authorize-as-its-routes-ask-it.md
 - RFCs:
   - rfcs/README.md
   - rfcs/0001-v0.1-implementation-plan.md

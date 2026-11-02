@@ -69,6 +69,9 @@ class Tool(BaseModel):
     toolset: Toolset
     route: str | None
     """portalr's path that a result links to, its placeholders unfilled."""
+    tenant_wide: bool = False
+    """It acts on the tenant as a whole, so a client names no workspace for it (lattice
+    ADR-0044)."""
 
 
 class Resource(BaseModel):
@@ -142,6 +145,7 @@ def offered(commands: Iterable[Command], *, toolsets: Collection[Toolset] = ()) 
                     annotations=_annotations(command),
                     toolset=command.toolset,
                     route=command.route,
+                    tenant_wide=command.tenant_wide,
                 )
             )
         if command.resource is not None:

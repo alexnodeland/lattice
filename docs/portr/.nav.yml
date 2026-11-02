@@ -3,3 +3,6 @@ nav:
 - Home: index.md
 - Architecture: architecture.md
 - Reference: reference.md
+- Decisions:
+  - adr/README.md
+  - adr/0001-the-mcp-server-stateless-streamable-http-a-verified-token-and-a-live-connection-on-every-request.md

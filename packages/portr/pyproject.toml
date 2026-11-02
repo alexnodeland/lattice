@@ -25,6 +25,10 @@ dependencies = [
     "pydantic>=2.13",
 ]
 
+[project.optional-dependencies]
+# portr.mcp: the Streamable HTTP server, on the MCP SDK and the Starlette it serves with.
+mcp = ["mcp>=2.2", "starlette>=0.27"]
+
 [project.urls]
 Homepage = "https://lattice.alexnodeland.com/portr/"
 Documentation = "https://lattice.alexnodeland.com/portr/"

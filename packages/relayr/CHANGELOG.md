@@ -5,6 +5,13 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0](https://github.com/alexnodeland/lattice/compare/relayr-v0.5.0...relayr-v0.6.0) (2026-11-02)
+
+
+### Features
+
+* **relayr:** relayr's provider, its two reads asked of reflexr's authorize as its routes ask it (ADR-0043) ([#1393](https://github.com/alexnodeland/lattice/issues/1393)) ([514b97f](https://github.com/alexnodeland/lattice/commit/514b97f7f2748cb72d8c5a32e4564b351cc149a3))
+
 ## [0.5.0](https://github.com/alexnodeland/lattice/compare/relayr-v0.4.0...relayr-v0.5.0) (2026-11-02)
 
 

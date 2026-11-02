@@ -90,6 +90,12 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"relayr.events", "relayr.outbound", "relayr.rules"},
         {*LIBRARIES, "pydantic", "pydantic_ai"},
     ),
+    # relayr's provider (lattice RFC-0014): its catalog bound to the connector's reads, each asked
+    # of reflexr's `authorize`, as relayr's routes ask it.
+    "capabilities": (
+        {"relayr.commands", "relayr.ledger", "relayr.trackers", "relayr.capabilities"},
+        {"pydantic", "reflexr", "lattice_core.capabilities"},
+    ),
     # relayr's static catalog (lattice RFC-0014): commands declared on lattice-core's types,
     # reading nothing, so the parity test and the schema read it without a workspace.
     "commands": (

@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/alexnodeland/lattice/compare/portr-v0.1.0...portr-v0.2.0) (2026-11-02)
+
+
+### Features
+
+* **portr:** portr.mcp, lattice's commands over stateless Streamable HTTP, each call through the enforcer (portr ADR-0001) ([#1387](https://github.com/alexnodeland/lattice/issues/1387)) ([5b1d713](https://github.com/alexnodeland/lattice/commit/5b1d7132074be6cba72f2b1855a10f28e81d66cb))
+
 ## 0.1.0 (2026-11-01)
 
 

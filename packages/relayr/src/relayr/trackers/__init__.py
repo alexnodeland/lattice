@@ -85,6 +85,15 @@ from relayr.trackers.port import (
     Unauthorized,
     Unavailable,
 )
+from relayr.trackers.reads import (
+    Filed,
+    FiledItem,
+    Following,
+    Reading,
+    Writes,
+    filed_in,
+    following_in,
+)
 
 __all__ = [
     "CLAIM_TTL",
@@ -103,6 +112,9 @@ __all__ = [
     "Deleted",
     "FakeConnection",
     "FakeTracker",
+    "Filed",
+    "FiledItem",
+    "Following",
     "Item",
     "ItemDraft",
     "ItemFields",
@@ -114,6 +126,7 @@ __all__ = [
     "Priority",
     "ProjectId",
     "RateLimited",
+    "Reading",
     "Refused",
     "State",
     "Tracker",
@@ -127,5 +140,8 @@ __all__ = [
     "Trackers",
     "Unauthorized",
     "Unavailable",
+    "Writes",
     "event_id",
+    "filed_in",
+    "following_in",
 ]

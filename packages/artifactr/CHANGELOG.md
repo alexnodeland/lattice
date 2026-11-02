@@ -5,6 +5,17 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.8.0...artifactr-v0.9.0) (2026-11-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* **core:** `lattice_core.capabilities.Scope.workspace_id` is `str | None`, and `Integrations.is_enabled`, `Settings.value` and grantr's `Holds` take a workspace that may be None. An application's own implementation of one of them, or its own `Provider`, must accept None, which a tenant-wide command's call passes.
+
+### Features
+
+* **core:** tenant-wide commands, called with no workspace and checked on the tenant (ADR-0044) ([#1382](https://github.com/alexnodeland/lattice/issues/1382)) ([97c80a5](https://github.com/alexnodeland/lattice/commit/97c80a5ebe70cbe0bf86c2bb4b709f66d035fdf8))
+
 ## [0.8.0](https://github.com/alexnodeland/lattice/compare/artifactr-v0.7.0...artifactr-v0.8.0) (2026-11-01)
 
 

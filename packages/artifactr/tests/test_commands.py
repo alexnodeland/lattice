@@ -6,12 +6,17 @@ import json
 import runpy
 from contextlib import redirect_stdout
 from pathlib import Path
+from typing import get_args
 
 import pytest
+from pydantic import TypeAdapter
 
 from artifactr.capabilities import NAMES as PROVIDED
-from artifactr.commands import CATALOG, LISTED
+from artifactr.commands import ARGUMENTS, CATALOG, LISTED
+from artifactr.commands.arguments import FeedbackTarget, ModeArguments
 from artifactr.commands.schema import catalog_document
+from artifactr.core import ArtifactTarget, MessageTarget, ThreadMode, ThreadTarget, TurnTarget
+from artifactr.core import FeedbackTarget as CoreTarget
 from artifactr.workspace import ACTIONS
 from lattice_core.commands import NotExposed, catalog
 
@@ -54,6 +59,32 @@ def test_the_providers_tools_are_commands_of_their_names() -> None:
 def test_listing_the_workspaces_alone_is_tenant_wide() -> None:
     tenant_wide = {name for name, command in COMMANDS.items() if command.tenant_wide}
     assert tenant_wide == {"artifactr.list_workspaces"}, "a client finds a workspace with it"
+
+
+def test_each_commands_arguments_are_the_models_its_input_schema_is() -> None:
+    assert list(ARGUMENTS) == list(COMMANDS)
+    for name, command in COMMANDS.items():
+        schema = ARGUMENTS[name].model_json_schema()
+        del schema["title"]
+        assert command.capability.input_schema == schema, name
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        ArtifactTarget(artifact_id="art_1", version=2),
+        ThreadTarget(thread_id="thr_1"),
+        TurnTarget(run_id="run_1"),
+        MessageTarget(message_id="msg_1", thread_id="thr_1", run_id="run_1"),
+    ],
+)
+def test_feedbacks_targets_are_cores_as_a_call_names_them(target: CoreTarget) -> None:
+    named = TypeAdapter(FeedbackTarget).validate_python(target.model_dump())
+    assert TypeAdapter(CoreTarget).validate_python(named.model_dump()) == target
+
+
+def test_a_threads_modes_are_cores() -> None:
+    assert get_args(ModeArguments.model_fields["mode"].annotation) == get_args(ThreadMode)
 
 
 def test_the_committed_catalog_is_current() -> None:

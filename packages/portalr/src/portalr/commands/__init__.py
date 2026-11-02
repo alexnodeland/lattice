@@ -16,7 +16,7 @@ it at its composition root, as portr does (lattice ADR-0041).
   the names of people and the models a turn may use are portalr's UI's own, gated by no action.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Annotated, Any, Final
@@ -34,7 +34,15 @@ from portalr.readers.query import Window
 from portalr.readers.tempo import TraceQuery
 from portalr.readers.usage import UsageQuery
 
-__all__ = ["CATALOG", "LISTED", "VERSION", "PortalrCommands"]
+__all__ = [
+    "ADD_MEMBER",
+    "ARGUMENTS",
+    "CATALOG",
+    "CREATE_TENANT",
+    "LISTED",
+    "VERSION",
+    "PortalrCommands",
+]
 
 VERSION: Final = "1.0.0"
 """Each command's version."""
@@ -270,3 +278,8 @@ class PortalrCommands:
 
 CATALOG: Final = PortalrCommands()
 """portalr's catalog, unbound: what an application binds at its composition root."""
+
+ARGUMENTS: Final[Mapping[str, type[BaseModel]]] = MappingProxyType(
+    {spec.name: spec.arguments for spec in _SPECS}
+)
+"""Each command's arguments, by its name: the model a bound provider validates a call with."""

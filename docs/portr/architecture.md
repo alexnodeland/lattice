@@ -7,8 +7,9 @@ portr is lattice's gateway for outside clients ([lattice RFC-0014](../rfcs/0014-
 | Module | What | Imports |
 |---|---|---|
 | `portr.core` | What a client is offered, from the composed commands: tools, resource templates and toolsets. No I/O, no MCP SDK | pydantic, lattice-core's `capabilities` and `commands` |
+| `portr.mcp` (the `mcp` extra) | The MCP server: the core's offer over stateless Streamable HTTP, behind bearer authentication, each call through lattice-core's enforcer ([ADR-0001](adr/0001-the-mcp-server-stateless-streamable-http-a-verified-token-and-a-live-connection-on-every-request.md)) | the core; the `mcp` SDK and Starlette; lattice-core's `capabilities`, `commands`, `enforcement` and `taint` |
 
-To come, as RFC-0014 plans them: `portr.mcp`, the Streamable HTTP server on the `mcp` SDK, with the protected resource metadata and the elicitation surface; `portr.oauth`, token verification against Supabase Auth, the connection check and the consent API; and `portr.acp`, the ACP permission surface for coding agents. Each comes behind an extra.
+To come, as RFC-0014 plans them: `portr.oauth`, token verification against Supabase Auth and the consent API; the elicitation surface, in `portr.mcp`; and `portr.acp`, the ACP permission surface for coding agents. Each comes behind an extra.
 
 ## What a client is offered
 
@@ -20,6 +21,16 @@ To come, as RFC-0014 plans them: `portr.mcp`, the Streamable HTTP server on the 
 - **A read exposed as a resource** is a template, by the URI its command names.
 
 `tiers(commands)` gives each toolset's tiers, among the commands offered on `mcp`, in lattice-core's order of toolsets, for the consent page to show beside each toolset a person may let a client use.
+
+## The MCP server
+
+`PortrMcp(enforcer, commands, connections, *, portal=None)` serves `tools/list` and `tools/call` ([ADR-0001](adr/0001-the-mcp-server-stateless-streamable-http-a-verified-token-and-a-live-connection-on-every-request.md), lattice RFC-0014's P5 and P6). `http_app(auth=, token_verifier=)` is the MCP SDK's Streamable HTTP app, stateless.
+
+- **Before a request reaches portr,** the SDK's bearer middleware verifies its token with the application's `TokenVerifier`, and, with `validate_token_resource`, accepts only a token issued for the gateway's URL. A request without one gets 401, naming the protected resource metadata portr serves at `/.well-known/oauth-protected-resource`, with `auth.issuer_url` as its authorization server. DNS rebinding protection accepts the resource URL's host alone.
+- **Every request reads its connection:** `Connections` turns the verified token into the live `Connected` it names (its id, tenant, person, client name and toolsets), or None, which refuses the request. An application binds it to grantr's connections, so a revoked one stops the next call.
+- **A client is offered its connection's toolsets**, `core` among them, as `offered` makes them, and calls only what it is offered.
+- **A workspace-scoped tool takes `workspace`,** required, which portr moves into the call's scope; a tenant-wide one, such as `artifactr_list_workspaces`, takes none and is called with no workspace ([lattice ADR-0044](../adr/0044-tenant-wide-commands-called-with-no-workspace-and-checked-on-the-tenant.md)).
+- **Every call goes through the enforcer** as the person, `via` the client, from surface `mcp`, clean of taint, with a correlation id of its own. A result is text and, for JSON, structured content, with a link to portalr's route when `portal` is given. A refusal or a provider's failure is the tool's error. A call that waits for an approval answers its id and its page in portalr.
 
 ## Independence
 

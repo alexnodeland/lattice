@@ -159,11 +159,12 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
         {"artifactr.commands"},
         {"pydantic", "lattice_core.capabilities", "lattice_core.commands"},
     ),
-    # artifactr's provider (lattice RFC-0011): its artifact tools as capabilities, on the agent's
-    # and the workspace's public API, against lattice-core's capabilities contract.
+    # artifactr's providers (lattice RFC-0011): its artifact tools as capabilities, and its
+    # catalog bound to its workspaces (lattice RFC-0014), on the agent's and the workspace's
+    # public API, against lattice-core's capabilities and commands contracts.
     "capabilities": (
-        {*INNER, "artifactr.capabilities"},
-        {"pydantic", "lattice_core.capabilities"},
+        {*INNER, "artifactr.capabilities", "artifactr.commands"},
+        {"pydantic", "lattice_core.capabilities", "lattice_core.commands"},
     ),
     # Native files, the files extra (lattice RFC-0003 and ADR-0026): built on the public API of
     # core and the workspace, with its SQL stores in the sql extra and the apps' adapters on the
@@ -176,14 +177,14 @@ LAYERS: dict[str, tuple[set[str], set[str]]] = {
     "files": (
         {
             *("artifactr.core", "artifactr.workspace", "artifactr.agent", "artifactr.fastapi"),
-            "artifactr.telemetry",
+            *("artifactr.telemetry", "artifactr.capabilities", "artifactr.commands"),
             "artifactr.files",
         },
         {
             *("pydantic", "pydantic_ai", "sqlalchemy", "alembic", "mcp", "anyio"),
             *("fastapi", "starlette", "uvicorn", "httpx"),
             *("lattice_core.sql", "lattice_core.integrations", "lattice_core.refusals"),
-            *("lattice_core.commands", "lattice_core.origins"),
+            *("lattice_core.commands", "lattice_core.origins", "lattice_core.capabilities"),
             *("FreeCAD", "Part", "Sketcher", "TechDraw", "PIL"),
             *("zstandard", "bpy", "bmesh", "mathutils"),
         },

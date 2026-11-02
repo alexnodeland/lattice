@@ -19,17 +19,37 @@ The names of the tools artifactr's provider already offers (artifactr ADR-0099) 
 commands' names, so a client sees one tool for each.
 """
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Final
 
-from pydantic import BaseModel, ConfigDict, Field
-
+from artifactr.commands.arguments import (
+    Arguments,
+    ArtifactArguments,
+    CreateArguments,
+    DeferredArguments,
+    EditArguments,
+    EditTextArguments,
+    EventsArguments,
+    FeedbackArguments,
+    FileArguments,
+    FocusArguments,
+    ListArguments,
+    ModeArguments,
+    NewThreadArguments,
+    NoArguments,
+    PageArguments,
+    PostArguments,
+    ProposalArguments,
+    ProposeTextArguments,
+    ReadThreadArguments,
+    RunArguments,
+)
 from lattice_core.capabilities import Capability, Effect, Gate, JsonObject, Reversibility, Tier
 from lattice_core.commands import Command, Exposure, NotExposed, Surface, Toolset
 
-__all__ = ["CATALOG", "LISTED", "VERSION", "ArtifactrCommands"]
+__all__ = ["ARGUMENTS", "CATALOG", "LISTED", "VERSION", "ArtifactrCommands"]
 
 VERSION: Final = "1.0.0"
 """Each command's version."""
@@ -55,141 +75,12 @@ LISTED: Final = MappingProxyType(
 """Each of artifactr's actions that is no command's gate, and why: what the parity test reads."""
 
 
-class _Arguments(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True, use_attribute_docstrings=True)
-
-
-class _Page(_Arguments):
-    after: str | None = None
-    """Read after this id, from the last page."""
-    limit: int = Field(default=100, ge=1, le=500)
-    """How many to read."""
-
-
-class _Nothing(_Arguments):
-    pass
-
-
-class _Thread(_Arguments):
-    thread_id: str
-    """The thread."""
-
-
-class _ReadThread(_Thread):
-    after_seq: int = Field(default=0, ge=0)
-    """Read the thread's events after this sequence number, to read what came since."""
-
-
-class _NewThread(_Arguments):
-    title: str | None = None
-    """Its title; one is made from its first message if omitted."""
-
-
-class _Post(_Arguments):
-    text: str = Field(min_length=1)
-    """The message."""
-    thread_id: str | None = None
-    """The thread to post in; a new one is started if omitted."""
-
-
-class _Run(_Arguments):
-    run_id: str
-    """The run."""
-
-
-class _Events(_Arguments):
-    after_seq: int = Field(default=0, ge=0)
-    """Read the workspace's events after this sequence number."""
-    limit: int = Field(default=100, ge=1, le=1000)
-    """How many to read."""
-
-
-class _List(_Arguments):
-    kind: str | None = None
-    """Only list artifacts of this kind."""
-
-
-class _Artifact(_Arguments):
-    artifact_id: str
-    """The artifact."""
-
-
-class _Create(_Arguments):
-    kind: str
-    """The kind of artifact to create: one the application registers."""
-    data: dict[str, Any]
-    """Its data, which must match its kind's JSON Schema."""
-
-
-class _EditText(_Artifact):
-    old: str
-    """Text that occurs exactly once in the field now; an empty string writes an empty field."""
-    new: str
-    """The replacement text."""
-    field: str = "text"
-    """The text field to edit."""
-    summary: str | None = None
-    """A short description of the change, shown to others."""
-
-
-class _ProposeText(_EditText):
-    rationale: str | None = None
-    """Why you propose it, shown to the person who reviews it."""
-
-
-class _Edit(_Artifact):
-    operations: list[dict[str, Any]] = Field(min_length=1)
-    """JSON Patch operations on the artifact's data."""
-    summary: str | None = None
-    """A short description of the change, shown to others."""
-
-
-class _Proposal(_Arguments):
-    proposal_id: str
-    """The proposal."""
-    accept: bool
-    """Whether to accept it, applying its change, or reject it."""
-    reason: str | None = None
-    """Why, shown to whoever proposed it."""
-
-
-class _Feedback(_Arguments):
-    target_id: str
-    """The message, run or artifact the feedback is on."""
-    rating: int = Field(ge=-1, le=1)
-    """-1, 0 or 1."""
-    comment: str | None = None
-    """What you would say about it."""
-
-
-class _Deferred(_Arguments):
-    call_id: str
-    """The deferred call."""
-    approved: bool
-    """Whether to let it go ahead."""
-
-
-class _Focus(_Arguments):
-    artifact_id: str | None
-    """What is open; none if omitted."""
-
-
-class _Mode(_Thread):
-    mode: str
-    """The thread's mode, as its runner offers them."""
-
-
-class _File(_Artifact):
-    page: int = Field(default=1, ge=1)
-    """The page to read, of a file read a page at a time."""
-
-
 @dataclass(frozen=True)
 class _Spec:
     name: str
     description: str
     action: str
-    arguments: type[_Arguments]
+    arguments: type[Arguments]
     tier: Tier = "write"
     reversibility: Reversibility = "compensable"
     effects: frozenset[Effect] = frozenset()
@@ -204,7 +95,7 @@ class _Spec:
 
 
 def _read(
-    name: str, description: str, action: str, arguments: type[_Arguments], **more: Any
+    name: str, description: str, action: str, arguments: type[Arguments], **more: Any
 ) -> _Spec:
     return _Spec(
         name,
@@ -223,7 +114,7 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.list_workspaces",
         "List the workspaces you can open in the tenant, a page at a time.",
         "artifactr:read_workspaces",
-        _Page,
+        PageArguments,
         route=APP,
         tenant_wide=True,
     ),
@@ -231,14 +122,14 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.list_threads",
         "List the workspace's threads you can open, newest first.",
         "artifactr:read_threads",
-        _Nothing,
+        NoArguments,
         route=HERE,
     ),
     _read(
         "artifactr.read_thread",
         "Read a thread's messages and runs, or what came since a sequence number.",
         "artifactr:read_threads",
-        _ReadThread,
+        ReadThreadArguments,
         exposure="both",
         route=f"{HERE}/threads/{{thread_id}}",
         resource="artifactr://{tenant}/{workspace}/threads/{thread_id}",
@@ -247,14 +138,14 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.create_thread",
         "Start an empty thread in the workspace.",
         "artifactr:create_thread",
-        _NewThread,
+        NewThreadArguments,
         route=f"{HERE}/threads/{{thread_id}}",
     ),
     _Spec(
         "artifactr.post_message",
         "Post a message in a thread, or start one with it; the thread's agent answers it.",
         "artifactr:post_message",
-        _Post,
+        PostArguments,
         reversibility="irreversible",
         route=f"{HERE}/threads/{{thread_id}}",
     ),
@@ -262,14 +153,14 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.read_run",
         "Read a run as it stands: its status, steps and outcome.",
         "artifactr:read_runs",
-        _Run,
+        RunArguments,
         route=f"{HERE}/runs",
     ),
     _Spec(
         "artifactr.stop_run",
         "Stop a run that is going; what it did stays done.",
         "artifactr:stop_run",
-        _Run,
+        RunArguments,
         reversibility="irreversible",
         route=f"{HERE}/runs",
     ),
@@ -277,7 +168,7 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.read_events",
         "Read the workspace's events after a sequence number, oldest first.",
         "artifactr:read_events",
-        _Events,
+        EventsArguments,
         toolset="automations",
         route=None,
     ),
@@ -285,14 +176,14 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.list_artifacts",
         "List the artifacts in the workspace, optionally of one kind, one per line.",
         "artifactr:read_artifacts",
-        _List,
+        ListArguments,
         route=f"{HERE}/artifacts",
     ),
     _read(
         "artifactr.read_artifact",
         "Read an artifact's current version.",
         "artifactr:read_artifacts",
-        _Artifact,
+        ArtifactArguments,
         exposure="both",
         route=f"{HERE}/artifacts/{{artifact_id}}",
         resource="artifactr://{tenant}/{workspace}/artifacts/{artifact_id}",
@@ -301,28 +192,28 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.list_revisions",
         "List an artifact's revisions, oldest first, with who made each and why.",
         "artifactr:read_history",
-        _Artifact,
+        ArtifactArguments,
         route=f"{HERE}/artifacts/{{artifact_id}}",
     ),
     _Spec(
         "artifactr.create_artifact",
         "Create an artifact of a kind the workspace has, whose data must match its JSON Schema.",
         "artifactr:create_artifact",
-        _Create,
+        CreateArguments,
         route=f"{HERE}/artifacts/{{artifact_id}}",
     ),
     _Spec(
         "artifactr.edit_text",
         "Replace one exact passage of an artifact's text field.",
         "artifactr:edit_artifact",
-        _EditText,
+        EditTextArguments,
         route=f"{HERE}/artifacts/{{artifact_id}}",
     ),
     _Spec(
         "artifactr.edit_artifact",
         "Change an artifact's data with JSON Patch operations.",
         "artifactr:edit_artifact",
-        _Edit,
+        EditArguments,
         route=f"{HERE}/artifacts/{{artifact_id}}",
     ),
     _Spec(
@@ -330,7 +221,7 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "Propose replacing one exact passage of an artifact's text field, for a person to "
         "accept or reject. Nothing changes until they accept it.",
         "artifactr:propose_change",
-        _ProposeText,
+        ProposeTextArguments,
         reversibility="undoable",
         route=f"{HERE}/proposals",
     ),
@@ -338,7 +229,7 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.archive_artifact",
         "Archive an artifact that is no longer needed. It stays readable, and can't be unarchived.",
         "artifactr:archive_artifact",
-        _Artifact,
+        ArtifactArguments,
         reversibility="irreversible",
         route=f"{HERE}/artifacts/{{artifact_id}}",
     ),
@@ -346,21 +237,21 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.list_proposals",
         "List the workspace's proposals waiting for an answer.",
         "artifactr:read_proposals",
-        _Nothing,
+        NoArguments,
         route=f"{HERE}/proposals",
     ),
     _Spec(
         "artifactr.respond_to_proposal",
         "Accept a proposal, applying its change, or reject it.",
         "artifactr:respond_to_proposal",
-        _Proposal,
+        ProposalArguments,
         route=f"{HERE}/proposals",
     ),
     _Spec(
         "artifactr.give_feedback",
         "Rate a message, run or artifact, with a comment if you have one.",
         "artifactr:give_feedback",
-        _Feedback,
+        FeedbackArguments,
         toolset="feedback",
         route=None,
     ),
@@ -368,7 +259,7 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.answer_deferred",
         "Answer a deferred tool's call.",
         "artifactr:answer_deferred",
-        _Deferred,
+        DeferredArguments,
         exposure=NotExposed(reason="a deferred call is answered by a person, never a model"),
         route=f"{HERE}/threads/{{thread_id}}",
         surfaces=frozenset({"portalr"}),
@@ -377,7 +268,7 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.set_focus",
         "Set what is open beside a thread.",
         "artifactr:set_focus",
-        _Focus,
+        FocusArguments,
         exposure=NotExposed(reason="the focus is what a person has open in portalr"),
         route=f"{HERE}/threads/{{thread_id}}",
         surfaces=frozenset({"portalr"}),
@@ -386,27 +277,27 @@ _SPECS: Final[tuple[_Spec, ...]] = (
         "artifactr.set_thread_mode",
         "Set a thread's mode, which says how its agent acts on artifacts.",
         "artifactr:set_thread_mode",
-        _Mode,
+        ModeArguments,
         route=f"{HERE}/threads/{{thread_id}}",
     ),
     _read(
         "artifactr.list_files",
         "List the workspace's native files.",
         "artifactr:read_artifacts",
-        _Nothing,
+        NoArguments,
         route=f"{HERE}/artifacts",
     ),
     _read(
         "artifactr.read_file",
         "Read a native file's text, a page at a time.",
         "artifactr:read_artifacts",
-        _File,
+        FileArguments,
         route=f"{HERE}/artifacts/{{artifact_id}}",
     ),
 )
 
 
-def _schema(arguments: type[_Arguments]) -> JsonObject:
+def _schema(arguments: type[Arguments]) -> JsonObject:
     schema: JsonObject = arguments.model_json_schema()
     del schema["title"]
     return schema
@@ -451,3 +342,8 @@ class ArtifactrCommands:
 
 CATALOG: Final = ArtifactrCommands()
 """artifactr's catalog, unbound: what an application binds at its composition root."""
+
+ARGUMENTS: Final[Mapping[str, type[Arguments]]] = MappingProxyType(
+    {spec.name: spec.arguments for spec in _SPECS}
+)
+"""Each command's arguments, by its name: the model a bound provider validates a call with."""

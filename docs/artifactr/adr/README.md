@@ -106,5 +106,7 @@ Each record captures one decision: the context that forced it, the options consi
 | [0100](0100-artifactrs-commands-every-action-a-command-or-listed-with-its-reason.md) | artifactr's commands: every action a command, or listed with its reason | Accepted |
 | [0101](0101-a-run-paused-on-an-enforcers-approval-names-it-and-is-answered-in-its-store.md) | A run paused on an enforcer's approval names it, and is answered in its store | Accepted |
 | [0102](0102-an-approval-a-run-asked-is-withdrawn-when-the-run-ends-before-it-pauses-on-it.md) | An approval a run asked is withdrawn when the run ends before it pauses on it | Accepted |
+| [0103](0103-artifactrs-catalog-bound-to-its-workspaces-and-runner-every-command-a-client-may-call.md) | artifactr's catalog bound to its workspaces and runner: every command a client may call | Accepted |
+| [0104](0104-native-files-commands-a-provider-of-the-files-extras-own.md) | Native files' commands, a provider of the files extra's own | Accepted |
 
 To add a record, copy lattice's [ADR template](../../adr/template.md) to the next number and add a row above.

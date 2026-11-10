@@ -1,4 +1,4 @@
-"""Only the readers talk to the tools, and only the router makes a Tenant."""
+"""Only the readers talk to the tools, and only the router and the provider make a Tenant."""
 
 import ast
 from pathlib import Path
@@ -31,10 +31,11 @@ def test_the_readers_know_no_web_framework() -> None:
         }, path
 
 
-def test_only_the_router_makes_a_tenant() -> None:
+def test_only_the_router_and_the_provider_make_a_tenant() -> None:
+    """Each checks grantr's action on the tenant first, as the call's subject (portalr ADR-0097)."""
     makers = {
         path.relative_to(SOURCE).as_posix()
         for path in SOURCE.rglob("*.py")
         if "portalr.tenant.allowed" in _imports(path)
     }
-    assert makers == {"fastapi/router.py"}
+    assert makers == {"fastapi/router.py", "capabilities.py"}

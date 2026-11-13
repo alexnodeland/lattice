@@ -64,7 +64,7 @@ jobs:
       contents: read
     services:
       postgres:
-        image: postgres:17@sha256:2d2b8998d31037bf721cfdf764d76ba74171b4fab3431b7f72c27c56ddbdf9e3
+        image: postgres:17@sha256:846a7ddaa67a4b354ae1d21087b683901aa6113a4ed626d3787cfbf6c85e3e07
         env:
           POSTGRES_PASSWORD: lattice
         ports:

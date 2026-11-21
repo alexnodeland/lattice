@@ -13,7 +13,7 @@ name: stackr-state
 
 services:
   clickhouse:
-    image: clickhouse/clickhouse-server:26.9.20.23@sha256:83243a0057e4c78fa019f5b59d0082f2f9844986b57a598a6d9b012221f90ba2
+    image: clickhouse/clickhouse-server:26.10.9.12@sha256:60bb5a5d7c0df82933d15dacf5a71e1384f8109cb158e6d0e4023b09cbaf72a3
     restart: unless-stopped
     user: "101:101"
     environment:

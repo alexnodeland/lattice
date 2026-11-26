@@ -32,7 +32,7 @@ RUN case "$TARGETARCH" in \
       "https://grafana.com/api/plugins/grafana-clickhouse-datasource/versions/4.22.1/download?os=linux&arch=$TARGETARCH" && \
     echo "$sha256  plugin.zip" | sha256sum -c -
 
-FROM grafana/grafana:13.2.2@sha256:ac461fb352abc50da10a51c7d02462e9c05488f11f53f14b3ad79a8145f638a0
+FROM grafana/grafana:13.3.2@sha256:81556409ba48b2b922e0adb69a2511337d8ba7578f11962eefa6149a2d815101
 LABEL org.opencontainers.image.source="https://github.com/alexnodeland/lattice"
 
 ENV PROMETHEUS_ADDRESS=prometheus \
